@@ -1,0 +1,28 @@
+{
+  "name": "Pantryo",
+  "short_name": "Pantryo",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAF7EE",
+  "theme_color": "#0E766E",
+  "description": "Smart Kitchen Inventory & Meal Planning",
+  "icons": [
+    {
+      "src": "/pantryo-logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pantryo-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pantryo-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
