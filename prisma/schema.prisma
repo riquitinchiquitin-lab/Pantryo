@@ -1,0 +1,153 @@
+// Kitchen Komrade - Prisma Schema
+// Production-ready PostgreSQL schema for self-hosted multi-tenant food inventory tracking
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  MEMBER
+  GUEST
+}
+
+enum StorageType {
+  FRIDGE
+  PANTRY
+  FREEZER
+  CELLAR
+  SPICE_RACK
+}
+
+enum ItemStatus {
+  ACTIVE
+  CONSUMED
+  EXPIRED
+  DISCARDED
+}
+
+enum ActivityAction {
+  ITEM_CREATED
+  ITEM_UPDATED
+  ITEM_DEFROSTED
+  ITEM_CONSUMED
+  ITEM_DISCARDED
+  LOCATION_CHANGED
+  HOUSEHOLD_JOINED
+}
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  name         String
+  avatarUrl    String?
+  role         UserRole      @default(MEMBER)
+  householdId  String?
+  household    Household?    @relation(fields: [householdId], references: [id], onDelete: SetNull)
+  itemsCreated Item[]        @relation("UserCreatedItems")
+  activityLogs ActivityLog[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([householdId])
+}
+
+model Household {
+  id           String        @id @default(uuid())
+  name         String
+  inviteCode   String        @unique
+  users        User[]
+  items        Item[]
+  locations    Location[]
+  categories   Category[]
+  activityLogs ActivityLog[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Location {
+  id          String      @id @default(uuid())
+  name        String      // e.g., "Fridge", "Pantry", "Freezer", "Wine Cooler"
+  type        StorageType @default(FRIDGE)
+  description String?
+  householdId String
+  household   Household   @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  items       Item[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@unique([householdId, name])
+  @@index([householdId])
+}
+
+model Category {
+  id          String    @id @default(uuid())
+  name        String    // e.g., "Dairy & Eggs", "Produce", "Meat & Seafood", "Bakery"
+  icon        String?   // Lucide icon identifier (e.g., "milk", "apple", "beef")
+  color       String?   // Hex or pastel badge color code
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  items       Item[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([householdId, name])
+  @@index([householdId])
+}
+
+model Item {
+  id                    String        @id @default(uuid())
+  name                  String
+  quantity              Float         @default(1.0)
+  unit                  String        @default("pcs") // pcs, pack, g, kg, lbs, oz, L, ml
+  householdId           String
+  household             Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  locationId            String
+  location              Location      @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  categoryId            String?
+  category              Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  addedById             String
+  addedBy               User          @relation("UserCreatedItems", fields: [addedById], references: [id], onDelete: Restrict)
+  status                ItemStatus    @default(ACTIVE)
+  
+  // Expiration & Freezer Duration Tracking
+  expirationDate        DateTime?     // Absolute expiration target
+  frozenAt              DateTime?     // When placed into freezer
+  monthsFrozenShelfLife Int?          @default(6) // Ideal max freezer duration in months
+  defrostedAt           DateTime?     // When defrosted from freezer
+  
+  notes                 String?
+  imageUrl              String?
+  barcode               String?
+  
+  activityLogs          ActivityLog[]
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  @@index([householdId, status])
+  @@index([locationId])
+  @@index([expirationDate])
+  @@index([frozenAt])
+}
+
+model ActivityLog {
+  id          String         @id @default(uuid())
+  action      ActivityAction
+  details     Json?          // Dynamic metadata: previous location, new expiration date, etc.
+  itemId      String?
+  item        Item?          @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  householdId String
+  household   Household      @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  createdAt   DateTime       @default(now())
+
+  @@index([householdId, createdAt])
+  @@index([itemId])
+  @@index([userId])
+}
