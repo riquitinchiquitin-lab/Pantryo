@@ -33,6 +33,7 @@ import {
   Leaf,
   TrendingUp,
   Clock,
+  Download,
 } from 'lucide-react';
 import { InventoryItem, User } from '../types';
 import { FoodVisualBadge } from './FoodVisualBadge';
@@ -101,9 +102,15 @@ const MOCK_MEMBERS: User[] = [
 
 interface MobileSimulatorProps {
   mode?: 'webapp' | 'frame';
+  onInstall?: () => void;
+  isInstalled?: boolean;
 }
 
-export const MobileSimulator: React.FC<MobileSimulatorProps> = ({ mode = 'webapp' }) => {
+export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
+  mode = 'webapp',
+  onInstall,
+  isInstalled = false,
+}) => {
   const [activeNav, setActiveNav] = useState<'home' | 'grocery' | 'cooking' | 'sync'>('home');
   const [filterLocation, setFilterLocation] = useState<'ALL' | 'FRIDGE' | 'PANTRY' | 'FREEZER' | 'EXPIRING'>('ALL');
   const [selectedFoodType, setSelectedFoodType] = useState<string | 'ALL'>('ALL');
@@ -264,7 +271,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({ mode = 'webapp
       className={`relative w-full text-[#133E3B] select-none flex flex-col mx-auto ${
         mode === 'frame'
           ? 'max-w-[430px] min-h-[850px] bg-[#FAF7EE] rounded-[44px] shadow-2xl border-[10px] border-slate-900 overflow-hidden'
-          : 'max-w-2xl bg-[#FAF7EE] sm:rounded-3xl border sm:border-[#E5DFD0] sm:shadow-sm overflow-hidden min-h-[800px]'
+          : 'max-w-2xl w-full bg-[#FAF7EE] min-h-screen sm:min-h-[850px] sm:rounded-3xl border-0 sm:border sm:border-[#E5DFD0] sm:shadow-md overflow-hidden'
       }`}
     >
       {/* Phone Notch & Status Bar only for Frame mode */}
@@ -295,18 +302,31 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({ mode = 'webapp
             </div>
           </div>
 
-          {/* Active User Pill */}
-          <button
-            onClick={() => setActiveNav('sync')}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/95 border border-[#E0D9C8] shadow-2xs hover:bg-white transition-colors"
-          >
-            <img
-              src={currentUser.avatarUrl}
-              alt={currentUser.name}
-              className="w-5 h-5 rounded-full object-cover"
-            />
-            <span className="text-xs font-bold text-[#0D3B37]">{currentUser.name}</span>
-          </button>
+          {/* Top Actions: Install + User Pill */}
+          <div className="flex items-center gap-2">
+            {!isInstalled && onInstall && (
+              <button
+                onClick={onInstall}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#0E766E] hover:bg-[#0B5C56] text-white text-xs font-bold shadow-2xs transition-all active:scale-95"
+                title="Install Pantryo App on your phone"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Install</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => setActiveNav('sync')}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/95 border border-[#E0D9C8] shadow-2xs hover:bg-white transition-colors"
+            >
+              <img
+                src={currentUser.avatarUrl}
+                alt={currentUser.name}
+                className="w-5 h-5 rounded-full object-cover"
+              />
+              <span className="text-xs font-bold text-[#0D3B37]">{currentUser.name}</span>
+            </button>
+          </div>
         </div>
 
         {/* Global Notice Toast */}
