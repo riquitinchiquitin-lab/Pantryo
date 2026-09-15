@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Copy, Check, FileCode, Database, Cpu, Route, Smartphone, Server } from 'lucide-react';
+import { Copy, Check, FileCode, Database, Cpu, Route, MonitorSmartphone, Server } from 'lucide-react';
 
 export const CodebaseExplorer: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'prisma' | 'gemini' | 'routes' | 'mobile' | 'docker'>('prisma');
+  const [activeTab, setActiveTab] = useState<'prisma' | 'gemini' | 'routes' | 'webapp' | 'docker'>('prisma');
   const [copied, setCopied] = useState(false);
 
   const files = {
@@ -307,55 +307,49 @@ router.put("/item/:id/defrost", (req, res) => {
 
 export default router;`,
     },
-    mobile: {
-      path: 'mobile/src/services/api.js',
-      title: 'Expo React Native API Service',
-      icon: Smartphone,
+    webapp: {
+      path: 'public/sw.js',
+      title: 'PWA Web App & Offline Worker',
+      icon: MonitorSmartphone,
       language: 'javascript',
-      summary: 'Production Fetch client connecting Expo (iOS / Android) to the backend with automatic base URL resolution and timeout handling.',
-      code: `// Pantryo - Mobile API Client Service (Expo / React Native)
+      summary: 'Progressive Web App service worker with stale-while-revalidate asset caching and network-first Gemini API proxy routing.',
+      code: `// Pantryo - Progressive Web App Service Worker (public/sw.js)
+const CACHE_NAME = 'pantryo-v1';
+const STATIC_ASSETS = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/pantryo-logo.svg',
+  '/pantryo-logo.png'
+];
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api/v1/inventory";
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
+  );
+  self.skipWaiting();
+});
 
-async function request(endpoint, options = {}) {
-  const url = \`\${API_BASE_URL}\${endpoint}\`;
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-  });
-  if (!response.ok) throw new Error(\`HTTP \${response.status}\`);
-  return response.json();
-}
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+    )
+  );
+  self.clients.claim();
+});
 
-export async function scanFoodPhoto(imageBase64, mimeType = "image/jpeg") {
-  return request("/scan", {
-    method: "POST",
-    body: JSON.stringify({ imageBase64, mimeType }),
-  });
-}
-
-export async function getHouseholdInventory(householdId = "hh_yan_kriz_01") {
-  return request(\`/household/\${encodeURIComponent(householdId)}\`);
-}
-
-export async function createInventoryItem(itemData, userId = "usr_yan") {
-  return request("/item", {
-    method: "POST",
-    body: JSON.stringify({ ...itemData, addedById: userId }),
-  });
-}
-
-export async function defrostItem(itemId, userId = "usr_yan") {
-  return request(\`/item/\${encodeURIComponent(itemId)}/defrost\`, {
-    method: "PUT",
-    body: JSON.stringify({ userId }),
-  });
-}
-
-export default { scanFoodPhoto, getHouseholdInventory, createInventoryItem, defrostItem };`,
+self.addEventListener('fetch', (event) => {
+  // Pass-through for Gemini AI & Inventory API routes
+  if (event.request.url.includes('/api/')) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+  // Stale-while-revalidate for snappy offline responsiveness
+  event.respondWith(
+    caches.match(event.request).then((cached) => cached || fetch(event.request))
+  );
+});`,
     },
     docker: {
       path: 'docker-compose.yml',

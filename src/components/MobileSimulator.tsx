@@ -99,7 +99,11 @@ const MOCK_MEMBERS: User[] = [
   },
 ];
 
-export const MobileSimulator: React.FC = () => {
+interface MobileSimulatorProps {
+  mode?: 'webapp' | 'frame';
+}
+
+export const MobileSimulator: React.FC<MobileSimulatorProps> = ({ mode = 'webapp' }) => {
   const [activeNav, setActiveNav] = useState<'home' | 'grocery' | 'cooking' | 'sync'>('home');
   const [filterLocation, setFilterLocation] = useState<'ALL' | 'FRIDGE' | 'PANTRY' | 'FREEZER' | 'EXPIRING'>('ALL');
   const [selectedFoodType, setSelectedFoodType] = useState<string | 'ALL'>('ALL');
@@ -256,18 +260,26 @@ export const MobileSimulator: React.FC = () => {
   const freezerCount = items.filter((i) => i.locationType === 'FREEZER').length;
 
   return (
-    <div className="relative w-full max-w-[430px] min-h-[850px] bg-[#FAF7EE] rounded-[44px] shadow-2xl border-[10px] border-slate-900 overflow-hidden flex flex-col mx-auto text-[#133E3B] select-none">
-      {/* Phone Notch & Status Bar */}
-      <div className="pt-3 px-6 flex items-center justify-between text-xs font-semibold text-slate-800 bg-[#FAF7EE]">
-        <span>9:41</span>
-        <div className="w-24 h-4 bg-slate-900 rounded-full" />
-        <div className="flex items-center gap-1.5 text-[11px]">
-          <span>5G</span>
-          <div className="w-5 h-2.5 border border-slate-700 rounded-sm p-0.5">
-            <div className="w-full h-full bg-slate-800 rounded-2xs" />
+    <div
+      className={`relative w-full text-[#133E3B] select-none flex flex-col mx-auto ${
+        mode === 'frame'
+          ? 'max-w-[430px] min-h-[850px] bg-[#FAF7EE] rounded-[44px] shadow-2xl border-[10px] border-slate-900 overflow-hidden'
+          : 'max-w-2xl bg-[#FAF7EE] sm:rounded-3xl border sm:border-[#E5DFD0] sm:shadow-sm overflow-hidden min-h-[800px]'
+      }`}
+    >
+      {/* Phone Notch & Status Bar only for Frame mode */}
+      {mode === 'frame' && (
+        <div className="pt-3 px-6 flex items-center justify-between text-xs font-semibold text-slate-800 bg-[#FAF7EE]">
+          <span>9:41</span>
+          <div className="w-24 h-4 bg-slate-900 rounded-full" />
+          <div className="flex items-center gap-1.5 text-[11px]">
+            <span>5G</span>
+            <div className="w-5 h-2.5 border border-slate-700 rounded-sm p-0.5">
+              <div className="w-full h-full bg-slate-800 rounded-2xs" />
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* App Top Bar */}
       <div className="px-5 pt-3 pb-3 bg-[#FAF7EE] border-b border-[#E8E2D5]">

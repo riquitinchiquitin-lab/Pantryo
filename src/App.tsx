@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Smartphone,
   Code2,
@@ -20,13 +20,67 @@ import {
   CheckCircle2,
   ChefHat,
   Flame,
+  MonitorSmartphone,
+  Download,
+  Share,
+  X,
 } from 'lucide-react';
 import { MobileSimulator } from './components/MobileSimulator';
 import { CodebaseExplorer } from './components/CodebaseExplorer';
 import { PantryoLogo } from './components/PantryoLogo';
 
 export default function App() {
-  const [activeView, setActiveView] = useState<'preview' | 'code'>('preview');
+  const [activeView, setActiveView] = useState<'webapp' | 'frame' | 'code'>('webapp');
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+  const [showIosInstallModal, setShowIosInstallModal] = useState(false);
+  const [serverStatus, setServerStatus] = useState<{ healthy: boolean; gemini: boolean }>({
+    healthy: true,
+    gemini: true,
+  });
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', () => {
+      setIsInstalled(true);
+      setInstallPrompt(null);
+    });
+
+    fetch('/api/health')
+      .then((res) => res.json())
+      .then((data) => {
+        setServerStatus({
+          healthy: data.status === 'ok',
+          gemini: data.geminiConfigured ?? true,
+        });
+      })
+      .catch(() => {
+        setServerStatus({ healthy: false, gemini: false });
+      });
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = () => {
+    if (installPrompt) {
+      installPrompt.prompt();
+      installPrompt.userChoice.then((choice: any) => {
+        if (choice.outcome === 'accepted') {
+          setIsInstalled(true);
+        }
+        setInstallPrompt(null);
+      });
+    } else {
+      setShowIosInstallModal(true);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#FAF7EE] text-[#133E3B] flex flex-col font-sans selection:bg-teal-200">
@@ -49,32 +103,60 @@ export default function App() {
             </div>
           </div>
 
-          {/* Mode Switcher */}
-          <div className="flex items-center gap-1.5 p-1 bg-[#F0EBE0] rounded-2xl border border-[#E0D9C8]">
-            <button
-              id="view-mobile-preview-btn"
-              onClick={() => setActiveView('preview')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
-                activeView === 'preview'
-                  ? 'bg-white text-[#0D3B37] shadow-xs'
-                  : 'text-[#5C7874] hover:text-[#0D3B37]'
-              }`}
-            >
-              <Smartphone className="w-3.5 h-3.5 text-teal-700" />
-              Mobile App Preview
-            </button>
-            <button
-              id="view-codebase-btn"
-              onClick={() => setActiveView('code')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
-                activeView === 'code'
-                  ? 'bg-white text-[#0D3B37] shadow-xs'
-                  : 'text-[#5C7874] hover:text-[#0D3B37]'
-              }`}
-            >
-              <Code2 className="w-3.5 h-3.5 text-teal-700" />
-              Production Deliverables ({activeView === 'code' ? 'Viewing' : '5 Files'})
-            </button>
+          {/* Mode Switcher & Install */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 p-1 bg-[#F0EBE0] rounded-2xl border border-[#E0D9C8]">
+              <button
+                id="view-webapp-btn"
+                onClick={() => setActiveView('webapp')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+                  activeView === 'webapp'
+                    ? 'bg-white text-[#0D3B37] shadow-xs'
+                    : 'text-[#5C7874] hover:text-[#0D3B37]'
+                }`}
+              >
+                <MonitorSmartphone className="w-3.5 h-3.5 text-teal-700" />
+                <span>Web App</span>
+              </button>
+
+              <button
+                id="view-mobile-frame-btn"
+                onClick={() => setActiveView('frame')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+                  activeView === 'frame'
+                    ? 'bg-white text-[#0D3B37] shadow-xs'
+                    : 'text-[#5C7874] hover:text-[#0D3B37]'
+                }`}
+              >
+                <Smartphone className="w-3.5 h-3.5 text-teal-700" />
+                <span>Phone Frame</span>
+              </button>
+
+              <button
+                id="view-codebase-btn"
+                onClick={() => setActiveView('code')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+                  activeView === 'code'
+                    ? 'bg-white text-[#0D3B37] shadow-xs'
+                    : 'text-[#5C7874] hover:text-[#0D3B37]'
+                }`}
+              >
+                <Code2 className="w-3.5 h-3.5 text-teal-700" />
+                <span>Server & API</span>
+              </button>
+            </div>
+
+            {!isInstalled && (
+              <button
+                id="install-pwa-header-btn"
+                onClick={handleInstallClick}
+                className="px-3 py-1.5 rounded-xl bg-[#0E766E] text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs hover:bg-[#0A5852] active:scale-95 transition-all"
+                title="Install Pantryo as a Web App on your phone or computer"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Install App</span>
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -198,9 +280,9 @@ export default function App() {
                 </div>
               </div>
 
-              {/* CENTER: THE MOBILE SIMULATOR */}
-              <div className="w-full max-w-[430px] flex justify-center">
-                <MobileSimulator />
+              {/* CENTER: THE WEB APP / MOBILE SIMULATOR */}
+              <div className={`w-full flex justify-center ${activeView === 'webapp' ? 'max-w-2xl' : 'max-w-[430px]'}`}>
+                <MobileSimulator mode={activeView === 'frame' ? 'frame' : 'webapp'} />
               </div>
 
               {/* RIGHT BENTO WING (Desktop) */}
@@ -304,6 +386,62 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* iOS / Browser PWA Install Guidance Modal */}
+      {showIosInstallModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="relative w-full max-w-md bg-[#FAF7EE] border border-[#E0D9C8] rounded-3xl shadow-2xl p-6 text-[#133E3B] space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-[#E8E2D5]">
+              <div className="flex items-center gap-2.5">
+                <PantryoLogo size={36} />
+                <div>
+                  <h3 className="text-base font-bold text-[#0D3B37]">Install Pantryo Web App</h3>
+                  <p className="text-xs text-[#527470]">Add directly to your iPhone or Android home screen</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowIosInstallModal(false)}
+                className="w-8 h-8 rounded-full bg-white border border-[#E0D9C8] text-slate-500 hover:text-slate-800 flex items-center justify-center"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-[#2A4D48]">
+              <div className="flex items-start gap-3 p-3 rounded-2xl bg-white border border-[#E5DFD0]">
+                <div className="w-6 h-6 rounded-lg bg-teal-100 text-teal-800 flex items-center justify-center shrink-0 font-black">
+                  1
+                </div>
+                <div>
+                  <p className="font-bold text-[#0D3B37]">On iPhone (Safari):</p>
+                  <p className="text-[#527470] mt-0.5">
+                    Tap the <strong className="text-teal-800">Share</strong> button (the square with an arrow pointing up <Share className="w-3.5 h-3.5 inline text-teal-700" />), scroll down and tap <strong className="text-teal-800">"Add to Home Screen"</strong>.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 p-3 rounded-2xl bg-white border border-[#E5DFD0]">
+                <div className="w-6 h-6 rounded-lg bg-teal-100 text-teal-800 flex items-center justify-center shrink-0 font-black">
+                  2
+                </div>
+                <div>
+                  <p className="font-bold text-[#0D3B37]">On Android (Chrome) or PC (Edge/Chrome):</p>
+                  <p className="text-[#527470] mt-0.5">
+                    Tap the three dots menu ⋮ in the browser bar and select <strong className="text-teal-800">"Install App"</strong> or <strong className="text-teal-800">"Add to Home Screen"</strong>.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowIosInstallModal(false)}
+              className="w-full py-2.5 rounded-xl bg-[#0E766E] hover:bg-[#0B5C56] text-white text-xs font-bold transition-all shadow-2xs"
+            >
+              Got It!
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Footer Info */}
       <footer className="py-4 border-t border-[#E5DFD0] text-center text-xs text-[#527470] bg-[#F2EDE0]/80">
