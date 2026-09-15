@@ -163,7 +163,7 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 flex flex-col items-center justify-center">
-        {activeView === 'preview' ? (
+        {activeView !== 'code' ? (
           <div className="w-full flex flex-col items-center space-y-6">
             <div className="text-center max-w-xl space-y-1">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EBF4F2] border border-[#CDE3DF] text-xs font-extrabold text-[#0D4B46]">
