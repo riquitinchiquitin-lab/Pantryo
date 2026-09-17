@@ -129,11 +129,42 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Read and compress image client-side to max 1280px dimension to ensure snappy AI scanning
     const reader = new FileReader();
     reader.onload = (event) => {
       const dataUrl = event.target?.result as string;
-      setImagePreview(dataUrl);
-      triggerAiScan(dataUrl);
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 1280;
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          setImagePreview(compressedDataUrl);
+          triggerAiScan(compressedDataUrl);
+        } else {
+          setImagePreview(dataUrl);
+          triggerAiScan(dataUrl);
+        }
+      };
+      img.onerror = () => {
+        setImagePreview(dataUrl);
+        triggerAiScan(dataUrl);
+      };
+      img.src = dataUrl;
     };
     reader.readAsDataURL(file);
     // Reset file input value so selecting the same photo triggers onChange again

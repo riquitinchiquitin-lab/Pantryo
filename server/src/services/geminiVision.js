@@ -69,6 +69,7 @@ Always respond with structured JSON following the specified schema. If multiple 
   const promptText = `Inspect this food photo thoroughly. Detect all grocery items, fresh produce, prepared foods, or packaged ingredients visible. Return complete inventory attributes for each item.`;
 
   try {
+    console.log(`[Pantryo Vision] Starting image analysis. Base64 length: ${cleanBase64.length} chars, mimeType: ${mimeType}`);
     let response;
     try {
       response = await ai.models.generateContent({
@@ -88,7 +89,7 @@ Always respond with structured JSON following the specified schema. If multiple 
         },
         config: {
           systemInstruction,
-          temperature: 0.2, // Lower temperature for consistent categorization
+          temperature: 0.2,
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
@@ -161,9 +162,9 @@ Always respond with structured JSON following the specified schema. If multiple 
         },
       });
     } catch (modelErr) {
-      console.warn("Primary gemini-2.5-flash failed, attempting fallback to gemini-2.0-flash:", modelErr.message);
+      console.warn("[Pantryo Vision] Primary gemini-2.5-flash with schema failed, retrying without strict schema:", modelErr.message);
       response = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
+        model: "gemini-2.5-flash",
         contents: {
           parts: [
             {
@@ -173,7 +174,7 @@ Always respond with structured JSON following the specified schema. If multiple 
               },
             },
             {
-              text: promptText,
+              text: promptText + "\nRespond with valid JSON conforming to { summary: string, items: Array<{ name, category, quantity, unit, recommendedLocation, storageReason, estimatedShelfLifeDays, monthsFrozenShelfLife, confidence, storageTip }> }",
             },
           ],
         },
