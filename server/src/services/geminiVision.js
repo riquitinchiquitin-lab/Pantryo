@@ -69,95 +69,121 @@ Always respond with structured JSON following the specified schema. If multiple 
   const promptText = `Inspect this food photo thoroughly. Detect all grocery items, fresh produce, prepared foods, or packaged ingredients visible. Return complete inventory attributes for each item.`;
 
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
-      contents: {
-        parts: [
-          {
-            inlineData: {
-              mimeType: mimeType || "image/jpeg",
-              data: cleanBase64,
-            },
-          },
-          {
-            text: promptText,
-          },
-        ],
-      },
-      config: {
-        systemInstruction,
-        temperature: 0.2, // Lower temperature for consistent categorization
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            summary: {
-              type: Type.STRING,
-              description: "Brief summary of what was identified in the image",
-            },
-            items: {
-              type: Type.ARRAY,
-              description: "List of identified inventory items",
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  name: {
-                    type: Type.STRING,
-                    description: "Specific item name",
-                  },
-                  category: {
-                    type: Type.STRING,
-                    description: "Item category (Produce, Dairy & Eggs, Meat & Seafood, Bakery, Beverages, Condiments, Pantry Staples, Frozen Meals, Snacks)",
-                  },
-                  quantity: {
-                    type: Type.NUMBER,
-                    description: "Estimated numeric quantity",
-                  },
-                  unit: {
-                    type: Type.STRING,
-                    description: "Measurement unit (pcs, pack, carton, bottle, lbs, kg, g, oz, L)",
-                  },
-                  recommendedLocation: {
-                    type: Type.STRING,
-                    description: "Optimal storage location: 'Fridge', 'Pantry', or 'Freezer'",
-                  },
-                  storageReason: {
-                    type: Type.STRING,
-                    description: "Short reason why this location is recommended",
-                  },
-                  estimatedShelfLifeDays: {
-                    type: Type.INTEGER,
-                    description: "Estimated days before expiration at recommended location",
-                  },
-                  monthsFrozenShelfLife: {
-                    type: Type.INTEGER,
-                    description: "Recommended maximum frozen storage duration in months",
-                  },
-                  confidence: {
-                    type: Type.NUMBER,
-                    description: "Detection confidence score between 0.0 and 1.0",
-                  },
-                  storageTip: {
-                    type: Type.STRING,
-                    description: "Practical tip to preserve freshness and avoid waste",
-                  },
-                },
-                required: [
-                  "name",
-                  "category",
-                  "quantity",
-                  "unit",
-                  "recommendedLocation",
-                  "estimatedShelfLifeDays",
-                  "monthsFrozenShelfLife",
-                ],
+    let response;
+    try {
+      response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: {
+          parts: [
+            {
+              inlineData: {
+                mimeType: mimeType || "image/jpeg",
+                data: cleanBase64,
               },
             },
-          },
-          required: ["summary", "items"],
+            {
+              text: promptText,
+            },
+          ],
         },
-      },
-    });
+        config: {
+          systemInstruction,
+          temperature: 0.2, // Lower temperature for consistent categorization
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              summary: {
+                type: Type.STRING,
+                description: "Brief summary of what was identified in the image",
+              },
+              items: {
+                type: Type.ARRAY,
+                description: "List of identified inventory items",
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    name: {
+                      type: Type.STRING,
+                      description: "Specific item name",
+                    },
+                    category: {
+                      type: Type.STRING,
+                      description: "Item category (Produce, Dairy & Eggs, Meat & Seafood, Bakery, Beverages, Condiments, Pantry Staples, Frozen Meals, Snacks)",
+                    },
+                    quantity: {
+                      type: Type.NUMBER,
+                      description: "Estimated numeric quantity",
+                    },
+                    unit: {
+                      type: Type.STRING,
+                      description: "Measurement unit (pcs, pack, carton, bottle, lbs, kg, g, oz, L)",
+                    },
+                    recommendedLocation: {
+                      type: Type.STRING,
+                      description: "Optimal storage location: 'Fridge', 'Pantry', or 'Freezer'",
+                    },
+                    storageReason: {
+                      type: Type.STRING,
+                      description: "Short reason why this location is recommended",
+                    },
+                    estimatedShelfLifeDays: {
+                      type: Type.INTEGER,
+                      description: "Estimated days before expiration at recommended location",
+                    },
+                    monthsFrozenShelfLife: {
+                      type: Type.INTEGER,
+                      description: "Recommended maximum frozen storage duration in months",
+                    },
+                    confidence: {
+                      type: Type.NUMBER,
+                      description: "Detection confidence score between 0.0 and 1.0",
+                    },
+                    storageTip: {
+                      type: Type.STRING,
+                      description: "Practical tip to preserve freshness and avoid waste",
+                    },
+                  },
+                  required: [
+                    "name",
+                    "category",
+                    "quantity",
+                    "unit",
+                    "recommendedLocation",
+                    "estimatedShelfLifeDays",
+                    "monthsFrozenShelfLife",
+                  ],
+                },
+              },
+            },
+            required: ["summary", "items"],
+          },
+        },
+      });
+    } catch (modelErr) {
+      console.warn("Primary gemini-2.5-flash failed, attempting fallback to gemini-2.0-flash:", modelErr.message);
+      response = await ai.models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: {
+          parts: [
+            {
+              inlineData: {
+                mimeType: mimeType || "image/jpeg",
+                data: cleanBase64,
+              },
+            },
+            {
+              text: promptText,
+            },
+          ],
+        },
+        config: {
+          systemInstruction,
+          temperature: 0.2,
+          responseMimeType: "application/json",
+        },
+      });
+    }
 
     const rawText = response.text;
     if (!rawText) {

@@ -34,11 +34,15 @@ import {
   TrendingUp,
   Clock,
   Download,
+  Edit2,
+  Edit3,
+  CheckCheck,
 } from 'lucide-react';
 import { InventoryItem, User } from '../types';
 import { FoodVisualBadge } from './FoodVisualBadge';
 import { getFoodVisual } from '../utils/foodVisuals';
 import { CameraScannerModal } from './CameraScannerModal';
+import { AddEditItemModal } from './AddEditItemModal';
 import { GroceryListView, GroceryCartItem } from './GroceryListView';
 import { CookingIdeasView } from './CookingIdeasView';
 import { FamilySyncView } from './FamilySyncView';
@@ -119,6 +123,8 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isAddEditModalOpen, setIsAddEditModalOpen] = useState(false);
+  const [itemToEdit, setItemToEdit] = useState<InventoryItem | null>(null);
   const [defrostingId, setDefrostingId] = useState<string | null>(null);
   const [bannerNotice, setBannerNotice] = useState<string | null>(null);
   const [bentoViewMode, setBentoViewMode] = useState<'grid' | 'list'>('grid');
@@ -210,6 +216,66 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
     fetchInventory();
     setBannerNotice(`Added "${newItem.name}" to inventory!`);
     setTimeout(() => setBannerNotice(null), 3000);
+  };
+
+  const handleOpenAddModal = () => {
+    setItemToEdit(null);
+    setIsAddEditModalOpen(true);
+  };
+
+  const handleOpenEditModal = (item: InventoryItem) => {
+    setItemToEdit(item);
+    setIsAddEditModalOpen(true);
+  };
+
+  const handleItemSaved = (savedItem: InventoryItem, isNew: boolean) => {
+    if (isNew) {
+      setItems((prev) => [savedItem, ...prev]);
+      setBannerNotice(`Added "${savedItem.name}" to inventory!`);
+    } else {
+      setItems((prev) => prev.map((item) => (item.id === savedItem.id ? savedItem : item)));
+      setBannerNotice(`Updated "${savedItem.name}"!`);
+    }
+    setTimeout(() => setBannerNotice(null), 3000);
+    fetchInventory();
+  };
+
+  const handleDeleteItem = async (itemId: string, itemName?: string) => {
+    if (!window.confirm(`Remove "${itemName || 'this item'}" from your kitchen?`)) return;
+    try {
+      const res = await fetch(`/api/v1/inventory/item/${encodeURIComponent(itemId)}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (data.success) {
+        setItems((prev) => prev.filter((i) => i.id !== itemId));
+        setBannerNotice(`Removed "${itemName || 'Item'}" from inventory.`);
+        setTimeout(() => setBannerNotice(null), 3000);
+      }
+    } catch (err) {
+      console.error('Delete item failed:', err);
+    }
+  };
+
+  const handleConsumeItem = async (item: InventoryItem) => {
+    try {
+      const res = await fetch(`/api/v1/inventory/item/${encodeURIComponent(item.id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'CONSUMED',
+          userId: currentUser.id,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setItems((prev) => prev.filter((i) => i.id !== item.id));
+        setBannerNotice(`Marked "${item.name}" as consumed!`);
+        setTimeout(() => setBannerNotice(null), 3000);
+      }
+    } catch (err) {
+      console.error('Consume item failed:', err);
+    }
   };
 
   // Perform Defrost API call
@@ -475,16 +541,27 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               </div>
             </div>
 
-            {/* Search Input */}
-            <div className="relative">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search food, produce, meats..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 text-xs font-medium bg-white border border-[#D5E1D2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 text-slate-800 placeholder-slate-400 shadow-2xs"
-              />
+            {/* Search Input & Quick Add Item Button */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search food, produce, meats..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 text-xs font-medium bg-white border border-[#D5E1D2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-teal-600/30 text-slate-800 placeholder-slate-400 shadow-2xs"
+                />
+              </div>
+              <button
+                id="quick-add-item-btn"
+                onClick={handleOpenAddModal}
+                className="py-2 px-3 rounded-2xl bg-[#0E766E] hover:bg-[#0B5C56] text-white font-bold text-xs flex items-center gap-1 shadow-2xs shrink-0 transition-all active:scale-95"
+                title="Add food item manually"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Add</span>
+              </button>
             </div>
 
             {/* Food Type Category Quick Chips (Icons & Labels) */}
@@ -685,7 +762,11 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                       className="p-2.5 rounded-3xl bg-white border border-[#D5E1D2] shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between group"
                     >
                       {/* Top Bento Image Frame with corner badges */}
-                      <div className="relative w-full h-24 rounded-2xl overflow-hidden bg-slate-100 mb-2 border border-[#E7EFE6]">
+                      <div
+                        onClick={() => handleOpenEditModal(item)}
+                        className="relative w-full h-24 rounded-2xl overflow-hidden bg-slate-100 mb-2 border border-[#E7EFE6] cursor-pointer"
+                        title="Click to edit item"
+                      >
                         <img
                           src={item.imageUrl || visual.defaultImage}
                           alt={item.name}
@@ -726,7 +807,11 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
 
                       {/* Middle Bento Title & Status */}
                       <div className="space-y-1.5 flex-1 flex flex-col justify-between">
-                        <h3 className="font-bold text-xs text-[#1F3323] leading-tight line-clamp-2" title={item.name}>
+                        <h3
+                          onClick={() => handleOpenEditModal(item)}
+                          className="font-bold text-xs text-[#1F3323] leading-tight line-clamp-2 cursor-pointer hover:text-teal-700 transition-colors"
+                          title="Click to edit item"
+                        >
                           {item.name}
                         </h3>
 
@@ -767,15 +852,15 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                         )}
                       </div>
 
-                      {/* Bottom Bento Row: Attribution & Defrost/Cart Action */}
-                      <div className="pt-2 mt-2 border-t border-[#EEF4ED] flex items-center justify-between">
-                        <div className="flex items-center gap-1">
+                      {/* Bottom Bento Row: Attribution & Complete Actions */}
+                      <div className="pt-2 mt-2 border-t border-[#EEF4ED] flex items-center justify-between gap-1">
+                        <div className="flex items-center gap-1 min-w-0">
                           <img
                             src={item.addedByAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80'}
                             alt={item.addedByName}
-                            className="w-4 h-4 rounded-full object-cover"
+                            className="w-4 h-4 rounded-full object-cover shrink-0"
                           />
-                          <span className="text-[10px] font-bold text-[#556D58] truncate max-w-[45px]">
+                          <span className="text-[10px] font-bold text-[#556D58] truncate max-w-[36px]">
                             {item.addedByName || 'Yan'}
                           </span>
                         </div>
@@ -783,23 +868,47 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => handleAddItemToGroceryCart(item)}
-                            title="Add item to shopping list/cart"
-                            className="py-0.5 px-1.5 bg-[#EEF4EC] hover:bg-emerald-100 text-[#355239] rounded-lg text-[9px] font-bold flex items-center gap-0.5 transition-all active:scale-95"
+                            title="Add to shopping cart"
+                            className="p-1 bg-[#EEF4EC] hover:bg-emerald-100 text-[#355239] rounded-lg text-[9px] font-bold flex items-center transition-all active:scale-95"
                           >
                             <ShoppingCart className="w-2.5 h-2.5 text-emerald-700" />
-                            <span>+Cart</span>
                           </button>
 
                           {isFreezer && (
                             <button
                               onClick={() => handleDefrost(item)}
                               disabled={defrostingId === item.id}
+                              title="Defrost item to fridge"
                               className="py-0.5 px-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[9px] font-bold flex items-center gap-0.5 shadow-2xs active:scale-95 transition-all"
                             >
                               <Flame className="w-2.5 h-2.5 text-amber-300" />
-                              {defrostingId === item.id ? '...' : 'Defrost'}
+                              <span className="text-[8px]">{defrostingId === item.id ? '...' : 'Defrost'}</span>
                             </button>
                           )}
+
+                          <button
+                            onClick={() => handleOpenEditModal(item)}
+                            title="Edit item"
+                            className="p-1 bg-[#F2ECE0] hover:bg-teal-100 text-teal-800 rounded-lg text-[9px] font-bold flex items-center transition-all active:scale-95"
+                          >
+                            <Edit3 className="w-2.5 h-2.5" />
+                          </button>
+
+                          <button
+                            onClick={() => handleConsumeItem(item)}
+                            title="Mark as consumed"
+                            className="p-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-[9px] font-bold flex items-center transition-all active:scale-95"
+                          >
+                            <Check className="w-2.5 h-2.5" />
+                          </button>
+
+                          <button
+                            onClick={() => handleDeleteItem(item.id, item.name)}
+                            title="Delete item"
+                            className="p-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-[9px] font-bold flex items-center transition-all active:scale-95"
+                          >
+                            <Trash2 className="w-2.5 h-2.5" />
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -824,17 +933,29 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                       {/* Top Row: Food Image/Icon + Title + Category & Location */}
                       <div className="flex items-start gap-3">
                         {/* Food Type Image & Icon Badge */}
-                        <FoodVisualBadge
-                          itemName={item.name}
-                          categoryName={item.categoryName}
-                          imageUrl={item.imageUrl}
-                          size="md"
-                        />
+                        <div
+                          onClick={() => handleOpenEditModal(item)}
+                          className="cursor-pointer"
+                          title="Click to edit item"
+                        >
+                          <FoodVisualBadge
+                            itemName={item.name}
+                            categoryName={item.categoryName}
+                            imageUrl={item.imageUrl}
+                            size="md"
+                          />
+                        </div>
 
                         {/* Item Details */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-1">
-                            <h3 className="font-bold text-sm text-[#1F3323] truncate">{item.name}</h3>
+                            <h3
+                              onClick={() => handleOpenEditModal(item)}
+                              className="font-bold text-sm text-[#1F3323] truncate cursor-pointer hover:text-teal-700 transition-colors"
+                              title="Click to edit item"
+                            >
+                              {item.name}
+                            </h3>
 
                             {/* Storage Location Badge */}
                             <span
@@ -941,7 +1062,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                           <button
                             onClick={() => handleAddItemToGroceryCart(item)}
                             title="Add item to shopping list/cart"
-                            className="py-1 px-2.5 bg-[#EEF4EC] hover:bg-emerald-100 text-[#355239] rounded-xl text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95"
+                            className="py-1 px-2 bg-[#EEF4EC] hover:bg-emerald-100 text-[#355239] rounded-xl text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95"
                           >
                             <ShoppingCart className="w-3 h-3 text-emerald-700" />
                             <span>+Cart</span>
@@ -952,12 +1073,40 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                             <button
                               onClick={() => handleDefrost(item)}
                               disabled={defrostingId === item.id}
-                              className="py-1 px-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[11px] font-bold flex items-center gap-1 shadow-xs transition-all active:scale-95"
+                              className="py-1 px-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[11px] font-bold flex items-center gap-1 shadow-xs transition-all active:scale-95"
                             >
                               <Flame className="w-3 h-3 text-amber-300" />
-                              {defrostingId === item.id ? 'Moving...' : 'DEFROST'}
+                              <span>{defrostingId === item.id ? '...' : 'Defrost'}</span>
                             </button>
                           )}
+
+                          {/* Edit Item */}
+                          <button
+                            onClick={() => handleOpenEditModal(item)}
+                            title="Edit item"
+                            className="py-1 px-2 bg-[#F2ECE0] hover:bg-teal-100 text-teal-800 rounded-xl text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                            <span>Edit</span>
+                          </button>
+
+                          {/* Mark Consumed */}
+                          <button
+                            onClick={() => handleConsumeItem(item)}
+                            title="Mark as consumed"
+                            className="py-1 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-[11px] font-bold flex items-center gap-0.5 transition-all active:scale-95"
+                          >
+                            <Check className="w-3 h-3" />
+                          </button>
+
+                          {/* Delete Item */}
+                          <button
+                            onClick={() => handleDeleteItem(item.id, item.name)}
+                            title="Delete item"
+                            className="py-1 px-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-[11px] font-bold flex items-center gap-0.5 transition-all active:scale-95"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -1014,15 +1163,25 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         )}
       </div>
 
-      {/* Floating Camera Action Button ("SNAP & ADD!") */}
-      <div className="absolute bottom-16 inset-x-0 flex justify-center pointer-events-none z-30">
-        <div className="relative pointer-events-auto">
+      {/* Floating Action Buttons ("+ ADD ITEM" and "SNAP & ADD!") */}
+      <div className="absolute bottom-16 inset-x-0 flex justify-center items-center pointer-events-none z-30">
+        <div className="flex items-center gap-2 pointer-events-auto bg-[#0A3834]/95 backdrop-blur-md p-1 rounded-full shadow-2xl border border-teal-500/40">
+          <button
+            id="floating-manual-add-btn"
+            onClick={handleOpenAddModal}
+            className="px-3.5 py-2.5 rounded-full bg-teal-800 hover:bg-teal-700 text-white font-extrabold text-[11px] tracking-wider flex items-center gap-1.5 shadow-xs hover:scale-105 active:scale-95 transition-all"
+            title="Add item manually"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>ADD ITEM</span>
+          </button>
           <button
             id="floating-snap-add-btn"
             onClick={() => setIsScannerOpen(true)}
-            className="px-5 py-3 rounded-full bg-[#0A3834] hover:bg-[#062926] text-white font-extrabold text-xs tracking-wider flex items-center gap-2 shadow-xl border border-teal-500/40 hover:scale-105 active:scale-95 transition-all"
+            className="px-4 py-2.5 rounded-full bg-[#0E766E] hover:bg-[#0B5C56] text-white font-extrabold text-[11px] tracking-wider flex items-center gap-1.5 shadow-xs hover:scale-105 active:scale-95 transition-all"
+            title="Scan item with camera"
           >
-            <Camera className="w-4 h-4 text-teal-300" />
+            <Camera className="w-3.5 h-3.5 text-teal-300" />
             <span>SNAP & ADD!</span>
           </button>
         </div>
@@ -1087,6 +1246,24 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         onClose={() => setIsScannerOpen(false)}
         onItemAdded={handleItemAdded}
         currentUser={currentUser}
+        onOpenManualAdd={handleOpenAddModal}
+      />
+
+      {/* Manual Add & Edit Item Modal */}
+      <AddEditItemModal
+        isOpen={isAddEditModalOpen}
+        onClose={() => {
+          setIsAddEditModalOpen(false);
+          setItemToEdit(null);
+        }}
+        itemToEdit={itemToEdit}
+        currentUser={currentUser}
+        onSaved={handleItemSaved}
+        onDeleted={(itemId) => {
+          setItems((prev) => prev.filter((i) => i.id !== itemId));
+          setBannerNotice('Item deleted from inventory.');
+          setTimeout(() => setBannerNotice(null), 3000);
+        }}
       />
     </div>
   );

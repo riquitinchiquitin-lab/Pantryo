@@ -544,6 +544,102 @@ router.put("/item/:id/defrost", (req, res) => {
 });
 
 /**
+ * PUT /api/v1/inventory/item/:id
+ * Updates an existing inventory item (name, quantity, unit, location, category, expiration, notes)
+ */
+router.put("/item/:id", (req, res) => {
+  try {
+    const { id } = req.params;
+    const itemIndex = itemsStore.findIndex((i) => i.id === id);
+    if (itemIndex === -1) {
+      return res.status(404).json({ success: false, error: "Item not found" });
+    }
+
+    const currentItem = itemsStore[itemIndex];
+    const {
+      name,
+      quantity,
+      unit,
+      locationName,
+      locationId,
+      categoryName,
+      categoryId,
+      expirationDate,
+      notes,
+      status,
+      imageUrl,
+      monthsFrozenShelfLife,
+      userId = "usr_yan",
+    } = req.body;
+
+    // Resolve location
+    let resolvedLocationId = locationId || currentItem.locationId;
+    if (locationName) {
+      const match = LOCATIONS.find(
+        (l) => l.name.toLowerCase() === locationName.toLowerCase() || l.type.toLowerCase() === locationName.toLowerCase()
+      );
+      if (match) resolvedLocationId = match.id;
+    }
+
+    // Resolve category
+    let resolvedCategoryId = categoryId || currentItem.categoryId;
+    if (categoryName) {
+      const match = CATEGORIES.find((c) => c.name.toLowerCase().includes(categoryName.toLowerCase()));
+      if (match) resolvedCategoryId = match.id;
+    }
+
+    const loc = LOCATIONS.find((l) => l.id === resolvedLocationId);
+    const isFreezer = loc && loc.type === "FREEZER";
+
+    const updatedItem = {
+      ...currentItem,
+      name: name !== undefined && name.trim().length > 0 ? name.trim() : currentItem.name,
+      quantity: quantity !== undefined ? Number(quantity) : currentItem.quantity,
+      unit: unit !== undefined ? unit : currentItem.unit,
+      locationId: resolvedLocationId,
+      categoryId: resolvedCategoryId,
+      status: status || currentItem.status,
+      expirationDate: expirationDate ? new Date(expirationDate).toISOString() : currentItem.expirationDate,
+      notes: notes !== undefined ? notes : currentItem.notes,
+      imageUrl: imageUrl !== undefined ? imageUrl : currentItem.imageUrl,
+      monthsFrozenShelfLife: monthsFrozenShelfLife !== undefined ? Number(monthsFrozenShelfLife) : currentItem.monthsFrozenShelfLife,
+      frozenAt: isFreezer ? (currentItem.frozenAt || new Date().toISOString()) : null,
+      updatedAt: new Date().toISOString(),
+    };
+
+    itemsStore[itemIndex] = updatedItem;
+
+    const user = USERS.find((u) => u.id === userId);
+    activityLogs.unshift({
+      id: `log_${Date.now()}`,
+      action: "ITEM_UPDATED",
+      details: {
+        itemName: updatedItem.name,
+        location: loc ? loc.name : "Fridge",
+        updatedBy: user ? user.name : "Yan",
+      },
+      itemId: updatedItem.id,
+      userId,
+      householdId: updatedItem.householdId,
+      createdAt: new Date().toISOString(),
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Updated "${updatedItem.name}"`,
+      item: updatedItem,
+    });
+  } catch (error) {
+    console.error("[Inventory Route] PUT /item/:id error:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to update item",
+      details: error.message,
+    });
+  }
+});
+
+/**
  * DELETE /api/v1/inventory/item/:id
  * Marks an item as consumed or discarded
  */
