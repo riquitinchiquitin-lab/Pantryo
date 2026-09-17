@@ -15,6 +15,9 @@ import {
   Plus,
   Edit2,
   CheckCheck,
+  FileText,
+  Tag,
+  Calendar,
 } from 'lucide-react';
 import { ScannedItemCandidate, ScanResponse } from '../types';
 import { FoodVisualBadge } from './FoodVisualBadge';
@@ -129,13 +132,13 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Read and compress image client-side to max 1280px dimension to ensure snappy AI scanning
+    // Read and compress image client-side to max 1600px dimension for sharp OCR label and expiration date reading
     const reader = new FileReader();
     reader.onload = (event) => {
       const dataUrl = event.target?.result as string;
       const img = new Image();
       img.onload = () => {
-        const maxDim = 1280;
+        const maxDim = 1600;
         let { width, height } = img;
         if (width > maxDim || height > maxDim) {
           if (width > height) {
@@ -152,7 +155,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.92);
           setImagePreview(compressedDataUrl);
           triggerAiScan(compressedDataUrl);
         } else {
@@ -227,7 +230,18 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
   const handleConfirmSingleItem = async (candidate: ScannedItemCandidate) => {
     try {
       const days = candidate.estimatedShelfLifeDays || 7;
-      const exp = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+      const exp = candidate.printedExpirationDate
+        ? new Date(candidate.printedExpirationDate).toISOString()
+        : candidate.suggestedExpirationDate
+        ? new Date(candidate.suggestedExpirationDate).toISOString()
+        : new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+
+      const notes = [
+        candidate.detectedText ? `OCR: "${candidate.detectedText}"` : null,
+        candidate.storageTip || candidate.storageReason,
+      ]
+        .filter(Boolean)
+        .join(' • ');
 
       const payload = {
         name: candidate.name,
@@ -237,7 +251,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
         categoryName: candidate.category,
         expirationDate: exp,
         monthsFrozenShelfLife: candidate.monthsFrozenShelfLife || 6,
-        notes: candidate.storageTip || candidate.storageReason || '',
+        notes: notes || 'Added via Gemini OCR Scan',
         addedById: currentUser.id,
       };
 
@@ -263,14 +277,31 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
     if (selectedCandidates.length === 0) return;
     setIsAddingAll(true);
 
-    const itemsToAdd = selectedCandidates.map((c) => ({
-      name: c.name,
-      quantity: c.quantity,
-      unit: c.unit,
-      locationType: (c.recommendedLocation.toUpperCase() as 'FRIDGE' | 'FREEZER' | 'PANTRY') || 'FRIDGE',
-      categoryName: c.category,
-      notes: c.storageTip || c.storageReason || 'Added via Gemini Vision Scan',
-    }));
+    const itemsToAdd = selectedCandidates.map((c) => {
+      const days = c.estimatedShelfLifeDays || 7;
+      const exp = c.printedExpirationDate
+        ? new Date(c.printedExpirationDate).toISOString()
+        : c.suggestedExpirationDate
+        ? new Date(c.suggestedExpirationDate).toISOString()
+        : new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+
+      const notes = [
+        c.detectedText ? `OCR: "${c.detectedText}"` : null,
+        c.storageTip || c.storageReason,
+      ]
+        .filter(Boolean)
+        .join(' • ') || 'Added via Gemini OCR Vision Scan';
+
+      return {
+        name: c.name,
+        quantity: c.quantity,
+        unit: c.unit,
+        locationType: (c.recommendedLocation.toUpperCase() as 'FRIDGE' | 'FREEZER' | 'PANTRY') || 'FRIDGE',
+        categoryName: c.category,
+        expirationDate: exp,
+        notes,
+      };
+    });
 
     try {
       const res = await fetch('/api/v1/inventory/bulk-items', {
@@ -390,8 +421,12 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                 Take Photo with Your Camera
               </h3>
               <p className="text-xs text-[#527470] max-w-sm mx-auto">
-                Opens your phone or device's native camera immediately. Works over local network, Proxmox, and mobile browsers.
+                Opens your camera instantly. Reads product names, packaging labels, grocery receipts, and printed expiration stamps.
               </p>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 mt-1 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] font-semibold text-emerald-800">
+                <FileText className="w-3 h-3 text-emerald-600" />
+                <span>OCR Active: Reads package labels, receipts & "EXP / Best By" dates</span>
+              </div>
             </div>
 
             <div className="pt-2 flex flex-col sm:flex-row gap-2.5 justify-center">
@@ -499,9 +534,9 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
         {isScanning && (
           <div className="my-4 p-6 rounded-3xl bg-white border border-[#D5E1D2] flex flex-col items-center text-center shadow-xs">
             <div className="w-10 h-10 rounded-full border-3 border-teal-200 border-t-teal-700 animate-spin mb-3" />
-            <p className="font-extrabold text-[#0D3B37] text-sm">Gemini Flash Vision Analyzing Groceries...</p>
+            <p className="font-extrabold text-[#0D3B37] text-sm">Gemini Multimodal OCR Reading Groceries...</p>
             <p className="text-xs text-[#527470] max-w-sm mt-1">
-              Identifying ingredients, shelf-life duration, and optimal fridge vs. freezer placement.
+              Extracting product names, packaging labels, grocery receipts, and stamped "EXP / Best By" dates.
             </p>
           </div>
         )}
@@ -584,14 +619,32 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                             onChange={(e) => updateCandidateField(idx, 'name', e.target.value)}
                             className="font-bold text-xs text-[#0D3B37] bg-transparent border-b border-transparent hover:border-slate-300 focus:border-teal-600 focus:outline-none w-full"
                           />
-                          <div className="flex items-center gap-1.5 mt-0.5">
+                          <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                             <span className="text-[10px] font-bold text-[#527470]">
                               {candidate.quantity} {candidate.unit}
                             </span>
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 font-semibold">
                               {candidate.category}
                             </span>
+                            {candidate.brand && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-50 text-teal-800 font-bold flex items-center gap-1">
+                                <Tag className="w-2.5 h-2.5 text-teal-600" />
+                                {candidate.brand}
+                              </span>
+                            )}
+                            {candidate.printedExpirationDate && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 font-extrabold flex items-center gap-1">
+                                <Calendar className="w-2.5 h-2.5 text-emerald-700" />
+                                Exp: {candidate.printedExpirationDate}
+                              </span>
+                            )}
                           </div>
+                          {candidate.detectedText && (
+                            <div className="mt-1 text-[10px] text-slate-600 bg-slate-100/80 border border-slate-200 rounded-md px-1.5 py-0.5 flex items-center gap-1 truncate max-w-xs">
+                              <FileText className="w-2.5 h-2.5 text-slate-500 shrink-0" />
+                              <span className="truncate">Label OCR: "{candidate.detectedText}"</span>
+                            </div>
+                          )}
                         </div>
                       </div>
 

@@ -199,23 +199,26 @@ router.post("/scan", async (req, res) => {
       });
     }
 
-    // Call the production Gemini Flash Vision service
-    const result = await analyzeFoodImage(imageBase64, mimeType);
+    const apiKey = process.env.GEMINI_API_KEY;
+    const isApiKeyConfigured = Boolean(
+      apiKey &&
+      apiKey !== "MY_GEMINI_API_KEY" &&
+      apiKey.trim().length > 0 &&
+      !apiKey.startsWith("your_")
+    );
 
-    return res.status(200).json(result);
-  } catch (error) {
-    console.error("[Inventory Route] /scan failed:", error);
-
-    // If Gemini API Key is not yet configured, return an intuitive fallback payload with instructive guidance
-    if (error.message && error.message.includes("GEMINI_API_KEY")) {
+    // If Gemini API Key is not yet configured, provide seamless demo candidates without throwing 500 error
+    if (!isApiKeyConfigured) {
+      console.info("[Inventory Route] GEMINI_API_KEY is not configured in environment. Returning demonstration scan items.");
       return res.status(200).json({
         success: true,
-        summary: "Notice: Gemini API Key pending in environment. Demo scan results populated.",
+        summary: "Notice: Gemini API Key pending in environment. Demonstration scan results loaded.",
         demoMode: true,
         itemsCount: 2,
         items: [
           {
             name: "Organic Baby Spinach",
+            brand: "Earthbound Farm",
             category: "Produce",
             quantity: 1,
             unit: "box (500g)",
@@ -226,9 +229,12 @@ router.post("/scan", async (req, res) => {
             confidence: 0.94,
             storageTip: "Add a dry paper towel in the tub to absorb condensation.",
             suggestedExpirationDate: getRelativeDate(5).split("T")[0],
+            detectedText: "ORGANIC BABY SPINACH 500G",
+            printedExpirationDate: getRelativeDate(5).split("T")[0],
           },
           {
             name: "Greek Feta Cheese in Brine",
+            brand: "Dodoni",
             category: "Dairy & Eggs",
             quantity: 1,
             unit: "block (200g)",
@@ -239,11 +245,19 @@ router.post("/scan", async (req, res) => {
             confidence: 0.96,
             storageTip: "Ensure cheese is always completely immersed in the brine.",
             suggestedExpirationDate: getRelativeDate(14).split("T")[0],
+            detectedText: "AUTHENTIC GREEK FETA IN BRINE 200G",
+            printedExpirationDate: getRelativeDate(14).split("T")[0],
           }
         ],
         scannedAt: new Date().toISOString(),
       });
     }
+
+    // Call the production Gemini Flash Vision service
+    const result = await analyzeFoodImage(imageBase64, mimeType);
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error("[Inventory Route] /scan processing error:", error.message || error);
 
     return res.status(500).json({
       success: false,

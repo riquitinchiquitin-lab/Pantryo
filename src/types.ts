@@ -50,6 +50,7 @@ export interface InventoryItem {
 
 export interface ScannedItemCandidate {
   name: string;
+  brand?: string;
   category: string;
   quantity: number;
   unit: string;
@@ -60,6 +61,8 @@ export interface ScannedItemCandidate {
   confidence?: number;
   storageTip?: string;
   suggestedExpirationDate?: string;
+  detectedText?: string;
+  printedExpirationDate?: string;
 }
 
 export interface ScanResponse {
