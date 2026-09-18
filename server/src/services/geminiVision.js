@@ -85,136 +85,167 @@ Always respond with structured JSON following the specified schema. If multiple 
 
   try {
     console.log(`[Pantryo Vision] Starting image analysis. Base64 length: ${cleanBase64.length} chars, mimeType: ${mimeType}`);
-    let response;
-    try {
-      response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: {
-          parts: [
-            {
-              inlineData: {
-                mimeType: mimeType || "image/jpeg",
-                data: cleanBase64,
-              },
-            },
-            {
-              text: promptText,
-            },
-          ],
+    
+    // Modern Gemini Flash model candidates (gemini-3.8-flash, gemini-3.6-flash, gemini-flash-latest)
+    const modelCandidates = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-flash-latest"];
+    let response = null;
+    let lastError = null;
+
+    const visionSchema = {
+      type: Type.OBJECT,
+      properties: {
+        summary: {
+          type: Type.STRING,
+          description: "Brief summary of what was identified in the image",
         },
-        config: {
-          systemInstruction,
-          temperature: 0.2,
-          responseMimeType: "application/json",
-          responseSchema: {
+        items: {
+          type: Type.ARRAY,
+          description: "List of identified inventory items",
+          items: {
             type: Type.OBJECT,
             properties: {
-              summary: {
+              name: {
                 type: Type.STRING,
-                description: "Brief summary of what was identified in the image",
+                description: "Specific item name",
               },
-              items: {
-                type: Type.ARRAY,
-                description: "List of identified inventory items",
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: {
-                      type: Type.STRING,
-                      description: "Specific item name",
-                    },
-                    category: {
-                      type: Type.STRING,
-                      description: "Item category (Produce, Dairy & Eggs, Meat & Seafood, Bakery, Beverages, Condiments, Pantry Staples, Frozen Meals, Snacks)",
-                    },
-                    quantity: {
-                      type: Type.NUMBER,
-                      description: "Estimated numeric quantity",
-                    },
-                    unit: {
-                      type: Type.STRING,
-                      description: "Measurement unit (pcs, pack, carton, bottle, lbs, kg, g, oz, L)",
-                    },
-                    recommendedLocation: {
-                      type: Type.STRING,
-                      description: "Optimal storage location: 'Fridge', 'Pantry', or 'Freezer'",
-                    },
-                    storageReason: {
-                      type: Type.STRING,
-                      description: "Short reason why this location is recommended",
-                    },
-                    estimatedShelfLifeDays: {
-                      type: Type.INTEGER,
-                      description: "Estimated days before expiration at recommended location",
-                    },
-                    monthsFrozenShelfLife: {
-                      type: Type.INTEGER,
-                      description: "Recommended maximum frozen storage duration in months",
-                    },
-                    brand: {
-                      type: Type.STRING,
-                      description: "Brand name read directly from packaging or receipt (e.g., 'Chobani', 'Oatly')",
-                    },
-                    barcode: {
-                      type: Type.STRING,
-                      description: "12-digit UPC or 13-digit EAN barcode number read from beneath barcode lines (e.g. '011110816850')",
-                    },
-                    detectedText: {
-                      type: Type.STRING,
-                      description: "Key printed label or receipt text read via OCR",
-                    },
-                    printedExpirationDate: {
-                      type: Type.STRING,
-                      description: "Date string (YYYY-MM-DD) if stamped/printed on packaging, else null",
-                    },
-                    confidence: {
-                      type: Type.NUMBER,
-                      description: "Detection confidence score between 0.0 and 1.0",
-                    },
-                    storageTip: {
-                      type: Type.STRING,
-                      description: "Practical tip to preserve freshness and avoid waste",
-                    },
-                  },
-                  required: [
-                    "name",
-                    "category",
-                    "quantity",
-                    "unit",
-                    "recommendedLocation",
-                    "estimatedShelfLifeDays",
-                    "monthsFrozenShelfLife",
-                  ],
-                },
+              category: {
+                type: Type.STRING,
+                description: "Item category (Produce, Dairy & Eggs, Meat & Seafood, Bakery, Beverages, Condiments, Pantry Staples, Frozen Meals, Snacks)",
+              },
+              quantity: {
+                type: Type.NUMBER,
+                description: "Estimated numeric quantity",
+              },
+              unit: {
+                type: Type.STRING,
+                description: "Measurement unit (pcs, pack, carton, bottle, lbs, kg, g, oz, L)",
+              },
+              recommendedLocation: {
+                type: Type.STRING,
+                description: "Optimal storage location: 'Fridge', 'Pantry', or 'Freezer'",
+              },
+              storageReason: {
+                type: Type.STRING,
+                description: "Short reason why this location is recommended",
+              },
+              estimatedShelfLifeDays: {
+                type: Type.INTEGER,
+                description: "Estimated days before expiration at recommended location",
+              },
+              monthsFrozenShelfLife: {
+                type: Type.INTEGER,
+                description: "Recommended maximum frozen storage duration in months",
+              },
+              brand: {
+                type: Type.STRING,
+                description: "Brand name read directly from packaging or receipt (e.g., 'Chobani', 'Oatly')",
+              },
+              barcode: {
+                type: Type.STRING,
+                description: "12-digit UPC or 13-digit EAN barcode number read from beneath barcode lines (e.g. '011110816850')",
+              },
+              detectedText: {
+                type: Type.STRING,
+                description: "Key printed label or receipt text read via OCR",
+              },
+              printedExpirationDate: {
+                type: Type.STRING,
+                description: "Date string (YYYY-MM-DD) if stamped/printed on packaging, else null",
+              },
+              confidence: {
+                type: Type.NUMBER,
+                description: "Detection confidence score between 0.0 and 1.0",
+              },
+              storageTip: {
+                type: Type.STRING,
+                description: "Practical tip to preserve freshness and avoid waste",
               },
             },
-            required: ["summary", "items"],
+            required: [
+              "name",
+              "category",
+              "quantity",
+              "unit",
+              "recommendedLocation",
+              "estimatedShelfLifeDays",
+              "monthsFrozenShelfLife",
+            ],
           },
         },
-      });
-    } catch (modelErr) {
-      console.warn("[Pantryo Vision] Primary gemini-2.5-flash with schema failed, retrying without strict schema:", modelErr.message);
-      response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: {
-          parts: [
-            {
-              inlineData: {
-                mimeType: mimeType || "image/jpeg",
-                data: cleanBase64,
+      },
+      required: ["summary", "items"],
+    };
+
+    for (const modelName of modelCandidates) {
+      try {
+        console.log(`[Pantryo Vision] Attempting image analysis with model: ${modelName}`);
+        response = await ai.models.generateContent({
+          model: modelName,
+          contents: {
+            parts: [
+              {
+                inlineData: {
+                  mimeType: mimeType || "image/jpeg",
+                  data: cleanBase64,
+                },
               },
+              {
+                text: promptText,
+              },
+            ],
+          },
+          config: {
+            systemInstruction,
+            temperature: 0.2,
+            responseMimeType: "application/json",
+            responseSchema: visionSchema,
+          },
+        });
+
+        if (response && response.text) {
+          console.log(`[Pantryo Vision] Successfully analyzed image with model: ${modelName}`);
+          break;
+        }
+      } catch (modelErr) {
+        lastError = modelErr;
+        console.warn(`[Pantryo Vision] Model ${modelName} with structured schema failed: ${modelErr.message || modelErr}. Trying unstructured prompt fallback...`);
+        
+        try {
+          response = await ai.models.generateContent({
+            model: modelName,
+            contents: {
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: mimeType || "image/jpeg",
+                    data: cleanBase64,
+                  },
+                },
+                {
+                  text: promptText + "\nRespond with valid JSON conforming to { summary: string, items: Array<{ name, brand, barcode, category, quantity, unit, recommendedLocation, storageReason, estimatedShelfLifeDays, monthsFrozenShelfLife, confidence, storageTip, detectedText, printedExpirationDate }> }",
+                },
+              ],
             },
-            {
-              text: promptText + "\nRespond with valid JSON conforming to { summary: string, items: Array<{ name, brand, barcode, category, quantity, unit, recommendedLocation, storageReason, estimatedShelfLifeDays, monthsFrozenShelfLife, confidence, storageTip, detectedText, printedExpirationDate }> }",
+            config: {
+              systemInstruction,
+              temperature: 0.2,
+              responseMimeType: "application/json",
             },
-          ],
-        },
-        config: {
-          systemInstruction,
-          temperature: 0.2,
-          responseMimeType: "application/json",
-        },
-      });
+          });
+
+          if (response && response.text) {
+            console.log(`[Pantryo Vision] Successfully analyzed image via unstructured prompt on ${modelName}`);
+            break;
+          }
+        } catch (retryErr) {
+          lastError = retryErr;
+          console.warn(`[Pantryo Vision] Fallback for ${modelName} also failed: ${retryErr.message || retryErr}`);
+        }
+      }
+    }
+
+    if (!response || !response.text) {
+      throw lastError || new Error("Gemini Vision returned an empty text response.");
     }
 
     const rawText = response.text;
