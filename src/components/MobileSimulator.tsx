@@ -37,6 +37,7 @@ import {
   Edit2,
   Edit3,
   CheckCheck,
+  Barcode,
 } from 'lucide-react';
 import { InventoryItem, User } from '../types';
 import { FoodVisualBadge } from './FoodVisualBadge';
@@ -833,7 +834,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                           </div>
                         ) : (
                           /* Days left */
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between gap-1">
                             <span
                               className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold flex items-center gap-1 ${
                                 isSoon
@@ -848,6 +849,16 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                                 : `${daysLeft}d left`
                                 : 'No date'}
                             </span>
+
+                            {item.barcode && (
+                              <span
+                                className="text-[9px] font-mono font-bold text-blue-700 bg-blue-50 border border-blue-200/70 px-1 py-0.5 rounded flex items-center gap-0.5 shrink-0"
+                                title={`UPC: ${item.barcode}`}
+                              >
+                                <Barcode className="w-2.5 h-2.5 text-blue-600" />
+                                {item.barcode.slice(-4)}
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
@@ -991,6 +1002,16 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                               <CategoryIcon className="w-3 h-3" />
                               {item.categoryName}
                             </span>
+
+                            {item.barcode && (
+                              <span
+                                className="text-[10px] font-mono font-bold text-blue-700 bg-blue-50 border border-blue-200/70 px-1.5 py-0.5 rounded-md flex items-center gap-1"
+                                title={`UPC: ${item.barcode}`}
+                              >
+                                <Barcode className="w-3 h-3 text-blue-600" />
+                                {item.barcode}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>

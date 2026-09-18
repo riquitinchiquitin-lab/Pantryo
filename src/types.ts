@@ -43,6 +43,7 @@ export interface InventoryItem {
   isFreezerWarning: boolean;
   defrostedAt?: string | null;
   notes?: string | null;
+  barcode?: string | null;
   imageUrl?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -51,6 +52,7 @@ export interface InventoryItem {
 export interface ScannedItemCandidate {
   name: string;
   brand?: string;
+  barcode?: string;
   category: string;
   quantity: number;
   unit: string;

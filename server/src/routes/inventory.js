@@ -229,7 +229,8 @@ router.post("/scan", async (req, res) => {
             confidence: 0.94,
             storageTip: "Add a dry paper towel in the tub to absorb condensation.",
             suggestedExpirationDate: getRelativeDate(5).split("T")[0],
-            detectedText: "ORGANIC BABY SPINACH 500G",
+            detectedText: "ORGANIC BABY SPINACH 500G - UPC 032601000142",
+            barcode: "032601000142",
             printedExpirationDate: getRelativeDate(5).split("T")[0],
           },
           {
@@ -245,7 +246,8 @@ router.post("/scan", async (req, res) => {
             confidence: 0.96,
             storageTip: "Ensure cheese is always completely immersed in the brine.",
             suggestedExpirationDate: getRelativeDate(14).split("T")[0],
-            detectedText: "AUTHENTIC GREEK FETA IN BRINE 200G",
+            detectedText: "AUTHENTIC GREEK FETA IN BRINE 200G - EAN 5201051001018",
+            barcode: "5201051001018",
             printedExpirationDate: getRelativeDate(14).split("T")[0],
           }
         ],
@@ -264,6 +266,143 @@ router.post("/scan", async (req, res) => {
       error: "AI Vision analysis failed",
       details: error.message,
     });
+  }
+});
+
+/**
+ * GET /api/v1/inventory/barcode/:code
+ * Resolves a UPC-A, UPC-E, or EAN barcode number.
+ * First checks existing household inventory items for quick match.
+ * Then looks up product details on Open Food Facts (global open product database).
+ */
+router.get("/barcode/:code", async (req, res) => {
+  try {
+    const rawCode = String(req.params.code || "").trim().replace(/[^0-9]/g, "");
+    if (!rawCode || rawCode.length < 6) {
+      return res.status(400).json({ success: false, error: "Invalid UPC/EAN barcode number." });
+    }
+
+    console.info(`[Pantryo Barcode] Looking up UPC/EAN: ${rawCode}`);
+
+    // Check if an item in the household already has this barcode
+    const existing = itemsStore.find(
+      (item) => item.barcode && item.barcode.replace(/[^0-9]/g, "") === rawCode
+    );
+
+    if (existing) {
+      const loc = LOCATIONS.find((l) => l.id === existing.locationId);
+      const cat = CATEGORIES.find((c) => c.id === existing.categoryId);
+
+      return res.status(200).json({
+        success: true,
+        source: "inventory_cache",
+        barcode: rawCode,
+        item: {
+          name: existing.name,
+          brand: null,
+          category: cat ? cat.name : "Pantry Staples",
+          quantity: existing.quantity,
+          unit: existing.unit,
+          recommendedLocation: loc ? (loc.type === "FREEZER" ? "Freezer" : loc.type === "PANTRY" ? "Pantry" : "Fridge") : "Fridge",
+          estimatedShelfLifeDays: 14,
+          monthsFrozenShelfLife: existing.monthsFrozenShelfLife || 6,
+          barcode: rawCode,
+          imageUrl: existing.imageUrl || null,
+        },
+      });
+    }
+
+    // Query Open Food Facts API (Open global food database)
+    const offUrl = `https://world.openfoodfacts.org/api/v2/product/${rawCode}.json`;
+    const offRes = await fetch(offUrl, {
+      headers: {
+        "User-Agent": "PantryoFoodTracker/1.0 (https://github.com/pantryo; support@pantryo.app)",
+      },
+    });
+
+    if (offRes.ok) {
+      const offData = await offRes.json();
+      if (offData && offData.status === 1 && offData.product) {
+        const prod = offData.product;
+        const brand = prod.brands ? prod.brands.split(",")[0].trim() : null;
+        let name = prod.product_name || prod.generic_name || "Food Product";
+        if (brand && !name.toLowerCase().includes(brand.toLowerCase())) {
+          name = `${brand} ${name}`;
+        }
+
+        // Determine category mapping
+        let category = "Pantry Staples";
+        const catTags = (prod.categories_tags || []).join(" ").toLowerCase();
+        if (catTags.includes("dairy") || catTags.includes("cheese") || catTags.includes("milk") || catTags.includes("yogurt") || catTags.includes("egg")) {
+          category = "Dairy & Eggs";
+        } else if (catTags.includes("meat") || catTags.includes("fish") || catTags.includes("seafood") || catTags.includes("poultry") || catTags.includes("beef") || catTags.includes("chicken")) {
+          category = "Meat & Seafood";
+        } else if (catTags.includes("fruit") || catTags.includes("vegetable") || catTags.includes("produce") || catTags.includes("salad")) {
+          category = "Produce";
+        } else if (catTags.includes("beverage") || catTags.includes("drink") || catTags.includes("juice") || catTags.includes("water") || catTags.includes("coffee") || catTags.includes("tea")) {
+          category = "Beverages";
+        } else if (catTags.includes("bread") || catTags.includes("bakery") || catTags.includes("pastry") || catTags.includes("cake") || catTags.includes("muffin")) {
+          category = "Bakery";
+        } else if (catTags.includes("sauce") || catTags.includes("condiment") || catTags.includes("dressing") || catTags.includes("mayo") || catTags.includes("ketchup")) {
+          category = "Condiments";
+        } else if (catTags.includes("snack") || catTags.includes("chip") || catTags.includes("cracker") || catTags.includes("cookie") || catTags.includes("chocolate") || catTags.includes("candy")) {
+          category = "Snacks";
+        } else if (catTags.includes("frozen")) {
+          category = "Frozen Meals";
+        }
+
+        // Storage recommendation
+        let recommendedLocation = "Pantry";
+        if (["Dairy & Eggs", "Meat & Seafood", "Produce"].includes(category)) {
+          recommendedLocation = "Fridge";
+        } else if (category === "Frozen Meals") {
+          recommendedLocation = "Freezer";
+        }
+
+        const quantityStr = prod.quantity || "1 item";
+
+        return res.status(200).json({
+          success: true,
+          source: "open_food_facts",
+          barcode: rawCode,
+          item: {
+            name: name.trim(),
+            brand,
+            category,
+            quantity: 1,
+            unit: quantityStr,
+            recommendedLocation,
+            estimatedShelfLifeDays: recommendedLocation === "Fridge" ? 10 : recommendedLocation === "Freezer" ? 180 : 45,
+            monthsFrozenShelfLife: 6,
+            barcode: rawCode,
+            imageUrl: prod.image_front_url || prod.image_url || null,
+            storageTip: prod.storage_instructions || `Store in ${recommendedLocation.toLowerCase()} for maximum freshness.`,
+          },
+        });
+      }
+    }
+
+    // If not found in Open Food Facts, return generic candidate populated with the barcode
+    return res.status(200).json({
+      success: true,
+      source: "unknown_barcode",
+      barcode: rawCode,
+      item: {
+        name: `UPC Item #${rawCode.slice(-4)}`,
+        brand: null,
+        category: "Pantry Staples",
+        quantity: 1,
+        unit: "pcs",
+        recommendedLocation: "Pantry",
+        estimatedShelfLifeDays: 30,
+        monthsFrozenShelfLife: 6,
+        barcode: rawCode,
+        storageTip: "Barcode detected. Confirm name and storage compartment.",
+      },
+    });
+  } catch (err) {
+    console.error("[Pantryo Barcode] Error looking up barcode:", err);
+    return res.status(500).json({ success: false, error: "Failed to look up barcode." });
   }
 });
 
@@ -730,7 +869,7 @@ router.post("/bulk-items", (req, res) => {
         monthsFrozenShelfLife: isFreezer ? 6 : null,
         defrostedAt: null,
         notes: raw.notes || `Stocked from grocery cart by ${user.name}`,
-        barcode: null,
+        barcode: raw.barcode || null,
         imageUrl: raw.imageUrl || null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
