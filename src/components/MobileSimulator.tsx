@@ -38,16 +38,26 @@ import {
   Edit3,
   CheckCheck,
   Barcode,
+  CalendarDays,
+  Utensils,
 } from 'lucide-react';
-import { InventoryItem, User } from '../types';
+import { InventoryItem, User, PlannedMeal } from '../types';
 import { FoodVisualBadge } from './FoodVisualBadge';
-import { getFoodVisual } from '../utils/foodVisuals';
+import { getFoodVisual, ALL_FOOD_CATEGORIES, ALL_SUB_CATEGORIES, ALL_MEAT_SEAFOOD_SUBCATEGORIES } from '../utils/foodVisuals';
 import { CameraScannerModal } from './CameraScannerModal';
 import { AddEditItemModal } from './AddEditItemModal';
 import { GroceryListView, GroceryCartItem } from './GroceryListView';
 import { CookingIdeasView } from './CookingIdeasView';
 import { FamilySyncView } from './FamilySyncView';
+import { MealPlannerView } from './MealPlannerView';
 import { PantryoLogo } from './PantryoLogo';
+import {
+  useLanguage,
+  LanguageSwitcher,
+  getCategoryLocalizedName,
+  getSubcategoryLocalizedName,
+  getLocationLocalizedName,
+} from '../utils/i18n';
 
 const INITIAL_GROCERY_ITEMS: GroceryCartItem[] = [
   {
@@ -116,12 +126,15 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   onInstall,
   isInstalled = false,
 }) => {
-  const [activeNav, setActiveNav] = useState<'home' | 'grocery' | 'cooking' | 'sync'>('home');
+  const { t, lang } = useLanguage();
+  const [activeNav, setActiveNav] = useState<'home' | 'meals' | 'grocery' | 'cooking' | 'sync'>('home');
   const [filterLocation, setFilterLocation] = useState<'ALL' | 'FRIDGE' | 'PANTRY' | 'FREEZER' | 'EXPIRING'>('ALL');
   const [selectedFoodType, setSelectedFoodType] = useState<string | 'ALL'>('ALL');
+  const [selectedSubCategory, setSelectedSubCategory] = useState<string | 'ALL'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentUser, setCurrentUser] = useState<User>(MOCK_MEMBERS[0]);
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const [plannedMeals, setPlannedMeals] = useState<PlannedMeal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isAddEditModalOpen, setIsAddEditModalOpen] = useState(false);
@@ -155,7 +168,11 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
       const data = await res.json();
       if (data.success) {
         await fetchInventory();
-        setBannerNotice(`🛒 Stocked ${data.addedCount} items into your kitchen!`);
+        setBannerNotice(
+          lang === 'FR'
+            ? `🛒 ${data.addedCount} articles rangés dans votre cuisine !`
+            : `🛒 Stocked ${data.addedCount} items into your kitchen!`
+        );
         setTimeout(() => setBannerNotice(null), 4000);
         return true;
       }
@@ -184,11 +201,18 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         unit: item.unit,
         locationType: targetLoc,
         inCart: true,
-        notes: `Restock requested by ${currentUser.name}`,
+        notes:
+          lang === 'FR'
+            ? `Réapprovisionnement demandé par ${currentUser.name}`
+            : `Restock requested by ${currentUser.name}`,
       },
       ...prev,
     ]);
-    setBannerNotice(`🛒 Added "${item.name}" to your grocery cart!`);
+    setBannerNotice(
+      lang === 'FR'
+        ? `🛒 "${item.name}" ajouté à votre panier de courses !`
+        : `🛒 Added "${item.name}" to your grocery cart!`
+    );
     setTimeout(() => setBannerNotice(null), 3000);
   };
 
@@ -208,14 +232,95 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
     }
   };
 
+  // Fetch planned meals for household
+  const fetchPlannedMeals = async () => {
+    try {
+      const res = await fetch('/api/v1/inventory/household/hh_yan_kriz_01/meals');
+      const data = await res.json();
+      if (data.success && data.meals) {
+        setPlannedMeals(data.meals);
+      }
+    } catch (err) {
+      console.error('Failed to load planned meals:', err);
+    }
+  };
+
   useEffect(() => {
     fetchInventory();
+    fetchPlannedMeals();
   }, []);
+
+  const handleAddMeal = async (mealData: Omit<PlannedMeal, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      const res = await fetch('/api/v1/inventory/household/hh_yan_kriz_01/meals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(mealData),
+      });
+      const data = await res.json();
+      if (data.success && data.meal) {
+        setPlannedMeals((prev) => [...prev, data.meal]);
+        setBannerNotice(
+          lang === 'FR'
+            ? `📅 Repas planifié "${data.meal.title}" !`
+            : `📅 Planned meal "${data.meal.title}"!`
+        );
+        setTimeout(() => setBannerNotice(null), 3000);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Add meal failed:', err);
+      return false;
+    }
+  };
+
+  const handleUpdateMeal = async (mealId: string, updates: Partial<PlannedMeal>) => {
+    try {
+      const res = await fetch(`/api/v1/inventory/meals/${mealId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      const data = await res.json();
+      if (data.success && data.meal) {
+        setPlannedMeals((prev) => prev.map((m) => (m.id === mealId ? data.meal : m)));
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Update meal failed:', err);
+      return false;
+    }
+  };
+
+  const handleDeleteMeal = async (mealId: string) => {
+    try {
+      const res = await fetch(`/api/v1/inventory/meals/${mealId}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPlannedMeals((prev) => prev.filter((m) => m.id !== mealId));
+        setBannerNotice(lang === 'FR' ? 'Repas retiré du calendrier' : 'Meal removed from calendar');
+        setTimeout(() => setBannerNotice(null), 3000);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Delete meal failed:', err);
+      return false;
+    }
+  };
 
   const handleItemAdded = (newItem: InventoryItem) => {
     setItems((prev) => [newItem, ...prev]);
     fetchInventory();
-    setBannerNotice(`Added "${newItem.name}" to inventory!`);
+    setBannerNotice(
+      lang === 'FR'
+        ? `Ajouté "${newItem.name}" à l'inventaire !`
+        : `Added "${newItem.name}" to inventory!`
+    );
     setTimeout(() => setBannerNotice(null), 3000);
   };
 
@@ -232,17 +337,27 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   const handleItemSaved = (savedItem: InventoryItem, isNew: boolean) => {
     if (isNew) {
       setItems((prev) => [savedItem, ...prev]);
-      setBannerNotice(`Added "${savedItem.name}" to inventory!`);
+      setBannerNotice(
+        lang === 'FR'
+          ? `Ajouté "${savedItem.name}" à l'inventaire !`
+          : `Added "${savedItem.name}" to inventory!`
+      );
     } else {
       setItems((prev) => prev.map((item) => (item.id === savedItem.id ? savedItem : item)));
-      setBannerNotice(`Updated "${savedItem.name}"!`);
+      setBannerNotice(
+        lang === 'FR' ? `Mis à jour "${savedItem.name}" !` : `Updated "${savedItem.name}"!`
+      );
     }
     setTimeout(() => setBannerNotice(null), 3000);
     fetchInventory();
   };
 
   const handleDeleteItem = async (itemId: string, itemName?: string) => {
-    if (!window.confirm(`Remove "${itemName || 'this item'}" from your kitchen?`)) return;
+    const confirmMsg =
+      lang === 'FR'
+        ? `Retirer "${itemName || 'cet article'}" de votre cuisine ?`
+        : `Remove "${itemName || 'this item'}" from your kitchen?`;
+    if (!window.confirm(confirmMsg)) return;
     try {
       const res = await fetch(`/api/v1/inventory/item/${encodeURIComponent(itemId)}`, {
         method: 'DELETE',
@@ -250,7 +365,11 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
       const data = await res.json();
       if (data.success) {
         setItems((prev) => prev.filter((i) => i.id !== itemId));
-        setBannerNotice(`Removed "${itemName || 'Item'}" from inventory.`);
+        setBannerNotice(
+          lang === 'FR'
+            ? `"${itemName || 'Article'}" retiré de l'inventaire.`
+            : `Removed "${itemName || 'Item'}" from inventory.`
+        );
         setTimeout(() => setBannerNotice(null), 3000);
       }
     } catch (err) {
@@ -271,7 +390,11 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
       const data = await res.json();
       if (data.success) {
         setItems((prev) => prev.filter((i) => i.id !== item.id));
-        setBannerNotice(`Marked "${item.name}" as consumed!`);
+        setBannerNotice(
+          lang === 'FR'
+            ? `Marqué "${item.name}" comme consommé !`
+            : `Marked "${item.name}" as consumed!`
+        );
         setTimeout(() => setBannerNotice(null), 3000);
       }
     } catch (err) {
@@ -290,7 +413,11 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
       });
       const data = await res.json();
       if (data.success) {
-        setBannerNotice(`❄️➡️🧊 Defrosted "${item.name}"! Moved to Fridge with 3-day countdown.`);
+        setBannerNotice(
+          lang === 'FR'
+            ? `❄️➡️🧊 "${item.name}" décongelé ! Déplacé au frigo avec compte à rebours de 3 jours.`
+            : `❄️➡️🧊 Defrosted "${item.name}"! Moved to Fridge with 3-day countdown.`
+        );
         setTimeout(() => setBannerNotice(null), 4000);
         fetchInventory();
       }
@@ -320,7 +447,18 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
     // Food Type filter
     if (selectedFoodType !== 'ALL') {
       const cat = (item.categoryName || '').toLowerCase();
-      if (!cat.includes(selectedFoodType.toLowerCase())) {
+      const sel = selectedFoodType.toLowerCase();
+      const itemName = (item.name || '').toLowerCase();
+      if (!cat.includes(sel) && !sel.includes(cat) && !itemName.includes(sel)) {
+        return false;
+      }
+    }
+
+    // Subcategory (Specific Cuts & Types) filter
+    if (selectedSubCategory !== 'ALL') {
+      const itemName = (item.name || '').toLowerCase();
+      const sub = selectedSubCategory.toLowerCase();
+      if (!itemName.includes(sub) && !sub.includes(itemName)) {
         return false;
       }
     }
@@ -334,30 +472,11 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   const freezerCount = items.filter((i) => i.locationType === 'FREEZER').length;
 
   return (
-    <div
-      className={`relative w-full text-[#133E3B] select-none flex flex-col mx-auto ${
-        mode === 'frame'
-          ? 'max-w-[430px] min-h-[850px] bg-[#FAF7EE] rounded-[44px] shadow-2xl border-[10px] border-slate-900 overflow-hidden'
-          : 'max-w-2xl w-full bg-[#FAF7EE] min-h-screen sm:min-h-[850px] sm:rounded-3xl border-0 sm:border sm:border-[#E5DFD0] sm:shadow-md overflow-hidden'
-      }`}
-    >
-      {/* Phone Notch & Status Bar only for Frame mode */}
-      {mode === 'frame' && (
-        <div className="pt-3 px-6 flex items-center justify-between text-xs font-semibold text-slate-800 bg-[#FAF7EE]">
-          <span>9:41</span>
-          <div className="w-24 h-4 bg-slate-900 rounded-full" />
-          <div className="flex items-center gap-1.5 text-[11px]">
-            <span>5G</span>
-            <div className="w-5 h-2.5 border border-slate-700 rounded-sm p-0.5">
-              <div className="w-full h-full bg-slate-800 rounded-2xs" />
-            </div>
-          </div>
-        </div>
-      )}
-
+    <div className="relative w-full max-w-7xl mx-auto text-[#133E3B] select-none flex flex-col min-h-screen sm:min-h-[850px] sm:rounded-3xl border-0 sm:border sm:border-[#E5DFD0] sm:shadow-lg bg-[#FAF7EE] overflow-hidden">
       {/* App Top Bar */}
       <div className="px-5 pt-3 pb-3 bg-[#FAF7EE] border-b border-[#E8E2D5]">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          {/* Logo & Kitchen Name */}
           <div className="flex items-center gap-2.5">
             <PantryoLogo size={38} />
             <div>
@@ -365,26 +484,99 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 <h1 className="text-base font-black tracking-tight text-[#0D3B37]">Pantryo</h1>
                 <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
               </div>
-              <p className="text-[11px] text-[#527470] font-medium">The Yan & Kriz Kitchen</p>
+              <p className="text-[11px] text-[#527470] font-medium">
+                {lang === 'FR' ? 'La Cuisine de Yan & Kriz' : 'The Yan & Kriz Kitchen'}
+              </p>
             </div>
           </div>
 
-          {/* Top Actions: Install + User Pill */}
+          {/* Desktop & Tablet Navigation Bar (automatically shown on md screens and up) */}
+          <div className="hidden md:flex items-center gap-1 p-1 bg-white/90 rounded-2xl border border-[#E0D9C8] shadow-2xs">
+            <button
+              onClick={() => setActiveNav('home')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                activeNav === 'home'
+                  ? 'bg-teal-700 text-white shadow-2xs'
+                  : 'text-[#527470] hover:text-[#0D3B37] hover:bg-[#F2ECE0]'
+              }`}
+            >
+              <Home className="w-3.5 h-3.5" />
+              <span>{t('nav_inventory')}</span>
+            </button>
+            <button
+              onClick={() => setActiveNav('meals')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                activeNav === 'meals'
+                  ? 'bg-teal-700 text-white shadow-2xs'
+                  : 'text-[#527470] hover:text-[#0D3B37] hover:bg-[#F2ECE0]'
+              }`}
+            >
+              <CalendarDays className="w-3.5 h-3.5 text-indigo-500" />
+              <span>{t('nav_meals')}</span>
+              {plannedMeals.length > 0 && (
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-indigo-100 text-indigo-800 font-black">
+                  {plannedMeals.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveNav('grocery')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                activeNav === 'grocery'
+                  ? 'bg-teal-700 text-white shadow-2xs'
+                  : 'text-[#527470] hover:text-[#0D3B37] hover:bg-[#F2ECE0]'
+              }`}
+            >
+              <ShoppingCart className="w-3.5 h-3.5" />
+              <span>{t('nav_grocery')}</span>
+              {groceryItems.filter((i) => i.inCart).length > 0 && (
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-teal-100 text-teal-900 font-black">
+                  {groceryItems.filter((i) => i.inCart).length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveNav('cooking')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                activeNav === 'cooking'
+                  ? 'bg-teal-700 text-white shadow-2xs'
+                  : 'text-[#527470] hover:text-[#0D3B37] hover:bg-[#F2ECE0]'
+              }`}
+            >
+              <ChefHat className="w-3.5 h-3.5" />
+              <span>{t('nav_cooking')}</span>
+            </button>
+            <button
+              onClick={() => setActiveNav('sync')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                activeNav === 'sync'
+                  ? 'bg-teal-700 text-white shadow-2xs'
+                  : 'text-[#527470] hover:text-[#0D3B37] hover:bg-[#F2ECE0]'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>{t('nav_family')}</span>
+            </button>
+          </div>
+
+          {/* Top Actions: Language Switcher + Install + User Pill */}
           <div className="flex items-center gap-2">
+            <LanguageSwitcher />
+
             {!isInstalled && onInstall && (
               <button
                 onClick={onInstall}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#0E766E] hover:bg-[#0B5C56] text-white text-xs font-bold shadow-2xs transition-all active:scale-95"
-                title="Install Pantryo App on your phone"
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#0E766E] hover:bg-[#0B5C56] text-white text-xs font-bold shadow-2xs transition-all active:scale-95"
+                title={t('install_tooltip')}
               >
                 <Download className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Install</span>
+                <span className="hidden sm:inline">{t('install_btn')}</span>
               </button>
             )}
 
             <button
               onClick={() => setActiveNav('sync')}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/95 border border-[#E0D9C8] shadow-2xs hover:bg-white transition-colors"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/95 border border-[#E0D9C8] shadow-2xs hover:bg-white transition-colors"
             >
               <img
                 src={currentUser.avatarUrl}
@@ -406,14 +598,14 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
       </div>
 
       {/* Main Scrollable View */}
-      <div className="flex-1 overflow-y-auto px-5 pt-1 pb-24 space-y-4">
+      <div className="flex-1 overflow-y-auto px-3.5 sm:px-6 pt-2 pb-28 md:pb-14 space-y-4">
         {/* VIEW: HOME INVENTORY */}
         {activeNav === 'home' && (
           <>
             {/* HERO BENTO BOX DASHBOARD */}
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
               {/* Bento Tile 1 (Span 2): Kitchen Bento Pulse & Zone Breakdown */}
-              <div className="col-span-2 p-3.5 rounded-3xl bg-white border border-[#E5DFD0] shadow-2xs">
+              <div className="col-span-2 lg:col-span-2 p-3.5 rounded-3xl bg-white border border-[#E5DFD0] shadow-2xs">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-2xl bg-teal-50 text-teal-800 border border-teal-100 flex items-center justify-center shadow-xs">
@@ -422,15 +614,17 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                     <div>
                       <div className="flex items-center gap-1.5">
                         <span className="text-[10px] uppercase font-black tracking-wider text-[#527470]">
-                          Bento Kitchen Pulse
+                          {t('bento_pulse_title')}
                         </span>
                         <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-ping" />
                       </div>
-                      <h3 className="text-xs font-black text-[#0D3B37]">96% Zero-Waste Efficiency</h3>
+                      <h3 className="text-xs font-black text-[#0D3B37]">
+                        {lang === 'FR' ? '96% Efficacité Zéro-Gaspillage' : '96% Zero-Waste Efficiency'}
+                      </h3>
                     </div>
                   </div>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-50 text-teal-800 border border-teal-200/80">
-                    Live Sync
+                    {t('live_sync')}
                   </span>
                 </div>
 
@@ -445,10 +639,12 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                     }`}
                   >
                     <div className="flex items-center justify-between text-[11px]">
-                      <span className="font-bold">Fridge</span>
+                      <span className="font-bold">{t('fridge_label')}</span>
                       <Refrigerator className="w-3.5 h-3.5 opacity-90" />
                     </div>
-                    <p className="text-xs font-extrabold mt-0.5">{fridgeCount} items</p>
+                    <p className="text-xs font-extrabold mt-0.5">
+                      {fridgeCount} {lang === 'FR' ? 'articles' : 'items'}
+                    </p>
                   </button>
 
                   <button
@@ -460,10 +656,12 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                     }`}
                   >
                     <div className="flex items-center justify-between text-[11px]">
-                      <span className="font-bold">Freezer</span>
+                      <span className="font-bold">{t('freezer_label')}</span>
                       <Snowflake className="w-3.5 h-3.5 opacity-90" />
                     </div>
-                    <p className="text-xs font-extrabold mt-0.5">{freezerCount} items</p>
+                    <p className="text-xs font-extrabold mt-0.5">
+                      {freezerCount} {lang === 'FR' ? 'articles' : 'items'}
+                    </p>
                   </button>
 
                   <button
@@ -475,10 +673,12 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                     }`}
                   >
                     <div className="flex items-center justify-between text-[11px]">
-                      <span className="font-bold">Pantry</span>
+                      <span className="font-bold">{t('pantry_label')}</span>
                       <Boxes className="w-3.5 h-3.5 opacity-90" />
                     </div>
-                    <p className="text-xs font-extrabold mt-0.5">{pantryCount} items</p>
+                    <p className="text-xs font-extrabold mt-0.5">
+                      {pantryCount} {lang === 'FR' ? 'articles' : 'items'}
+                    </p>
                   </button>
                 </div>
               </div>
@@ -497,22 +697,24 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                     <div className="w-6 h-6 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center">
                       <AlertTriangle className="w-3.5 h-3.5" />
                     </div>
-                    <span className="text-[10px] font-bold text-rose-950">Rescue</span>
+                    <span className="text-[10px] font-bold text-rose-950">{t('rescue_label')}</span>
                   </div>
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-rose-200/70 text-rose-800">
-                    {expiringItems.length} soon
+                    {expiringItems.length} {lang === 'FR' ? 'bientôt' : 'soon'}
                   </span>
                 </div>
                 {expiringItems.length > 0 ? (
                   <div className="mt-2 space-y-1">
                     <p className="text-xs font-bold text-[#203222] truncate">{expiringItems[0]?.name}</p>
                     <p className="text-[10px] text-rose-700 font-semibold flex items-center gap-1">
-                      <Clock className="w-2.5 h-2.5" /> {expiringItems[0]?.daysUntilExpiration} day left
+                      <Clock className="w-2.5 h-2.5" /> {expiringItems[0]?.daysUntilExpiration}{' '}
+                      {lang === 'FR' ? 'j restant' : 'day left'}
                     </p>
                   </div>
                 ) : (
                   <div className="mt-2 text-[10px] text-emerald-700 font-medium flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" /> All fresh & safe
+                    <CheckCircle2 className="w-3 h-3" />{' '}
+                    {lang === 'FR' ? 'Tout est frais & sain' : 'All fresh & safe'}
                   </div>
                 )}
               </div>
@@ -527,16 +729,19 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                     <div className="w-6 h-6 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
                       <Snowflake className="w-3.5 h-3.5" />
                     </div>
-                    <span className="text-[10px] font-bold text-blue-950">Deep Freeze</span>
+                    <span className="text-[10px] font-bold text-blue-950">{t('deep_freeze_label')}</span>
                   </div>
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-800">
                     -18°C
                   </span>
                 </div>
                 <div className="mt-2 space-y-1">
-                  <p className="text-xs font-bold text-[#1F3323]">{freezerCount} items stored</p>
+                  <p className="text-xs font-bold text-[#1F3323]">
+                    {freezerCount} {lang === 'FR' ? 'articles stockés' : 'items stored'}
+                  </p>
                   <p className="text-[10px] text-blue-700 font-semibold flex items-center gap-1">
-                    <Flame className="w-3 h-3 text-amber-500" /> Defrost ready
+                    <Flame className="w-3 h-3 text-amber-500" />{' '}
+                    {lang === 'FR' ? 'Prêt à décongeler' : 'Defrost ready'}
                   </p>
                 </div>
               </div>
@@ -548,7 +753,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Search food, produce, meats..."
+                  placeholder={t('search_placeholder')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 text-xs font-medium bg-white border border-[#D5E1D2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-teal-600/30 text-slate-800 placeholder-slate-400 shadow-2xs"
@@ -558,94 +763,131 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 id="quick-add-item-btn"
                 onClick={handleOpenAddModal}
                 className="py-2 px-3 rounded-2xl bg-[#0E766E] hover:bg-[#0B5C56] text-white font-bold text-xs flex items-center gap-1 shadow-2xs shrink-0 transition-all active:scale-95"
-                title="Add food item manually"
+                title={t('quick_add_tooltip')}
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>+ Add</span>
+                <span>{lang === 'FR' ? '+ Ajouter' : '+ Add'}</span>
               </button>
             </div>
 
-            {/* Food Type Category Quick Chips (Icons & Labels) */}
-            <div className="space-y-1">
+            {/* Food Type Category Quick Chips (Pictures from the Web) */}
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between px-1 text-[11px] font-bold text-[#556D58]">
-                <span>Browse by Food Type</span>
+                <span className="flex items-center gap-1.5">
+                  <span>{t('browse_by_category')}</span>
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    ({ALL_FOOD_CATEGORIES.length} {lang === 'FR' ? 'types' : 'types'})
+                  </span>
+                </span>
                 {selectedFoodType !== 'ALL' && (
                   <button
                     onClick={() => setSelectedFoodType('ALL')}
-                    className="text-emerald-700 hover:underline font-semibold"
+                    className="text-emerald-700 hover:underline font-semibold text-[11px]"
                   >
-                    Clear Filter
+                    {t('clear_filter')}
                   </button>
                 )}
               </div>
 
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-none">
                 <button
                   onClick={() => setSelectedFoodType('ALL')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-all ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-all shrink-0 ${
                     selectedFoodType === 'ALL'
                       ? 'bg-[#233527] text-white shadow-xs'
                       : 'bg-white border border-[#D5E1D2] text-[#4F6553] hover:bg-[#EAF1E8]'
                   }`}
                 >
                   <Layers className="w-3.5 h-3.5" />
-                  All
+                  {t('all_categories')}
                 </button>
+                {ALL_FOOD_CATEGORIES.map((cat) => {
+                  const isSelected = selectedFoodType === cat.filterKey || selectedFoodType === cat.name;
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => setSelectedFoodType(isSelected ? 'ALL' : cat.filterKey)}
+                      className={`pl-1 pr-2.5 py-1 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-all shrink-0 border ${
+                        isSelected
+                          ? `${cat.bgColor} ${cat.textColor} ${cat.borderColor} ring-2 ring-emerald-600/30 shadow-xs scale-102`
+                          : 'bg-white border-[#D5E1D2] text-[#334D37] hover:bg-[#F2F7F1]'
+                      }`}
+                    >
+                      <div className="w-5 h-5 rounded-full overflow-hidden shrink-0 border border-black/10 shadow-2xs">
+                        <img
+                          src={cat.imageUrl}
+                          alt={cat.name}
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <span>{getCategoryLocalizedName(cat.name, lang)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Specific Cuts & Subcategories with Web Photography */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between px-1 text-[11px] font-bold text-[#556D58]">
+                <span className="flex items-center gap-1.5">
+                  <span className="text-xs">
+                    {lang === 'FR' ? '🥩 Découpes, Poissons & Sous-catégories' : '🥩 Meat Cuts, Seafood & Subcategories'}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    ({ALL_SUB_CATEGORIES.length} {lang === 'FR' ? 'découpes' : 'visual cuts'})
+                  </span>
+                </span>
+                {selectedSubCategory !== 'ALL' && (
+                  <button
+                    onClick={() => setSelectedSubCategory('ALL')}
+                    className="text-emerald-700 hover:underline font-semibold text-[11px]"
+                  >
+                    {lang === 'FR' ? 'Réinitialiser découpe' : 'Reset Cut Filter'}
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 overflow-x-auto pb-1.5 scrollbar-none">
                 <button
-                  onClick={() => setSelectedFoodType(selectedFoodType === 'Produce' ? 'ALL' : 'Produce')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-all ${
-                    selectedFoodType === 'Produce'
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'bg-white border border-emerald-200 text-emerald-800 hover:bg-emerald-50'
+                  onClick={() => setSelectedSubCategory('ALL')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
+                    selectedSubCategory === 'ALL'
+                      ? 'bg-[#0D3B37] text-white shadow-xs'
+                      : 'bg-white border border-[#D5E1D2] text-[#4F6553] hover:bg-[#EAF1E8]'
                   }`}
                 >
-                  <Apple className="w-3.5 h-3.5 text-emerald-600" />
-                  Produce
+                  {lang === 'FR' ? 'Toutes découpes' : 'All Cuts'}
                 </button>
-                <button
-                  onClick={() => setSelectedFoodType(selectedFoodType === 'Dairy' ? 'ALL' : 'Dairy')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-all ${
-                    selectedFoodType === 'Dairy'
-                      ? 'bg-sky-600 text-white shadow-xs'
-                      : 'bg-white border border-sky-200 text-sky-800 hover:bg-sky-50'
-                  }`}
-                >
-                  <Milk className="w-3.5 h-3.5 text-sky-600" />
-                  Dairy & Eggs
-                </button>
-                <button
-                  onClick={() => setSelectedFoodType(selectedFoodType === 'Meat' ? 'ALL' : 'Meat')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-all ${
-                    selectedFoodType === 'Meat'
-                      ? 'bg-rose-600 text-white shadow-xs'
-                      : 'bg-white border border-rose-200 text-rose-800 hover:bg-rose-50'
-                  }`}
-                >
-                  <Beef className="w-3.5 h-3.5 text-rose-600" />
-                  Meat & Seafood
-                </button>
-                <button
-                  onClick={() => setSelectedFoodType(selectedFoodType === 'Pantry' ? 'ALL' : 'Pantry')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-all ${
-                    selectedFoodType === 'Pantry'
-                      ? 'bg-purple-600 text-white shadow-xs'
-                      : 'bg-white border border-purple-200 text-purple-800 hover:bg-purple-50'
-                  }`}
-                >
-                  <Package className="w-3.5 h-3.5 text-purple-600" />
-                  Pantry
-                </button>
-                <button
-                  onClick={() => setSelectedFoodType(selectedFoodType === 'Bakery' ? 'ALL' : 'Bakery')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-all ${
-                    selectedFoodType === 'Bakery'
-                      ? 'bg-amber-600 text-white shadow-xs'
-                      : 'bg-white border border-amber-200 text-amber-800 hover:bg-amber-50'
-                  }`}
-                >
-                  <Wheat className="w-3.5 h-3.5 text-amber-600" />
-                  Bakery
-                </button>
+                {ALL_SUB_CATEGORIES.map((sub) => {
+                  const isSelected =
+                    selectedSubCategory.toLowerCase() === sub.name.toLowerCase() ||
+                    selectedSubCategory.toLowerCase() === sub.badgeLabel.toLowerCase();
+                  return (
+                    <button
+                      key={sub.id}
+                      onClick={() => setSelectedSubCategory(isSelected ? 'ALL' : sub.name)}
+                      className={`pl-1.5 pr-3 py-1 rounded-2xl text-xs font-bold whitespace-nowrap flex items-center gap-2 transition-all shrink-0 border ${
+                        isSelected
+                          ? `${sub.bgColor} ${sub.textColor} ${sub.borderColor} ring-2 ring-emerald-600/40 shadow-xs scale-102`
+                          : 'bg-white border-[#D5E1D2] text-[#334D37] hover:bg-[#F2F7F1]'
+                      }`}
+                    >
+                      <div className="w-6 h-6 rounded-full overflow-hidden shrink-0 border border-black/10 shadow-2xs">
+                        <img
+                          src={sub.imageUrl}
+                          alt={sub.name}
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <span className="leading-tight text-[11px]">
+                        {getSubcategoryLocalizedName(sub.badgeLabel || sub.name, lang)}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -660,7 +902,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                       : 'bg-white border border-[#D5E1D2] text-[#4F6553] hover:bg-[#EAF1E8]'
                   }`}
                 >
-                  All Zones ({items.length})
+                  {lang === 'FR' ? `Toutes zones (${items.length})` : `All Zones (${items.length})`}
                 </button>
                 <button
                   onClick={() => setFilterLocation('FRIDGE')}
@@ -671,7 +913,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                   }`}
                 >
                   <Refrigerator className="w-3 h-3" />
-                  Fridge ({fridgeCount})
+                  {lang === 'FR' ? `Frigo (${fridgeCount})` : `Fridge (${fridgeCount})`}
                 </button>
                 <button
                   onClick={() => setFilterLocation('PANTRY')}
@@ -682,7 +924,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                   }`}
                 >
                   <Boxes className="w-3 h-3" />
-                  Pantry ({pantryCount})
+                  {lang === 'FR' ? `Garde-manger (${pantryCount})` : `Pantry (${pantryCount})`}
                 </button>
                 <button
                   onClick={() => setFilterLocation('FREEZER')}
@@ -693,7 +935,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                   }`}
                 >
                   <Snowflake className="w-3 h-3" />
-                  Freezer ({freezerCount})
+                  {lang === 'FR' ? `Congélateur (${freezerCount})` : `Freezer (${freezerCount})`}
                 </button>
                 <button
                   onClick={() => setFilterLocation('EXPIRING')}
@@ -704,7 +946,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                   }`}
                 >
                   <AlertTriangle className="w-3 h-3" />
-                  Soon ({expiringItems.length})
+                  {lang === 'FR' ? `Bientôt (${expiringItems.length})` : `Soon (${expiringItems.length})`}
                 </button>
               </div>
 
@@ -712,7 +954,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               <div className="flex items-center gap-0.5 p-1 bg-white border border-[#D5E1D2] rounded-xl shrink-0 shadow-2xs">
                 <button
                   onClick={() => setBentoViewMode('grid')}
-                  title="Bento Grid Mode"
+                  title={lang === 'FR' ? 'Mode Grille Bento' : 'Bento Grid Mode'}
                   className={`p-1.5 rounded-lg transition-all ${
                     bentoViewMode === 'grid'
                       ? 'bg-[#233527] text-white shadow-xs'
@@ -723,7 +965,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 </button>
                 <button
                   onClick={() => setBentoViewMode('list')}
-                  title="Bento List Mode"
+                  title={lang === 'FR' ? 'Mode Liste Bento' : 'Bento List Mode'}
                   className={`p-1.5 rounded-lg transition-all ${
                     bentoViewMode === 'list'
                       ? 'bg-[#233527] text-white shadow-xs'
@@ -739,17 +981,25 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             {isLoading ? (
               <div className="py-12 flex flex-col items-center justify-center text-[#556D58]">
                 <div className="w-8 h-8 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin mb-2" />
-                <span className="text-xs">Loading household inventory...</span>
+                <span className="text-xs">
+                  {lang === 'FR' ? "Chargement de l'inventaire du foyer..." : 'Loading household inventory...'}
+                </span>
               </div>
             ) : filteredItems.length === 0 ? (
               <div className="py-12 text-center text-[#5D7360] bg-white rounded-3xl border border-[#D5E1D2] p-6 space-y-2">
                 <Box className="w-8 h-8 mx-auto text-slate-300" />
-                <p className="text-sm font-bold text-[#233527]">No items match this filter</p>
-                <p className="text-xs">Try selecting 'All' or use the SNAP & ADD button below to scan groceries with Gemini Flash Vision!</p>
+                <p className="text-sm font-bold text-[#233527]">
+                  {lang === 'FR' ? 'Aucun article ne correspond à ce filtre' : 'No items match this filter'}
+                </p>
+                <p className="text-xs">
+                  {lang === 'FR'
+                    ? "Essayez de sélectionner 'Tout' ou utilisez le bouton 'SCANNER & AJOUTER !' ci-dessous pour scanner avec l'IA Gemini !"
+                    : "Try selecting 'All' or use the SNAP & ADD button below to scan groceries with Gemini Flash Vision!"}
+                </p>
               </div>
             ) : bentoViewMode === 'grid' ? (
-              /* BENTO BOX GRID MODE (2-column tactile compartments) */
-              <div className="grid grid-cols-2 gap-2.5">
+              /* BENTO BOX GRID MODE (Responsive tactile compartments) */
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                 {filteredItems.map((item) => {
                   const isFreezer = item.locationType === 'FREEZER';
                   const daysLeft = item.daysUntilExpiration;
@@ -779,7 +1029,9 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                           className={`absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-lg text-[9px] font-extrabold flex items-center gap-1 backdrop-blur-md shadow-2xs border ${visual.bgColor} ${visual.textColor} ${visual.borderColor}`}
                         >
                           <CategoryIcon className="w-2.5 h-2.5" />
-                          <span className="truncate max-w-[60px]">{item.categoryName}</span>
+                          <span className="truncate max-w-[60px]">
+                            {getCategoryLocalizedName(item.categoryName, lang)}
+                          </span>
                         </div>
                         {/* Top-right Location Pill */}
                         <div
@@ -798,7 +1050,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                           ) : (
                             <Refrigerator className="w-2.5 h-2.5" />
                           )}
-                          <span>{item.locationName}</span>
+                          <span>{getLocationLocalizedName(item.locationName, lang)}</span>
                         </div>
                         {/* Quantity Pill on bottom-left */}
                         <div className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-black/65 backdrop-blur-md text-white">
@@ -811,7 +1063,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                         <h3
                           onClick={() => handleOpenEditModal(item)}
                           className="font-bold text-xs text-[#1F3323] leading-tight line-clamp-2 cursor-pointer hover:text-teal-700 transition-colors"
-                          title="Click to edit item"
+                          title={lang === 'FR' ? "Cliquer pour modifier l'article" : "Click to edit item"}
                         >
                           {item.name}
                         </h3>
@@ -820,8 +1072,14 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                           /* Freezer duration */
                           <div className="p-1.5 rounded-xl bg-[#F0F5FA] border border-[#D6E3EF] text-[10px] space-y-1">
                             <div className="flex items-center justify-between text-[10px] font-bold text-[#2A4763]">
-                              <span>{item.monthsFrozen ?? 2.5}m frozen</span>
-                              <span className="text-[#5A7794] text-[9px]">{item.monthsFrozenShelfLife ?? 6}m</span>
+                              <span>
+                                {item.monthsFrozen ?? 2.5}
+                                {lang === 'FR' ? ' m congelé' : 'm frozen'}
+                              </span>
+                              <span className="text-[#5A7794] text-[9px]">
+                                {item.monthsFrozenShelfLife ?? 6}
+                                {lang === 'FR' ? ' m max' : 'm'}
+                              </span>
                             </div>
                             <div className="w-full h-1 bg-blue-200/60 rounded-full overflow-hidden">
                               <div
@@ -845,9 +1103,9 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                               <Calendar className="w-2.5 h-2.5" />
                               {daysLeft !== null
                                 ? daysLeft <= 0
-                                ? 'Today'
-                                : `${daysLeft}d left`
-                                : 'No date'}
+                                  ? lang === 'FR' ? "Aujourd'hui" : 'Today'
+                                  : lang === 'FR' ? `${daysLeft}j restants` : `${daysLeft}d left`
+                                : lang === 'FR' ? 'Pas de date' : 'No date'}
                             </span>
 
                             {item.barcode && (
@@ -879,7 +1137,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => handleAddItemToGroceryCart(item)}
-                            title="Add to shopping cart"
+                            title={t('add_to_cart_tooltip')}
                             className="p-1 bg-[#EEF4EC] hover:bg-emerald-100 text-[#355239] rounded-lg text-[9px] font-bold flex items-center transition-all active:scale-95"
                           >
                             <ShoppingCart className="w-2.5 h-2.5 text-emerald-700" />
@@ -889,17 +1147,19 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                             <button
                               onClick={() => handleDefrost(item)}
                               disabled={defrostingId === item.id}
-                              title="Defrost item to fridge"
+                              title={t('defrost_tooltip')}
                               className="py-0.5 px-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[9px] font-bold flex items-center gap-0.5 shadow-2xs active:scale-95 transition-all"
                             >
                               <Flame className="w-2.5 h-2.5 text-amber-300" />
-                              <span className="text-[8px]">{defrostingId === item.id ? '...' : 'Defrost'}</span>
+                              <span className="text-[8px]">
+                                {defrostingId === item.id ? '...' : (lang === 'FR' ? 'Décongeler' : 'Defrost')}
+                              </span>
                             </button>
                           )}
 
                           <button
                             onClick={() => handleOpenEditModal(item)}
-                            title="Edit item"
+                            title={t('edit_item_tooltip')}
                             className="p-1 bg-[#F2ECE0] hover:bg-teal-100 text-teal-800 rounded-lg text-[9px] font-bold flex items-center transition-all active:scale-95"
                           >
                             <Edit3 className="w-2.5 h-2.5" />
@@ -907,7 +1167,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
 
                           <button
                             onClick={() => handleConsumeItem(item)}
-                            title="Mark as consumed"
+                            title={t('mark_consumed_tooltip')}
                             className="p-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-[9px] font-bold flex items-center transition-all active:scale-95"
                           >
                             <Check className="w-2.5 h-2.5" />
@@ -915,7 +1175,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
 
                           <button
                             onClick={() => handleDeleteItem(item.id, item.name)}
-                            title="Delete item"
+                            title={t('delete_item_tooltip')}
                             className="p-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-[9px] font-bold flex items-center transition-all active:scale-95"
                           >
                             <Trash2 className="w-2.5 h-2.5" />
@@ -963,7 +1223,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                             <h3
                               onClick={() => handleOpenEditModal(item)}
                               className="font-bold text-sm text-[#1F3323] truncate cursor-pointer hover:text-teal-700 transition-colors"
-                              title="Click to edit item"
+                              title={lang === 'FR' ? "Cliquer pour modifier l'article" : "Click to edit item"}
                             >
                               {item.name}
                             </h3>
@@ -985,7 +1245,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                               ) : (
                                 <Refrigerator className="w-2.5 h-2.5" />
                               )}
-                              {item.locationName}
+                              {getLocationLocalizedName(item.locationName, lang)}
                             </span>
                           </div>
 
@@ -1000,7 +1260,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                               className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border flex items-center gap-1 ${visual.bgColor} ${visual.textColor} ${visual.borderColor}`}
                             >
                               <CategoryIcon className="w-3 h-3" />
-                              {item.categoryName}
+                              {getCategoryLocalizedName(item.categoryName, lang)}
                             </span>
 
                             {item.barcode && (
@@ -1023,10 +1283,14 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                           <div className="flex items-center justify-between text-[11px]">
                             <span className="font-bold text-[#2A4763] flex items-center gap-1">
                               <Snowflake className="w-3 h-3 text-blue-500" />
-                              Frozen {item.monthsFrozen ?? 2.5} mos
+                              {lang === 'FR'
+                                ? `Congelé depuis ${item.monthsFrozen ?? 2.5} mois`
+                                : `Frozen ${item.monthsFrozen ?? 2.5} mos`}
                             </span>
                             <span className="text-[#5A7794]">
-                              Max {item.monthsFrozenShelfLife ?? 6} mos safe
+                              {lang === 'FR'
+                                ? `Max ${item.monthsFrozenShelfLife ?? 6} mois conseillé`
+                                : `Max ${item.monthsFrozenShelfLife ?? 6} mos safe`}
                             </span>
                           </div>
                           {/* Progress bar */}
@@ -1052,9 +1316,11 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                             <Calendar className="w-3 h-3" />
                             {daysLeft !== null
                               ? daysLeft <= 0
-                                ? 'Expired today'
+                                ? lang === 'FR' ? "Expiré aujourd'hui" : 'Expired today'
+                                : lang === 'FR'
+                                ? `Expire dans ${daysLeft} jour${daysLeft === 1 ? '' : 's'}`
                                 : `Expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`
-                              : 'No expiration set'}
+                              : lang === 'FR' ? 'Aucune date définie' : 'No expiration set'}
                           </span>
 
                           {item.notes && (
@@ -1075,18 +1341,18 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                             className="w-4 h-4 rounded-full object-cover"
                           />
                           <span className="text-[11px] font-bold text-[#556D58]">
-                            by {item.addedByName || 'Yan'}
+                            {lang === 'FR' ? 'par' : 'by'} {item.addedByName || 'Yan'}
                           </span>
                         </div>
 
                         <div className="flex items-center gap-1.5">
                           <button
                             onClick={() => handleAddItemToGroceryCart(item)}
-                            title="Add item to shopping list/cart"
+                            title={t('add_to_cart_tooltip')}
                             className="py-1 px-2 bg-[#EEF4EC] hover:bg-emerald-100 text-[#355239] rounded-xl text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95"
                           >
                             <ShoppingCart className="w-3 h-3 text-emerald-700" />
-                            <span>+Cart</span>
+                            <span>{lang === 'FR' ? '+Panier' : '+Cart'}</span>
                           </button>
 
                           {/* Defrost Button for Freezer items */}
@@ -1094,27 +1360,34 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                             <button
                               onClick={() => handleDefrost(item)}
                               disabled={defrostingId === item.id}
+                              title={t('defrost_tooltip')}
                               className="py-1 px-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[11px] font-bold flex items-center gap-1 shadow-xs transition-all active:scale-95"
                             >
                               <Flame className="w-3 h-3 text-amber-300" />
-                              <span>{defrostingId === item.id ? '...' : 'Defrost'}</span>
+                              <span>
+                                {defrostingId === item.id
+                                  ? '...'
+                                  : lang === 'FR'
+                                  ? 'Décongeler'
+                                  : 'Defrost'}
+                              </span>
                             </button>
                           )}
 
                           {/* Edit Item */}
                           <button
                             onClick={() => handleOpenEditModal(item)}
-                            title="Edit item"
+                            title={t('edit_item_tooltip')}
                             className="py-1 px-2 bg-[#F2ECE0] hover:bg-teal-100 text-teal-800 rounded-xl text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95"
                           >
                             <Edit3 className="w-3 h-3" />
-                            <span>Edit</span>
+                            <span>{lang === 'FR' ? 'Modifier' : 'Edit'}</span>
                           </button>
 
                           {/* Mark Consumed */}
                           <button
                             onClick={() => handleConsumeItem(item)}
-                            title="Mark as consumed"
+                            title={t('mark_consumed_tooltip')}
                             className="py-1 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-[11px] font-bold flex items-center gap-0.5 transition-all active:scale-95"
                           >
                             <Check className="w-3 h-3" />
@@ -1123,7 +1396,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                           {/* Delete Item */}
                           <button
                             onClick={() => handleDeleteItem(item.id, item.name)}
-                            title="Delete item"
+                            title={t('delete_item_tooltip')}
                             className="py-1 px-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-[11px] font-bold flex items-center gap-0.5 transition-all active:scale-95"
                           >
                             <Trash2 className="w-3 h-3" />
@@ -1150,6 +1423,42 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
           />
         )}
 
+        {/* VIEW: MEAL PLANNER & CALENDAR */}
+        {activeNav === 'meals' && (
+          <MealPlannerView
+            householdId="hh_yan_kriz_01"
+            items={items}
+            plannedMeals={plannedMeals}
+            onAddMeal={handleAddMeal}
+            onUpdateMeal={handleUpdateMeal}
+            onDeleteMeal={handleDeleteMeal}
+            onAddIngredientsToGrocery={(ingredients) => {
+              ingredients.forEach((ing) => {
+                setGroceryItems((prev) => [
+                  {
+                    id: `g_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+                    name: ing.name,
+                    category: ing.category || 'Pantry Staples',
+                    quantity: ing.quantity || 1,
+                    unit: ing.unit || 'item',
+                    locationType: 'FRIDGE',
+                    inCart: true,
+                    notes: lang === 'FR' ? 'Du plan de repas' : 'From Meal Plan',
+                  },
+                  ...prev,
+                ]);
+              });
+              setBannerNotice(
+                lang === 'FR'
+                  ? `🛒 ${ingredients.length} ingrédients ajoutés à votre panier !`
+                  : `🛒 Added ${ingredients.length} ingredients to your grocery cart!`
+              );
+              setTimeout(() => setBannerNotice(null), 3500);
+            }}
+            onOpenRecipes={() => setActiveNav('cooking')}
+          />
+        )}
+
         {/* VIEW: COOKING IDEAS */}
         {activeNav === 'cooking' && (
           <CookingIdeasView
@@ -1164,11 +1473,19 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                   unit: missing.unit || 'item',
                   locationType: missing.locationType || 'FRIDGE',
                   inCart: false,
-                  notes: missing.recipeTitle ? `For: ${missing.recipeTitle}` : undefined,
+                  notes: missing.recipeTitle
+                    ? lang === 'FR'
+                      ? `Pour : ${missing.recipeTitle}`
+                      : `For: ${missing.recipeTitle}`
+                    : undefined,
                 },
                 ...prev,
               ]);
-              setBannerNotice(`🛒 Added "${missing.name}" to your grocery list!`);
+              setBannerNotice(
+                lang === 'FR'
+                  ? `🛒 "${missing.name}" ajouté à votre liste de courses !`
+                  : `🛒 Added "${missing.name}" to your grocery list!`
+              );
               setTimeout(() => setBannerNotice(null), 3000);
             }}
           />
@@ -1184,32 +1501,32 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         )}
       </div>
 
-      {/* Floating Action Buttons ("+ ADD ITEM" and "SNAP & ADD!") */}
-      <div className="absolute bottom-16 inset-x-0 flex justify-center items-center pointer-events-none z-30">
-        <div className="flex items-center gap-2 pointer-events-auto bg-[#0A3834]/95 backdrop-blur-md p-1 rounded-full shadow-2xl border border-teal-500/40">
+      {/* Floating Action Buttons ("+ ADD ITEM" and "SNAP & ADD!") - Screen size responsive */}
+      <div className="fixed sm:absolute bottom-20 md:bottom-6 inset-x-0 md:inset-x-auto md:right-8 flex justify-center md:justify-end items-center pointer-events-none z-30">
+        <div className="flex items-center gap-2 pointer-events-auto bg-[#0A3834]/95 backdrop-blur-md p-1.5 rounded-full shadow-2xl border border-teal-500/40">
           <button
             id="floating-manual-add-btn"
             onClick={handleOpenAddModal}
             className="px-3.5 py-2.5 rounded-full bg-teal-800 hover:bg-teal-700 text-white font-extrabold text-[11px] tracking-wider flex items-center gap-1.5 shadow-xs hover:scale-105 active:scale-95 transition-all"
-            title="Add item manually"
+            title={t('quick_add_tooltip')}
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>ADD ITEM</span>
+            <span>{lang === 'FR' ? '+ AJOUTER' : '+ ADD ITEM'}</span>
           </button>
           <button
             id="floating-snap-add-btn"
             onClick={() => setIsScannerOpen(true)}
             className="px-4 py-2.5 rounded-full bg-[#0E766E] hover:bg-[#0B5C56] text-white font-extrabold text-[11px] tracking-wider flex items-center gap-1.5 shadow-xs hover:scale-105 active:scale-95 transition-all"
-            title="Scan item with camera"
+            title={lang === 'FR' ? "Scanner l'article avec la caméra" : "Scan item with camera"}
           >
             <Camera className="w-3.5 h-3.5 text-teal-300" />
-            <span>SNAP & ADD!</span>
+            <span>{lang === 'FR' ? 'SCANNER & AJOUTER !' : 'SNAP & ADD!'}</span>
           </button>
         </div>
       </div>
 
-      {/* Expo Bottom Navigation Bar */}
-      <div className="absolute bottom-0 inset-x-0 h-16 bg-[#FAF7EE]/95 backdrop-blur-md border-t border-[#E5DFD0] px-4 flex items-center justify-around z-20">
+      {/* Mobile-Only Bottom Navigation Bar (automatically hidden on tablet/desktop screens md and up) */}
+      <div className="fixed sm:absolute bottom-0 inset-x-0 h-16 bg-[#FAF7EE]/95 backdrop-blur-md border-t border-[#E5DFD0] px-3 flex md:hidden items-center justify-around z-20">
         <button
           onClick={() => setActiveNav('home')}
           className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition-colors ${
@@ -1217,7 +1534,24 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
           }`}
         >
           <Home className="w-4 h-4" />
-          <span>Home</span>
+          <span>{t('nav_inventory')}</span>
+        </button>
+
+        <button
+          onClick={() => setActiveNav('meals')}
+          className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition-colors relative ${
+            activeNav === 'meals' ? 'text-teal-700' : 'text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          <div className="relative">
+            <CalendarDays className="w-4 h-4" />
+            {plannedMeals.length > 0 && (
+              <span className="absolute -top-1.5 -right-2 w-3.5 h-3.5 bg-indigo-600 text-white rounded-full text-[9px] font-black flex items-center justify-center">
+                {plannedMeals.length}
+              </span>
+            )}
+          </div>
+          <span>{t('nav_meals')}</span>
         </button>
 
         <button
@@ -1234,11 +1568,8 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               </span>
             )}
           </div>
-          <span>Grocery</span>
+          <span>{t('nav_grocery')}</span>
         </button>
-
-        {/* Center spacer for floating camera button */}
-        <div className="w-16" />
 
         <button
           onClick={() => setActiveNav('cooking')}
@@ -1247,7 +1578,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
           }`}
         >
           <ChefHat className="w-4 h-4" />
-          <span>Cooking</span>
+          <span>{t('nav_cooking')}</span>
         </button>
 
         <button
@@ -1257,7 +1588,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
           }`}
         >
           <Users className="w-4 h-4" />
-          <span>Family</span>
+          <span>{t('nav_family')}</span>
         </button>
       </div>
 
@@ -1282,7 +1613,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         onSaved={handleItemSaved}
         onDeleted={(itemId) => {
           setItems((prev) => prev.filter((i) => i.id !== itemId));
-          setBannerNotice('Item deleted from inventory.');
+          setBannerNotice(lang === 'FR' ? "Article supprimé de l'inventaire." : 'Item deleted from inventory.');
           setTimeout(() => setBannerNotice(null), 3000);
         }}
       />

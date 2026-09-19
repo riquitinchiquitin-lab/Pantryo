@@ -30,6 +30,7 @@ import {
 import { InventoryItem } from '../types';
 import { RICARDO_RECIPES, RicardoRecipe } from '../data/ricardoRecipes';
 import { AddRecipeModal } from './AddRecipeModal';
+import { useLanguage } from '../utils/i18n';
 
 const LOCAL_STORAGE_CUSTOM_RECIPES = 'kitchen_komrade_custom_recipes';
 
@@ -49,7 +50,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
   items,
   onAddMissingToGrocery,
 }) => {
-  const [lang, setLang] = useState<'EN' | 'FR'>('EN');
+  const { lang, setLang } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<
     'ALL' | 'RICARDO' | 'CUSTOM' | 'EXPIRING' | 'FAST'

@@ -16,6 +16,8 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { InventoryItem, User, StorageType } from '../types';
+import { ALL_FOOD_CATEGORIES, ALL_SUB_CATEGORIES, ALL_MEAT_SEAFOOD_SUBCATEGORIES } from '../utils/foodVisuals';
+import { useLanguage, getCategoryLocalizedName, getSubcategoryLocalizedName } from '../utils/i18n';
 
 interface AddEditItemModalProps {
   isOpen: boolean;
@@ -25,18 +27,6 @@ interface AddEditItemModalProps {
   onSaved: (item: InventoryItem, isNew: boolean) => void;
   onDeleted?: (itemId: string) => void;
 }
-
-const CATEGORIES = [
-  'Produce',
-  'Dairy & Eggs',
-  'Meat & Seafood',
-  'Bakery',
-  'Pantry Staples',
-  'Frozen Meals',
-  'Beverages',
-  'Condiments',
-  'Snacks',
-];
 
 const COMMON_UNITS = [
   'pcs',
@@ -59,6 +49,7 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
   onSaved,
   onDeleted,
 }) => {
+  const { t, lang } = useLanguage();
   const isEditing = Boolean(itemToEdit);
 
   // Helper to format date YYYY-MM-DD
@@ -80,6 +71,7 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
   };
 
   const [name, setName] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
   const [locationType, setLocationType] = useState<'FRIDGE' | 'FREEZER' | 'PANTRY'>('FRIDGE');
   const [categoryName, setCategoryName] = useState('Produce');
   const [quantity, setQuantity] = useState(1);
@@ -93,6 +85,7 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
   useEffect(() => {
     if (itemToEdit) {
       setName(itemToEdit.name || '');
+      setImageUrl(itemToEdit.imageUrl || '');
       const loc = (itemToEdit.locationType as 'FRIDGE' | 'FREEZER' | 'PANTRY') || 'FRIDGE';
       setLocationType(loc === 'FREEZER' || loc === 'PANTRY' ? loc : 'FRIDGE');
       setCategoryName(itemToEdit.categoryName || 'Produce');
@@ -102,6 +95,7 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
       setNotes(itemToEdit.notes || '');
     } else {
       setName('');
+      setImageUrl('');
       setLocationType('FRIDGE');
       setCategoryName('Produce');
       setQuantity(1);
@@ -139,6 +133,7 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
     const locationName = locationType === 'FREEZER' ? 'Freezer' : locationType === 'PANTRY' ? 'Pantry' : 'Fridge';
     const payload = {
       name: name.trim(),
+      imageUrl: imageUrl.trim() || undefined,
       quantity: Number(quantity) || 1,
       unit: unit.trim() || 'pcs',
       locationName,
@@ -166,6 +161,7 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
           ...itemToEdit,
           ...data.item,
           name: payload.name,
+          imageUrl: payload.imageUrl || itemToEdit.imageUrl,
           quantity: payload.quantity,
           unit: payload.unit,
           locationName,
@@ -226,7 +222,11 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
 
   const handleDelete = async () => {
     if (!itemToEdit || !onDeleted) return;
-    if (!window.confirm(`Are you sure you want to remove "${itemToEdit.name}" from your kitchen?`)) {
+    const confirmMsg =
+      lang === 'FR'
+        ? `Voulez-vous vraiment retirer « ${itemToEdit.name} » de votre cuisine ?`
+        : `Are you sure you want to remove "${itemToEdit.name}" from your kitchen?`;
+    if (!window.confirm(confirmMsg)) {
       return;
     }
 
@@ -237,12 +237,12 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to delete item.');
+        throw new Error(data.error || (lang === 'FR' ? "Échec de suppression de l'aliment." : 'Failed to delete item.'));
       }
       onDeleted(itemToEdit.id);
       onClose();
     } catch (err: any) {
-      alert(`Error removing item: ${err.message}`);
+      alert(`${lang === 'FR' ? 'Erreur lors de la suppression :' : 'Error removing item:'} ${err.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -261,10 +261,14 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-black text-[#0D3B37]">
-                {isEditing ? `Edit "${itemToEdit?.name}"` : 'Add New Item to Kitchen'}
+                {isEditing
+                  ? (lang === 'FR' ? `Modifier « ${itemToEdit?.name} »` : `Edit "${itemToEdit?.name}"`)
+                  : (lang === 'FR' ? 'Ajouter un aliment à la cuisine' : 'Add New Item to Kitchen')}
               </h2>
               <p className="text-xs text-[#527470]">
-                {isEditing ? 'Modify quantity, location, or expiration' : 'Direct manual entry without scanning'}
+                {isEditing
+                  ? (lang === 'FR' ? 'Modifier quantité, compartiment ou péremption' : 'Modify quantity, location, or expiration')
+                  : (lang === 'FR' ? 'Saisie manuelle directe sans numérisation' : 'Direct manual entry without scanning')}
               </p>
             </div>
           </div>
@@ -286,12 +290,14 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           {/* Item Name */}
           <div>
-            <label className="block text-xs font-bold text-[#0D3B37] mb-1">Item Name *</label>
+            <label className="block text-xs font-bold text-[#0D3B37] mb-1">
+              {lang === 'FR' ? "Nom de l'aliment *" : 'Item Name *'}
+            </label>
             <input
               type="text"
               required
               autoFocus={!isEditing}
-              placeholder="e.g. Organic Whole Milk, Greek Yogurt, Cheddar..."
+              placeholder={lang === 'FR' ? 'ex. Pommes Honeycrisp bio, Bifteck de faux-filet...' : 'e.g. Organic Whole Milk, Greek Yogurt, Cheddar...'}
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-2xl bg-white border border-[#D5E1D2] text-sm font-medium text-[#133E3B] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 shadow-2xs"
@@ -300,7 +306,9 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
 
           {/* Storage Location Selector */}
           <div>
-            <label className="block text-xs font-bold text-[#0D3B37] mb-1.5">Storage Compartment</label>
+            <label className="block text-xs font-bold text-[#0D3B37] mb-1.5">
+              {lang === 'FR' ? 'Compartiment de stockage' : 'Storage Compartment'}
+            </label>
             <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
@@ -312,7 +320,7 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
                 }`}
               >
                 <Refrigerator className="w-4 h-4" />
-                <span>Fridge</span>
+                <span>{lang === 'FR' ? 'Frigo' : 'Fridge'}</span>
               </button>
 
               <button
@@ -325,7 +333,7 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
                 }`}
               >
                 <Snowflake className="w-4 h-4" />
-                <span>Freezer</span>
+                <span>{lang === 'FR' ? 'Congélateur' : 'Freezer'}</span>
               </button>
 
               <button
@@ -338,27 +346,102 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
                 }`}
               >
                 <Boxes className="w-4 h-4" />
-                <span>Pantry</span>
+                <span>{lang === 'FR' ? 'Garde-manger' : 'Pantry'}</span>
               </button>
             </div>
           </div>
 
-          {/* Category Selector */}
+          {/* Category Selector with Web Pictures */}
           <div>
-            <label className="block text-xs font-bold text-[#0D3B37] mb-1">Category</label>
-            <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1.5 bg-white border border-[#D5E1D2] rounded-2xl">
-              {CATEGORIES.map((cat) => (
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-[#0D3B37]">
+                {lang === 'FR' ? 'Catégorie alimentaire *' : 'Food Category *'}
+              </label>
+              <span className="text-[11px] text-[#527470]">
+                {lang === 'FR' ? 'Sélectionnez pour les conseils' : 'Select best match for storage tips'}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-1.5 bg-white border border-[#D5E1D2] rounded-2xl">
+              {ALL_FOOD_CATEGORIES.map((cat) => (
                 <button
-                  key={cat}
+                  key={cat.id}
                   type="button"
-                  onClick={() => setCategoryName(cat)}
-                  className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition-all ${
-                    categoryName === cat
-                      ? 'bg-[#0E766E] text-white shadow-2xs'
-                      : 'bg-[#F2ECE0] text-[#4A6460] hover:bg-[#E5DDD0]'
+                  onClick={() => setCategoryName(cat.name)}
+                  className={`pl-1 pr-2.5 py-1 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 border ${
+                    categoryName === cat.name
+                      ? 'bg-[#0E766E] text-white border-[#0E766E] shadow-2xs'
+                      : 'bg-[#F2ECE0] border-[#E0D9C8] text-[#334D37] hover:bg-[#E5DDD0]'
                   }`}
                 >
-                  {cat}
+                  <div className="w-5 h-5 rounded-full overflow-hidden shrink-0 border border-black/10">
+                    <img
+                      src={cat.imageUrl}
+                      alt={cat.name}
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <span>{getCategoryLocalizedName(cat.name, lang)}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Specific Cuts & Subcategories (Meat, Fish & Specialty types) */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-[#0D3B37]">
+                {lang === 'FR' ? 'Coupe ou sous-catégorie spécifique' : 'Specific Cut or Subcategory'}
+              </label>
+              <span className="text-[11px] text-teal-800 font-medium">
+                {lang === 'FR' ? 'Cliquer pour remplir photo et coupe' : 'Click to auto-fill photo & cut'}
+              </span>
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1.5 pt-0.5 no-scrollbar">
+              {(categoryName.includes('Meat') || categoryName.includes('Seafood')
+                ? ALL_MEAT_SEAFOOD_SUBCATEGORIES
+                : ALL_SUB_CATEGORIES
+              ).map((sub) => (
+                <button
+                  key={sub.id}
+                  type="button"
+                  onClick={() => {
+                    if (!name.trim()) setName(sub.name);
+                    setImageUrl(sub.imageUrl);
+                    if (sub.parentCategoryId === 'cat_meat') {
+                      setCategoryName('Meat & Seafood');
+                    } else if (sub.parentCategoryId === 'cat_dairy') {
+                      setCategoryName('Dairy & Eggs');
+                    } else if (sub.parentCategoryId === 'cat_produce') {
+                      setCategoryName('Produce');
+                    } else if (sub.parentCategoryId === 'cat_bakery') {
+                      setCategoryName('Bakery');
+                    } else if (sub.parentCategoryId === 'cat_pantry') {
+                      setCategoryName('Pantry Staples');
+                    }
+                  }}
+                  className={`px-2.5 py-1.5 rounded-xl border flex items-center gap-2 shrink-0 transition-all text-left ${
+                    imageUrl === sub.imageUrl
+                      ? 'bg-teal-700 text-white border-teal-800 shadow-xs'
+                      : 'bg-white border-[#E0D9C8] hover:border-teal-500 text-[#133E3B] shadow-2xs'
+                  }`}
+                >
+                  <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 border border-black/10 bg-slate-100">
+                    <img
+                      src={sub.imageUrl}
+                      alt={sub.name}
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div>
+                    <span className="block text-[11px] font-bold leading-tight truncate max-w-[130px]">
+                      {getSubcategoryLocalizedName(sub.name, lang)}
+                    </span>
+                    <span className={`block text-[9px] ${imageUrl === sub.imageUrl ? 'text-teal-200' : 'text-[#627C65]'}`}>
+                      {getSubcategoryLocalizedName(sub.badgeLabel || sub.name, lang)}
+                    </span>
+                  </div>
                 </button>
               ))}
             </div>
@@ -367,7 +450,9 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
           {/* Quantity and Unit */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-[#0D3B37] mb-1">Quantity</label>
+              <label className="block text-xs font-bold text-[#0D3B37] mb-1">
+                {lang === 'FR' ? 'Quantité' : 'Quantity'}
+              </label>
               <div className="flex items-center bg-white border border-[#D5E1D2] rounded-2xl overflow-hidden shadow-2xs">
                 <button
                   type="button"
@@ -396,18 +481,20 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-[#0D3B37] mb-1">Unit</label>
+              <label className="block text-xs font-bold text-[#0D3B37] mb-1">
+                {lang === 'FR' ? 'Unité' : 'Unit'}
+              </label>
               <div className="flex items-center gap-1">
                 <input
                   type="text"
                   value={unit}
                   onChange={(e) => setUnit(e.target.value)}
-                  placeholder="pcs, pack, lbs..."
+                  placeholder={lang === 'FR' ? 'unités, paquet, kg...' : 'pcs, pack, lbs...'}
                   className="w-full px-3 py-2 rounded-2xl bg-white border border-[#D5E1D2] text-sm font-medium text-[#133E3B] focus:outline-none focus:ring-2 focus:ring-teal-600 shadow-2xs"
                 />
               </div>
               <div className="flex gap-1 mt-1 overflow-x-auto pb-0.5 scrollbar-none">
-                {COMMON_UNITS.slice(0, 5).map((u) => (
+                {(lang === 'FR' ? ['unités', 'paquet', 'boîte', 'bouteille', 'kg', 'g', 'lbs'] : COMMON_UNITS.slice(0, 5)).map((u) => (
                   <button
                     key={u}
                     type="button"
@@ -424,35 +511,37 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
           {/* Expiration Date */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-bold text-[#0D3B37]">Expiration Date</label>
+              <label className="text-xs font-bold text-[#0D3B37]">
+                {lang === 'FR' ? 'Date de péremption' : 'Expiration Date'}
+              </label>
               <div className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={() => handleQuickDate(3)}
                   className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-100 text-amber-900 hover:bg-amber-200"
                 >
-                  +3d
+                  {lang === 'FR' ? '+3j' : '+3d'}
                 </button>
                 <button
                   type="button"
                   onClick={() => handleQuickDate(7)}
                   className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-teal-100 text-teal-900 hover:bg-teal-200"
                 >
-                  +1w
+                  {lang === 'FR' ? '+1sem' : '+1w'}
                 </button>
                 <button
                   type="button"
                   onClick={() => handleQuickDate(14)}
                   className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-100 text-emerald-900 hover:bg-emerald-200"
                 >
-                  +2w
+                  {lang === 'FR' ? '+2sem' : '+2w'}
                 </button>
                 <button
                   type="button"
                   onClick={() => handleQuickDate(60)}
                   className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-blue-100 text-blue-900 hover:bg-blue-200"
                 >
-                  +2m
+                  {lang === 'FR' ? '+2m' : '+2m'}
                 </button>
               </div>
             </div>
@@ -468,12 +557,14 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
 
           {/* Notes */}
           <div>
-            <label className="block text-xs font-bold text-[#0D3B37] mb-1">Notes / Storage Tips (Optional)</label>
+            <label className="block text-xs font-bold text-[#0D3B37] mb-1">
+              {lang === 'FR' ? 'Notes / Conseils de conservation (Facultatif)' : 'Notes / Storage Tips (Optional)'}
+            </label>
             <textarea
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="e.g. Keep on middle shelf, opened on Tuesday, organic..."
+              placeholder={lang === 'FR' ? "ex. Étagère du milieu, ouvert mardi, biologique..." : "e.g. Keep on middle shelf, opened on Tuesday, organic..."}
               className="w-full px-3.5 py-2 rounded-2xl bg-white border border-[#D5E1D2] text-xs font-medium text-[#133E3B] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 shadow-2xs resize-none"
             />
           </div>
@@ -488,7 +579,7 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
                 className="py-2.5 px-3.5 rounded-2xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold flex items-center gap-1.5 transition-colors border border-rose-200 shadow-2xs"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>Delete</span>
+                <span>{lang === 'FR' ? 'Supprimer' : 'Delete'}</span>
               </button>
             ) : (
               <button
@@ -496,7 +587,7 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
                 onClick={onClose}
                 className="py-2.5 px-4 rounded-2xl bg-white hover:bg-slate-50 text-slate-600 text-xs font-bold border border-[#D5E1D2] shadow-2xs"
               >
-                Cancel
+                {lang === 'FR' ? 'Annuler' : 'Cancel'}
               </button>
             )}
 
@@ -506,7 +597,13 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
               className="flex-1 py-2.5 px-5 rounded-2xl bg-[#0E766E] hover:bg-[#0B5C56] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition-all active:scale-98 disabled:opacity-50"
             >
               <Check className="w-4 h-4" />
-              <span>{isSubmitting ? 'Saving...' : isEditing ? 'Save Changes' : 'Add to Kitchen'}</span>
+              <span>
+                {isSubmitting
+                  ? (lang === 'FR' ? 'Enregistrement...' : 'Saving...')
+                  : isEditing
+                  ? (lang === 'FR' ? 'Enregistrer' : 'Save Changes')
+                  : (lang === 'FR' ? 'Ajouter à la cuisine' : 'Add to Kitchen')}
+              </span>
             </button>
           </div>
         </form>
@@ -514,3 +611,4 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
     </div>
   );
 };
+

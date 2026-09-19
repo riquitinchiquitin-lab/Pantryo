@@ -25,6 +25,7 @@ import {
 import { ScannedItemCandidate, ScanResponse } from '../types';
 import { FoodVisualBadge } from './FoodVisualBadge';
 import { PantryoLogo } from './PantryoLogo';
+import { useLanguage, getCategoryLocalizedName, getLocationLocalizedName } from '../utils/i18n';
 
 interface CameraScannerModalProps {
   isOpen: boolean;
@@ -106,6 +107,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
   currentUser,
   onOpenManualAdd,
 }) => {
+  const { t, lang } = useLanguage();
   const [activeMode, setActiveMode] = useState<'snap' | 'barcode' | 'upload' | 'presets'>('snap');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
@@ -455,25 +457,29 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base sm:text-lg font-black tracking-tight text-[#0D3B37]">
-                  SNAP & ADD! Vision Scanner
+                  {lang === 'FR' ? 'SCANNER & AJOUTER !' : 'SNAP & ADD! Vision Scanner'}
                 </h2>
                 {geminiConnected === true && (
                   <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100/80 border border-emerald-300 px-2 py-0.5 rounded-full">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Live AI Active
+                    {lang === 'FR' ? 'IA en direct active' : 'Live AI Active'}
                   </span>
                 )}
                 {geminiConnected === false && (
                   <span
                     className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full"
-                    title="GEMINI_API_KEY is not configured in your server environment"
+                    title={lang === 'FR' ? "Clé GEMINI_API_KEY non configurée sur le serveur" : "GEMINI_API_KEY is not configured in your server environment"}
                   >
                     <AlertTriangle className="w-3 h-3 text-amber-600" />
-                    Demo Mode (No API Key)
+                    {lang === 'FR' ? 'Mode Démo' : 'Demo Mode (No API Key)'}
                   </span>
                 )}
               </div>
-              <p className="text-xs text-[#527470]">Powered by Google Gemini Flash Multimodal Vision & OCR</p>
+              <p className="text-xs text-[#527470]">
+                {lang === 'FR'
+                  ? 'Propulsé par Google Gemini Flash Vision Multimodale & ROC'
+                  : 'Powered by Google Gemini Flash Multimodal Vision & OCR'}
+              </p>
             </div>
           </div>
           <button
@@ -494,7 +500,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
               }`}
             >
               <Camera className="w-3.5 h-3.5" />
-              <span>Camera</span>
+              <span>{lang === 'FR' ? 'Caméra' : 'Camera'}</span>
             </button>
             <button
               onClick={() => setActiveMode('barcode')}
@@ -503,7 +509,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
               }`}
             >
               <Barcode className="w-3.5 h-3.5 text-blue-700" />
-              <span>UPC Code</span>
+              <span>{lang === 'FR' ? 'Code UPC' : 'UPC Code'}</span>
             </button>
             <button
               onClick={() => setActiveMode('upload')}
@@ -512,7 +518,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
               }`}
             >
               <Upload className="w-3.5 h-3.5" />
-              <span>Upload</span>
+              <span>{lang === 'FR' ? 'Téléverser' : 'Upload'}</span>
             </button>
             <button
               onClick={() => setActiveMode('presets')}
@@ -521,7 +527,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
               }`}
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Presets</span>
+              <span>{lang === 'FR' ? 'Exemples' : 'Presets'}</span>
             </button>
           </div>
         )}
@@ -535,14 +541,20 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
 
             <div className="space-y-1">
               <h3 className="font-extrabold text-sm sm:text-base text-[#0D3B37]">
-                Take Photo with Your Camera
+                {lang === 'FR' ? 'Prendre une photo avec votre caméra' : 'Take Photo with Your Camera'}
               </h3>
               <p className="text-xs text-[#527470] max-w-sm mx-auto">
-                Opens your camera instantly. Reads product names, packaging labels, grocery receipts, barcodes, and printed expiration stamps.
+                {lang === 'FR'
+                  ? "Ouvre la caméra instantanément. Reconnaît les produits, étiquettes, reçus d'épicerie, codes-barres et dates de péremption."
+                  : 'Opens your camera instantly. Reads product names, packaging labels, grocery receipts, barcodes, and printed expiration stamps.'}
               </p>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 mt-1 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] font-semibold text-emerald-800">
                 <FileText className="w-3 h-3 text-emerald-600" />
-                <span>OCR & Barcode: Reads package labels, UPC digits, receipts & "EXP" dates</span>
+                <span>
+                  {lang === 'FR'
+                    ? 'ROC & Code-barres : Lit les emballages, codes UPC, reçus et dates « EXP »'
+                    : 'OCR & Barcode: Reads package labels, UPC digits, receipts & "EXP" dates'}
+                </span>
               </div>
             </div>
 
@@ -552,7 +564,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                 className="py-3 px-6 rounded-2xl bg-[#0E766E] hover:bg-[#0B5C56] text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs active:scale-98 transition-all"
               >
                 <Camera className="w-4 h-4" />
-                <span>Snap Grocery Photo</span>
+                <span>{lang === 'FR' ? 'Prendre en Photo' : 'Snap Grocery Photo'}</span>
               </button>
 
               <button
@@ -560,7 +572,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                 className="py-3 px-5 rounded-2xl bg-[#FAF7EE] hover:bg-[#F2ECE0] text-[#0D3B37] font-bold text-xs sm:text-sm border border-[#D5E1D2] flex items-center justify-center gap-2 transition-all"
               >
                 <Upload className="w-4 h-4 text-teal-700" />
-                <span>Pick from Gallery</span>
+                <span>{lang === 'FR' ? 'Choisir dans la Galerie' : 'Pick from Gallery'}</span>
               </button>
             </div>
 
@@ -573,7 +585,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                   }}
                   className="text-xs font-bold text-teal-800 hover:text-teal-900 underline underline-offset-2"
                 >
-                  Or enter food item manually with keyboard &gt;
+                  {lang === 'FR' ? 'Ou saisir manuellement avec le clavier >' : 'Or enter food item manually with keyboard >'}
                 </button>
               </div>
             )}
@@ -588,10 +600,12 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                 <Barcode className="w-7 h-7" />
               </div>
               <h3 className="font-extrabold text-sm sm:text-base text-[#0D3B37]">
-                Scan or Enter UPC / EAN Barcode
+                {lang === 'FR' ? 'Scanner ou Saisir un Code-Barres UPC / EAN' : 'Scan or Enter UPC / EAN Barcode'}
               </h3>
               <p className="text-xs text-[#527470] max-w-sm mx-auto">
-                Directly reads 12-digit UPC or 13-digit EAN barcodes. Resolves against global food registries (Open Food Facts) and your household stock.
+                {lang === 'FR'
+                  ? 'Lit directement les codes 12 chiffres UPC ou 13 chiffres EAN. Interroge les registres alimentaires mondiaux (Open Food Facts).'
+                  : 'Directly reads 12-digit UPC or 13-digit EAN barcodes. Resolves against global food registries (Open Food Facts) and your household stock.'}
               </p>
             </div>
 
@@ -602,13 +616,15 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                 className="py-2.5 px-5 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all"
               >
                 <Camera className="w-3.5 h-3.5" />
-                <span>Snap Barcode Photo</span>
+                <span>{lang === 'FR' ? 'Photographier le Code-Barres' : 'Snap Barcode Photo'}</span>
               </button>
             </div>
 
             <div className="relative flex py-1 items-center">
               <div className="flex-grow border-t border-slate-200"></div>
-              <span className="flex-shrink mx-3 text-[11px] font-semibold text-slate-400">or enter barcode digits</span>
+              <span className="flex-shrink mx-3 text-[11px] font-semibold text-slate-400">
+                {lang === 'FR' ? 'ou entrer les chiffres du code' : 'or enter barcode digits'}
+              </span>
               <div className="flex-grow border-t border-slate-200"></div>
             </div>
 
@@ -643,7 +659,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                   ) : (
                     <Search className="w-3.5 h-3.5" />
                   )}
-                  <span>Look Up</span>
+                  <span>{lang === 'FR' ? 'Rechercher' : 'Look Up'}</span>
                 </button>
               </div>
 
@@ -656,7 +672,9 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
 
               {/* Quick Preset Barcode Chips */}
               <div className="pt-2">
-                <p className="text-[10px] font-bold text-slate-400 mb-1.5">Try sample barcode codes:</p>
+                <p className="text-[10px] font-bold text-slate-400 mb-1.5">
+                  {lang === 'FR' ? "Tester des codes d'exemples :" : 'Try sample barcode codes:'}
+                </p>
                 <div className="flex flex-wrap gap-1.5">
                   {[
                     { label: '032601000142 (Spinach)', code: '032601000142' },
@@ -691,16 +709,20 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
               <Upload className="w-7 h-7" />
             </div>
             <div>
-              <p className="font-extrabold text-sm text-[#0D3B37]">Click or drag food photo here</p>
+              <p className="font-extrabold text-sm text-[#0D3B37]">
+                {lang === 'FR' ? 'Cliquer ou glisser une photo ici' : 'Click or drag food photo here'}
+              </p>
               <p className="text-xs text-[#527470] mt-1 max-w-xs mx-auto">
-                Upload photos of grocery receipts, open fridge shelves, or food packages (JPG, PNG, WebP)
+                {lang === 'FR'
+                  ? "Téléversez des photos de reçus d'épicerie, étagères de réfrigérateur ou emballages (JPG, PNG, WebP)"
+                  : 'Upload photos of grocery receipts, open fridge shelves, or food packages (JPG, PNG, WebP)'}
               </p>
             </div>
             <button
               type="button"
               className="py-2 px-4 rounded-xl bg-teal-700 text-white text-xs font-bold shadow-2xs"
             >
-              Browse Files
+              {lang === 'FR' ? 'Parcourir les Fichiers' : 'Browse Files'}
             </button>
           </div>
         )}
@@ -709,7 +731,9 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
         {activeMode === 'presets' && !imagePreview && (
           <div className="space-y-3">
             <p className="text-xs font-medium text-[#527470]">
-              Test Gemini Multimodal Vision inference instantly with sample kitchen cart hauls:
+              {lang === 'FR'
+                ? "Testez l'inférence multimodale Gemini Vision instantanément avec des exemples de panier :"
+                : 'Test Gemini Multimodal Vision inference instantly with sample kitchen cart hauls:'}
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {SAMPLE_PRESETS.map((p, idx) => (
@@ -723,7 +747,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                   </span>
                   <span className="text-xs text-[#527470] mt-1 line-clamp-2">{p.description}</span>
                   <div className="mt-3 flex items-center text-xs font-bold text-teal-700 gap-1">
-                    Scan Preset <ArrowRight className="w-3.5 h-3.5" />
+                    {lang === 'FR' ? 'Scanner cet exemple' : 'Scan Preset'} <ArrowRight className="w-3.5 h-3.5" />
                   </div>
                 </button>
               ))}
@@ -742,7 +766,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                 setSelectedCandidates([]);
               }}
               className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-white hover:bg-black/80"
-              title="Change photo"
+              title={lang === 'FR' ? 'Changer de photo' : 'Change photo'}
             >
               <RefreshCw className="w-3.5 h-3.5" />
             </button>
@@ -752,9 +776,13 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
         {isScanning && (
           <div className="my-4 p-6 rounded-3xl bg-white border border-[#D5E1D2] flex flex-col items-center text-center shadow-xs">
             <div className="w-10 h-10 rounded-full border-3 border-teal-200 border-t-teal-700 animate-spin mb-3" />
-            <p className="font-extrabold text-[#0D3B37] text-sm">Gemini Multimodal OCR Reading Groceries...</p>
+            <p className="font-extrabold text-[#0D3B37] text-sm">
+              {lang === 'FR' ? 'Gemini ROC lit vos courses...' : 'Gemini Multimodal OCR Reading Groceries...'}
+            </p>
             <p className="text-xs text-[#527470] max-w-sm mt-1">
-              Extracting product names, packaging labels, grocery receipts, and stamped "EXP / Best By" dates.
+              {lang === 'FR'
+                ? "Reconnaissance des noms d'aliments, étiquettes, reçus et dates « EXP / Meilleur avant »."
+                : 'Extracting product names, packaging labels, grocery receipts, and stamped "EXP / Best By" dates.'}
             </p>
           </div>
         )}
@@ -764,7 +792,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
           <div className="my-4 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs flex items-start gap-2.5">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-700" />
             <div className="space-y-2 flex-1">
-              <p className="font-bold">Scan Notice</p>
+              <p className="font-bold">{lang === 'FR' ? 'Avis de Numérisation' : 'Scan Notice'}</p>
               <p>{errorMessage}</p>
               <div className="flex gap-2 pt-1">
                 <button
@@ -774,7 +802,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                   }}
                   className="py-1 px-2.5 bg-white border border-rose-300 rounded-lg text-[11px] font-bold text-rose-800 hover:bg-rose-100"
                 >
-                  Try Again
+                  {lang === 'FR' ? 'Réessayer' : 'Try Again'}
                 </button>
                 {onOpenManualAdd && (
                   <button
@@ -784,7 +812,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                     }}
                     className="py-1 px-2.5 bg-rose-700 text-white rounded-lg text-[11px] font-bold hover:bg-rose-800"
                   >
-                    Enter Item Manually
+                    {lang === 'FR' ? 'Saisir manuellement' : 'Enter Item Manually'}
                   </button>
                 )}
               </div>
@@ -800,17 +828,15 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-bold text-amber-900">Why are these same 2 items showing?</p>
+                    <p className="font-bold text-amber-900">
+                      {lang === 'FR' ? 'Pourquoi ces 2 mêmes articles apparaissent-ils ?' : 'Why are these same 2 items showing?'}
+                    </p>
                     <p className="text-[11px] text-amber-800/90 mt-0.5 leading-relaxed">
-                      Your server does not have <code>GEMINI_API_KEY</code> set in its environment, so it loaded sample demonstration items (<strong>Organic Baby Spinach</strong> and <strong>Greek Feta Cheese</strong>) instead of scanning your live photo.
+                      {lang === 'FR'
+                        ? "Votre serveur n'a pas la variable GEMINI_API_KEY configurée, des exemples de démonstration ont été chargés."
+                        : 'Your server does not have GEMINI_API_KEY set in its environment, so it loaded sample demonstration items.'}
                     </p>
                   </div>
-                </div>
-                <div className="text-[10px] font-mono bg-white/90 p-2.5 rounded-xl border border-amber-200 text-amber-950 space-y-1">
-                  <p className="font-sans font-bold text-slate-700">To scan real photos with Gemini AI on Proxmox:</p>
-                  <p>1. Open <code className="font-bold text-teal-800">/opt/pantryo/.env</code></p>
-                  <p>2. Add your key: <code className="font-bold text-teal-800">GEMINI_API_KEY=AIzaSy...</code></p>
-                  <p>3. Run: <code className="font-bold text-teal-800">cd /opt/pantryo && docker compose restart app</code></p>
                 </div>
               </div>
             )}
@@ -819,7 +845,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-teal-700" />
                 <h3 className="text-sm font-black text-[#0D3B37]">
-                  Detected Items ({selectedCandidates.length})
+                  {lang === 'FR' ? `Aliments Détectés (${selectedCandidates.length})` : `Detected Items (${selectedCandidates.length})`}
                 </h3>
               </div>
               <button
@@ -828,7 +854,11 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                 className="py-1.5 px-3 rounded-xl bg-[#0E766E] hover:bg-[#0B5C56] text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 disabled:opacity-50"
               >
                 <CheckCheck className="w-3.5 h-3.5" />
-                <span>{isAddingAll ? 'Adding All...' : `Add All (${selectedCandidates.length})`}</span>
+                <span>
+                  {isAddingAll
+                    ? (lang === 'FR' ? 'Ajout en cours...' : 'Adding All...')
+                    : (lang === 'FR' ? `Tout Ajouter (${selectedCandidates.length})` : `Add All (${selectedCandidates.length})`)}
+                </span>
               </button>
             </div>
 
@@ -862,7 +892,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                               {candidate.quantity} {candidate.unit}
                             </span>
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 font-semibold">
-                              {candidate.category}
+                              {getCategoryLocalizedName(candidate.category, lang)}
                             </span>
                             {candidate.brand && (
                               <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-50 text-teal-800 font-bold flex items-center gap-1">
@@ -873,7 +903,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                             {candidate.printedExpirationDate && (
                               <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 font-extrabold flex items-center gap-1">
                                 <Calendar className="w-2.5 h-2.5 text-emerald-700" />
-                                Exp: {candidate.printedExpirationDate}
+                                {lang === 'FR' ? 'Pér:' : 'Exp:'} {candidate.printedExpirationDate}
                               </span>
                             )}
                             {candidate.barcode && (
@@ -886,7 +916,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                           {candidate.detectedText && (
                             <div className="mt-1 text-[10px] text-slate-600 bg-slate-100/80 border border-slate-200 rounded-md px-1.5 py-0.5 flex items-center gap-1 truncate max-w-xs">
                               <FileText className="w-2.5 h-2.5 text-slate-500 shrink-0" />
-                              <span className="truncate">Label OCR: "{candidate.detectedText}"</span>
+                              <span className="truncate">{lang === 'FR' ? 'ROC Étiquette :' : 'Label OCR:'} "{candidate.detectedText}"</span>
                             </div>
                           )}
                         </div>
@@ -900,14 +930,18 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                         }
                         className="text-[10px] font-bold px-2 py-1 rounded-xl bg-[#FAF7EE] border border-[#D5E1D2] text-[#0D3B37] focus:outline-none"
                       >
-                        <option value="Fridge">Fridge</option>
-                        <option value="Freezer">Freezer</option>
-                        <option value="Pantry">Pantry</option>
+                        <option value="Fridge">{lang === 'FR' ? 'Frigo' : 'Fridge'}</option>
+                        <option value="Freezer">{lang === 'FR' ? 'Congélateur' : 'Freezer'}</option>
+                        <option value="Pantry">{lang === 'FR' ? 'Garde-manger' : 'Pantry'}</option>
                       </select>
                     </div>
 
                     <div className="mt-2 text-[10px] text-[#527470] bg-[#FAF7EE] p-2 rounded-xl flex items-center justify-between">
-                      <span>Shelf Life: ~{candidate.estimatedShelfLifeDays}d (or {candidate.monthsFrozenShelfLife}m frozen)</span>
+                      <span>
+                        {lang === 'FR'
+                          ? `Conservation : ~${candidate.estimatedShelfLifeDays}j (${candidate.monthsFrozenShelfLife}m congelé)`
+                          : `Shelf Life: ~${candidate.estimatedShelfLifeDays}d (or ${candidate.monthsFrozenShelfLife}m frozen)`}
+                      </span>
                       <button
                         onClick={() => handleConfirmSingleItem(candidate)}
                         disabled={isAdded}
@@ -920,12 +954,12 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                         {isAdded ? (
                           <>
                             <Check className="w-3 h-3 text-emerald-700" />
-                            <span>Added</span>
+                            <span>{lang === 'FR' ? 'Ajouté' : 'Added'}</span>
                           </>
                         ) : (
                           <>
                             <Plus className="w-3 h-3" />
-                            <span>Add</span>
+                            <span>{lang === 'FR' ? 'Ajouter' : 'Add'}</span>
                           </>
                         )}
                       </button>
@@ -943,13 +977,13 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                 }}
                 className="flex items-center gap-1 text-teal-800 font-bold hover:underline"
               >
-                <RefreshCw className="w-3.5 h-3.5" /> Scan another photo
+                <RefreshCw className="w-3.5 h-3.5" /> {lang === 'FR' ? 'Scanner une autre photo' : 'Scan another photo'}
               </button>
               <button
                 onClick={onClose}
                 className="py-1.5 px-4 bg-[#EDF3EC] hover:bg-[#E2ECE0] text-[#0D3B37] font-bold rounded-xl transition-all"
               >
-                Done
+                {lang === 'FR' ? 'Fermer' : 'Done'}
               </button>
             </div>
           </div>
@@ -958,3 +992,4 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
     </div>
   );
 };
+

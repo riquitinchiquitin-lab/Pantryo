@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { MobileSimulator } from './components/MobileSimulator';
 import { PantryoLogo } from './components/PantryoLogo';
 import { Share, X } from 'lucide-react';
+import { LanguageProvider, useLanguage } from './utils/i18n';
 
-export default function App() {
+function AppContent() {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [showIosInstallModal, setShowIosInstallModal] = useState(false);
+  const { t, lang } = useLanguage();
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -57,8 +59,12 @@ export default function App() {
               <div className="flex items-center gap-2.5">
                 <PantryoLogo size={36} />
                 <div>
-                  <h3 className="text-base font-bold text-[#0D3B37]">Install Pantryo Web App</h3>
-                  <p className="text-xs text-[#527470]">Add directly to your iPhone or Android home screen</p>
+                  <h3 className="text-base font-bold text-[#0D3B37]">
+                    {t('install_modal_title')}
+                  </h3>
+                  <p className="text-xs text-[#527470]">
+                    {t('install_modal_subtitle')}
+                  </p>
                 </div>
               </div>
               <button
@@ -75,9 +81,19 @@ export default function App() {
                   1
                 </div>
                 <div>
-                  <p className="font-bold text-[#0D3B37]">On iPhone (Safari):</p>
+                  <p className="font-bold text-[#0D3B37]">
+                    {t('install_step_iphone_title')}
+                  </p>
                   <p className="text-[#527470] mt-0.5">
-                    Tap the <strong className="text-teal-800">Share</strong> button (the square with an arrow pointing up <Share className="w-3.5 h-3.5 inline text-teal-700" />), scroll down and tap <strong className="text-teal-800">"Add to Home Screen"</strong>.
+                    {lang === 'FR' ? (
+                      <>
+                        Touchez le bouton <strong className="text-teal-800">Partager</strong> (le carré avec la flèche <Share className="w-3.5 h-3.5 inline text-teal-700" />), faites défiler et touchez <strong className="text-teal-800">« Sur l'écran d'accueil »</strong>.
+                      </>
+                    ) : (
+                      <>
+                        Tap the <strong className="text-teal-800">Share</strong> button (the square with an arrow pointing up <Share className="w-3.5 h-3.5 inline text-teal-700" />), scroll down and tap <strong className="text-teal-800">"Add to Home Screen"</strong>.
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
@@ -87,9 +103,19 @@ export default function App() {
                   2
                 </div>
                 <div>
-                  <p className="font-bold text-[#0D3B37]">On Android (Chrome) or PC (Edge/Chrome):</p>
+                  <p className="font-bold text-[#0D3B37]">
+                    {t('install_step_android_title')}
+                  </p>
                   <p className="text-[#527470] mt-0.5">
-                    Tap the three dots menu ⋮ in the browser bar and select <strong className="text-teal-800">"Install App"</strong> or <strong className="text-teal-800">"Add to Home Screen"</strong>.
+                    {lang === 'FR' ? (
+                      <>
+                        Touchez le menu à trois points ⋮ dans votre navigateur et sélectionnez <strong className="text-teal-800">« Installer l'application »</strong> ou <strong className="text-teal-800">« Ajouter à l'écran d'accueil »</strong>.
+                      </>
+                    ) : (
+                      <>
+                        Tap the three dots menu ⋮ in the browser bar and select <strong className="text-teal-800">"Install App"</strong> or <strong className="text-teal-800">"Add to Home Screen"</strong>.
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
@@ -99,7 +125,7 @@ export default function App() {
               onClick={() => setShowIosInstallModal(false)}
               className="w-full py-2.5 rounded-xl bg-[#0E766E] hover:bg-[#0B5C56] text-white text-xs font-bold transition-all shadow-2xs"
             >
-              Got It!
+              {t('btn_got_it')}
             </button>
           </div>
         </div>
@@ -107,3 +133,12 @@ export default function App() {
     </div>
   );
 }
+
+export default function App() {
+  return (
+    <LanguageProvider>
+      <AppContent />
+    </LanguageProvider>
+  );
+}
+

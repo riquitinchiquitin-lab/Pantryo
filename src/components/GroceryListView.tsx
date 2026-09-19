@@ -24,6 +24,7 @@ import { InventoryItem, StorageType, SavedGroceryListItem } from '../types';
 import { FoodVisualBadge } from './FoodVisualBadge';
 import { getFoodVisual } from '../utils/foodVisuals';
 import { SavedListsModal } from './SavedListsModal';
+import { useLanguage, getLocationLocalizedName, getCategoryLocalizedName } from '../utils/i18n';
 
 export interface GroceryCartItem {
   id: string;
@@ -65,6 +66,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
   onUpdateGroceryItems,
   onSwitchToInventory,
 }) => {
+  const { t, lang } = useLanguage();
   const [filterView, setFilterView] = useState<'ALL' | 'TO_BUY' | 'IN_CART'>('ALL');
   const [inputName, setInputName] = useState('');
   const [inputCategory, setInputCategory] = useState('Produce');
@@ -258,7 +260,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
               onClick={onSwitchToInventory}
               className="px-2.5 py-1 bg-white text-teal-900 rounded-xl font-bold text-[11px] shrink-0 hover:bg-teal-50"
             >
-              View Kitchen →
+              {lang === 'FR' ? 'Voir la Cuisine →' : 'View Kitchen →'}
             </button>
           )}
         </div>
@@ -270,25 +272,25 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
           <div>
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] uppercase font-black tracking-wider text-[#527470]">
-                Household Grocery Run
+                {lang === 'FR' ? 'Courses du Foyer' : 'Household Grocery Run'}
               </span>
               <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
             </div>
             <h2 className="text-base font-black tracking-tight text-[#0D3B37]">
-              Store Shopping Cart
+              {lang === 'FR' ? "Panier d'Épicerie" : 'Store Shopping Cart'}
             </h2>
             <p className="text-xs text-[#527470]">
-              Synced in real time between Yan & Kriz
+              {lang === 'FR' ? 'Synchronisé en direct entre Yan & Kriz' : 'Synced in real time between Yan & Kriz'}
             </p>
           </div>
 
           <div className="text-right">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-50 border border-teal-200/70 text-teal-800 text-xs font-bold">
               <ShoppingCart className="w-3.5 h-3.5" />
-              <span>{inCartItems.length} in cart</span>
+              <span>{inCartItems.length} {lang === 'FR' ? 'au panier' : 'in cart'}</span>
             </div>
             <p className="text-[11px] text-[#527470] mt-0.5">
-              {toBuyItems.length} items left to find
+              {toBuyItems.length} {lang === 'FR' ? 'articles à trouver' : 'items left to find'}
             </p>
           </div>
         </div>
@@ -296,12 +298,12 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
         {/* Shopping Progress Bar */}
         <div className="space-y-1 pt-1">
           <div className="flex items-center justify-between text-[11px] font-bold text-[#133E3B]">
-            <span>Shopping Cart Progress</span>
+            <span>{lang === 'FR' ? 'Progression du Panier' : 'Shopping Cart Progress'}</span>
             <span>
               {groceryItems.length > 0
                 ? Math.round((inCartItems.length / groceryItems.length) * 100)
                 : 0}
-              % Collected
+              % {lang === 'FR' ? 'Collectés' : 'Collected'}
             </span>
           </div>
           <div className="w-full h-2 bg-[#EAE5D8] rounded-full overflow-hidden">
@@ -320,19 +322,21 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
 
         {/* Location Destination Legend with Distinct Icons */}
         <div className="pt-2 border-t border-[#F2ECE0] flex items-center justify-between text-[10px] font-bold text-[#527470]">
-          <span className="text-[#6A8884] uppercase tracking-wider">Destination Zones:</span>
+          <span className="text-[#6A8884] uppercase tracking-wider">
+            {lang === 'FR' ? 'Zones de Rangement :' : 'Destination Zones:'}
+          </span>
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1 text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200/60">
               <Refrigerator className="w-3 h-3 text-teal-700" />
-              Fridge ({cartFridgeCount})
+              {lang === 'FR' ? 'Frigo' : 'Fridge'} ({cartFridgeCount})
             </span>
             <span className="flex items-center gap-1 text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200/60">
               <Snowflake className="w-3 h-3 text-blue-500" />
-              Freezer ({cartFreezerCount})
+              {lang === 'FR' ? 'Congélateur' : 'Freezer'} ({cartFreezerCount})
             </span>
             <span className="flex items-center gap-1 text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60">
               <Boxes className="w-3 h-3 text-amber-600" />
-              Pantry ({cartPantryCount})
+              {lang === 'FR' ? 'Garde-manger' : 'Pantry'} ({cartPantryCount})
             </span>
           </div>
         </div>
@@ -350,14 +354,16 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
               <BookmarkCheck className="w-3.5 h-3.5" />
             </div>
             <div className="text-left">
-              <span className="block text-xs font-black">Saved Grocery Lists</span>
+              <span className="block text-xs font-black">
+                {lang === 'FR' ? 'Listes de Courses Enregistrées' : 'Saved Grocery Lists'}
+              </span>
               <span className="block text-[10px] font-medium text-[#527470]">
-                Staples, meal kits & bulk restocks
+                {lang === 'FR' ? 'Essentiels, kits repas & réassorts' : 'Staples, meal kits & bulk restocks'}
               </span>
             </div>
           </div>
           <span className="px-2 py-0.5 rounded-full bg-teal-50 text-teal-800 border border-teal-200/70 text-[10px] font-black shrink-0">
-            Open
+            {lang === 'FR' ? 'Ouvrir' : 'Open'}
           </span>
         </button>
 
@@ -365,11 +371,11 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
           <button
             type="button"
             onClick={() => setIsSavedListsOpen(true)}
-            title="Save your current grocery list as a reusable template"
+            title={lang === 'FR' ? 'Sauvegarder votre liste comme modèle réutilisable' : 'Save your current grocery list as a reusable template'}
             className="py-2 px-3 rounded-xl bg-teal-50 hover:bg-teal-100 border border-teal-200 text-teal-900 text-xs font-black flex items-center gap-1.5 transition-all active:scale-95 shrink-0"
           >
             <BookmarkPlus className="w-3.5 h-3.5 text-teal-700" />
-            <span>Save Run</span>
+            <span>{lang === 'FR' ? 'Enregistrer' : 'Save Run'}</span>
           </button>
         )}
       </div>
@@ -380,7 +386,8 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
             <span>
-              <strong>{expiringItems[0].name}</strong> is running low or expiring soon.
+              <strong>{expiringItems[0].name}</strong>{' '}
+              {lang === 'FR' ? 'est presque épuisé ou expire bientôt.' : 'is running low or expiring soon.'}
             </span>
           </div>
           <button
@@ -409,7 +416,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
             }}
             className="px-2.5 py-1 bg-amber-200/70 hover:bg-amber-200 text-amber-900 font-bold rounded-xl text-[11px] transition-colors flex items-center gap-1 shrink-0"
           >
-            <Plus className="w-3 h-3" /> Add to List
+            <Plus className="w-3 h-3" /> {lang === 'FR' ? 'Ajouter à la liste' : 'Add to List'}
           </button>
         </div>
       )}
@@ -424,7 +431,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
               : 'text-[#5C715F] hover:bg-[#F2F7F1]'
           }`}
         >
-          All ({groceryItems.length})
+          {lang === 'FR' ? 'Tous' : 'All'} ({groceryItems.length})
         </button>
         <button
           onClick={() => setFilterView('TO_BUY')}
@@ -434,7 +441,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
               : 'text-[#5C715F] hover:bg-[#F2F7F1]'
           }`}
         >
-          <span>To Find</span>
+          <span>{lang === 'FR' ? 'À Trouver' : 'To Find'}</span>
           <span className="px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-900 text-[10px] font-extrabold">
             {toBuyItems.length}
           </span>
@@ -448,7 +455,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
           }`}
         >
           <ShoppingCart className="w-3.5 h-3.5" />
-          <span>In Cart</span>
+          <span>{lang === 'FR' ? 'Au Panier' : 'In Cart'}</span>
           <span className="px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-900 text-[10px] font-extrabold">
             {inCartItems.length}
           </span>
@@ -465,7 +472,11 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
             type="text"
             value={inputName}
             onChange={(e) => setInputName(e.target.value)}
-            placeholder="Add grocery item (e.g. Sourdough, Avocados, Ice Cream)..."
+            placeholder={
+              lang === 'FR'
+                ? 'Ajouter un article (ex. Pain au levain, Avocats, Glace)...'
+                : 'Add grocery item (e.g. Sourdough, Avocados, Ice Cream)...'
+            }
             className="flex-1 px-3.5 py-2 text-xs bg-[#F7FAF6] border border-[#D5E1D2] rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800"
           />
           <button
@@ -473,14 +484,16 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
             className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center gap-1 shadow-xs transition-all active:scale-95 shrink-0"
           >
             <Plus className="w-3.5 h-3.5" />
-            Add
+            {lang === 'FR' ? 'Ajouter' : 'Add'}
           </button>
         </div>
 
         {/* Location selector and in-cart toggle row */}
         <div className="flex items-center justify-between pt-1 gap-2 flex-wrap">
           <div className="flex items-center gap-1">
-            <span className="text-[10px] font-bold text-[#627C65] mr-1">Destination:</span>
+            <span className="text-[10px] font-bold text-[#627C65] mr-1">
+              {lang === 'FR' ? 'Destination :' : 'Destination:'}
+            </span>
             <button
               type="button"
               onClick={() => setInputLocation('FRIDGE')}
@@ -491,7 +504,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
               }`}
             >
               <Refrigerator className="w-3 h-3" />
-              Fridge
+              {lang === 'FR' ? 'Frigo' : 'Fridge'}
             </button>
             <button
               type="button"
@@ -503,7 +516,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
               }`}
             >
               <Snowflake className="w-3 h-3" />
-              Freezer
+              {lang === 'FR' ? 'Congélateur' : 'Freezer'}
             </button>
             <button
               type="button"
@@ -515,7 +528,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
               }`}
             >
               <Boxes className="w-3 h-3" />
-              Pantry
+              {lang === 'FR' ? 'Garde-manger' : 'Pantry'}
             </button>
           </div>
 
@@ -526,7 +539,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
               onChange={(e) => setAddDirectlyToCart(e.target.checked)}
               className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5"
             />
-            <span>Put directly in Cart</span>
+            <span>{lang === 'FR' ? 'Mettre directement au panier' : 'Put directly in Cart'}</span>
           </label>
         </div>
       </form>
@@ -538,15 +551,15 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
             <ShoppingCart className="w-8 h-8 mx-auto text-[#8FA592] opacity-60 mb-2" />
             <p className="text-xs font-bold text-[#233527]">
               {filterView === 'IN_CART'
-                ? 'Your cart is empty'
+                ? (lang === 'FR' ? 'Votre panier est vide' : 'Your cart is empty')
                 : filterView === 'TO_BUY'
-                ? 'Everything is already in your cart!'
-                : 'No grocery items on list'}
+                ? (lang === 'FR' ? 'Tout est déjà dans votre panier !' : 'Everything is already in your cart!')
+                : (lang === 'FR' ? 'Aucun article sur la liste' : 'No grocery items on list')}
             </p>
             <p className="text-[11px]">
               {filterView === 'IN_CART'
-                ? 'Tap the cart button on any item to mark it as picked up in the store.'
-                : 'Add groceries above or load from your saved lists.'}
+                ? (lang === 'FR' ? "Touchez l'icône de panier sur un article pour marquer qu'il est pris." : 'Tap the cart button on any item to mark it as picked up in the store.')
+                : (lang === 'FR' ? 'Ajoutez des articles ci-dessus ou chargez une liste sauvegardée.' : 'Add groceries above or load from your saved lists.')}
             </p>
             {filterView !== 'IN_CART' && (
               <button
@@ -555,7 +568,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                 className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-2xs active:scale-95"
               >
                 <BookmarkCheck className="w-3.5 h-3.5" />
-                <span>Load a Saved List</span>
+                <span>{lang === 'FR' ? 'Charger une Liste Sauvegardée' : 'Load a Saved List'}</span>
               </button>
             )}
           </div>
@@ -580,7 +593,11 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                   {/* Cart Action Button */}
                   <button
                     onClick={() => toggleCart(item.id)}
-                    title={item.inCart ? 'Remove from Cart' : 'Place into Cart'}
+                    title={
+                      item.inCart
+                        ? (lang === 'FR' ? 'Retirer du panier' : 'Remove from Cart')
+                        : (lang === 'FR' ? 'Mettre au panier' : 'Place into Cart')
+                    }
                     className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all shrink-0 active:scale-90 ${
                       item.inCart
                         ? 'bg-emerald-600 border-emerald-600 text-white shadow-2xs'
@@ -611,7 +628,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                       </span>
                       {item.inCart && (
                         <span className="px-1.5 py-0.2 rounded-md bg-emerald-100 text-emerald-800 text-[9px] font-black uppercase tracking-wider shrink-0">
-                          In Cart
+                          {lang === 'FR' ? 'Au Panier' : 'In Cart'}
                         </span>
                       )}
                     </div>
@@ -625,7 +642,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                       {/* Destination Pill with Icon (Click to cycle destination) */}
                       <button
                         onClick={() => cycleLocation(item.id)}
-                        title="Click to switch destination (Fridge / Freezer / Pantry)"
+                        title={lang === 'FR' ? 'Cliquer pour changer de destination (Frigo / Congélateur / Garde-manger)' : 'Click to switch destination (Fridge / Freezer / Pantry)'}
                         className={`text-[10px] font-extrabold px-2 py-0.5 rounded-lg border flex items-center gap-1 transition-all active:scale-95 ${
                           isFridge
                             ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
@@ -638,13 +655,17 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                         {isFreezer && <Snowflake className="w-2.5 h-2.5 text-blue-500" />}
                         {isPantry && <Boxes className="w-2.5 h-2.5 text-amber-600" />}
                         <span>
-                          {isFridge ? 'To Fridge' : isFreezer ? 'To Freezer' : 'To Pantry'}
+                          {isFridge
+                            ? (lang === 'FR' ? 'Vers Frigo' : 'To Fridge')
+                            : isFreezer
+                            ? (lang === 'FR' ? 'Vers Congélateur' : 'To Freezer')
+                            : (lang === 'FR' ? 'Vers Garde-manger' : 'To Pantry')}
                         </span>
                       </button>
 
                       {item.autoSuggested && (
                         <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 font-semibold">
-                          Restock
+                          {lang === 'FR' ? 'Réassort' : 'Restock'}
                         </span>
                       )}
                     </div>
@@ -656,7 +677,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                   <button
                     onClick={() => removeItem(item.id)}
                     className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                    title="Remove item"
+                    title={lang === 'FR' ? "Supprimer l'article" : 'Remove item'}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -668,14 +689,19 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
 
         {groceryItems.length > 0 && (
           <div className="pt-2 px-1 flex items-center justify-between text-[11px] text-[#556D58]">
-            <span>{groceryItems.length} total list {groceryItems.length === 1 ? 'item' : 'items'}</span>
+            <span>
+              {groceryItems.length}{' '}
+              {lang === 'FR'
+                ? (groceryItems.length === 1 ? 'article au total' : 'articles au total')
+                : (groceryItems.length === 1 ? 'total list item' : 'total list items')}
+            </span>
             <button
               type="button"
               onClick={() => setIsSavedListsOpen(true)}
               className="text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-1 hover:underline active:scale-95 transition-all"
             >
               <BookmarkPlus className="w-3.5 h-3.5" />
-              <span>Save run as template</span>
+              <span>{lang === 'FR' ? 'Enregistrer comme modèle' : 'Save run as template'}</span>
             </button>
           </div>
         )}
@@ -691,22 +717,26 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
               </div>
               <div>
                 <p className="text-xs font-black tracking-tight">
-                  {inCartItems.length} {inCartItems.length === 1 ? 'Item' : 'Items'} in Cart
+                  {inCartItems.length}{' '}
+                  {lang === 'FR'
+                    ? (inCartItems.length === 1 ? 'Article' : 'Articles')
+                    : (inCartItems.length === 1 ? 'Item' : 'Items')}{' '}
+                  {lang === 'FR' ? 'au Panier' : 'in Cart'}
                 </p>
                 <div className="flex items-center gap-2 text-[10px] text-emerald-200 font-bold">
                   {cartFridgeCount > 0 && (
                     <span className="flex items-center gap-0.5">
-                      <Refrigerator className="w-2.5 h-2.5" /> {cartFridgeCount} Fridge
+                      <Refrigerator className="w-2.5 h-2.5" /> {cartFridgeCount} {lang === 'FR' ? 'Frigo' : 'Fridge'}
                     </span>
                   )}
                   {cartFreezerCount > 0 && (
                     <span className="flex items-center gap-0.5">
-                      <Snowflake className="w-2.5 h-2.5" /> {cartFreezerCount} Freezer
+                      <Snowflake className="w-2.5 h-2.5" /> {cartFreezerCount} {lang === 'FR' ? 'Congélateur' : 'Freezer'}
                     </span>
                   )}
                   {cartPantryCount > 0 && (
                     <span className="flex items-center gap-0.5">
-                      <Boxes className="w-2.5 h-2.5" /> {cartPantryCount} Pantry
+                      <Boxes className="w-2.5 h-2.5" /> {cartPantryCount} {lang === 'FR' ? 'Garde-manger' : 'Pantry'}
                     </span>
                   )}
                 </div>
@@ -717,7 +747,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
               onClick={() => setIsStockModalOpen(true)}
               className="py-2 px-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white rounded-2xl text-xs font-black flex items-center gap-1.5 shadow-md active:scale-95 transition-all shrink-0"
             >
-              <span>Stock Kitchen</span>
+              <span>{lang === 'FR' ? 'Ranger en Cuisine' : 'Stock Kitchen'}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -734,9 +764,13 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                   <ShoppingBag className="w-4 h-4 text-emerald-700" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-[#1E3022]">Stock to Kitchen</h3>
+                  <h3 className="text-sm font-black text-[#1E3022]">
+                    {lang === 'FR' ? 'Ranger en Cuisine' : 'Stock to Kitchen'}
+                  </h3>
                   <p className="text-[11px] text-[#556D58]">
-                    Review target compartments before adding
+                    {lang === 'FR'
+                      ? 'Vérifiez les compartiments cibles avant de ranger'
+                      : 'Review target compartments before adding'}
                   </p>
                 </div>
               </div>
@@ -763,7 +797,9 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                   </div>
 
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] text-[#69826D] font-bold">Zone:</span>
+                    <span className="text-[10px] text-[#69826D] font-bold">
+                      {lang === 'FR' ? 'Zone :' : 'Zone:'}
+                    </span>
                     <button
                       onClick={() => setSpecificLocation(item.id, 'FRIDGE')}
                       className={`px-2 py-0.5 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all ${
@@ -773,7 +809,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                       }`}
                     >
                       <Refrigerator className="w-2.5 h-2.5" />
-                      Fridge
+                      {lang === 'FR' ? 'Frigo' : 'Fridge'}
                     </button>
                     <button
                       onClick={() => setSpecificLocation(item.id, 'FREEZER')}
@@ -784,7 +820,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                       }`}
                     >
                       <Snowflake className="w-2.5 h-2.5" />
-                      Freezer
+                      {lang === 'FR' ? 'Congélateur' : 'Freezer'}
                     </button>
                     <button
                       onClick={() => setSpecificLocation(item.id, 'PANTRY')}
@@ -795,7 +831,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                       }`}
                     >
                       <Boxes className="w-2.5 h-2.5" />
-                      Pantry
+                      {lang === 'FR' ? 'Garde-manger' : 'Pantry'}
                     </button>
                   </div>
                 </div>
@@ -806,17 +842,22 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
             <div className="p-3 rounded-2xl bg-[#EAF2E7] border border-[#CADCC6] text-xs space-y-1">
               <p className="font-bold text-[#203624] flex items-center gap-1.5">
                 <Store className="w-3.5 h-3.5 text-emerald-700" />
-                Transferring {inCartItems.length} items to Kitchen:
+                {lang === 'FR'
+                  ? `Transfert de ${inCartItems.length} article(s) vers la cuisine :`
+                  : `Transferring ${inCartItems.length} items to Kitchen:`}
               </p>
               <div className="flex items-center gap-3 text-[11px] text-[#425B45]">
                 <span className="flex items-center gap-1">
-                  <Refrigerator className="w-3 h-3 text-emerald-600" /> {cartFridgeCount} in Fridge
+                  <Refrigerator className="w-3 h-3 text-emerald-600" /> {cartFridgeCount}{' '}
+                  {lang === 'FR' ? 'au Frigo' : 'in Fridge'}
                 </span>
                 <span className="flex items-center gap-1">
-                  <Snowflake className="w-3 h-3 text-blue-600" /> {cartFreezerCount} in Freezer
+                  <Snowflake className="w-3 h-3 text-blue-600" /> {cartFreezerCount}{' '}
+                  {lang === 'FR' ? 'au Congélateur' : 'in Freezer'}
                 </span>
                 <span className="flex items-center gap-1">
-                  <Boxes className="w-3 h-3 text-amber-700" /> {cartPantryCount} in Pantry
+                  <Boxes className="w-3 h-3 text-amber-700" /> {cartPantryCount}{' '}
+                  {lang === 'FR' ? 'au Garde-manger' : 'in Pantry'}
                 </span>
               </div>
             </div>
@@ -829,7 +870,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                 disabled={isStocking}
                 className="flex-1 py-2 rounded-xl text-xs font-bold text-[#556D58] hover:bg-slate-100"
               >
-                Cancel
+                {lang === 'FR' ? 'Annuler' : 'Cancel'}
               </button>
               <button
                 type="button"
@@ -840,12 +881,12 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                 {isStocking ? (
                   <>
                     <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Adding to Kitchen...</span>
+                    <span>{lang === 'FR' ? 'Rangement en cours...' : 'Adding to Kitchen...'}</span>
                   </>
                 ) : (
                   <>
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Confirm & Add to Kitchen</span>
+                    <span>{lang === 'FR' ? 'Confirmer & Ranger' : 'Confirm & Add to Kitchen'}</span>
                   </>
                 )}
               </button>

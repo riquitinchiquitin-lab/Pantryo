@@ -1,5 +1,7 @@
 export type StorageType = 'FRIDGE' | 'PANTRY' | 'FREEZER' | 'CELLAR' | 'SPICE_RACK';
 
+export type Language = 'EN' | 'FR';
+
 export interface User {
   id: string;
   name: string;
@@ -112,3 +114,34 @@ export interface SavedGroceryList {
   createdAt: string;
   updatedAt?: string;
 }
+
+export type MealType = 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SNACK';
+
+export interface PlannedMealIngredient {
+  name: string;
+  quantity?: number;
+  unit?: string;
+  inStock?: boolean;
+  inventoryItemId?: string;
+}
+
+export interface PlannedMeal {
+  id: string;
+  householdId: string;
+  title: string;
+  date: string; // YYYY-MM-DD
+  mealType: MealType;
+  recipeName?: string;
+  recipeUrl?: string;
+  imageUrl?: string;
+  servings?: number;
+  prepTimeMinutes?: number;
+  notes?: string;
+  isCooked: boolean;
+  ingredients: PlannedMealIngredient[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ViewportMode = 'desktop' | 'tablet' | 'mobile';
+

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Users, Copy, Check, Shield, Clock, Plus, UserCheck, ArrowRightLeft } from 'lucide-react';
 import { User, ActivityLogItem } from '../types';
+import { useLanguage, getLocationLocalizedName } from '../utils/i18n';
 
 interface FamilySyncViewProps {
   currentUser: User;
@@ -13,6 +14,7 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
   onSwitchUser,
   members,
 }) => {
+  const { t, lang } = useLanguage();
   const [copied, setCopied] = useState(false);
   const inviteCode = 'KOMRADE-7729';
 
@@ -26,26 +28,26 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
     {
       id: 'log_3',
       action: 'ITEM_DEFROSTED',
-      details: { itemName: 'Grass-Fed Ground Beef', fromLocation: 'Freezer', toLocation: 'Fridge', newExpiration: '3 days', defrostedBy: 'Yan' },
+      details: { itemName: lang === 'FR' ? 'Bœuf haché bio' : 'Grass-Fed Ground Beef', fromLocation: 'Freezer', toLocation: 'Fridge', newExpiration: '3 days', defrostedBy: 'Yan' },
       userId: 'usr_yan',
       householdId: 'hh_01',
-      createdAt: '12 minutes ago',
+      createdAt: lang === 'FR' ? 'Il y a 12 min' : '12 minutes ago',
     },
     {
       id: 'log_2',
       action: 'ITEM_CREATED',
-      details: { itemName: 'Organic Strawberries', location: 'Fridge', addedBy: 'Kriz' },
+      details: { itemName: lang === 'FR' ? 'Fraises bio' : 'Organic Strawberries', location: 'Fridge', addedBy: 'Kriz' },
       userId: 'usr_kriz',
       householdId: 'hh_01',
-      createdAt: '3 hours ago',
+      createdAt: lang === 'FR' ? 'Il y a 3 heures' : '3 hours ago',
     },
     {
       id: 'log_1',
       action: 'ITEM_CREATED',
-      details: { itemName: 'Oat Milk (Barista Blend)', location: 'Fridge', addedBy: 'Yan' },
+      details: { itemName: lang === 'FR' ? 'Lait d\'avoine barista' : 'Oat Milk (Barista Blend)', location: 'Fridge', addedBy: 'Yan' },
       userId: 'usr_yan',
       householdId: 'hh_01',
-      createdAt: 'Yesterday',
+      createdAt: lang === 'FR' ? 'Hier' : 'Yesterday',
     },
   ];
 
@@ -53,8 +55,14 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
     <div className="space-y-5 pb-20 animate-fade-in">
       {/* Header */}
       <div>
-        <h2 className="text-xl font-bold tracking-tight text-[#233527]">Family Sync & Household</h2>
-        <p className="text-xs text-[#5D7060]">Multi-tenant access for roommates and families</p>
+        <h2 className="text-xl font-bold tracking-tight text-[#233527]">
+          {lang === 'FR' ? 'Synchronisation Familiale & Foyer' : 'Family Sync & Household'}
+        </h2>
+        <p className="text-xs text-[#5D7060]">
+          {lang === 'FR'
+            ? 'Accès partagé pour colocataires et familles'
+            : 'Multi-tenant access for roommates and families'}
+        </p>
       </div>
 
       {/* Household Invite Box */}
@@ -65,12 +73,14 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
             <span>The Yan & Kriz Kitchen</span>
           </div>
           <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-600 text-white font-semibold">
-            Active Household
+            {lang === 'FR' ? 'Foyer Actif' : 'Active Household'}
           </span>
         </div>
 
         <p className="text-xs text-[#425E45] leading-relaxed">
-          Share this invite code with family members or roommates so they can scan items, receive expiration alerts, and manage fridge items together.
+          {lang === 'FR'
+            ? 'Partagez ce code d\'invitation avec les membres de votre foyer pour scanner des articles, recevoir les alertes de péremption et gérer les courses ensemble.'
+            : 'Share this invite code with family members or roommates so they can scan items, receive expiration alerts, and manage fridge items together.'}
         </p>
 
         <div className="flex items-center gap-2 p-2 bg-white/90 backdrop-blur rounded-2xl border border-emerald-200">
@@ -82,7 +92,7 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
             className="py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 transition-all"
           >
             {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-            {copied ? 'Copied' : 'Copy'}
+            {copied ? (lang === 'FR' ? 'Copié' : 'Copied') : (lang === 'FR' ? 'Copier' : 'Copy')}
           </button>
         </div>
       </div>
@@ -91,9 +101,11 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
       <div className="space-y-2.5">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-bold uppercase tracking-wider text-[#5D7060]">
-            Household Members ({members.length})
+            {lang === 'FR' ? `Membres du Foyer (${members.length})` : `Household Members (${members.length})`}
           </h3>
-          <span className="text-[11px] text-[#69856C]">Tap to switch active profile</span>
+          <span className="text-[11px] text-[#69856C]">
+            {lang === 'FR' ? 'Touchez pour changer de profil actif' : 'Tap to switch active profile'}
+          </span>
         </div>
 
         <div className="grid grid-cols-2 gap-2.5">
@@ -119,7 +131,11 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
                     <span className="font-bold text-sm text-[#233527] truncate">{member.name}</span>
                     {isActive && <UserCheck className="w-4 h-4 text-emerald-600 shrink-0" />}
                   </div>
-                  <span className="text-[11px] text-[#6C8470] capitalize">{member.role.toLowerCase()}</span>
+                  <span className="text-[11px] text-[#6C8470]">
+                    {member.role === 'ADMIN'
+                      ? (lang === 'FR' ? 'Administrateur' : 'Admin')
+                      : (lang === 'FR' ? 'Membre' : 'Member')}
+                  </span>
                 </div>
               </button>
             );
@@ -131,7 +147,7 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
       <div className="space-y-3 pt-2">
         <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#5D7060]">
           <Clock className="w-3.5 h-3.5" />
-          <span>Real-Time Audit Activity</span>
+          <span>{lang === 'FR' ? 'Journal d\'Activité en Temps Réel' : 'Real-Time Audit Activity'}</span>
         </div>
 
         <div className="space-y-2.5">
@@ -148,9 +164,17 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
               </div>
               <p className="text-[#59725C]">
                 {log.action === 'ITEM_DEFROSTED' ? (
-                  <>Defrosted by <strong>{log.details.defrostedBy}</strong> (moved from Freezer ➡️ Fridge with 3 days shelf-life)</>
+                  lang === 'FR' ? (
+                    <>Décongelé par <strong>{log.details.defrostedBy}</strong> (déplacé du Congélateur ➡️ Réfrigérateur avec 3 jours de conservation)</>
+                  ) : (
+                    <>Defrosted by <strong>{log.details.defrostedBy}</strong> (moved from Freezer ➡️ Fridge with 3 days shelf-life)</>
+                  )
                 ) : (
-                  <>Added to {log.details.location} by <strong>{log.details.addedBy}</strong></>
+                  lang === 'FR' ? (
+                    <>Ajouté dans {getLocationLocalizedName(log.details.location, lang)} par <strong>{log.details.addedBy}</strong></>
+                  ) : (
+                    <>Added to {log.details.location} by <strong>{log.details.addedBy}</strong></>
+                  )
                 )}
               </p>
             </div>

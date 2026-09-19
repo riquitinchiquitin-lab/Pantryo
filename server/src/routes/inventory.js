@@ -23,12 +23,114 @@ const LOCATIONS = [
 ];
 
 const CATEGORIES = [
-  { id: "cat_dairy", name: "Dairy & Eggs", icon: "Milk", color: "#E0F2FE", householdId: SEED_HOUSEHOLD_ID },
-  { id: "cat_produce", name: "Produce", icon: "Apple", color: "#DCFCE7", householdId: SEED_HOUSEHOLD_ID },
-  { id: "cat_meat", name: "Meat & Seafood", icon: "Beef", color: "#FEE2E2", householdId: SEED_HOUSEHOLD_ID },
-  { id: "cat_bakery", name: "Bakery", icon: "Wheat", color: "#FEF3C7", householdId: SEED_HOUSEHOLD_ID },
-  { id: "cat_pantry", name: "Pantry Staples", icon: "Package", color: "#F3E8FF", householdId: SEED_HOUSEHOLD_ID },
-  { id: "cat_frozen", name: "Frozen Meals", icon: "Snowflake", color: "#E0E7FF", householdId: SEED_HOUSEHOLD_ID },
+  {
+    id: "cat_produce",
+    name: "Produce",
+    icon: "Apple",
+    color: "#DCFCE7",
+    householdId: SEED_HOUSEHOLD_ID,
+    imageUrl: "https://images.unsplash.com/photo-1610832958506-aa56368176cf?auto=format&fit=crop&w=600&q=80",
+    description: "Fresh vegetables, fruits, salad greens & herbs",
+  },
+  {
+    id: "cat_dairy",
+    name: "Dairy & Eggs",
+    icon: "Milk",
+    color: "#E0F2FE",
+    householdId: SEED_HOUSEHOLD_ID,
+    imageUrl: "https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=600&q=80",
+    description: "Milk, butter, cheeses, yogurt & farm eggs",
+  },
+  {
+    id: "cat_meat",
+    name: "Meat & Seafood",
+    icon: "Beef",
+    color: "#FEE2E2",
+    householdId: SEED_HOUSEHOLD_ID,
+    imageUrl: "https://images.unsplash.com/photo-1603048588665-791ca8aea617?auto=format&fit=crop&w=600&q=80",
+    description: "Beef, poultry, pork, salmon & fresh seafood",
+  },
+  {
+    id: "cat_bakery",
+    name: "Bakery",
+    icon: "Wheat",
+    color: "#FEF3C7",
+    householdId: SEED_HOUSEHOLD_ID,
+    imageUrl: "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80",
+    description: "Artisanal sourdough, baguettes, bread & pastries",
+  },
+  {
+    id: "cat_pantry",
+    name: "Pantry Staples",
+    icon: "Package",
+    color: "#F3E8FF",
+    householdId: SEED_HOUSEHOLD_ID,
+    imageUrl: "https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?auto=format&fit=crop&w=600&q=80",
+    description: "Pasta, grains, legumes, rice, flour & spices",
+  },
+  {
+    id: "cat_frozen",
+    name: "Frozen Meals",
+    icon: "Snowflake",
+    color: "#E0E7FF",
+    householdId: SEED_HOUSEHOLD_ID,
+    imageUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=80",
+    description: "Frozen pizzas, dumplings, waffles & frozen veggies",
+  },
+  {
+    id: "cat_beverages",
+    name: "Beverages",
+    icon: "Coffee",
+    color: "#CCFBF1",
+    householdId: SEED_HOUSEHOLD_ID,
+    imageUrl: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=600&q=80",
+    description: "Coffee, tea, matcha, natural juices & sparkling drinks",
+  },
+  {
+    id: "cat_snacks",
+    name: "Snacks",
+    icon: "Cookie",
+    color: "#FFEDD5",
+    householdId: SEED_HOUSEHOLD_ID,
+    imageUrl: "https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?auto=format&fit=crop&w=600&q=80",
+    description: "Mixed roasted nuts, crisps, dried fruits & crackers",
+  },
+  {
+    id: "cat_condiments",
+    name: "Condiments",
+    icon: "Soup",
+    color: "#FEF9C3",
+    householdId: SEED_HOUSEHOLD_ID,
+    imageUrl: "https://images.unsplash.com/photo-1472476443507-c7a5948772fc?auto=format&fit=crop&w=600&q=80",
+    description: "Olive oil, balsamic vinegar, hot sauces & dressings",
+  },
+  {
+    id: "cat_deli",
+    name: "Deli & Prepared",
+    icon: "Sandwich",
+    color: "#FEF3C7",
+    householdId: SEED_HOUSEHOLD_ID,
+    imageUrl: "https://images.unsplash.com/photo-1541544741938-0af808871cc0?auto=format&fit=crop&w=600&q=80",
+    description: "Charcuterie, cured meats, prepared salads & dips",
+  },
+  {
+    id: "cat_canned",
+    name: "Canned Goods",
+    icon: "Package",
+    color: "#FFE4E6",
+    householdId: SEED_HOUSEHOLD_ID,
+    imageUrl: "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=600&q=80",
+    description: "Canned tomatoes, soups, broths & preserved beans",
+  },
+  {
+    id: "cat_sweets",
+    name: "Sweets & Desserts",
+    icon: "IceCream",
+    color: "#FCE7F3",
+    householdId: SEED_HOUSEHOLD_ID,
+    imageUrl: "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=600&q=80",
+    description: "Fine chocolates, gourmet pastries, honey & desserts",
+  },
 ];
 
 // Helper to calculate target ISO date string relative to today
@@ -407,6 +509,17 @@ router.get("/barcode/:code", async (req, res) => {
 });
 
 /**
+ * GET /api/v1/inventory/categories
+ * Returns all food categories with their curated web photos and metadata.
+ */
+router.get("/categories", (req, res) => {
+  res.json({
+    success: true,
+    categories: CATEGORIES,
+  });
+});
+
+/**
  * GET /api/v1/inventory/household/:id
  * Returns structured inventory grouped by location and expiring-soon priority.
  * Computes live shelf-life metrics and freezer duration countdowns.
@@ -421,7 +534,12 @@ router.get("/household/:id", (req, res) => {
       .filter((item) => item.householdId === householdId && item.status === "ACTIVE")
       .map((item) => {
         const location = LOCATIONS.find((l) => l.id === item.locationId) || { name: "Fridge", type: "FRIDGE" };
-        const category = CATEGORIES.find((c) => c.id === item.categoryId) || { name: "Pantry Staples", icon: "Package", color: "#F3E8FF" };
+        const category = CATEGORIES.find((c) => c.id === item.categoryId) || {
+          name: "Pantry Staples",
+          icon: "Package",
+          color: "#F3E8FF",
+          imageUrl: "https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?auto=format&fit=crop&w=600&q=80",
+        };
         const addedBy = USERS.find((u) => u.id === item.addedById) || { name: "Unknown", avatarUrl: null };
 
         // Expiration calculation
@@ -453,11 +571,13 @@ router.get("/household/:id", (req, res) => {
 
         return {
           ...item,
+          imageUrl: item.imageUrl || category.imageUrl,
           locationName: location.name,
           locationType: location.type,
           categoryName: category.name,
           categoryIcon: category.icon,
           categoryColor: category.color,
+          categoryImageUrl: category.imageUrl,
           addedByName: addedBy.name,
           addedByAvatar: addedBy.avatarUrl,
           daysUntilExpiration,
@@ -909,4 +1029,228 @@ router.post("/bulk-items", (req, res) => {
   }
 });
 
+/**
+ * ============================================================================
+ * MEAL PLANNING WITH CALENDAR ROUTES
+ * ============================================================================
+ */
+
+function getIsoDateOffset(daysOffset = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() + daysOffset);
+  return d.toISOString().split('T')[0];
+}
+
+let plannedMealsStore = [
+  {
+    id: "meal_001",
+    householdId: SEED_HOUSEHOLD_ID,
+    title: "Herb Butter Pan-Seared Salmon",
+    date: getIsoDateOffset(0), // Today
+    mealType: "DINNER",
+    recipeName: "Pan-Seared Atlantic Salmon with Garlic Greens",
+    imageUrl: "https://images.unsplash.com/photo-1467003909585-2f8a72700288?auto=format&fit=crop&w=600&q=80",
+    servings: 2,
+    prepTimeMinutes: 25,
+    notes: "Uses Wild Salmon Fillets from Freezer and Organic Baby Spinach from Fridge",
+    isCooked: false,
+    ingredients: [
+      { name: "Wild Salmon Fillets", quantity: 2, unit: "portions", inStock: true },
+      { name: "Organic Baby Spinach", quantity: 1, unit: "box", inStock: true },
+      { name: "Garlic & Butter", quantity: 1, unit: "tbsp", inStock: true },
+    ],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: "meal_002",
+    householdId: SEED_HOUSEHOLD_ID,
+    title: "Slow-Cooked Beef Bolognese Pasta",
+    date: getIsoDateOffset(1), // Tomorrow
+    mealType: "DINNER",
+    recipeName: "Hearty Bolognese with San Marzano Tomatoes",
+    imageUrl: "https://images.unsplash.com/photo-1551462147-ff29053bfc14?auto=format&fit=crop&w=600&q=80",
+    servings: 4,
+    prepTimeMinutes: 45,
+    notes: "Uses Ground Beef and San Marzano Canned Tomatoes from Pantry",
+    isCooked: false,
+    ingredients: [
+      { name: "Ground Beef", quantity: 1, unit: "pack (500g)", inStock: true },
+      { name: "San Marzano Canned Tomatoes", quantity: 2, unit: "cans", inStock: true },
+      { name: "Bronze-Cut Spaghetti", quantity: 1, unit: "box", inStock: true },
+    ],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: "meal_003",
+    householdId: SEED_HOUSEHOLD_ID,
+    title: "Greek Yogurt Parfait with Honey",
+    date: getIsoDateOffset(1), // Tomorrow Breakfast
+    mealType: "BREAKFAST",
+    recipeName: "Protein Morning Parfait",
+    imageUrl: "https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=600&q=80",
+    servings: 2,
+    prepTimeMinutes: 5,
+    notes: "High protein quick breakfast",
+    isCooked: false,
+    ingredients: [
+      { name: "Greek Yogurt (0% Fat)", quantity: 200, unit: "g", inStock: true },
+      { name: "Fresh Strawberries", quantity: 1, unit: "cup", inStock: true },
+    ],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: "meal_004",
+    householdId: SEED_HOUSEHOLD_ID,
+    title: "Crispy Searing Pork Chops & Rosemary",
+    date: getIsoDateOffset(3),
+    mealType: "DINNER",
+    recipeName: "Skillet Pork Chops",
+    imageUrl: "https://images.unsplash.com/photo-1432139555190-58524dae6a55?auto=format&fit=crop&w=600&q=80",
+    servings: 2,
+    prepTimeMinutes: 30,
+    notes: "Pair with roasted potatoes or salad",
+    isCooked: false,
+    ingredients: [
+      { name: "Pork Chops", quantity: 2, unit: "chops", inStock: true },
+      { name: "Rosemary & Garlic", quantity: 1, unit: "bundle", inStock: false },
+    ],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+];
+
+// GET /api/v1/inventory/household/:householdId/meals
+router.get("/household/:householdId/meals", (req, res) => {
+  const { householdId } = req.params;
+  const meals = plannedMealsStore
+    .filter((m) => m.householdId === householdId)
+    .sort((a, b) => (a.date > b.date ? 1 : -1));
+
+  return res.json({
+    success: true,
+    count: meals.length,
+    meals,
+  });
+});
+
+// POST /api/v1/inventory/household/:householdId/meals
+router.post("/household/:householdId/meals", (req, res) => {
+  try {
+    const { householdId } = req.params;
+    const {
+      title,
+      date,
+      mealType = "DINNER",
+      recipeName,
+      recipeUrl,
+      imageUrl,
+      servings = 2,
+      prepTimeMinutes = 30,
+      notes = "",
+      ingredients = [],
+    } = req.body;
+
+    if (!title || !date) {
+      return res.status(400).json({
+        success: false,
+        error: "Title and date (YYYY-MM-DD) are required for meal planning.",
+      });
+    }
+
+    const newMeal = {
+      id: `meal_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      householdId,
+      title: title.trim(),
+      date,
+      mealType: (mealType || "DINNER").toUpperCase(),
+      recipeName: recipeName ? recipeName.trim() : null,
+      recipeUrl: recipeUrl || null,
+      imageUrl: imageUrl || null,
+      servings: Number(servings) || 2,
+      prepTimeMinutes: Number(prepTimeMinutes) || 30,
+      notes: notes || "",
+      isCooked: false,
+      ingredients: Array.isArray(ingredients) ? ingredients : [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    plannedMealsStore.push(newMeal);
+
+    // Record activity log
+    activityLogs.unshift({
+      id: `log_${Date.now()}`,
+      action: "MEAL_PLANNED",
+      details: {
+        mealTitle: newMeal.title,
+        date: newMeal.date,
+        mealType: newMeal.mealType,
+      },
+      userId: USERS[0].id,
+      householdId,
+      createdAt: new Date().toISOString(),
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: `Meal "${newMeal.title}" added to calendar for ${newMeal.date}`,
+      meal: newMeal,
+    });
+  } catch (error) {
+    console.error("[Inventory Route] POST meal error:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to schedule meal",
+      details: error.message,
+    });
+  }
+});
+
+// PUT /api/v1/inventory/meals/:mealId
+router.put("/meals/:mealId", (req, res) => {
+  const { mealId } = req.params;
+  const index = plannedMealsStore.findIndex((m) => m.id === mealId);
+
+  if (index === -1) {
+    return res.status(404).json({ success: false, error: "Meal not found" });
+  }
+
+  const existing = plannedMealsStore[index];
+  const updated = {
+    ...existing,
+    ...req.body,
+    id: existing.id,
+    householdId: existing.householdId,
+    updatedAt: new Date().toISOString(),
+  };
+
+  plannedMealsStore[index] = updated;
+
+  return res.json({
+    success: true,
+    message: "Meal plan updated successfully",
+    meal: updated,
+  });
+});
+
+// DELETE /api/v1/inventory/meals/:mealId
+router.delete("/meals/:mealId", (req, res) => {
+  const { mealId } = req.params;
+  const initialLength = plannedMealsStore.length;
+  plannedMealsStore = plannedMealsStore.filter((m) => m.id !== mealId);
+
+  if (plannedMealsStore.length === initialLength) {
+    return res.status(404).json({ success: false, error: "Meal not found" });
+  }
+
+  return res.json({
+    success: true,
+    message: "Meal removed from calendar",
+  });
+});
+
 export default router;
+

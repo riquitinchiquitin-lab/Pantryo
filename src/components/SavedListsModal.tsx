@@ -23,6 +23,7 @@ import { SavedGroceryList, SavedGroceryListItem } from '../types';
 import { GroceryCartItem } from './GroceryListView';
 import { FoodVisualBadge } from './FoodVisualBadge';
 import { getFoodVisual } from '../utils/foodVisuals';
+import { useLanguage, getLocationLocalizedName, getCategoryLocalizedName } from '../utils/i18n';
 
 const STORAGE_KEY = 'kitchen_komrade_saved_grocery_lists_v1';
 
@@ -92,6 +93,7 @@ export const SavedListsModal: React.FC<SavedListsModalProps> = ({
   onAddItemsToCurrentGrocery,
   onSaveCurrentAsList,
 }) => {
+  const { t, lang } = useLanguage();
   const [savedLists, setSavedLists] = useState<SavedGroceryList[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -233,10 +235,12 @@ export const SavedListsModal: React.FC<SavedListsModalProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-black tracking-tight text-[#1E3022]">
-                Saved Grocery Lists
+                {lang === 'FR' ? 'Listes de Courses Enregistrées' : 'Saved Grocery Lists'}
               </h3>
               <p className="text-[11px] text-[#556D58]">
-                Reusable templates & recurring household restocks
+                {lang === 'FR'
+                  ? 'Modèles réutilisables & réassorts récurrents'
+                  : 'Reusable templates & recurring household restocks'}
               </p>
             </div>
           </div>
@@ -267,7 +271,9 @@ export const SavedListsModal: React.FC<SavedListsModalProps> = ({
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
-            <span>Saved Lists ({savedLists.length})</span>
+            <span>
+              {lang === 'FR' ? 'Listes Enregistrées' : 'Saved Lists'} ({savedLists.length})
+            </span>
           </button>
 
           <button
@@ -279,7 +285,7 @@ export const SavedListsModal: React.FC<SavedListsModalProps> = ({
             }`}
           >
             <ListPlus className="w-3.5 h-3.5" />
-            <span>Save Current Run</span>
+            <span>{lang === 'FR' ? 'Enregistrer la Liste Actuelle' : 'Save Current Run'}</span>
           </button>
         </div>
 
@@ -292,16 +298,18 @@ export const SavedListsModal: React.FC<SavedListsModalProps> = ({
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-black text-[#1E3022] flex items-center gap-1.5">
                     <ShoppingBag className="w-3.5 h-3.5 text-emerald-600" />
-                    Items in Current Grocery Run:
+                    {lang === 'FR' ? 'Articles dans le panier actuel :' : 'Items in Current Grocery Run:'}
                   </span>
                   <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black">
-                    {currentGroceryItems.length} items
+                    {currentGroceryItems.length} {lang === 'FR' ? 'articles' : 'items'}
                   </span>
                 </div>
 
                 {currentGroceryItems.length === 0 ? (
                   <p className="text-xs text-[#6B856E] italic">
-                    Your current grocery cart is empty. Add items to your grocery list first to save them as a template.
+                    {lang === 'FR'
+                      ? 'Votre liste de courses est vide. Ajoutez des articles pour les enregistrer comme modèle.'
+                      : 'Your current grocery cart is empty. Add items to your grocery list first to save them as a template.'}
                   </p>
                 ) : (
                   <div className="flex flex-wrap gap-1.5 pt-1">
@@ -315,7 +323,7 @@ export const SavedListsModal: React.FC<SavedListsModalProps> = ({
                     ))}
                     {currentGroceryItems.length > 8 && (
                       <span className="px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-800 text-[10px] font-bold">
-                        +{currentGroceryItems.length - 8} more
+                        +{currentGroceryItems.length - 8} {lang === 'FR' ? 'de plus' : 'more'}
                       </span>
                     )}
                   </div>
@@ -324,13 +332,17 @@ export const SavedListsModal: React.FC<SavedListsModalProps> = ({
 
               <div className="space-y-1">
                 <label className="text-[11px] font-black uppercase tracking-wider text-[#4E6852]">
-                  Template / List Name *
+                  {lang === 'FR' ? 'Nom du Modèle / de la Liste *' : 'Template / List Name *'}
                 </label>
                 <input
                   type="text"
                   value={newListName}
                   onChange={(e) => setNewListName(e.target.value)}
-                  placeholder="e.g. Weekly Pantry Staples, Costco Sub-Zero Run"
+                  placeholder={
+                    lang === 'FR'
+                      ? 'ex. Essentiels Hebdomadaires, Réassort Surgelés'
+                      : 'e.g. Weekly Pantry Staples, Costco Sub-Zero Run'
+                  }
                   required
                   className="w-full px-3 py-2 text-xs bg-white border border-[#D5E1D2] rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800"
                 />
@@ -338,21 +350,27 @@ export const SavedListsModal: React.FC<SavedListsModalProps> = ({
 
               <div className="space-y-1">
                 <label className="text-[11px] font-black uppercase tracking-wider text-[#4E6852]">
-                  Category / Tag
+                  {lang === 'FR' ? 'Catégorie / Tag' : 'Category / Tag'}
                 </label>
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  {['Weekly Routine', 'Freezer Bulk', 'Meal Theme', 'Party', 'Custom'].map((tag) => (
+                  {[
+                    { key: 'Weekly Routine', label: lang === 'FR' ? 'Routine Hebdo' : 'Weekly Routine' },
+                    { key: 'Freezer Bulk', label: lang === 'FR' ? 'Vrac Congélateur' : 'Freezer Bulk' },
+                    { key: 'Meal Theme', label: lang === 'FR' ? 'Thème Repas' : 'Meal Theme' },
+                    { key: 'Party', label: lang === 'FR' ? 'Fête / Apéro' : 'Party' },
+                    { key: 'Custom', label: lang === 'FR' ? 'Personnalisé' : 'Custom' },
+                  ].map(({ key, label }) => (
                     <button
-                      key={tag}
+                      key={key}
                       type="button"
-                      onClick={() => setNewListTag(tag)}
+                      onClick={() => setNewListTag(key)}
                       className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
-                        newListTag === tag
+                        newListTag === key
                           ? 'bg-emerald-600 text-white shadow-2xs'
                           : 'bg-[#EEF4EC] text-[#4F6853] hover:bg-[#E2EDE0]'
                       }`}
                     >
-                      {tag}
+                      {label}
                     </button>
                   ))}
                 </div>
@@ -360,13 +378,17 @@ export const SavedListsModal: React.FC<SavedListsModalProps> = ({
 
               <div className="space-y-1">
                 <label className="text-[11px] font-black uppercase tracking-wider text-[#4E6852]">
-                  Description (Optional)
+                  {lang === 'FR' ? 'Description (Optionnelle)' : 'Description (Optional)'}
                 </label>
                 <input
                   type="text"
                   value={newListDescription}
                   onChange={(e) => setNewListDescription(e.target.value)}
-                  placeholder="e.g. Every Monday breakfast and dinner basics"
+                  placeholder={
+                    lang === 'FR'
+                      ? 'ex. Indispensables du lundi pour le petit-déjeuner et dîner'
+                      : 'e.g. Every Monday breakfast and dinner basics'
+                  }
                   className="w-full px-3 py-2 text-xs bg-white border border-[#D5E1D2] rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800"
                 />
               </div>
@@ -377,7 +399,7 @@ export const SavedListsModal: React.FC<SavedListsModalProps> = ({
                   onClick={() => setIsSavingCurrent(false)}
                   className="flex-1 py-2 text-xs font-bold text-[#556D58] hover:bg-slate-100 rounded-xl"
                 >
-                  Cancel
+                  {lang === 'FR' ? 'Annuler' : 'Cancel'}
                 </button>
                 <button
                   type="submit"
@@ -385,7 +407,7 @@ export const SavedListsModal: React.FC<SavedListsModalProps> = ({
                   className="flex-2 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1.5 shadow-xs active:scale-95 transition-all"
                 >
                   <BookmarkCheck className="w-3.5 h-3.5" />
-                  <span>Save Template</span>
+                  <span>{lang === 'FR' ? 'Enregistrer le Modèle' : 'Save Template'}</span>
                 </button>
               </div>
             </form>
@@ -395,15 +417,19 @@ export const SavedListsModal: React.FC<SavedListsModalProps> = ({
               {savedLists.length === 0 ? (
                 <div className="p-8 text-center text-[#69826C] bg-[#F7FAF6] rounded-2xl border border-[#D5E1D2] space-y-2">
                   <BookmarkCheck className="w-8 h-8 mx-auto text-emerald-400 opacity-70" />
-                  <p className="text-xs font-bold text-[#233527]">No saved lists yet</p>
+                  <p className="text-xs font-bold text-[#233527]">
+                    {lang === 'FR' ? 'Aucune liste enregistrée' : 'No saved lists yet'}
+                  </p>
                   <p className="text-[11px]">
-                    Save your current shopping list or reset to default household templates.
+                    {lang === 'FR'
+                      ? 'Enregistrez votre liste actuelle ou restaurez les modèles par défaut.'
+                      : 'Save your current shopping list or reset to default household templates.'}
                   </p>
                   <button
                     onClick={() => setSavedLists(DEFAULT_SAVED_LISTS)}
                     className="mt-2 px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-bold"
                   >
-                    Load Default Templates
+                    {lang === 'FR' ? 'Charger les Modèles par Défaut' : 'Load Default Templates'}
                   </button>
                 </div>
               ) : (
@@ -458,7 +484,7 @@ export const SavedListsModal: React.FC<SavedListsModalProps> = ({
                             <button
                               onClick={() => handleDeleteList(list.id, list.name)}
                               className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                              title="Delete saved list"
+                              title={lang === 'FR' ? 'Supprimer la liste enregistrée' : 'Delete saved list'}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -480,7 +506,7 @@ export const SavedListsModal: React.FC<SavedListsModalProps> = ({
                         {/* Summary Badges: Fridge, Freezer, Pantry distribution */}
                         <div className="flex items-center justify-between pt-1 border-t border-[#EDF4EB] text-[10px] font-bold text-[#556D58]">
                           <span className="font-extrabold text-[#233527]">
-                            {total} Items Total
+                            {total} {lang === 'FR' ? 'Articles au total' : 'Items Total'}
                           </span>
                           <div className="flex items-center gap-2">
                             {fridgeCount > 0 && (
@@ -508,21 +534,23 @@ export const SavedListsModal: React.FC<SavedListsModalProps> = ({
                           {/* Item Checklist selection controls */}
                           <div className="flex items-center justify-between text-[11px] text-[#556D58]">
                             <span className="font-bold">
-                              Select items to add ({selectedCount}/{total}):
+                              {lang === 'FR'
+                                ? `Sélectionner les articles (${selectedCount}/${total}) :`
+                                : `Select items to add (${selectedCount}/${total}):`}
                             </span>
                             <div className="flex items-center gap-2 text-[10px] font-bold">
                               <button
                                 onClick={() => selectAllInList(list.id, total)}
                                 className="text-emerald-700 hover:underline"
                               >
-                                Select All
+                                {lang === 'FR' ? 'Tout sélectionner' : 'Select All'}
                               </button>
                               <span>•</span>
                               <button
                                 onClick={() => deselectAllInList(list.id)}
                                 className="text-slate-500 hover:underline"
                               >
-                                Deselect All
+                                {lang === 'FR' ? 'Tout désélectionner' : 'Deselect All'}
                               </button>
                             </div>
                           </div>
@@ -586,7 +614,7 @@ export const SavedListsModal: React.FC<SavedListsModalProps> = ({
                                       ) : (
                                         <Boxes className="w-2.5 h-2.5" />
                                       )}
-                                      {item.locationType}
+                                      {getLocationLocalizedName(item.locationType, lang)}
                                     </span>
                                   </div>
                                 </div>
@@ -602,14 +630,20 @@ export const SavedListsModal: React.FC<SavedListsModalProps> = ({
                               className="flex-2 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1.5 shadow-xs active:scale-95 transition-all"
                             >
                               <Plus className="w-3.5 h-3.5" />
-                              <span>Add {selectedCount} to Current Grocery</span>
+                              <span>
+                                {lang === 'FR'
+                                  ? `Ajouter ${selectedCount} aux courses`
+                                  : `Add ${selectedCount} to Current Grocery`}
+                              </span>
                             </button>
 
                             <button
                               onClick={() => {
                                 if (
                                   window.confirm(
-                                    `Replace current grocery list with ${selectedCount} items from "${list.name}"?`
+                                    lang === 'FR'
+                                      ? `Remplacer la liste de courses actuelle avec les ${selectedCount} articles de "${list.name}" ?`
+                                      : `Replace current grocery list with ${selectedCount} items from "${list.name}"?`
                                   )
                                 ) {
                                   handleAddItems(list, 'REPLACE');
@@ -617,9 +651,9 @@ export const SavedListsModal: React.FC<SavedListsModalProps> = ({
                               }}
                               disabled={selectedCount === 0}
                               className="flex-1 py-2 px-2.5 bg-white hover:bg-slate-100 border border-[#CBD9C8] text-[#344D38] rounded-xl text-[11px] font-bold transition-all active:scale-95"
-                              title="Replaces active cart with this list"
+                              title={lang === 'FR' ? 'Remplace le panier actif avec cette liste' : 'Replaces active cart with this list'}
                             >
-                              Replace List
+                              {lang === 'FR' ? 'Remplacer la Liste' : 'Replace List'}
                             </button>
                           </div>
                         </div>
@@ -634,7 +668,9 @@ export const SavedListsModal: React.FC<SavedListsModalProps> = ({
 
         {/* Footer info note */}
         <div className="p-3 bg-[#F5F8F4] border-t border-[#E1EDE0] text-center text-[10px] text-[#69826D]">
-          💡 Saved lists stay synced across household members and can be used on every grocery run.
+          {lang === 'FR'
+            ? '💡 Les listes enregistrées sont synchronisées entre les membres du foyer et prêtes pour chaque passage au magasin.'
+            : '💡 Saved lists stay synced across household members and can be used on every grocery run.'}
         </div>
       </div>
     </div>

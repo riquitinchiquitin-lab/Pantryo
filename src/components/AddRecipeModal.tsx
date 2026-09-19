@@ -19,6 +19,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { RicardoRecipe, RecipeIngredient } from '../data/ricardoRecipes';
+import { useLanguage } from '../utils/i18n';
 
 interface AddRecipeModalProps {
   isOpen: boolean;
@@ -31,8 +32,10 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
   isOpen,
   onClose,
   onRecipeSaved,
-  lang = 'EN',
+  lang: propLang,
 }) => {
+  const { lang: globalLang } = useLanguage();
+  const lang = propLang || globalLang;
   const [activeTab, setActiveTab] = useState<'youtube' | 'text' | 'photo'>('youtube');
 
   // Input states

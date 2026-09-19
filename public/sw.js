@@ -1,8 +1,6 @@
 // Pantryo Progressive Web App Service Worker
-const CACHE_NAME = 'pantryo-v1';
+const CACHE_NAME = 'pantryo-v2';
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
   '/manifest.json',
   '/pantryo-logo.svg',
   '/pantryo-logo.png'
@@ -18,49 +16,50 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
+  // Purge all old caches immediately to avoid stale React chunk mismatches
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
         keys.map((key) => {
           if (key !== CACHE_NAME) {
+            console.log('[Pantryo PWA] Purging outdated cache:', key);
             return caches.delete(key);
           }
         })
       )
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
-  // Pass-through for API calls (always network-first for fresh inventory and Gemini AI)
-  if (event.request.url.includes('/api/')) {
-    event.respondWith(
-      fetch(event.request).catch(() => {
-        return new Response(JSON.stringify({ error: 'Offline', offline: true }), {
-          headers: { 'Content-Type': 'application/json' },
-        });
-      })
-    );
+  const url = event.request.url;
+
+  // Never intercept non-GET requests or API calls
+  if (event.request.method !== 'GET' || url.includes('/api/')) {
     return;
   }
 
-  // Stale-while-revalidate for static assets
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request)
-        .then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-            const responseToCache = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, responseToCache);
-            });
-          }
-          return networkResponse;
-        })
-        .catch(() => cachedResponse);
+  // Never intercept Vite internal modules, source files, or dev requests
+  if (
+    url.includes('/@') ||
+    url.includes('/node_modules/') ||
+    url.includes('/src/') ||
+    url.includes('?v=') ||
+    url.includes('?t=') ||
+    url.endsWith('.tsx') ||
+    url.endsWith('.ts')
+  ) {
+    return;
+  }
 
-      return cachedResponse || fetchPromise;
-    })
-  );
+  // Only serve static icons/manifest from cache
+  const isStaticAsset = STATIC_ASSETS.some((asset) => url.endsWith(asset));
+  if (isStaticAsset) {
+    event.respondWith(
+      caches.match(event.request).then((cachedResponse) => {
+        return cachedResponse || fetch(event.request);
+      })
+    );
+  }
 });
+

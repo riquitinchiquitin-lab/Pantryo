@@ -1,6 +1,6 @@
 {
   "name": "Pantryo",
-  "description": "A self-hosted, camera-first, multi-user food inventory tracking mobile application with Ricardo Cuisine recipes, AI recipe ingestion from YouTube, text and photos, saved grocery runs, and Gemini Vision.",
+  "description": "Smart bento-style food inventory tracking with meal planning calendar, visual meat and seafood cuts subcategories with web photography, and responsive desktop, tablet, and mobile viewing modes.",
   "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
