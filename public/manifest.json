@@ -1,23 +1,38 @@
 {
+  "id": "/",
   "name": "Pantryo",
   "short_name": "Pantryo",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#FAF7EE",
   "theme_color": "#0E766E",
-  "description": "Smart Kitchen Inventory & Meal Planning",
+  "description": "Smart Kitchen Food Inventory, Receipts & Meal Planning",
   "icons": [
     {
-      "src": "/pantryo-logo.png",
+      "src": "/pwa-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "/pantryo-logo.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/pantryo-logo.svg",
@@ -26,3 +41,4 @@
     }
   ]
 }
+

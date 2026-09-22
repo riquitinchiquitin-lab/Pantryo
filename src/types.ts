@@ -2,12 +2,37 @@ export type StorageType = 'FRIDGE' | 'PANTRY' | 'FREEZER' | 'CELLAR' | 'SPICE_RA
 
 export type Language = 'EN' | 'FR';
 
+export interface Fido2CredentialInfo {
+  id: string;
+  friendlyName: string;
+  counter: number;
+  deviceType?: string;
+  backedUp?: boolean;
+  transports?: string[];
+  createdAt: string;
+}
+
 export interface User {
   id: string;
   name: string;
   email: string;
   role: 'ADMIN' | 'MEMBER' | 'GUEST';
   avatarUrl?: string;
+  fido2Enabled?: boolean;
+  fido2Enforced?: boolean;
+  isCompliant?: boolean;
+  requiresEnrollment?: boolean;
+  fido2Credentials?: Fido2CredentialInfo[];
+  recoveryCodesRemaining?: number;
+}
+
+export interface Fido2PolicyInfo {
+  allUsersRequired: boolean;
+  enforced: boolean;
+  totalUsers: number;
+  compliantUsers: number;
+  nonCompliantUsers: number;
+  users?: User[];
 }
 
 export interface Household {
@@ -47,13 +72,20 @@ export interface InventoryItem {
   notes?: string | null;
   barcode?: string | null;
   imageUrl?: string | null;
+  isLeftover?: boolean;
+  leftoverFoodType?: string;
+  leftoverSourceMeal?: string;
+  prepDate?: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface ScannedItemCandidate {
   name: string;
+  nameFr?: string;
+  nameEn?: string;
   brand?: string;
+  price?: string;
   barcode?: string;
   category: string;
   quantity: number;
@@ -74,6 +106,7 @@ export interface ScanResponse {
   summary: string;
   itemsCount: number;
   items: ScannedItemCandidate[];
+  storeName?: string;
   demoMode?: boolean;
   scannedAt: string;
 }
@@ -113,6 +146,7 @@ export interface SavedGroceryList {
   items: SavedGroceryListItem[];
   createdAt: string;
   updatedAt?: string;
+  lastModifiedBy?: string;
 }
 
 export type MealType = 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SNACK';
@@ -144,4 +178,109 @@ export interface PlannedMeal {
 }
 
 export type ViewportMode = 'desktop' | 'tablet' | 'mobile';
+
+export interface SmartMealSuggestionIngredient {
+  name: string;
+  nameFr?: string;
+  amount?: string;
+  inStock: boolean;
+  category?: string;
+}
+
+export interface SmartMealSuggestion {
+  id: string;
+  title: string;
+  titleFr?: string;
+  source: string;
+  sourceUrl?: string;
+  imageUrl?: string;
+  prepTime?: string;
+  cookTime?: string;
+  totalTime?: string;
+  servings?: string;
+  difficulty?: 'Easy' | 'Medium' | 'Advanced' | string;
+  difficultyFr?: string;
+  zeroWasteReason: string;
+  rescuedIngredients: string[];
+  matchPercentage: number;
+  ingredients: SmartMealSuggestionIngredient[];
+  instructionsEn?: string[];
+  instructionsFr?: string[];
+  tags?: string[];
+  mealType?: MealType;
+  suitableMealTypes?: MealType[];
+  isWebSearch?: boolean;
+  isFromMyRecipes?: boolean;
+}
+
+export interface RecipeWebsiteSource {
+  id: string;
+  name: string;
+  url: string;
+  domain: string;
+  language: 'FR' | 'EN' | 'BOTH';
+  enabled: boolean;
+  isCustom?: boolean;
+  favicon?: string;
+  description?: string;
+  descriptionFr?: string;
+}
+
+export interface DatabaseStats {
+  status: string;
+  encryption: {
+    algorithm: string;
+    atRest: boolean;
+    authenticated: boolean;
+    keyDerivation: string;
+    storageLocation: string;
+    fileSizeKb: number;
+  };
+  twoFactor?: {
+    standard: string;
+    passkeysSupported: boolean;
+    hardwareKeysSupported: boolean;
+    recoveryCodesSupported: boolean;
+    activeEnrolledUsers: number;
+  };
+  counts: {
+    items: number;
+    plannedMeals: number;
+    customRecipes: number;
+    groceryItems: number;
+    savedLists: number;
+    users: number;
+    locations: number;
+    categories: number;
+  };
+  household: {
+    id: string;
+    name: string;
+    inviteCode: string;
+  };
+  lastBackupAt: string | null;
+  lastRestoreAt: string | null;
+  serverTime: string;
+}
+
+export interface DatabaseBackupPackage {
+  metadata: {
+    app: string;
+    schemaVersion: string;
+    exportedAt: string;
+    isEncrypted: boolean;
+    algorithm?: string;
+    checksum: string;
+    recordCounts: {
+      items: number;
+      plannedMeals: number;
+      customRecipes: number;
+      groceryItems: number;
+      savedLists: number;
+      users: number;
+    };
+  };
+  payload: any;
+}
+
 

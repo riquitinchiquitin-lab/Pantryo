@@ -19,7 +19,10 @@ import {
   Trash2,
   Calendar,
   Sparkles,
+  ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   ShieldCheck,
   Check,
   Apple,
@@ -40,17 +43,24 @@ import {
   Barcode,
   CalendarDays,
   Utensils,
+  FileText,
+  X,
 } from 'lucide-react';
 import { InventoryItem, User, PlannedMeal } from '../types';
 import { FoodVisualBadge } from './FoodVisualBadge';
+import { InventoryListItem } from './InventoryListItem';
 import { getFoodVisual, ALL_FOOD_CATEGORIES, ALL_SUB_CATEGORIES, ALL_MEAT_SEAFOOD_SUBCATEGORIES } from '../utils/foodVisuals';
 import { CameraScannerModal } from './CameraScannerModal';
 import { AddEditItemModal } from './AddEditItemModal';
+import { ImportLeftoverModal } from './ImportLeftoverModal';
 import { GroceryListView, GroceryCartItem } from './GroceryListView';
 import { CookingIdeasView } from './CookingIdeasView';
 import { FamilySyncView } from './FamilySyncView';
 import { MealPlannerView } from './MealPlannerView';
 import { PantryoLogo } from './PantryoLogo';
+import { ScrollableRow } from './ScrollableRow';
+import { AdminManagementModal } from './AdminManagementModal';
+import { AdminRestrictedModal } from './AdminRestrictedModal';
 import {
   useLanguage,
   LanguageSwitcher,
@@ -98,13 +108,16 @@ const INITIAL_GROCERY_ITEMS: GroceryCartItem[] = [
   },
 ];
 
-const MOCK_MEMBERS: User[] = [
+const LOCAL_STORAGE_MEMBERS_KEY = 'kitchen_komrade_household_members';
+
+const DEFAULT_MEMBERS: User[] = [
   {
     id: 'usr_yan',
     name: 'Yan',
     email: 'yan@example.com',
     role: 'ADMIN',
     avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+    fido2Enabled: true,
   },
   {
     id: 'usr_kriz',
@@ -112,8 +125,24 @@ const MOCK_MEMBERS: User[] = [
     email: 'kriz@example.com',
     role: 'MEMBER',
     avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80',
+    fido2Enabled: false,
   },
 ];
+
+function getStoredMembers(): User[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_MEMBERS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.error('Failed reading household members from localStorage:', e);
+  }
+  return DEFAULT_MEMBERS;
+}
 
 interface MobileSimulatorProps {
   mode?: 'webapp' | 'frame';
@@ -132,16 +161,57 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   const [selectedFoodType, setSelectedFoodType] = useState<string | 'ALL'>('ALL');
   const [selectedSubCategory, setSelectedSubCategory] = useState<string | 'ALL'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [currentUser, setCurrentUser] = useState<User>(MOCK_MEMBERS[0]);
+  const [householdMembers, setHouseholdMembers] = useState<User[]>(getStoredMembers);
+  const [currentUser, setCurrentUser] = useState<User>(() => {
+    const list = getStoredMembers();
+    return list[0] || DEFAULT_MEMBERS[0];
+  });
+
+  const handleUpdateMember = (updatedUser: User) => {
+    setHouseholdMembers((prev) => {
+      const updatedList = prev.map((m) => (m.id === updatedUser.id ? updatedUser : m));
+      try {
+        localStorage.setItem(LOCAL_STORAGE_MEMBERS_KEY, JSON.stringify(updatedList));
+      } catch (e) {
+        console.error('Failed saving members to localStorage:', e);
+      }
+      return updatedList;
+    });
+
+    if (currentUser.id === updatedUser.id) {
+      setCurrentUser(updatedUser);
+    }
+  };
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [plannedMeals, setPlannedMeals] = useState<PlannedMeal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [scannerInitialMode, setScannerInitialMode] = useState<'snap' | 'receipt' | 'barcode' | 'upload' | 'presets'>('snap');
   const [isAddEditModalOpen, setIsAddEditModalOpen] = useState(false);
+  const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+  const [isAdminRestrictedOpen, setIsAdminRestrictedOpen] = useState(false);
+  const [isImportLeftoverOpen, setIsImportLeftoverOpen] = useState(false);
+  const [selectedMealForLeftover, setSelectedMealForLeftover] = useState<PlannedMeal | null>(null);
+  const [filterLeftoversOnly, setFilterLeftoversOnly] = useState(false);
   const [itemToEdit, setItemToEdit] = useState<InventoryItem | null>(null);
   const [defrostingId, setDefrostingId] = useState<string | null>(null);
   const [bannerNotice, setBannerNotice] = useState<string | null>(null);
-  const [bentoViewMode, setBentoViewMode] = useState<'grid' | 'list'>('grid');
+  const [bentoViewMode, setBentoViewMode] = useState<'grid' | 'list'>('list');
+  const [isBentoCompact, setIsBentoCompact] = useState<boolean>(true);
+  const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(new Set());
+
+  const toggleExpandItem = (id: string) => {
+    setExpandedItemIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
   const [groceryItems, setGroceryItems] = useState<GroceryCartItem[]>(INITIAL_GROCERY_ITEMS);
 
   // Stock items from the Grocery Shopping Cart into Kitchen Inventory
@@ -220,13 +290,17 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   const fetchInventory = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/v1/inventory/household/hh_yan_kriz_01');
-      const data = await res.json();
-      if (data.success && data.allItems) {
-        setItems(data.allItems);
+      const res = await fetch('/api/v1/inventory/household/hh_yan_kriz_01', {
+        headers: { Accept: 'application/json' },
+      });
+      if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
+        const data = await res.json();
+        if (data.success && data.allItems) {
+          setItems(data.allItems);
+        }
       }
     } catch (err) {
-      console.error('Failed to load inventory:', err);
+      console.warn('Note: Inventory using local initial state:', err);
     } finally {
       setIsLoading(false);
     }
@@ -235,13 +309,17 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   // Fetch planned meals for household
   const fetchPlannedMeals = async () => {
     try {
-      const res = await fetch('/api/v1/inventory/household/hh_yan_kriz_01/meals');
-      const data = await res.json();
-      if (data.success && data.meals) {
-        setPlannedMeals(data.meals);
+      const res = await fetch('/api/v1/inventory/household/hh_yan_kriz_01/meals', {
+        headers: { Accept: 'application/json' },
+      });
+      if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
+        const data = await res.json();
+        if (data.success && data.meals) {
+          setPlannedMeals(data.meals);
+        }
       }
     } catch (err) {
-      console.error('Failed to load planned meals:', err);
+      console.warn('Note: Planned meals using local initial state:', err);
     }
   };
 
@@ -463,6 +541,11 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
       }
     }
 
+    // Leftovers only filter
+    if (filterLeftoversOnly && !item.isLeftover) {
+      return false;
+    }
+
     return true;
   });
 
@@ -470,120 +553,194 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   const fridgeCount = items.filter((i) => i.locationType === 'FRIDGE').length;
   const pantryCount = items.filter((i) => i.locationType === 'PANTRY').length;
   const freezerCount = items.filter((i) => i.locationType === 'FREEZER').length;
+  const leftoversCount = items.filter((i) => i.isLeftover).length;
 
   return (
-    <div className="relative w-full max-w-7xl mx-auto text-[#133E3B] select-none flex flex-col min-h-screen sm:min-h-[850px] sm:rounded-3xl border-0 sm:border sm:border-[#E5DFD0] sm:shadow-lg bg-[#FAF7EE] overflow-hidden">
-      {/* App Top Bar */}
-      <div className="px-5 pt-3 pb-3 bg-[#FAF7EE] border-b border-[#E8E2D5]">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          {/* Logo & Kitchen Name */}
-          <div className="flex items-center gap-2.5">
-            <PantryoLogo size={38} />
-            <div>
+    <div className="relative w-full max-w-7xl mx-auto text-[#133E3B] flex flex-col min-h-screen sm:min-h-[850px] sm:rounded-3xl border-0 sm:border sm:border-[#E5DFD0] sm:shadow-lg bg-[#FAF7EE] overflow-hidden">
+      {/* App Top Bar - Ultra-compact, spacious on tablet and desktop, zero overlapping or text-wrapping */}
+      <div className="px-3 sm:px-5 py-1.5 sm:py-2.5 pt-[max(0.5rem,env(safe-area-inset-top,0px))] bg-[#FAF7EE] border-b border-[#E8E2D5] shrink-0">
+        <div className="flex items-center justify-between gap-2 lg:gap-4 max-w-7xl mx-auto w-full">
+          {/* 1. Left: Logo & Kitchen Name (Clickable Admin Console Trigger) */}
+          <button
+            id="btn-pantryo-admin-management"
+            onClick={() => {
+              if (currentUser.role === 'ADMIN') {
+                setIsAdminModalOpen(true);
+              } else {
+                setIsAdminRestrictedOpen(true);
+              }
+            }}
+            className="flex items-center gap-2 sm:gap-2.5 shrink-0 hover:opacity-90 active:scale-98 transition-all cursor-pointer p-1 -m-1 rounded-2xl hover:bg-[#F2ECE0]/60 group text-left"
+            title={
+              currentUser.role === 'ADMIN'
+                ? lang === 'FR'
+                  ? 'Ouvrir la Console d’Administration & Sauvegarde (Admin)'
+                  : 'Open App & Database Administration (Admin)'
+                : lang === 'FR'
+                ? 'Console Pantryo (Accès Administrateur requis)'
+                : 'Pantryo Console (Admin Access Required)'
+            }
+          >
+            <div className="shrink-0 flex items-center justify-center transition-transform group-hover:scale-105">
+              <PantryoLogo size={28} />
+            </div>
+            <div className="shrink-0">
               <div className="flex items-center gap-1.5">
-                <h1 className="text-base font-black tracking-tight text-[#0D3B37]">Pantryo</h1>
-                <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
+                <h1 className="text-sm sm:text-base font-black tracking-tight text-[#0D3B37] leading-none whitespace-nowrap">
+                  Pantryo
+                </h1>
+                {currentUser.role === 'ADMIN' ? (
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-teal-100 text-teal-800 border border-teal-200">
+                    <ShieldCheck className="w-2.5 h-2.5" />
+                    <span>Admin</span>
+                  </span>
+                ) : (
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse shrink-0" />
+                )}
               </div>
-              <p className="text-[11px] text-[#527470] font-medium">
+              <p className="text-[10px] sm:text-[11px] text-[#527470] font-medium leading-tight mt-0.5 whitespace-nowrap hidden sm:block md:hidden xl:block">
                 {lang === 'FR' ? 'La Cuisine de Yan & Kriz' : 'The Yan & Kriz Kitchen'}
               </p>
             </div>
-          </div>
+          </button>
 
-          {/* Desktop & Tablet Navigation Bar (automatically shown on md screens and up) */}
-          <div className="hidden md:flex items-center gap-1 p-1 bg-white/90 rounded-2xl border border-[#E0D9C8] shadow-2xs">
+          {/* 2. Center: Navigation Bar (shown on md+ screens, centered, zero wrapping, responsive labels) */}
+          <nav aria-label="Main Navigation" className="hidden md:flex items-center gap-0.5 lg:gap-1 p-1 bg-white/95 rounded-2xl border border-[#E0D9C8] shadow-2xs shrink-0">
+            {/* Inventory */}
             <button
               onClick={() => setActiveNav('home')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              title={t('nav_inventory')}
+              className={`px-2.5 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
                 activeNav === 'home'
                   ? 'bg-teal-700 text-white shadow-2xs'
                   : 'text-[#527470] hover:text-[#0D3B37] hover:bg-[#F2ECE0]'
               }`}
             >
-              <Home className="w-3.5 h-3.5" />
-              <span>{t('nav_inventory')}</span>
+              <Home className="w-3.5 h-3.5 shrink-0" />
+              <span className={activeNav === 'home' ? 'inline' : 'hidden lg:inline'}>
+                {t('nav_inventory')}
+              </span>
             </button>
+
+            {/* Meals */}
             <button
               onClick={() => setActiveNav('meals')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              title={t('nav_meals')}
+              className={`px-2.5 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
                 activeNav === 'meals'
                   ? 'bg-teal-700 text-white shadow-2xs'
                   : 'text-[#527470] hover:text-[#0D3B37] hover:bg-[#F2ECE0]'
               }`}
             >
-              <CalendarDays className="w-3.5 h-3.5 text-indigo-500" />
-              <span>{t('nav_meals')}</span>
+              <CalendarDays className={`w-3.5 h-3.5 shrink-0 ${activeNav === 'meals' ? 'text-white' : 'text-indigo-500'}`} />
+              <span className={activeNav === 'meals' ? 'inline' : 'hidden lg:inline'}>
+                {lang === 'FR' ? 'Repas' : 'Meals'}
+              </span>
               {plannedMeals.length > 0 && (
-                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-indigo-100 text-indigo-800 font-black">
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black shrink-0 ${
+                  activeNav === 'meals' ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-800'
+                }`}>
                   {plannedMeals.length}
                 </span>
               )}
             </button>
+
+            {/* Grocery */}
             <button
               onClick={() => setActiveNav('grocery')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              title={t('nav_grocery')}
+              className={`px-2.5 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
                 activeNav === 'grocery'
                   ? 'bg-teal-700 text-white shadow-2xs'
                   : 'text-[#527470] hover:text-[#0D3B37] hover:bg-[#F2ECE0]'
               }`}
             >
-              <ShoppingCart className="w-3.5 h-3.5" />
-              <span>{t('nav_grocery')}</span>
+              <ShoppingCart className="w-3.5 h-3.5 shrink-0" />
+              <span className={activeNav === 'grocery' ? 'inline' : 'hidden lg:inline'}>
+                {lang === 'FR' ? 'Épicerie' : 'Grocery'}
+              </span>
               {groceryItems.filter((i) => i.inCart).length > 0 && (
-                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-teal-100 text-teal-900 font-black">
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black shrink-0 ${
+                  activeNav === 'grocery' ? 'bg-white/20 text-white' : 'bg-teal-100 text-teal-900'
+                }`}>
                   {groceryItems.filter((i) => i.inCart).length}
                 </span>
               )}
             </button>
+
+            {/* Cooking */}
             <button
               onClick={() => setActiveNav('cooking')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              title={t('nav_cooking')}
+              className={`px-2.5 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
                 activeNav === 'cooking'
                   ? 'bg-teal-700 text-white shadow-2xs'
                   : 'text-[#527470] hover:text-[#0D3B37] hover:bg-[#F2ECE0]'
               }`}
             >
-              <ChefHat className="w-3.5 h-3.5" />
-              <span>{t('nav_cooking')}</span>
+              <ChefHat className="w-3.5 h-3.5 shrink-0" />
+              <span className={activeNav === 'cooking' ? 'inline' : 'hidden lg:inline'}>
+                {t('nav_cooking')}
+              </span>
             </button>
+
+            {/* Family */}
             <button
               onClick={() => setActiveNav('sync')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              title={t('nav_family')}
+              className={`px-2.5 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
                 activeNav === 'sync'
                   ? 'bg-teal-700 text-white shadow-2xs'
                   : 'text-[#527470] hover:text-[#0D3B37] hover:bg-[#F2ECE0]'
               }`}
             >
-              <Users className="w-3.5 h-3.5" />
-              <span>{t('nav_family')}</span>
+              <Users className="w-3.5 h-3.5 shrink-0" />
+              <span className={activeNav === 'sync' ? 'inline' : 'hidden lg:inline'}>
+                {t('nav_family')}
+              </span>
             </button>
-          </div>
+          </nav>
 
-          {/* Top Actions: Language Switcher + Install + User Pill */}
-          <div className="flex items-center gap-2">
+          {/* 3. Right: Top Actions (Quick Add + Language + Install + User, strictly shrink-0) */}
+          <div className="flex items-center gap-1.5 lg:gap-2 shrink-0">
+            {/* Quick Add Button on tablet and desktop */}
+            <button
+              type="button"
+              onClick={() => setIsAddMenuOpen(true)}
+              className="hidden md:flex items-center gap-1 p-1.5 lg:px-2.5 lg:py-1.5 rounded-xl bg-gradient-to-r from-[#0D3B37] to-[#0E766E] hover:from-[#092926] hover:to-[#0B5C56] text-white text-xs font-bold shadow-2xs transition-all active:scale-95 shrink-0 cursor-pointer"
+              title={lang === 'FR' ? 'Ajouter un aliment' : 'Add food item'}
+            >
+              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span className="hidden lg:inline">{lang === 'FR' ? 'Ajout' : 'Add'}</span>
+            </button>
+
+            {/* Unified Single Language Toggle (e.g. FR when in English, EN when in French) */}
             <LanguageSwitcher />
 
+            {/* Install Button */}
             {!isInstalled && onInstall && (
               <button
                 onClick={onInstall}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#0E766E] hover:bg-[#0B5C56] text-white text-xs font-bold shadow-2xs transition-all active:scale-95"
+                className="p-1.5 lg:px-2.5 lg:py-1.5 rounded-xl bg-[#0E766E] hover:bg-[#0B5C56] text-white text-xs font-bold shadow-2xs transition-all active:scale-95 flex items-center gap-1 shrink-0 cursor-pointer"
                 title={t('install_tooltip')}
               >
                 <Download className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{t('install_btn')}</span>
+                <span className="hidden lg:inline">{t('install_btn')}</span>
               </button>
             )}
 
+            {/* User Pill */}
             <button
               onClick={() => setActiveNav('sync')}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/95 border border-[#E0D9C8] shadow-2xs hover:bg-white transition-colors"
+              className="p-1 lg:px-2.5 lg:py-1 rounded-xl bg-white/95 border border-[#E0D9C8] shadow-2xs hover:bg-white transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
+              title={currentUser.name}
             >
               <img
                 src={currentUser.avatarUrl}
                 alt={currentUser.name}
-                className="w-5 h-5 rounded-full object-cover"
+                className="w-5 h-5 rounded-full object-cover shrink-0"
               />
-              <span className="text-xs font-bold text-[#0D3B37]">{currentUser.name}</span>
+              <span className="text-xs font-bold text-[#0D3B37] hidden lg:inline">{currentUser.name}</span>
             </button>
           </div>
         </div>
@@ -598,154 +755,292 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
       </div>
 
       {/* Main Scrollable View */}
-      <div className="flex-1 overflow-y-auto px-3.5 sm:px-6 pt-2 pb-28 md:pb-14 space-y-4">
+      <div className="flex-1 overflow-y-auto px-3 sm:px-5 pt-1.5 pb-24 md:pb-12 space-y-2.5 sm:space-y-3.5">
         {/* VIEW: HOME INVENTORY */}
         {activeNav === 'home' && (
           <>
-            {/* HERO BENTO BOX DASHBOARD */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-              {/* Bento Tile 1 (Span 2): Kitchen Bento Pulse & Zone Breakdown */}
-              <div className="col-span-2 lg:col-span-2 p-3.5 rounded-3xl bg-white border border-[#E5DFD0] shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-2xl bg-teal-50 text-teal-800 border border-teal-100 flex items-center justify-center shadow-xs">
-                      <Leaf className="w-4 h-4 text-teal-700" />
+            {/* HERO BENTO BOX DASHBOARD - Space maximized for mobile & tablet */}
+            {isBentoCompact ? (
+              <div className="p-2.5 sm:p-3 rounded-2xl bg-white border border-[#E5DFD0] shadow-2xs space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-7 h-7 rounded-xl bg-teal-50 text-teal-800 border border-teal-100 flex items-center justify-center shrink-0">
+                      <Leaf className="w-3.5 h-3.5 text-teal-700" />
                     </div>
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] uppercase font-black tracking-wider text-[#527470]">
-                          {t('bento_pulse_title')}
-                        </span>
+                    <div className="flex items-center gap-2 truncate">
+                      <span className="text-xs font-black text-[#0D3B37] truncate">
+                        {lang === 'FR' ? '96% Zéro-Gaspillage' : '96% Zero-Waste'}
+                      </span>
+                      <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-teal-50 text-teal-800 border border-teal-200/80">
                         <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-ping" />
-                      </div>
-                      <h3 className="text-xs font-black text-[#0D3B37]">
-                        {lang === 'FR' ? '96% Efficacité Zéro-Gaspillage' : '96% Zero-Waste Efficiency'}
-                      </h3>
+                        {t('live_sync')}
+                      </span>
                     </div>
                   </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-50 text-teal-800 border border-teal-200/80">
-                    {t('live_sync')}
-                  </span>
+
+                  {/* Toggle to view detailed tiles */}
+                  <button
+                    type="button"
+                    onClick={() => setIsBentoCompact(false)}
+                    className="px-2.5 py-1 rounded-xl bg-[#F7FAF9] border border-[#D5E1D2] hover:bg-[#EBF3F1] text-[11px] font-bold text-[#0D3B37] flex items-center gap-1 transition-all cursor-pointer shrink-0 shadow-2xs active:scale-95"
+                    title={lang === 'FR' ? 'Afficher les cartes détaillées' : 'Show detailed bento cards'}
+                  >
+                    <span>{lang === 'FR' ? 'Détails' : 'Details'}</span>
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  </button>
                 </div>
 
-                {/* Storage Compartment Bento Pills */}
-                <div className="grid grid-cols-3 gap-2 mt-3 pt-2.5 border-t border-[#F2ECE0]">
+                {/* Compact Location Quick Pills */}
+                <div className="grid grid-cols-4 gap-1.5">
                   <button
-                    onClick={() => setFilterLocation('FRIDGE')}
-                    className={`p-2 rounded-2xl text-left border transition-all ${
+                    type="button"
+                    onClick={() => setFilterLocation(filterLocation === 'FRIDGE' ? 'ALL' : 'FRIDGE')}
+                    className={`py-1.5 px-1.5 sm:px-2 rounded-xl text-center border transition-all cursor-pointer ${
                       filterLocation === 'FRIDGE'
                         ? 'bg-teal-700 text-white border-teal-700 shadow-xs'
                         : 'bg-[#F7FAF9] border-[#E0ECE8] text-[#244E49] hover:bg-[#EBF3F1]'
                     }`}
                   >
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="font-bold">{t('fridge_label')}</span>
-                      <Refrigerator className="w-3.5 h-3.5 opacity-90" />
-                    </div>
-                    <p className="text-xs font-extrabold mt-0.5">
-                      {fridgeCount} {lang === 'FR' ? 'articles' : 'items'}
-                    </p>
+                    <span className="text-[10px] font-semibold block opacity-85 truncate">
+                      {lang === 'FR' ? 'Frigo' : 'Fridge'}
+                    </span>
+                    <span className="text-xs font-black block leading-tight">{fridgeCount}</span>
                   </button>
 
                   <button
-                    onClick={() => setFilterLocation('FREEZER')}
-                    className={`p-2 rounded-2xl text-left border transition-all ${
+                    type="button"
+                    onClick={() => setFilterLocation(filterLocation === 'FREEZER' ? 'ALL' : 'FREEZER')}
+                    className={`py-1.5 px-1.5 sm:px-2 rounded-xl text-center border transition-all cursor-pointer ${
                       filterLocation === 'FREEZER'
                         ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
                         : 'bg-[#F0F6FA] border-[#D7E6F2] text-[#244563] hover:bg-[#E4F0F9]'
                     }`}
                   >
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="font-bold">{t('freezer_label')}</span>
-                      <Snowflake className="w-3.5 h-3.5 opacity-90" />
-                    </div>
-                    <p className="text-xs font-extrabold mt-0.5">
-                      {freezerCount} {lang === 'FR' ? 'articles' : 'items'}
-                    </p>
+                    <span className="text-[10px] font-semibold block opacity-85 truncate">
+                      {lang === 'FR' ? 'Congélo' : 'Freezer'}
+                    </span>
+                    <span className="text-xs font-black block leading-tight">{freezerCount}</span>
                   </button>
 
                   <button
-                    onClick={() => setFilterLocation('PANTRY')}
-                    className={`p-2 rounded-2xl text-left border transition-all ${
+                    type="button"
+                    onClick={() => setFilterLocation(filterLocation === 'PANTRY' ? 'ALL' : 'PANTRY')}
+                    className={`py-1.5 px-1.5 sm:px-2 rounded-xl text-center border transition-all cursor-pointer ${
                       filterLocation === 'PANTRY'
                         ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
                         : 'bg-[#FAF6EE] border-[#EFE5D0] text-[#544122] hover:bg-[#F5EDDC]'
                     }`}
                   >
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="font-bold">{t('pantry_label')}</span>
-                      <Boxes className="w-3.5 h-3.5 opacity-90" />
-                    </div>
-                    <p className="text-xs font-extrabold mt-0.5">
-                      {pantryCount} {lang === 'FR' ? 'articles' : 'items'}
-                    </p>
+                    <span className="text-[10px] font-semibold block opacity-85 truncate">
+                      {lang === 'FR' ? 'Garde-m.' : 'Pantry'}
+                    </span>
+                    <span className="text-xs font-black block leading-tight">{pantryCount}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFilterLocation(filterLocation === 'EXPIRING' ? 'ALL' : 'EXPIRING')}
+                    className={`py-1.5 px-1.5 sm:px-2 rounded-xl text-center border transition-all cursor-pointer ${
+                      filterLocation === 'EXPIRING'
+                        ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                        : expiringItems.length > 0
+                        ? 'bg-rose-50 border-rose-200 text-rose-800 hover:bg-rose-100'
+                        : 'bg-white border-[#E0D9C8] text-[#527470]'
+                    }`}
+                  >
+                    <span className="text-[10px] font-semibold block opacity-85 truncate">
+                      {lang === 'FR' ? 'Bientôt' : 'Soon'}
+                    </span>
+                    <span className="text-xs font-black block leading-tight">{expiringItems.length}</span>
                   </button>
                 </div>
-              </div>
 
-              {/* Bento Tile 2 (1 Col): Urgent Rescue Compartment */}
-              <div
-                onClick={() => setFilterLocation('EXPIRING')}
-                className={`p-3 rounded-3xl border transition-all cursor-pointer flex flex-col justify-between ${
-                  expiringItems.length > 0
-                    ? 'bg-gradient-to-b from-rose-50 to-amber-50/40 border-rose-200 hover:border-rose-300 shadow-2xs'
-                    : 'bg-white border-[#D5E1D2] shadow-2xs'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-6 h-6 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center">
-                      <AlertTriangle className="w-3.5 h-3.5" />
+                {/* 1-Line Urgent Rescue strip if items expiring */}
+                {expiringItems.length > 0 && (
+                  <div
+                    onClick={() => setFilterLocation('EXPIRING')}
+                    className="p-1.5 px-2.5 rounded-xl bg-rose-50 border border-rose-200/80 text-rose-900 flex items-center justify-between text-[11px] font-medium cursor-pointer hover:bg-rose-100/70 transition-colors"
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0 truncate">
+                      <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                      <span className="font-bold text-rose-800 shrink-0">
+                        {expiringItems.length} {lang === 'FR' ? 'à sauver :' : 'to rescue:'}
+                      </span>
+                      <span className="truncate">{expiringItems[0]?.name}</span>
+                      <span className="text-[10px] text-rose-700 font-bold shrink-0">
+                        ({expiringItems[0]?.daysUntilExpiration} {lang === 'FR' ? 'j' : 'd'})
+                      </span>
                     </div>
-                    <span className="text-[10px] font-bold text-rose-950">{t('rescue_label')}</span>
-                  </div>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-rose-200/70 text-rose-800">
-                    {expiringItems.length} {lang === 'FR' ? 'bientôt' : 'soon'}
-                  </span>
-                </div>
-                {expiringItems.length > 0 ? (
-                  <div className="mt-2 space-y-1">
-                    <p className="text-xs font-bold text-[#203222] truncate">{expiringItems[0]?.name}</p>
-                    <p className="text-[10px] text-rose-700 font-semibold flex items-center gap-1">
-                      <Clock className="w-2.5 h-2.5" /> {expiringItems[0]?.daysUntilExpiration}{' '}
-                      {lang === 'FR' ? 'j restant' : 'day left'}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="mt-2 text-[10px] text-emerald-700 font-medium flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" />{' '}
-                    {lang === 'FR' ? 'Tout est frais & sain' : 'All fresh & safe'}
+                    <span className="text-[10px] font-bold text-rose-700 shrink-0 ml-1">→</span>
                   </div>
                 )}
               </div>
-
-              {/* Bento Tile 3 (1 Col): Sub-Zero Deep Freeze Compartment */}
-              <div
-                onClick={() => setFilterLocation('FREEZER')}
-                className="p-3 rounded-3xl bg-gradient-to-b from-blue-50/70 to-white border border-blue-200/80 hover:border-blue-300 transition-all cursor-pointer flex flex-col justify-between shadow-2xs"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-6 h-6 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
-                      <Snowflake className="w-3.5 h-3.5" />
-                    </div>
-                    <span className="text-[10px] font-bold text-blue-950">{t('deep_freeze_label')}</span>
-                  </div>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-800">
-                    -18°C
+            ) : (
+              /* DETAILED BENTO BOX DASHBOARD (EXPANDED VIEW) */
+              <div className="space-y-2">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-[10px] uppercase font-black tracking-wider text-[#527470]">
+                    {t('bento_pulse_title')}
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsBentoCompact(true)}
+                    className="px-2.5 py-1 rounded-xl bg-white border border-[#D5E1D2] hover:bg-[#F2ECE0] text-[11px] font-bold text-[#0D3B37] flex items-center gap-1 transition-all cursor-pointer shadow-2xs active:scale-95"
+                    title={lang === 'FR' ? 'Mode compact pour maximiser l’espace' : 'Compact mode to maximize space'}
+                  >
+                    <span>{lang === 'FR' ? 'Réduire' : 'Compact'}</span>
+                    <ChevronUp className="w-3.5 h-3.5" />
+                  </button>
                 </div>
-                <div className="mt-2 space-y-1">
-                  <p className="text-xs font-bold text-[#1F3323]">
-                    {freezerCount} {lang === 'FR' ? 'articles stockés' : 'items stored'}
-                  </p>
-                  <p className="text-[10px] text-blue-700 font-semibold flex items-center gap-1">
-                    <Flame className="w-3 h-3 text-amber-500" />{' '}
-                    {lang === 'FR' ? 'Prêt à décongeler' : 'Defrost ready'}
-                  </p>
+
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                  {/* Bento Tile 1 (Span 2): Kitchen Bento Pulse & Zone Breakdown */}
+                  <div className="col-span-2 lg:col-span-2 p-3 rounded-2xl bg-white border border-[#E5DFD0] shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-xl bg-teal-50 text-teal-800 border border-teal-100 flex items-center justify-center shadow-xs">
+                          <Leaf className="w-3.5 h-3.5 text-teal-700" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] uppercase font-black tracking-wider text-[#527470]">
+                              {t('bento_pulse_title')}
+                            </span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-ping" />
+                          </div>
+                          <h3 className="text-xs font-black text-[#0D3B37]">
+                            {lang === 'FR' ? '96% Efficacité Zéro-Gaspillage' : '96% Zero-Waste Efficiency'}
+                          </h3>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-50 text-teal-800 border border-teal-200/80">
+                        {t('live_sync')}
+                      </span>
+                    </div>
+
+                    {/* Storage Compartment Bento Pills */}
+                    <div className="grid grid-cols-3 gap-1.5 mt-2.5 pt-2 border-t border-[#F2ECE0]">
+                      <button
+                        type="button"
+                        onClick={() => setFilterLocation(filterLocation === 'FRIDGE' ? 'ALL' : 'FRIDGE')}
+                        className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${
+                          filterLocation === 'FRIDGE'
+                            ? 'bg-teal-700 text-white border-teal-700 shadow-xs'
+                            : 'bg-[#F7FAF9] border-[#E0ECE8] text-[#244E49] hover:bg-[#EBF3F1]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="font-bold">{t('fridge_label')}</span>
+                          <Refrigerator className="w-3.5 h-3.5 opacity-90" />
+                        </div>
+                        <p className="text-xs font-extrabold mt-0.5">
+                          {fridgeCount} {lang === 'FR' ? 'articles' : 'items'}
+                        </p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setFilterLocation(filterLocation === 'FREEZER' ? 'ALL' : 'FREEZER')}
+                        className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${
+                          filterLocation === 'FREEZER'
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                            : 'bg-[#F0F6FA] border-[#D7E6F2] text-[#244563] hover:bg-[#E4F0F9]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="font-bold">{t('freezer_label')}</span>
+                          <Snowflake className="w-3.5 h-3.5 opacity-90" />
+                        </div>
+                        <p className="text-xs font-extrabold mt-0.5">
+                          {freezerCount} {lang === 'FR' ? 'articles' : 'items'}
+                        </p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setFilterLocation(filterLocation === 'PANTRY' ? 'ALL' : 'PANTRY')}
+                        className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${
+                          filterLocation === 'PANTRY'
+                            ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                            : 'bg-[#FAF6EE] border-[#EFE5D0] text-[#544122] hover:bg-[#F5EDDC]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="font-bold">{t('pantry_label')}</span>
+                          <Boxes className="w-3.5 h-3.5 opacity-90" />
+                        </div>
+                        <p className="text-xs font-extrabold mt-0.5">
+                          {pantryCount} {lang === 'FR' ? 'articles' : 'items'}
+                        </p>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Bento Tile 2 (1 Col): Urgent Rescue Compartment */}
+                  <div
+                    onClick={() => setFilterLocation('EXPIRING')}
+                    className={`p-3 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+                      expiringItems.length > 0
+                        ? 'bg-gradient-to-b from-rose-50 to-amber-50/40 border-rose-200 hover:border-rose-300 shadow-2xs'
+                        : 'bg-white border-[#D5E1D2] shadow-2xs'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-6 h-6 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                        </div>
+                        <span className="text-[10px] font-bold text-rose-950">{t('rescue_label')}</span>
+                      </div>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-rose-200/70 text-rose-800">
+                        {expiringItems.length} {lang === 'FR' ? 'bientôt' : 'soon'}
+                      </span>
+                    </div>
+                    {expiringItems.length > 0 ? (
+                      <div className="mt-2 space-y-1">
+                        <p className="text-xs font-bold text-[#203222] truncate">{expiringItems[0]?.name}</p>
+                        <p className="text-[10px] text-rose-700 font-semibold flex items-center gap-1">
+                          <Clock className="w-2.5 h-2.5" /> {expiringItems[0]?.daysUntilExpiration}{' '}
+                          {lang === 'FR' ? 'j restant' : 'day left'}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="mt-2 text-[10px] text-emerald-700 font-medium flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" />{' '}
+                        {lang === 'FR' ? 'Tout est frais & sain' : 'All fresh & safe'}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Bento Tile 3 (1 Col): Sub-Zero Deep Freeze Compartment */}
+                  <div
+                    onClick={() => setFilterLocation('FREEZER')}
+                    className="p-3 rounded-2xl bg-gradient-to-b from-blue-50/70 to-white border border-blue-200/80 hover:border-blue-300 transition-all cursor-pointer flex flex-col justify-between shadow-2xs"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-6 h-6 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+                          <Snowflake className="w-3.5 h-3.5" />
+                        </div>
+                        <span className="text-[10px] font-bold text-blue-950">{t('deep_freeze_label')}</span>
+                      </div>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-800">
+                        -18°C
+                      </span>
+                    </div>
+                    <div className="mt-2 space-y-1">
+                      <p className="text-xs font-bold text-[#1F3323]">
+                        {freezerCount} {lang === 'FR' ? 'articles stockés' : 'items stored'}
+                      </p>
+                      <p className="text-[10px] text-blue-700 font-semibold flex items-center gap-1">
+                        <Flame className="w-3 h-3 text-amber-500" />{' '}
+                        {lang === 'FR' ? 'Prêt à décongeler' : 'Defrost ready'}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Search Input & Quick Add Item Button */}
             <div className="flex items-center gap-2">
@@ -773,15 +1068,34 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             {/* Food Type Category Quick Chips (Pictures from the Web) */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between px-1 text-[11px] font-bold text-[#556D58]">
-                <span className="flex items-center gap-1.5">
+                <span className="flex items-center gap-2 flex-wrap">
                   <span>{t('browse_by_category')}</span>
                   <span className="text-[10px] text-slate-400 font-normal">
                     ({ALL_FOOD_CATEGORIES.length} {lang === 'FR' ? 'types' : 'types'})
                   </span>
+                  {leftoversCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setFilterLeftoversOnly(!filterLeftoversOnly)}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition-all border flex items-center gap-1 cursor-pointer ${
+                        filterLeftoversOnly
+                          ? 'bg-amber-500 text-white border-amber-600 shadow-2xs'
+                          : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                      }`}
+                      title={lang === 'FR' ? 'Filtrer uniquement les restes' : 'Filter leftovers only'}
+                    >
+                      <span>🍲</span>
+                      <span>{lang === 'FR' ? 'Restes' : 'Leftovers'} ({leftoversCount})</span>
+                      {filterLeftoversOnly && <X className="w-2.5 h-2.5 ml-0.5" />}
+                    </button>
+                  )}
                 </span>
-                {selectedFoodType !== 'ALL' && (
+                {(selectedFoodType !== 'ALL' || filterLeftoversOnly) && (
                   <button
-                    onClick={() => setSelectedFoodType('ALL')}
+                    onClick={() => {
+                      setSelectedFoodType('ALL');
+                      setFilterLeftoversOnly(false);
+                    }}
                     className="text-emerald-700 hover:underline font-semibold text-[11px]"
                   >
                     {t('clear_filter')}
@@ -789,7 +1103,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 )}
               </div>
 
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-none">
+              <ScrollableRow className="pb-1.5">
                 <button
                   onClick={() => setSelectedFoodType('ALL')}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-all shrink-0 ${
@@ -825,7 +1139,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                     </button>
                   );
                 })}
-              </div>
+              </ScrollableRow>
             </div>
 
             {/* Specific Cuts & Subcategories with Web Photography */}
@@ -849,7 +1163,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 )}
               </div>
 
-              <div className="flex items-center gap-2 overflow-x-auto pb-1.5 scrollbar-none">
+              <ScrollableRow className="pb-1.5">
                 <button
                   onClick={() => setSelectedSubCategory('ALL')}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
@@ -888,15 +1202,15 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                     </button>
                   );
                 })}
-              </div>
+              </ScrollableRow>
             </div>
 
             {/* Storage Location Pills & Bento View Switcher */}
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none flex-1 min-w-0">
+              <ScrollableRow containerClassName="flex-1 min-w-0" className="pb-1">
                 <button
                   onClick={() => setFilterLocation('ALL')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
                     filterLocation === 'ALL'
                       ? 'bg-[#233527] text-white shadow-xs'
                       : 'bg-white border border-[#D5E1D2] text-[#4F6553] hover:bg-[#EAF1E8]'
@@ -906,7 +1220,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 </button>
                 <button
                   onClick={() => setFilterLocation('FRIDGE')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1 transition-all ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1 transition-all shrink-0 ${
                     filterLocation === 'FRIDGE'
                       ? 'bg-emerald-600 text-white shadow-xs'
                       : 'bg-white border border-[#D5E1D2] text-[#4F6553] hover:bg-[#EAF1E8]'
@@ -917,7 +1231,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 </button>
                 <button
                   onClick={() => setFilterLocation('PANTRY')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1 transition-all ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1 transition-all shrink-0 ${
                     filterLocation === 'PANTRY'
                       ? 'bg-amber-600 text-white shadow-xs'
                       : 'bg-white border border-[#D5E1D2] text-[#4F6553] hover:bg-[#EAF1E8]'
@@ -928,7 +1242,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 </button>
                 <button
                   onClick={() => setFilterLocation('FREEZER')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1 transition-all ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1 transition-all shrink-0 ${
                     filterLocation === 'FREEZER'
                       ? 'bg-blue-600 text-white shadow-xs'
                       : 'bg-white border border-[#D5E1D2] text-[#4F6553] hover:bg-[#EAF1E8]'
@@ -939,7 +1253,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 </button>
                 <button
                   onClick={() => setFilterLocation('EXPIRING')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1 transition-all ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1 transition-all shrink-0 ${
                     filterLocation === 'EXPIRING'
                       ? 'bg-rose-600 text-white shadow-xs'
                       : 'bg-white border border-rose-200 text-rose-700 hover:bg-rose-50'
@@ -948,7 +1262,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                   <AlertTriangle className="w-3 h-3" />
                   {lang === 'FR' ? `Bientôt (${expiringItems.length})` : `Soon (${expiringItems.length})`}
                 </button>
-              </div>
+              </ScrollableRow>
 
               {/* Bento Layout Switcher (Grid vs List) */}
               <div className="flex items-center gap-0.5 p-1 bg-white border border-[#D5E1D2] rounded-xl shrink-0 shadow-2xs">
@@ -1187,225 +1501,23 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 })}
               </div>
             ) : (
-              /* BENTO BOX LIST / SLAB MODE */
-              <div className="space-y-3">
-                {filteredItems.map((item) => {
-                  const isFreezer = item.locationType === 'FREEZER';
-                  const daysLeft = item.daysUntilExpiration;
-                  const isSoon = item.isExpiringSoon || (daysLeft !== null && daysLeft <= 3);
-                  const visual = getFoodVisual(item.name, item.categoryName);
-                  const CategoryIcon = visual.icon;
-
-                  return (
-                    <div
-                      key={item.id}
-                      className="p-3.5 rounded-3xl bg-white border border-[#D5E1D2] shadow-2xs hover:shadow-sm transition-all space-y-2.5"
-                    >
-                      {/* Top Row: Food Image/Icon + Title + Category & Location */}
-                      <div className="flex items-start gap-3">
-                        {/* Food Type Image & Icon Badge */}
-                        <div
-                          onClick={() => handleOpenEditModal(item)}
-                          className="cursor-pointer"
-                          title="Click to edit item"
-                        >
-                          <FoodVisualBadge
-                            itemName={item.name}
-                            categoryName={item.categoryName}
-                            imageUrl={item.imageUrl}
-                            size="md"
-                          />
-                        </div>
-
-                        {/* Item Details */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-1">
-                            <h3
-                              onClick={() => handleOpenEditModal(item)}
-                              className="font-bold text-sm text-[#1F3323] truncate cursor-pointer hover:text-teal-700 transition-colors"
-                              title={lang === 'FR' ? "Cliquer pour modifier l'article" : "Click to edit item"}
-                            >
-                              {item.name}
-                            </h3>
-
-                            {/* Storage Location Badge */}
-                            <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1 ${
-                                isFreezer
-                                  ? 'bg-blue-50 text-blue-700 border border-blue-200/60'
-                                  : item.locationType === 'PANTRY'
-                                  ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
-                                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
-                              }`}
-                            >
-                              {isFreezer ? (
-                                <Snowflake className="w-2.5 h-2.5" />
-                              ) : item.locationType === 'PANTRY' ? (
-                                <Boxes className="w-2.5 h-2.5" />
-                              ) : (
-                                <Refrigerator className="w-2.5 h-2.5" />
-                              )}
-                              {getLocationLocalizedName(item.locationName, lang)}
-                            </span>
-                          </div>
-
-                          {/* Food Type & Quantity Pill */}
-                          <div className="flex items-center gap-1.5 mt-1">
-                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-[#EDF3EC] text-[#344837]">
-                              {item.quantity} {item.unit}
-                            </span>
-
-                            {/* Food Category Tag with Icon */}
-                            <span
-                              className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border flex items-center gap-1 ${visual.bgColor} ${visual.textColor} ${visual.borderColor}`}
-                            >
-                              <CategoryIcon className="w-3 h-3" />
-                              {getCategoryLocalizedName(item.categoryName, lang)}
-                            </span>
-
-                            {item.barcode && (
-                              <span
-                                className="text-[10px] font-mono font-bold text-blue-700 bg-blue-50 border border-blue-200/70 px-1.5 py-0.5 rounded-md flex items-center gap-1"
-                                title={`UPC: ${item.barcode}`}
-                              >
-                                <Barcode className="w-3 h-3 text-blue-600" />
-                                {item.barcode}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Expiration or Freezer Metric Section */}
-                      {isFreezer ? (
-                        /* Freezer Duration Tracking (Months Frozen vs Shelf-Life) */
-                        <div className="p-2.5 rounded-2xl bg-[#F0F5FA] border border-[#D6E3EF] space-y-1.5">
-                          <div className="flex items-center justify-between text-[11px]">
-                            <span className="font-bold text-[#2A4763] flex items-center gap-1">
-                              <Snowflake className="w-3 h-3 text-blue-500" />
-                              {lang === 'FR'
-                                ? `Congelé depuis ${item.monthsFrozen ?? 2.5} mois`
-                                : `Frozen ${item.monthsFrozen ?? 2.5} mos`}
-                            </span>
-                            <span className="text-[#5A7794]">
-                              {lang === 'FR'
-                                ? `Max ${item.monthsFrozenShelfLife ?? 6} mois conseillé`
-                                : `Max ${item.monthsFrozenShelfLife ?? 6} mos safe`}
-                            </span>
-                          </div>
-                          {/* Progress bar */}
-                          <div className="w-full h-1.5 bg-blue-200/60 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all ${
-                                (item.frozenPercentage ?? 50) >= 80 ? 'bg-amber-500' : 'bg-blue-500'
-                              }`}
-                              style={{ width: `${Math.min(100, item.frozenPercentage ?? 50)}%` }}
-                            />
-                          </div>
-                        </div>
-                      ) : (
-                        /* Chilled / Pantry Shelf-Life Alert */
-                        <div className="flex items-center justify-between text-xs">
-                          <span
-                            className={`px-2.5 py-1 rounded-xl text-[11px] font-bold flex items-center gap-1 ${
-                              isSoon
-                                ? 'bg-rose-100 text-rose-800'
-                                : 'bg-[#EDF3EC] text-[#39503D]'
-                            }`}
-                          >
-                            <Calendar className="w-3 h-3" />
-                            {daysLeft !== null
-                              ? daysLeft <= 0
-                                ? lang === 'FR' ? "Expiré aujourd'hui" : 'Expired today'
-                                : lang === 'FR'
-                                ? `Expire dans ${daysLeft} jour${daysLeft === 1 ? '' : 's'}`
-                                : `Expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`
-                              : lang === 'FR' ? 'Aucune date définie' : 'No expiration set'}
-                          </span>
-
-                          {item.notes && (
-                            <span className="text-[11px] text-[#697F6C] truncate max-w-[170px] italic">
-                              {item.notes}
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Bottom Row: Household Attribution Badge ("by Yan" / "by Kriz") & Actions */}
-                      <div className="pt-2 border-t border-[#EEF4ED] flex items-center justify-between">
-                        {/* Attribution Badge */}
-                        <div className="flex items-center gap-1.5">
-                          <img
-                            src={item.addedByAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80'}
-                            alt={item.addedByName}
-                            className="w-4 h-4 rounded-full object-cover"
-                          />
-                          <span className="text-[11px] font-bold text-[#556D58]">
-                            {lang === 'FR' ? 'par' : 'by'} {item.addedByName || 'Yan'}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => handleAddItemToGroceryCart(item)}
-                            title={t('add_to_cart_tooltip')}
-                            className="py-1 px-2 bg-[#EEF4EC] hover:bg-emerald-100 text-[#355239] rounded-xl text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95"
-                          >
-                            <ShoppingCart className="w-3 h-3 text-emerald-700" />
-                            <span>{lang === 'FR' ? '+Panier' : '+Cart'}</span>
-                          </button>
-
-                          {/* Defrost Button for Freezer items */}
-                          {isFreezer && (
-                            <button
-                              onClick={() => handleDefrost(item)}
-                              disabled={defrostingId === item.id}
-                              title={t('defrost_tooltip')}
-                              className="py-1 px-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[11px] font-bold flex items-center gap-1 shadow-xs transition-all active:scale-95"
-                            >
-                              <Flame className="w-3 h-3 text-amber-300" />
-                              <span>
-                                {defrostingId === item.id
-                                  ? '...'
-                                  : lang === 'FR'
-                                  ? 'Décongeler'
-                                  : 'Defrost'}
-                              </span>
-                            </button>
-                          )}
-
-                          {/* Edit Item */}
-                          <button
-                            onClick={() => handleOpenEditModal(item)}
-                            title={t('edit_item_tooltip')}
-                            className="py-1 px-2 bg-[#F2ECE0] hover:bg-teal-100 text-teal-800 rounded-xl text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95"
-                          >
-                            <Edit3 className="w-3 h-3" />
-                            <span>{lang === 'FR' ? 'Modifier' : 'Edit'}</span>
-                          </button>
-
-                          {/* Mark Consumed */}
-                          <button
-                            onClick={() => handleConsumeItem(item)}
-                            title={t('mark_consumed_tooltip')}
-                            className="py-1 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-[11px] font-bold flex items-center gap-0.5 transition-all active:scale-95"
-                          >
-                            <Check className="w-3 h-3" />
-                          </button>
-
-                          {/* Delete Item */}
-                          <button
-                            onClick={() => handleDeleteItem(item.id, item.name)}
-                            title={t('delete_item_tooltip')}
-                            className="py-1 px-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-[11px] font-bold flex items-center gap-0.5 transition-all active:scale-95"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+              /* BENTO BOX LIST / SLAB MODE (Compact rows expandable on click) */
+              <div className="space-y-2">
+                {filteredItems.map((item) => (
+                  <InventoryListItem
+                    key={item.id}
+                    item={item}
+                    isExpanded={expandedItemIds.has(item.id)}
+                    onToggleExpand={() => toggleExpandItem(item.id)}
+                    onConsume={handleConsumeItem}
+                    onDelete={handleDeleteItem}
+                    onEdit={handleOpenEditModal}
+                    onAddToCart={handleAddItemToGroceryCart}
+                    onDefrost={handleDefrost}
+                    isDefrosting={defrostingId === item.id}
+                    lang={lang}
+                  />
+                ))}
               </div>
             )}
           </>
@@ -1420,6 +1532,10 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             groceryItems={groceryItems}
             onUpdateGroceryItems={setGroceryItems}
             onSwitchToInventory={() => setActiveNav('home')}
+            onOpenReceiptScanner={() => {
+              setScannerInitialMode('receipt');
+              setIsScannerOpen(true);
+            }}
           />
         )}
 
@@ -1440,9 +1556,9 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                     name: ing.name,
                     category: ing.category || 'Pantry Staples',
                     quantity: ing.quantity || 1,
-                    unit: ing.unit || 'item',
+                    unit: ing.unit || 'pcs',
                     locationType: 'FRIDGE',
-                    inCart: true,
+                    inCart: false,
                     notes: lang === 'FR' ? 'Du plan de repas' : 'From Meal Plan',
                   },
                   ...prev,
@@ -1450,11 +1566,12 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               });
               setBannerNotice(
                 lang === 'FR'
-                  ? `🛒 ${ingredients.length} ingrédients ajoutés à votre panier !`
-                  : `🛒 Added ${ingredients.length} ingredients to your grocery cart!`
+                  ? `🛒 ${ingredients.length} ingrédients ajoutés à votre liste d'épicerie !`
+                  : `🛒 Added ${ingredients.length} ingredients to your grocery list!`
               );
               setTimeout(() => setBannerNotice(null), 3500);
             }}
+            onNavigateToGrocery={() => setActiveNav('grocery')}
             onOpenRecipes={() => setActiveNav('cooking')}
           />
         )}
@@ -1463,6 +1580,8 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         {activeNav === 'cooking' && (
           <CookingIdeasView
             items={items}
+            onPlanMeal={handleAddMeal}
+            onNavigateToMealPlanner={() => setActiveNav('mealplanner')}
             onAddMissingToGrocery={(missing) => {
               setGroceryItems((prev) => [
                 {
@@ -1496,101 +1615,246 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
           <FamilySyncView
             currentUser={currentUser}
             onSwitchUser={setCurrentUser}
-            members={MOCK_MEMBERS}
+            members={householdMembers}
+            onUpdateMember={handleUpdateMember}
+            onOpenAdmin={() => {
+              if (currentUser.role === 'ADMIN') {
+                setIsAdminModalOpen(true);
+              } else {
+                setIsAdminRestrictedOpen(true);
+              }
+            }}
           />
         )}
       </div>
 
-      {/* Floating Action Buttons ("+ ADD ITEM" and "SNAP & ADD!") - Screen size responsive */}
-      <div className="fixed sm:absolute bottom-20 md:bottom-6 inset-x-0 md:inset-x-auto md:right-8 flex justify-center md:justify-end items-center pointer-events-none z-30">
-        <div className="flex items-center gap-2 pointer-events-auto bg-[#0A3834]/95 backdrop-blur-md p-1.5 rounded-full shadow-2xl border border-teal-500/40">
+      {/* Quick Add Action Menu (Full Screen with Exit Button) */}
+      {isAddMenuOpen && (
+        <div className="fixed inset-0 z-50 bg-[#FAF7EE] flex flex-col w-full h-full overflow-hidden text-[#133E3B] animate-fade-in">
+          {/* Header */}
+          <div className="px-5 py-3.5 border-b border-[#E8E2D5] flex items-center justify-between bg-white/90 backdrop-blur-xs shrink-0">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-full bg-teal-800 text-white flex items-center justify-center shadow-xs">
+                <Plus className="w-4 h-4 stroke-[3]" />
+              </div>
+              <div>
+                <h2 className="text-sm sm:text-base font-black text-[#0D3B37] leading-tight">
+                  {lang === 'FR' ? 'Ajouter à la cuisine' : 'Add to Kitchen'}
+                </h2>
+                <p className="text-[11px] text-[#527470]">
+                  {lang === 'FR' ? 'Choisissez le mode d’ajout souhaité' : 'Choose how you want to add items'}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsAddMenuOpen(false)}
+              className="px-3.5 py-1.5 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs"
+              title={lang === 'FR' ? 'Quitter' : 'Exit'}
+            >
+              <X className="w-4 h-4" />
+              <span>{lang === 'FR' ? 'Quitter' : 'Exit'}</span>
+            </button>
+          </div>
+
+          {/* Options in Full-Screen View */}
+          <div className="flex-1 overflow-y-auto p-5 sm:p-6 max-w-lg mx-auto w-full flex flex-col justify-center space-y-4">
+            {/* Option 1: Manual Add */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsAddMenuOpen(false);
+                handleOpenAddModal();
+              }}
+              className="w-full p-4 rounded-3xl bg-white hover:bg-[#F6F2E8] border-2 border-[#E5DFD0] hover:border-teal-400 flex items-center gap-4 text-left transition-all active:scale-[0.98] shadow-xs group"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-teal-700 group-hover:bg-teal-800 text-white flex items-center justify-center shadow-xs shrink-0 transition-colors">
+                <Plus className="w-6 h-6 stroke-[2.5]" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-extrabold text-[#0D3B37]">
+                  {lang === 'FR' ? 'Saisie manuelle' : 'Manual Add'}
+                </p>
+                <p className="text-xs text-[#527470]">
+                  {lang === 'FR' ? 'Entrez le nom, la quantité, le lieu de stockage et la date' : 'Name, quantity, compartment, and expiry date'}
+                </p>
+              </div>
+            </button>
+
+            {/* Option 2: Camera Photo Scan */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsAddMenuOpen(false);
+                setScannerInitialMode('snap');
+                setIsScannerOpen(true);
+              }}
+              className="w-full p-4 rounded-3xl bg-white hover:bg-[#F6F2E8] border-2 border-[#E5DFD0] hover:border-teal-400 flex items-center gap-4 text-left transition-all active:scale-[0.98] shadow-xs group"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-[#0E766E] group-hover:bg-[#0B5C56] text-white flex items-center justify-center shadow-xs shrink-0 transition-colors">
+                <Camera className="w-6 h-6 text-teal-200" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-extrabold text-[#0D3B37]">
+                  {lang === 'FR' ? 'Scanner un aliment par photo' : 'Scan Item (Camera)'}
+                </p>
+                <p className="text-xs text-[#527470]">
+                  {lang === 'FR' ? 'Prenez des photos en rafale, l’ajout continue en arrière-plan' : 'Continuous background scanning as you take pictures'}
+                </p>
+              </div>
+            </button>
+
+            {/* Option 3: Receipt Scan */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsAddMenuOpen(false);
+                setScannerInitialMode('receipt');
+                setIsScannerOpen(true);
+              }}
+              className="w-full p-4 rounded-3xl bg-white hover:bg-[#F6F2E8] border-2 border-[#E5DFD0] hover:border-amber-400 flex items-center gap-4 text-left transition-all active:scale-[0.98] shadow-xs group"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-amber-600 group-hover:bg-amber-700 text-white flex items-center justify-center shadow-xs shrink-0 transition-colors">
+                <FileText className="w-6 h-6 text-amber-200" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-extrabold text-[#0D3B37]">
+                  {lang === 'FR' ? 'Scanner un reçu d’épicerie' : 'Scan Grocery Receipt'}
+                </p>
+                <p className="text-xs text-[#527470]">
+                  {lang === 'FR' ? 'Numérisez votre facture Maxi, IGA, Métro ou Costco' : 'OCR scan for Maxi, IGA, Metro, Costco receipt'}
+                </p>
+              </div>
+            </button>
+
+            {/* Option 4: Leftovers & Prepared Foods (Health Canada & European Standards) */}
+            <button
+              type="button"
+              id="add-kitchen-leftovers-option"
+              onClick={() => {
+                setIsAddMenuOpen(false);
+                setSelectedMealForLeftover(null);
+                setIsImportLeftoverOpen(true);
+              }}
+              className="w-full p-4 rounded-3xl bg-white hover:bg-[#FDF7ED] border-2 border-[#E5DFD0] hover:border-amber-500 flex items-center gap-4 text-left transition-all active:scale-[0.98] shadow-xs group"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-[#C25E00] group-hover:bg-[#A34E00] text-white flex items-center justify-center shadow-xs shrink-0 transition-colors">
+                <Utensils className="w-6 h-6 text-amber-100" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <p className="text-sm font-extrabold text-[#0D3B37]">
+                    {lang === 'FR' ? 'Restes & Plats préparés' : 'Leftovers & Prepared Foods'}
+                  </p>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-200">
+                    {lang === 'FR' ? '🇨🇦 Canada & 🇪🇺 UE' : '🇨🇦 Canada & 🇪🇺 EU'}
+                  </span>
+                </div>
+                <p className="text-xs text-[#527470] mt-0.5">
+                  {lang === 'FR'
+                    ? 'Souper de ce soir, fête philippine (lechon, riz...), ou plats enregistrés'
+                    : 'Tonight’s dinner, Filipino party (lechon, rice...), or saved items'}
+                </p>
+              </div>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bottom Navigation Bar with Integrated Center + Add Button (Mobile screens, with Safe Area support) */}
+      <nav aria-label="Bottom Navigation" className="md:hidden fixed bottom-0 inset-x-0 pb-[env(safe-area-inset-bottom,0px)] bg-[#FAF7EE]/95 backdrop-blur-md border-t border-[#E5DFD0] px-4 flex items-center justify-center z-30 shadow-lg">
+        <div className="w-full max-w-lg mx-auto h-16 flex items-center justify-between">
+          {/* Tab 1: Inventory */}
           <button
-            id="floating-manual-add-btn"
-            onClick={handleOpenAddModal}
-            className="px-3.5 py-2.5 rounded-full bg-teal-800 hover:bg-teal-700 text-white font-extrabold text-[11px] tracking-wider flex items-center gap-1.5 shadow-xs hover:scale-105 active:scale-95 transition-all"
-            title={t('quick_add_tooltip')}
+            onClick={() => {
+              setIsAddMenuOpen(false);
+              setActiveNav('home');
+            }}
+            className={`flex flex-col items-center justify-center flex-1 py-1 gap-0.5 text-[10px] font-bold transition-colors ${
+              activeNav === 'home' ? 'text-teal-700' : 'text-slate-400 hover:text-slate-600'
+            }`}
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>{lang === 'FR' ? '+ AJOUTER' : '+ ADD ITEM'}</span>
+            <Home className="w-4 h-4" />
+            <span>{t('nav_inventory')}</span>
           </button>
+
+          {/* Tab 2: Meals */}
           <button
-            id="floating-snap-add-btn"
-            onClick={() => setIsScannerOpen(true)}
-            className="px-4 py-2.5 rounded-full bg-[#0E766E] hover:bg-[#0B5C56] text-white font-extrabold text-[11px] tracking-wider flex items-center gap-1.5 shadow-xs hover:scale-105 active:scale-95 transition-all"
-            title={lang === 'FR' ? "Scanner l'article avec la caméra" : "Scan item with camera"}
+            onClick={() => {
+              setIsAddMenuOpen(false);
+              setActiveNav('meals');
+            }}
+            className={`flex flex-col items-center justify-center flex-1 py-1 gap-0.5 text-[10px] font-bold transition-colors relative ${
+              activeNav === 'meals' ? 'text-teal-700' : 'text-slate-400 hover:text-slate-600'
+            }`}
           >
-            <Camera className="w-3.5 h-3.5 text-teal-300" />
-            <span>{lang === 'FR' ? 'SCANNER & AJOUTER !' : 'SNAP & ADD!'}</span>
+            <div className="relative">
+              <CalendarDays className="w-4 h-4" />
+              {plannedMeals.length > 0 && (
+                <span className="absolute -top-1.5 -right-2 w-3.5 h-3.5 bg-indigo-600 text-white rounded-full text-[9px] font-black flex items-center justify-center">
+                  {plannedMeals.length}
+                </span>
+              )}
+            </div>
+            <span>{t('nav_meals')}</span>
+          </button>
+
+          {/* CENTER: Integrated Raised Add Button with + icon */}
+          <div className="flex flex-col items-center justify-center px-2 shrink-0 relative">
+            <button
+              id="bottom-center-add-btn"
+              type="button"
+              onClick={() => setIsAddMenuOpen((prev) => !prev)}
+              className={`w-13 h-13 -mt-6 rounded-full bg-gradient-to-tr from-[#0D3B37] via-[#0E766E] to-teal-500 text-white flex items-center justify-center shadow-xl border-4 border-[#FAF7EE] active:scale-90 transition-all duration-300 hover:scale-105 ${
+                isAddMenuOpen ? 'rotate-45 scale-105 ring-4 ring-teal-500/40' : ''
+              }`}
+              aria-label={lang === 'FR' ? 'Ajouter un aliment' : 'Add Item'}
+              title={lang === 'FR' ? 'Ajouter un aliment' : 'Add Item'}
+            >
+              <Plus className="w-7 h-7 stroke-[3]" />
+            </button>
+            <span className="text-[10px] font-black text-[#0D3B37] mt-0.5 tracking-tight">
+              {lang === 'FR' ? 'Ajout' : 'Add'}
+            </span>
+          </div>
+
+          {/* Tab 3: Grocery */}
+          <button
+            onClick={() => {
+              setIsAddMenuOpen(false);
+              setActiveNav('grocery');
+            }}
+            className={`flex flex-col items-center justify-center flex-1 py-1 gap-0.5 text-[10px] font-bold transition-colors relative ${
+              activeNav === 'grocery' ? 'text-teal-700' : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            <div className="relative">
+              <ShoppingCart className="w-4 h-4" />
+              {groceryItems.filter((i) => i.inCart).length > 0 && (
+                <span className="absolute -top-1.5 -right-2 w-3.5 h-3.5 bg-teal-700 text-white rounded-full text-[9px] font-black flex items-center justify-center">
+                  {groceryItems.filter((i) => i.inCart).length}
+                </span>
+              )}
+            </div>
+            <span>{t('nav_grocery')}</span>
+          </button>
+
+          {/* Tab 4: Cooking Ideas */}
+          <button
+            onClick={() => {
+              setIsAddMenuOpen(false);
+              setActiveNav('cooking');
+            }}
+            className={`flex flex-col items-center justify-center flex-1 py-1 gap-0.5 text-[10px] font-bold transition-colors ${
+              activeNav === 'cooking' ? 'text-teal-700' : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            <ChefHat className="w-4 h-4" />
+            <span>{t('nav_cooking')}</span>
           </button>
         </div>
-      </div>
-
-      {/* Mobile-Only Bottom Navigation Bar (automatically hidden on tablet/desktop screens md and up) */}
-      <div className="fixed sm:absolute bottom-0 inset-x-0 h-16 bg-[#FAF7EE]/95 backdrop-blur-md border-t border-[#E5DFD0] px-3 flex md:hidden items-center justify-around z-20">
-        <button
-          onClick={() => setActiveNav('home')}
-          className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition-colors ${
-            activeNav === 'home' ? 'text-teal-700' : 'text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          <Home className="w-4 h-4" />
-          <span>{t('nav_inventory')}</span>
-        </button>
-
-        <button
-          onClick={() => setActiveNav('meals')}
-          className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition-colors relative ${
-            activeNav === 'meals' ? 'text-teal-700' : 'text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          <div className="relative">
-            <CalendarDays className="w-4 h-4" />
-            {plannedMeals.length > 0 && (
-              <span className="absolute -top-1.5 -right-2 w-3.5 h-3.5 bg-indigo-600 text-white rounded-full text-[9px] font-black flex items-center justify-center">
-                {plannedMeals.length}
-              </span>
-            )}
-          </div>
-          <span>{t('nav_meals')}</span>
-        </button>
-
-        <button
-          onClick={() => setActiveNav('grocery')}
-          className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition-colors relative ${
-            activeNav === 'grocery' ? 'text-teal-700' : 'text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          <div className="relative">
-            <ShoppingCart className="w-4 h-4" />
-            {groceryItems.filter((i) => i.inCart).length > 0 && (
-              <span className="absolute -top-1.5 -right-2 w-3.5 h-3.5 bg-teal-700 text-white rounded-full text-[9px] font-black flex items-center justify-center">
-                {groceryItems.filter((i) => i.inCart).length}
-              </span>
-            )}
-          </div>
-          <span>{t('nav_grocery')}</span>
-        </button>
-
-        <button
-          onClick={() => setActiveNav('cooking')}
-          className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition-colors ${
-            activeNav === 'cooking' ? 'text-teal-700' : 'text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          <ChefHat className="w-4 h-4" />
-          <span>{t('nav_cooking')}</span>
-        </button>
-
-        <button
-          onClick={() => setActiveNav('sync')}
-          className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition-colors ${
-            activeNav === 'sync' ? 'text-teal-700' : 'text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          <span>{t('nav_family')}</span>
-        </button>
-      </div>
+      </nav>
 
       {/* Vision Scanner Modal */}
       <CameraScannerModal
@@ -1599,6 +1863,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         onItemAdded={handleItemAdded}
         currentUser={currentUser}
         onOpenManualAdd={handleOpenAddModal}
+        initialMode={scannerInitialMode}
       />
 
       {/* Manual Add & Edit Item Modal */}
@@ -1615,6 +1880,79 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
           setItems((prev) => prev.filter((i) => i.id !== itemId));
           setBannerNotice(lang === 'FR' ? "Article supprimé de l'inventaire." : 'Item deleted from inventory.');
           setTimeout(() => setBannerNotice(null), 3000);
+        }}
+      />
+
+      {/* Import Leftovers Modal with Smart Expiration */}
+      <ImportLeftoverModal
+        isOpen={isImportLeftoverOpen}
+        onClose={() => {
+          setIsImportLeftoverOpen(false);
+          setSelectedMealForLeftover(null);
+        }}
+        currentUser={currentUser}
+        plannedMeals={plannedMeals}
+        initialMeal={selectedMealForLeftover}
+        lang={lang}
+        onLeftoversImported={(newItems) => {
+          setItems((prev) => {
+            const newIds = new Set(newItems.map((i) => i.id));
+            return [...newItems, ...prev.filter((i) => !newIds.has(i.id))];
+          });
+          const count = newItems.length;
+          const names = newItems.map((i) => i.name).slice(0, 2).join(', ');
+          const more = count > 2 ? ` (+${count - 2})` : '';
+          setBannerNotice(
+            lang === 'FR'
+              ? `🍲 ${count} plat(s) de restes (${names}${more}) ajouté(s) à la cuisine ! Normes Santé Canada & UE appliquées.`
+              : `🍲 ${count} leftover dish(es) (${names}${more}) added to Kitchen! Canadian & EU safety standards applied.`
+          );
+          setTimeout(() => setBannerNotice(null), 5500);
+        }}
+      />
+
+      {/* Admin App & Database Management Modal */}
+      <AdminManagementModal
+        isOpen={isAdminModalOpen}
+        onClose={() => setIsAdminModalOpen(false)}
+        currentUser={currentUser}
+        onUserChange={(newUser) => {
+          setCurrentUser(newUser);
+          setBannerNotice(
+            lang === 'FR'
+              ? `Session basculée sur ${newUser.name} (${newUser.role})`
+              : `Switched active session to ${newUser.name} (${newUser.role})`
+          );
+          setTimeout(() => setBannerNotice(null), 3500);
+        }}
+        onDatabaseRestored={async () => {
+          await fetchInventory();
+          setBannerNotice(
+            lang === 'FR'
+              ? 'Base de données restaurée et synchronisée avec succès !'
+              : 'Database restored and synchronized successfully!'
+          );
+          setTimeout(() => setBannerNotice(null), 4000);
+        }}
+      />
+
+      {/* Admin Restricted Notice Modal */}
+      <AdminRestrictedModal
+        isOpen={isAdminRestrictedOpen}
+        onClose={() => setIsAdminRestrictedOpen(false)}
+        currentUser={currentUser}
+        adminUser={householdMembers.find((m) => m.role === 'ADMIN') || householdMembers[0]}
+        onSwitchToAdmin={() => {
+          const admin = householdMembers.find((m) => m.role === 'ADMIN') || householdMembers[0];
+          setCurrentUser(admin);
+          setIsAdminRestrictedOpen(false);
+          setIsAdminModalOpen(true);
+          setBannerNotice(
+            lang === 'FR'
+              ? `Connecté en tant qu’administrateur (${admin.name})`
+              : `Logged in as administrator (${admin.name})`
+          );
+          setTimeout(() => setBannerNotice(null), 3500);
         }}
       />
     </div>

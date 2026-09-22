@@ -1,20 +1,16 @@
 import express from "express";
-import { analyzeFoodImage } from "../services/geminiVision.js";
+import { analyzeFoodImage, analyzeReceiptText, analyzeReceiptImage } from "../services/geminiVision.js";
+import { dbStore } from "../services/dbStore.js";
 
 const router = express.Router();
 
 /**
- * In-memory Household Storage & Prisma Adapter
- * Enables immediate execution out-of-the-box and full compatibility with Prisma ORM
- * when PostgreSQL DATABASE_URL is configured.
+ * Household Storage with AES-256-GCM Encrypted Disk Persistence
  */
 
-// Initial Seed Data for Multi-User Household (Yan & Kriz)
+// Multi-User Household (Yan & Kriz)
 const SEED_HOUSEHOLD_ID = "hh_yan_kriz_01";
-const USERS = [
-  { id: "usr_yan", name: "Yan", email: "yan@example.com", role: "ADMIN", avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80" },
-  { id: "usr_kriz", name: "Kriz", email: "kriz@example.com", role: "MEMBER", avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80" },
-];
+const USERS = dbStore.users;
 
 const LOCATIONS = [
   { id: "loc_fridge", name: "Fridge", type: "FRIDGE", householdId: SEED_HOUSEHOLD_ID },
@@ -292,7 +288,7 @@ let activityLogs = [
  */
 router.post("/scan", async (req, res) => {
   try {
-    const { imageBase64, mimeType = "image/jpeg" } = req.body;
+    const { imageBase64, mimeType = "image/jpeg", language = "EN" } = req.body;
 
     if (!imageBase64) {
       return res.status(400).json({
@@ -314,39 +310,53 @@ router.post("/scan", async (req, res) => {
       console.info("[Inventory Route] GEMINI_API_KEY is not configured in environment. Returning demonstration scan items.");
       return res.status(200).json({
         success: true,
-        summary: "Notice: Gemini API Key pending in environment. Demonstration scan results loaded.",
+        summary: language === "FR"
+          ? "Avis : Clé API Gemini en attente dans l'environnement. Résultats de numérisation de démonstration chargés."
+          : "Notice: Gemini API Key pending in environment. Demonstration scan results loaded.",
         demoMode: true,
         itemsCount: 2,
         items: [
           {
-            name: "Organic Baby Spinach",
+            name: language === "FR" ? "Épinards frais bio" : "Organic Baby Spinach",
+            nameFr: "Épinards frais bio",
+            nameEn: "Organic Baby Spinach",
             brand: "Earthbound Farm",
-            category: "Produce",
+            category: language === "FR" ? "Produits frais" : "Produce",
             quantity: 1,
-            unit: "box (500g)",
+            unit: language === "FR" ? "bac (500g)" : "box (500g)",
             recommendedLocation: "Fridge",
-            storageReason: "Moisture-sensitive leafy greens stay crisp at 36°F.",
+            storageReason: language === "FR"
+              ? "Les jeunes pousses sensibles à l'humidité restent croquantes à 2°C."
+              : "Moisture-sensitive leafy greens stay crisp at 36°F.",
             estimatedShelfLifeDays: 5,
             monthsFrozenShelfLife: 10,
             confidence: 0.94,
-            storageTip: "Add a dry paper towel in the tub to absorb condensation.",
+            storageTip: language === "FR"
+              ? "Ajoutez un essuie-tout sec dans le bac pour absorber la condensation."
+              : "Add a dry paper towel in the tub to absorb condensation.",
             suggestedExpirationDate: getRelativeDate(5).split("T")[0],
             detectedText: "ORGANIC BABY SPINACH 500G - UPC 032601000142",
             barcode: "032601000142",
             printedExpirationDate: getRelativeDate(5).split("T")[0],
           },
           {
-            name: "Greek Feta Cheese in Brine",
+            name: language === "FR" ? "Fromage Féta grecque en saumure" : "Greek Feta Cheese in Brine",
+            nameFr: "Fromage Féta grecque en saumure",
+            nameEn: "Greek Feta Cheese in Brine",
             brand: "Dodoni",
-            category: "Dairy & Eggs",
+            category: language === "FR" ? "Produits laitiers & œufs" : "Dairy & Eggs",
             quantity: 1,
-            unit: "block (200g)",
+            unit: language === "FR" ? "bloc (200g)" : "block (200g)",
             recommendedLocation: "Fridge",
-            storageReason: "Submerged brine preserves texture and prevents mold.",
+            storageReason: language === "FR"
+              ? "La saumure préserve la texture et empêche le développement des moisissures."
+              : "Submerged brine preserves texture and prevents mold.",
             estimatedShelfLifeDays: 14,
             monthsFrozenShelfLife: 3,
             confidence: 0.96,
-            storageTip: "Ensure cheese is always completely immersed in the brine.",
+            storageTip: language === "FR"
+              ? "Assurez-vous que le fromage reste toujours entièrement immergé dans la saumure."
+              : "Ensure cheese is always completely immersed in the brine.",
             suggestedExpirationDate: getRelativeDate(14).split("T")[0],
             detectedText: "AUTHENTIC GREEK FETA IN BRINE 200G - EAN 5201051001018",
             barcode: "5201051001018",
@@ -358,7 +368,7 @@ router.post("/scan", async (req, res) => {
     }
 
     // Call the production Gemini Flash Vision service
-    const result = await analyzeFoodImage(imageBase64, mimeType);
+    const result = await analyzeFoodImage(imageBase64, mimeType, language);
     return res.status(200).json(result);
   } catch (error) {
     console.error("[Inventory Route] /scan processing error:", error.message || error);
@@ -366,6 +376,60 @@ router.post("/scan", async (req, res) => {
     return res.status(500).json({
       success: false,
       error: "AI Vision analysis failed",
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/v1/inventory/scan-receipt-text
+ * Parses pasted grocery receipt text using Gemini 3.8 Flash,
+ * extracting item names, categories, quantities, recommended locations, and shelf lives.
+ */
+router.post("/scan-receipt-text", async (req, res) => {
+  try {
+    const { receiptText, language = "EN" } = req.body;
+    if (!receiptText || typeof receiptText !== "string" || receiptText.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required field: receiptText. Paste the receipt text to parse.",
+      });
+    }
+
+    const result = await analyzeReceiptText(receiptText, language);
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error("[Inventory Route] /scan-receipt-text error:", error.message || error);
+    return res.status(500).json({
+      success: false,
+      error: "Receipt text parsing failed",
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/v1/inventory/scan-receipt-photo
+ * Performs specialized OCR and parsing on a photograph of a grocery receipt
+ * using Gemini Flash Vision.
+ */
+router.post("/scan-receipt-photo", async (req, res) => {
+  try {
+    const { imageBase64, mimeType = "image/jpeg", language = "EN" } = req.body;
+    if (!imageBase64) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required field: imageBase64. Provide a base64 encoded receipt photo.",
+      });
+    }
+
+    const result = await analyzeReceiptImage(imageBase64, mimeType, language);
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error("[Inventory Route] /scan-receipt-photo error:", error.message || error);
+    return res.status(500).json({
+      success: false,
+      error: "Receipt photo analysis failed",
       details: error.message,
     });
   }
@@ -380,11 +444,12 @@ router.post("/scan", async (req, res) => {
 router.get("/barcode/:code", async (req, res) => {
   try {
     const rawCode = String(req.params.code || "").trim().replace(/[^0-9]/g, "");
+    const language = String(req.query.language || "EN").toUpperCase();
     if (!rawCode || rawCode.length < 6) {
       return res.status(400).json({ success: false, error: "Invalid UPC/EAN barcode number." });
     }
 
-    console.info(`[Pantryo Barcode] Looking up UPC/EAN: ${rawCode}`);
+    console.info(`[Pantryo Barcode] Looking up UPC/EAN: ${rawCode} (Language: ${language})`);
 
     // Check if an item in the household already has this barcode
     const existing = itemsStore.find(
@@ -427,10 +492,21 @@ router.get("/barcode/:code", async (req, res) => {
       if (offData && offData.status === 1 && offData.product) {
         const prod = offData.product;
         const brand = prod.brands ? prod.brands.split(",")[0].trim() : null;
-        let name = prod.product_name || prod.generic_name || "Food Product";
-        if (brand && !name.toLowerCase().includes(brand.toLowerCase())) {
-          name = `${brand} ${name}`;
+        let nameFr = prod.product_name_fr || prod.generic_name_fr || null;
+        let nameEn = prod.product_name_en || prod.generic_name_en || prod.product_name || "Food Product";
+        
+        if (brand) {
+          if (nameFr && !nameFr.toLowerCase().includes(brand.toLowerCase())) {
+            nameFr = `${brand} ${nameFr}`;
+          }
+          if (nameEn && !nameEn.toLowerCase().includes(brand.toLowerCase())) {
+            nameEn = `${brand} ${nameEn}`;
+          }
         }
+
+        let name = language === "FR" ? (nameFr || nameEn) : (nameEn || nameFr);
+        if (!nameFr) nameFr = name;
+        if (!nameEn) nameEn = name;
 
         // Determine category mapping
         let category = "Pantry Staples";
@@ -469,6 +545,8 @@ router.get("/barcode/:code", async (req, res) => {
           barcode: rawCode,
           item: {
             name: name.trim(),
+            nameFr: nameFr ? nameFr.trim() : name.trim(),
+            nameEn: nameEn ? nameEn.trim() : name.trim(),
             brand,
             category,
             quantity: 1,
@@ -519,6 +597,12 @@ router.get("/categories", (req, res) => {
   });
 });
 
+// Helper to sync items to encrypted storage
+const syncItemsToEncryptedDisk = () => {
+  dbStore.items = itemsStore;
+  dbStore.persistToEncryptedDisk();
+};
+
 /**
  * GET /api/v1/inventory/household/:id
  * Returns structured inventory grouped by location and expiring-soon priority.
@@ -528,6 +612,9 @@ router.get("/household/:id", (req, res) => {
   try {
     const householdId = req.params.id || SEED_HOUSEHOLD_ID;
     const now = new Date();
+
+    // Ensure synchronized with dbStore
+    itemsStore = dbStore.items;
 
     // Enrich items with live status, computed days, and member attribution
     const enrichedItems = itemsStore
@@ -656,6 +743,10 @@ router.post("/item", (req, res) => {
       notes = "",
       barcode = null,
       imageUrl = null,
+      isLeftover = false,
+      leftoverFoodType = null,
+      leftoverSourceMeal = null,
+      prepDate = null,
     } = req.body;
 
     if (!name || name.trim().length === 0) {
@@ -707,11 +798,16 @@ router.post("/item", (req, res) => {
       notes: notes || null,
       barcode: barcode || null,
       imageUrl: imageUrl || null,
+      isLeftover: Boolean(isLeftover),
+      leftoverFoodType: leftoverFoodType || null,
+      leftoverSourceMeal: leftoverSourceMeal || null,
+      prepDate: prepDate ? new Date(prepDate).toISOString() : null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
     itemsStore.unshift(newItem);
+    syncItemsToEncryptedDisk();
 
     // Log the creation activity
     const user = USERS.find((u) => u.id === addedById);
@@ -780,6 +876,7 @@ router.put("/item/:id/defrost", (req, res) => {
     };
 
     itemsStore[itemIndex] = updatedItem;
+    syncItemsToEncryptedDisk();
 
     // Log defrost activity
     const user = USERS.find((u) => u.id === userId);
@@ -842,6 +939,10 @@ router.put("/item/:id", (req, res) => {
       status,
       imageUrl,
       monthsFrozenShelfLife,
+      isLeftover,
+      leftoverFoodType,
+      leftoverSourceMeal,
+      prepDate,
       userId = "usr_yan",
     } = req.body;
 
@@ -875,12 +976,17 @@ router.put("/item/:id", (req, res) => {
       expirationDate: expirationDate ? new Date(expirationDate).toISOString() : currentItem.expirationDate,
       notes: notes !== undefined ? notes : currentItem.notes,
       imageUrl: imageUrl !== undefined ? imageUrl : currentItem.imageUrl,
+      isLeftover: isLeftover !== undefined ? Boolean(isLeftover) : currentItem.isLeftover,
+      leftoverFoodType: leftoverFoodType !== undefined ? leftoverFoodType : currentItem.leftoverFoodType,
+      leftoverSourceMeal: leftoverSourceMeal !== undefined ? leftoverSourceMeal : currentItem.leftoverSourceMeal,
+      prepDate: prepDate !== undefined ? prepDate : currentItem.prepDate,
       monthsFrozenShelfLife: monthsFrozenShelfLife !== undefined ? Number(monthsFrozenShelfLife) : currentItem.monthsFrozenShelfLife,
       frozenAt: isFreezer ? (currentItem.frozenAt || new Date().toISOString()) : null,
       updatedAt: new Date().toISOString(),
     };
 
     itemsStore[itemIndex] = updatedItem;
+    syncItemsToEncryptedDisk();
 
     const user = USERS.find((u) => u.id === userId);
     activityLogs.unshift({
@@ -924,6 +1030,7 @@ router.delete("/item/:id", (req, res) => {
   }
 
   itemsStore = itemsStore.filter((i) => i.id !== id);
+  syncItemsToEncryptedDisk();
   return res.status(200).json({ success: true, message: `Removed "${item.name}" from inventory.` });
 });
 
@@ -991,6 +1098,10 @@ router.post("/bulk-items", (req, res) => {
         notes: raw.notes || `Stocked from grocery cart by ${user.name}`,
         barcode: raw.barcode || null,
         imageUrl: raw.imageUrl || null,
+        isLeftover: Boolean(raw.isLeftover),
+        leftoverFoodType: raw.leftoverFoodType || null,
+        leftoverSourceMeal: raw.leftoverSourceMeal || null,
+        prepDate: raw.prepDate || null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -998,6 +1109,7 @@ router.post("/bulk-items", (req, res) => {
       itemsStore.unshift(newItem);
       addedItems.push(newItem);
     }
+    syncItemsToEncryptedDisk();
 
     // Record activity log for the shopping trip
     activityLogs.unshift({
@@ -1122,9 +1234,16 @@ let plannedMealsStore = [
   },
 ];
 
+// Helper to sync meals to encrypted storage
+const syncMealsToEncryptedDisk = () => {
+  dbStore.plannedMeals = plannedMealsStore;
+  dbStore.persistToEncryptedDisk();
+};
+
 // GET /api/v1/inventory/household/:householdId/meals
 router.get("/household/:householdId/meals", (req, res) => {
   const { householdId } = req.params;
+  plannedMealsStore = dbStore.plannedMeals;
   const meals = plannedMealsStore
     .filter((m) => m.householdId === householdId)
     .sort((a, b) => (a.date > b.date ? 1 : -1));
@@ -1179,6 +1298,7 @@ router.post("/household/:householdId/meals", (req, res) => {
     };
 
     plannedMealsStore.push(newMeal);
+    syncMealsToEncryptedDisk();
 
     // Record activity log
     activityLogs.unshift({
@@ -1228,6 +1348,7 @@ router.put("/meals/:mealId", (req, res) => {
   };
 
   plannedMealsStore[index] = updated;
+  syncMealsToEncryptedDisk();
 
   return res.json({
     success: true,
@@ -1245,6 +1366,8 @@ router.delete("/meals/:mealId", (req, res) => {
   if (plannedMealsStore.length === initialLength) {
     return res.status(404).json({ success: false, error: "Meal not found" });
   }
+
+  syncMealsToEncryptedDisk();
 
   return res.json({
     success: true,

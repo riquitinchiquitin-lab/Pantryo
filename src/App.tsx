@@ -51,40 +51,42 @@ function AppContent() {
         />
       </main>
 
-      {/* iOS / Browser PWA Install Guidance Modal */}
+      {/* iOS / Browser PWA Install Guidance (Full Screen with Exit Button) */}
       {showIosInstallModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="relative w-full max-w-md bg-[#FAF7EE] border border-[#E0D9C8] rounded-3xl shadow-2xl p-6 text-[#133E3B] space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-[#E8E2D5]">
-              <div className="flex items-center gap-2.5">
-                <PantryoLogo size={36} />
-                <div>
-                  <h3 className="text-base font-bold text-[#0D3B37]">
-                    {t('install_modal_title')}
-                  </h3>
-                  <p className="text-xs text-[#527470]">
-                    {t('install_modal_subtitle')}
-                  </p>
-                </div>
+        <div className="fixed inset-0 z-50 bg-[#FAF7EE] flex flex-col w-full h-full overflow-hidden text-[#133E3B] animate-fade-in">
+          <div className="px-5 py-3.5 bg-white border-b border-[#E8E2D5] flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-2.5">
+              <PantryoLogo size={32} />
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-[#0D3B37]">
+                  {t('install_modal_title')}
+                </h3>
+                <p className="text-[11px] text-[#527470]">
+                  {t('install_modal_subtitle')}
+                </p>
               </div>
-              <button
-                onClick={() => setShowIosInstallModal(false)}
-                className="w-8 h-8 rounded-full bg-white border border-[#E0D9C8] text-slate-500 hover:text-slate-800 flex items-center justify-center"
-              >
-                <X className="w-4 h-4" />
-              </button>
             </div>
+            <button
+              onClick={() => setShowIosInstallModal(false)}
+              className="px-3.5 py-1.5 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs"
+              title={lang === 'FR' ? 'Quitter' : 'Exit'}
+            >
+              <X className="w-4 h-4" />
+              <span>{lang === 'FR' ? 'Quitter' : 'Exit'}</span>
+            </button>
+          </div>
 
+          <div className="flex-1 overflow-y-auto p-5 sm:p-6 max-w-lg mx-auto w-full flex flex-col justify-center space-y-4">
             <div className="space-y-3 text-xs text-[#2A4D48]">
-              <div className="flex items-start gap-3 p-3 rounded-2xl bg-white border border-[#E5DFD0]">
-                <div className="w-6 h-6 rounded-lg bg-teal-100 text-teal-800 flex items-center justify-center shrink-0 font-black">
+              <div className="flex items-start gap-3 p-4 rounded-2xl bg-white border border-[#E5DFD0] shadow-2xs">
+                <div className="w-7 h-7 rounded-xl bg-teal-100 text-teal-800 flex items-center justify-center shrink-0 font-black">
                   1
                 </div>
                 <div>
-                  <p className="font-bold text-[#0D3B37]">
+                  <p className="font-bold text-sm text-[#0D3B37]">
                     {t('install_step_iphone_title')}
                   </p>
-                  <p className="text-[#527470] mt-0.5">
+                  <p className="text-[#527470] mt-1 text-xs">
                     {lang === 'FR' ? (
                       <>
                         Touchez le bouton <strong className="text-teal-800">Partager</strong> (le carré avec la flèche <Share className="w-3.5 h-3.5 inline text-teal-700" />), faites défiler et touchez <strong className="text-teal-800">« Sur l'écran d'accueil »</strong>.
@@ -98,15 +100,15 @@ function AppContent() {
                 </div>
               </div>
 
-              <div className="flex items-start gap-3 p-3 rounded-2xl bg-white border border-[#E5DFD0]">
-                <div className="w-6 h-6 rounded-lg bg-teal-100 text-teal-800 flex items-center justify-center shrink-0 font-black">
+              <div className="flex items-start gap-3 p-4 rounded-2xl bg-white border border-[#E5DFD0] shadow-2xs">
+                <div className="w-7 h-7 rounded-xl bg-teal-100 text-teal-800 flex items-center justify-center shrink-0 font-black">
                   2
                 </div>
                 <div>
-                  <p className="font-bold text-[#0D3B37]">
+                  <p className="font-bold text-sm text-[#0D3B37]">
                     {t('install_step_android_title')}
                   </p>
-                  <p className="text-[#527470] mt-0.5">
+                  <p className="text-[#527470] mt-1 text-xs">
                     {lang === 'FR' ? (
                       <>
                         Touchez le menu à trois points ⋮ dans votre navigateur et sélectionnez <strong className="text-teal-800">« Installer l'application »</strong> ou <strong className="text-teal-800">« Ajouter à l'écran d'accueil »</strong>.
@@ -123,7 +125,7 @@ function AppContent() {
 
             <button
               onClick={() => setShowIosInstallModal(false)}
-              className="w-full py-2.5 rounded-xl bg-[#0E766E] hover:bg-[#0B5C56] text-white text-xs font-bold transition-all shadow-2xs"
+              className="w-full py-3 rounded-2xl bg-[#0E766E] hover:bg-[#0B5C56] text-white text-xs font-bold transition-all shadow-xs"
             >
               {t('btn_got_it')}
             </button>

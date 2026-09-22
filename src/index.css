@@ -1,9 +1,80 @@
 @import "tailwindcss";
 
 @layer base {
+  :root {
+    --sat: env(safe-area-inset-top, 0px);
+    --sar: env(safe-area-inset-right, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+    --sal: env(safe-area-inset-left, 0px);
+  }
+
+  html,
   body {
     background-color: #FAF7EE;
     color: #133E3B;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button,
+  input,
+  select,
+  textarea,
+  a {
+    touch-action: manipulation;
+  }
+
+  /* Allow smooth horizontal and vertical scrolling across mobile and tablet touchscreens */
+  .overflow-x-auto,
+  .scroll-touch-x {
+    touch-action: pan-x pan-y !important;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
+  .overflow-x-auto button,
+  .scroll-touch-x button {
+    touch-action: pan-x pan-y !important;
   }
 }
+
+/* Universal scrollbar removal across Pixel Pro, iPhone Pro, mobile & tablet devices */
+*,
+*::before,
+*::after {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+*::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  -webkit-appearance: none !important;
+  background: transparent !important;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Explicit utility class for custom scrollable containers */
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+
+

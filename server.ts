@@ -4,11 +4,16 @@ import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import inventoryRouter from "./server/src/routes/inventory.js";
 import recipesRouter from "./server/src/routes/recipes.js";
+import adminRouter from "./server/src/routes/admin.js";
+import authFido2Router from "./server/src/routes/authFido2.js";
 
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
+
+// Trust reverse proxy headers from Cloudflare Tunnel
+app.set("trust proxy", true);
 
 // Middleware for parsing JSON with generous limits for high-resolution base64 camera photos
 app.use(express.json({ limit: "50mb" }));
@@ -17,6 +22,9 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 // Mount the Kitchen Komrade Backend APIs
 app.use("/api/v1/inventory", inventoryRouter);
 app.use("/api/v1/recipes", recipesRouter);
+app.use("/api/v1/admin", adminRouter);
+app.use("/api/v1/auth/fido2", authFido2Router);
+app.use("/api/v1/auth", adminRouter);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
@@ -28,11 +36,19 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+// Explicit 404 handler for API routes to prevent fallback to index.html
+app.all("/api/*", (req, res) => {
+  res.status(404).json({
+    error: `API endpoint not found: ${req.method} ${req.path}`,
+    status: 404,
+  });
+});
+
 async function startServer() {
   // Vite middleware setup
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true, host: "0.0.0.0", port: 3000 },
+      server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Globe } from 'lucide-react';
 import { Language } from '../types';
 
 export const LOCAL_STORAGE_LANG_KEY = 'pantryo_language_pref';
@@ -135,6 +136,24 @@ export const translations = {
     manual_upc_label: 'Enter Barcode Number:',
     manual_upc_btn: 'Lookup Barcode',
     or_manual_add: 'Or add food manually',
+
+    // Receipt Scanner & Paste
+    tab_receipt: 'Receipt',
+    receipt_title: 'Receipt Scanner & Importer',
+    receipt_subtitle: 'Paste receipt text or snap a photo of a paper receipt to auto-extract all grocery items with Gemini AI.',
+    paste_receipt_tab: 'Paste Receipt Text',
+    photo_receipt_tab: 'Snap Receipt Photo',
+    paste_receipt_placeholder: 'Paste your grocery receipt text here (from email, Instacart, Walmart, Costco, supermarket e-receipt)...',
+    paste_sample_btn: 'Try Sample Receipt',
+    clear_text_btn: 'Clear Text',
+    parse_receipt_btn: 'Parse Receipt with Gemini AI',
+    parsing_receipt: 'Extracting groceries with Gemini AI...',
+    snap_receipt_btn: 'Snap Receipt Photo',
+    pick_receipt_photo: 'Pick Receipt Photo',
+    receipt_photo_hint: 'Position the receipt flat with good lighting so all items and prices are legible.',
+    receipt_items_found: 'Found {count} items on receipt',
+    floating_receipt_btn: 'RECEIPT',
+    floating_receipt_tooltip: 'Paste or photograph a grocery receipt',
 
     // Grocery List View
     grocery_title: 'Grocery Shopping List',
@@ -364,6 +383,24 @@ export const translations = {
     manual_upc_label: 'Numéro de code-barres :',
     manual_upc_btn: 'Rechercher le code',
     or_manual_add: 'Ou ajouter manuellement',
+
+    // Receipt Scanner & Paste
+    tab_receipt: 'Reçu',
+    receipt_title: 'Scanner & Importateur de Reçus',
+    receipt_subtitle: "Collez le texte d'un reçu ou photographiez un reçu papier pour extraire automatiquement tous vos articles avec Gemini IA.",
+    paste_receipt_tab: 'Coller le Texte du Reçu',
+    photo_receipt_tab: 'Photographier le Reçu',
+    paste_receipt_placeholder: "Collez le texte de votre reçu d'épicerie ici (courriel, Instacart, Walmart, Costco, Maxi, IGA, Provigo, Super C)...",
+    paste_sample_btn: 'Tester un Reçu Exemple',
+    clear_text_btn: 'Effacer le texte',
+    parse_receipt_btn: 'Analyser le Reçu avec Gemini IA',
+    parsing_receipt: "Extraction des articles avec l'IA Gemini...",
+    snap_receipt_btn: 'Photographier le Reçu',
+    pick_receipt_photo: 'Choisir la Photo du Reçu',
+    receipt_photo_hint: 'Placez le reçu à plat avec un bon éclairage afin que tous les articles et prix soient lisibles.',
+    receipt_items_found: '{count} articles trouvés sur le reçu',
+    floating_receipt_btn: 'REÇU',
+    floating_receipt_tooltip: 'Coller ou photographier un reçu d\'épicerie',
 
     // Grocery List View
     grocery_title: "Liste d'Épicerie",
@@ -619,44 +656,33 @@ export const getLocationLocalizedName = (
 };
 
 /**
- * Compact Language Switcher Button Component
+ * Single-Button Language Switcher Component
+ * Eliminates redundant dual buttons by using a single toggle button (e.g. "FR" when in English, "EN" when in French).
  */
 export const LanguageSwitcher: React.FC<{
   className?: string;
   compact?: boolean;
 }> = ({ className = '', compact = false }) => {
   const { lang, setLang } = useLanguage();
+  const nextLang = lang === 'EN' ? 'FR' : 'EN';
+  const targetLabel = nextLang;
+  const tooltip = lang === 'EN' ? 'Passer en français (FR)' : 'Switch to English (EN)';
 
   return (
-    <div
-      className={`inline-flex items-center rounded-xl p-0.5 bg-white/95 border border-[#E0D9C8] shadow-2xs text-xs font-black ${className}`}
-      role="group"
-      aria-label="Language selection"
+    <button
+      type="button"
+      onClick={() => setLang(nextLang)}
+      className={`px-2.5 py-1.5 rounded-xl bg-white/95 border border-[#E0D9C8] hover:border-teal-700 hover:bg-[#F2ECE0] shadow-2xs text-xs font-bold text-[#0D3B37] transition-all active:scale-95 cursor-pointer shrink-0 flex items-center gap-1.5 ${className}`}
+      title={tooltip}
+      aria-label={tooltip}
     >
-      <button
-        type="button"
-        onClick={() => setLang('EN')}
-        className={`px-2 py-1 rounded-lg transition-all ${
-          lang === 'EN'
-            ? 'bg-teal-700 text-white shadow-2xs scale-102'
-            : 'text-[#527470] hover:text-[#0D3B37] hover:bg-[#F2ECE0]'
-        }`}
-        title="Switch to English"
-      >
-        <span>EN</span>
-      </button>
-      <button
-        type="button"
-        onClick={() => setLang('FR')}
-        className={`px-2 py-1 rounded-lg transition-all ${
-          lang === 'FR'
-            ? 'bg-teal-700 text-white shadow-2xs scale-102'
-            : 'text-[#527470] hover:text-[#0D3B37] hover:bg-[#F2ECE0]'
-        }`}
-        title="Passer en français"
-      >
-        <span>FR</span>
-      </button>
-    </div>
+      <Globe className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+      <span className="font-extrabold text-[#0D3B37] tracking-wide">{targetLabel}</span>
+      {!compact && (
+        <span className="hidden xl:inline text-[11px] text-[#527470] font-medium">
+          {lang === 'EN' ? 'Français' : 'English'}
+        </span>
+      )}
+    </button>
   );
 };

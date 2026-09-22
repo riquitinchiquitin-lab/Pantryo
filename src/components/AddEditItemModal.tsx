@@ -14,10 +14,15 @@ import {
   Hash,
   FileText,
   AlertTriangle,
+  Scale,
+  Sparkles,
+  ShieldCheck,
 } from 'lucide-react';
 import { InventoryItem, User, StorageType } from '../types';
 import { ALL_FOOD_CATEGORIES, ALL_SUB_CATEGORIES, ALL_MEAT_SEAFOOD_SUBCATEGORIES } from '../utils/foodVisuals';
 import { useLanguage, getCategoryLocalizedName, getSubcategoryLocalizedName } from '../utils/i18n';
+import { ScrollableRow } from './ScrollableRow';
+import { estimateSmartShelfLife } from '../utils/smartExpirationRules';
 
 interface AddEditItemModalProps {
   isOpen: boolean;
@@ -28,17 +33,96 @@ interface AddEditItemModalProps {
   onDeleted?: (itemId: string) => void;
 }
 
-const COMMON_UNITS = [
-  'pcs',
-  'pack',
-  'carton',
-  'bottle',
-  'can',
-  'box',
-  'lbs',
-  'kg',
-  'g',
-  'oz',
+export type UnitCategory = 'metric' | 'imperial' | 'container' | 'composite';
+
+interface UnitPreset {
+  val: string;
+  label: string;
+  category: UnitCategory;
+}
+
+const UNIT_PRESETS_EN: UnitPreset[] = [
+  // Metric
+  { val: 'g', label: 'g (grams)', category: 'metric' },
+  { val: 'kg', label: 'kg', category: 'metric' },
+  { val: 'mg', label: 'mg (milligrams)', category: 'metric' },
+  { val: 'ml', label: 'ml', category: 'metric' },
+  { val: 'L', label: 'L (liters)', category: 'metric' },
+  { val: 'cl', label: 'cl', category: 'metric' },
+
+  // Imperial
+  { val: 'oz', label: 'oz (ounces)', category: 'imperial' },
+  { val: 'lbs', label: 'lbs (pounds)', category: 'imperial' },
+  { val: 'fl oz', label: 'fl oz', category: 'imperial' },
+  { val: 'cup', label: 'cup', category: 'imperial' },
+  { val: 'pt', label: 'pt (pint)', category: 'imperial' },
+  { val: 'qt', label: 'qt (quart)', category: 'imperial' },
+  { val: 'gal', label: 'gal (gallon)', category: 'imperial' },
+
+  // Containers
+  { val: 'pcs', label: 'pcs', category: 'container' },
+  { val: 'pack', label: 'pack', category: 'container' },
+  { val: 'can', label: 'can', category: 'container' },
+  { val: 'bottle', label: 'bottle', category: 'container' },
+  { val: 'box', label: 'box', category: 'container' },
+  { val: 'bag', label: 'bag', category: 'container' },
+  { val: 'carton', label: 'carton', category: 'container' },
+  { val: 'slices', label: 'slices', category: 'container' },
+
+  // Composite Packs (e.g. 2 Packs of 300mg of salami)
+  { val: 'Packs of 300mg', label: 'Packs of 300mg', category: 'composite' },
+  { val: 'pack (300mg)', label: 'pack (300mg)', category: 'composite' },
+  { val: 'Packs of 300g', label: 'Packs of 300g', category: 'composite' },
+  { val: 'pack (300g)', label: 'pack (300g)', category: 'composite' },
+  { val: 'pack (400g)', label: 'pack (400g)', category: 'composite' },
+  { val: 'pack (500g)', label: 'pack (500g)', category: 'composite' },
+  { val: 'pack (8 oz)', label: 'pack (8 oz)', category: 'composite' },
+  { val: 'pack (10 oz)', label: 'pack (10 oz)', category: 'composite' },
+  { val: 'can (355ml)', label: 'can (355ml)', category: 'composite' },
+  { val: 'bag (1 lb)', label: 'bag (1 lb)', category: 'composite' },
+  { val: 'bottle (750ml)', label: 'bottle (750ml)', category: 'composite' },
+];
+
+const UNIT_PRESETS_FR: UnitPreset[] = [
+  // Métrique
+  { val: 'g', label: 'g (grammes)', category: 'metric' },
+  { val: 'kg', label: 'kg', category: 'metric' },
+  { val: 'mg', label: 'mg (milligrammes)', category: 'metric' },
+  { val: 'ml', label: 'ml', category: 'metric' },
+  { val: 'L', label: 'L (litres)', category: 'metric' },
+  { val: 'cl', label: 'cl', category: 'metric' },
+
+  // Impérial
+  { val: 'oz', label: 'oz (onces)', category: 'imperial' },
+  { val: 'lbs', label: 'lbs (livres)', category: 'imperial' },
+  { val: 'fl oz', label: 'fl oz (onces liq.)', category: 'imperial' },
+  { val: 'tasse', label: 'tasse (cup)', category: 'imperial' },
+  { val: 'pinte', label: 'pinte (pt)', category: 'imperial' },
+  { val: 'quart', label: 'quart (qt)', category: 'imperial' },
+  { val: 'gal', label: 'gallon (gal)', category: 'imperial' },
+
+  // Contenants
+  { val: 'unités', label: 'unités', category: 'container' },
+  { val: 'paquet', label: 'paquet', category: 'container' },
+  { val: 'boîte', label: 'boîte', category: 'container' },
+  { val: 'canette', label: 'canette', category: 'container' },
+  { val: 'bouteille', label: 'bouteille', category: 'container' },
+  { val: 'sac', label: 'sac', category: 'container' },
+  { val: 'carton', label: 'carton', category: 'container' },
+  { val: 'tranches', label: 'tranches', category: 'container' },
+
+  // Emballages composites
+  { val: 'paquets de 300mg', label: 'paquets de 300mg', category: 'composite' },
+  { val: 'paquet (300mg)', label: 'paquet (300mg)', category: 'composite' },
+  { val: 'paquets de 300g', label: 'paquets de 300g', category: 'composite' },
+  { val: 'paquet (300g)', label: 'paquet (300g)', category: 'composite' },
+  { val: 'paquet (400g)', label: 'paquet (400g)', category: 'composite' },
+  { val: 'paquet (500g)', label: 'paquet (500g)', category: 'composite' },
+  { val: 'paquet (8 oz)', label: 'paquet (8 oz)', category: 'composite' },
+  { val: 'paquet (10 oz)', label: 'paquet (10 oz)', category: 'composite' },
+  { val: 'canette (355ml)', label: 'canette (355ml)', category: 'composite' },
+  { val: 'sac (1 lb)', label: 'sac (1 lb)', category: 'composite' },
+  { val: 'bouteille (750ml)', label: 'bouteille (750ml)', category: 'composite' },
 ];
 
 export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
@@ -74,12 +158,19 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
   const [imageUrl, setImageUrl] = useState('');
   const [locationType, setLocationType] = useState<'FRIDGE' | 'FREEZER' | 'PANTRY'>('FRIDGE');
   const [categoryName, setCategoryName] = useState('Produce');
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState<number | string>(1);
   const [unit, setUnit] = useState('pcs');
+  const [unitCategory, setUnitCategory] = useState<UnitCategory>('metric');
   const [expirationDate, setExpirationDate] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Smart food safety expiration recommendation (CFIA/MAPAQ/EFSA standards)
+  const smartRecommendation = React.useMemo(() => {
+    if (!name.trim()) return null;
+    return estimateSmartShelfLife(name, categoryName, locationType);
+  }, [name, categoryName, locationType]);
 
   // Sync state when modal opens or itemToEdit changes
   useEffect(() => {
@@ -112,11 +203,29 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
     setExpirationDate(target.toISOString().split('T')[0]);
   };
 
+  const handleApplySmartRecommendation = () => {
+    if (smartRecommendation) {
+      setExpirationDate(smartRecommendation.suggestedDate);
+      // Auto-suggest storage note if notes is currently empty
+      if (!notes.trim()) {
+        const tip = lang === 'FR' 
+          ? smartRecommendation.matchedRule.storageRecommendationFr
+          : smartRecommendation.matchedRule.storageRecommendationEn;
+        setNotes(tip);
+      }
+    }
+  };
+
   const handleLocationChange = (newLoc: 'FRIDGE' | 'FREEZER' | 'PANTRY') => {
     setLocationType(newLoc);
-    // If setting a new item and user hasn't typed custom date, auto-adjust default date
+    // If setting a new item and user hasn't typed custom date, auto-adjust default date or smart suggestion
     if (!isEditing) {
-      setExpirationDate(getDefaultExpiration(newLoc));
+      if (name.trim()) {
+        const smart = estimateSmartShelfLife(name, categoryName, newLoc);
+        setExpirationDate(smart.suggestedDate);
+      } else {
+        setExpirationDate(getDefaultExpiration(newLoc));
+      }
     }
   };
 
@@ -130,11 +239,13 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
     setIsSubmitting(true);
     setErrorMessage(null);
 
+    const parsedQty = parseFloat(String(quantity));
+    const safeQty = isNaN(parsedQty) || parsedQty <= 0 ? 1 : Number(parsedQty.toFixed(3));
     const locationName = locationType === 'FREEZER' ? 'Freezer' : locationType === 'PANTRY' ? 'Pantry' : 'Fridge';
     const payload = {
       name: name.trim(),
       imageUrl: imageUrl.trim() || undefined,
-      quantity: Number(quantity) || 1,
+      quantity: safeQty,
       unit: unit.trim() || 'pcs',
       locationName,
       categoryName,
@@ -251,43 +362,46 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
-      <div className="relative w-full max-w-lg max-h-[92vh] overflow-y-auto bg-[#FAF7EE] border border-[#E0D9C8] rounded-3xl shadow-2xl p-5 sm:p-6 text-[#133E3B]">
-        {/* Header */}
-        <div className="flex items-center justify-between pb-3.5 border-b border-[#E8E2D5]">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-2xl bg-teal-700 text-white flex items-center justify-center shadow-xs">
-              {isEditing ? <Edit3 className="w-4 h-4" /> : <Plus className="w-5 h-5" />}
-            </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-black text-[#0D3B37]">
-                {isEditing
-                  ? (lang === 'FR' ? `Modifier « ${itemToEdit?.name} »` : `Edit "${itemToEdit?.name}"`)
-                  : (lang === 'FR' ? 'Ajouter un aliment à la cuisine' : 'Add New Item to Kitchen')}
-              </h2>
-              <p className="text-xs text-[#527470]">
-                {isEditing
-                  ? (lang === 'FR' ? 'Modifier quantité, compartiment ou péremption' : 'Modify quantity, location, or expiration')
-                  : (lang === 'FR' ? 'Saisie manuelle directe sans numérisation' : 'Direct manual entry without scanning')}
-              </p>
-            </div>
+    <div className="fixed inset-0 z-50 bg-[#FAF7EE] flex flex-col w-full h-full overflow-hidden text-[#133E3B] animate-fade-in">
+      {/* Header */}
+      <div className="px-5 py-3.5 border-b border-[#E8E2D5] flex items-center justify-between bg-white/90 backdrop-blur-xs shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-2xl bg-teal-700 text-white flex items-center justify-center shadow-xs">
+            {isEditing ? <Edit3 className="w-4 h-4" /> : <Plus className="w-5 h-5" />}
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white border border-[#E0D9C8] text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div>
+            <h2 className="text-sm sm:text-base font-black text-[#0D3B37]">
+              {isEditing
+                ? (lang === 'FR' ? `Modifier « ${itemToEdit?.name} »` : `Edit "${itemToEdit?.name}"`)
+                : (lang === 'FR' ? 'Ajouter un aliment à la cuisine' : 'Add New Item to Kitchen')}
+            </h2>
+            <p className="text-[11px] text-[#527470]">
+              {isEditing
+                ? (lang === 'FR' ? 'Modifier quantité, compartiment ou péremption' : 'Modify quantity, location, or expiration')
+                : (lang === 'FR' ? 'Saisie manuelle directe sans numérisation' : 'Direct manual entry without scanning')}
+            </p>
+          </div>
         </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-3.5 py-1.5 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs"
+          title={lang === 'FR' ? 'Quitter' : 'Exit'}
+        >
+          <X className="w-4 h-4" />
+          <span>{lang === 'FR' ? 'Quitter' : 'Exit'}</span>
+        </button>
+      </div>
 
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 max-w-2xl mx-auto w-full">
         {errorMessage && (
-          <div className="mt-3 p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
+          <div className="mb-4 p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
             <span>{errorMessage}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {/* Item Name */}
           <div>
             <label className="block text-xs font-bold text-[#0D3B37] mb-1">
@@ -397,7 +511,7 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
                 {lang === 'FR' ? 'Cliquer pour remplir photo et coupe' : 'Click to auto-fill photo & cut'}
               </span>
             </div>
-            <div className="flex gap-2 overflow-x-auto pb-1.5 pt-0.5 no-scrollbar">
+            <ScrollableRow className="gap-2 pb-1.5 pt-0.5" gradientFrom="from-white" showChevrons={true}>
               {(categoryName.includes('Meat') || categoryName.includes('Seafood')
                 ? ALL_MEAT_SEAFOOD_SUBCATEGORIES
                 : ALL_SUB_CATEGORIES
@@ -444,66 +558,139 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
                   </div>
                 </button>
               ))}
-            </div>
+            </ScrollableRow>
           </div>
 
           {/* Quantity and Unit */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-[#0D3B37] mb-1">
-                {lang === 'FR' ? 'Quantité' : 'Quantity'}
-              </label>
-              <div className="flex items-center bg-white border border-[#D5E1D2] rounded-2xl overflow-hidden shadow-2xs">
-                <button
-                  type="button"
-                  onClick={() => setQuantity((q) => Math.max(0.5, Number((q - 0.5).toFixed(1))))}
-                  className="px-3 py-2 text-slate-500 hover:bg-slate-100 font-black text-sm"
-                >
-                  -
-                </button>
-                <input
-                  type="number"
-                  step="0.5"
-                  min="0.1"
-                  required
-                  value={quantity}
-                  onChange={(e) => setQuantity(Number(e.target.value) || 1)}
-                  className="w-full text-center py-2 text-sm font-bold text-[#133E3B] focus:outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => setQuantity((q) => Number((q + 0.5).toFixed(1)))}
-                  className="px-3 py-2 text-slate-500 hover:bg-slate-100 font-black text-sm"
-                >
-                  +
-                </button>
+          <div className="space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-[#0D3B37] mb-1">
+                  {lang === 'FR' ? 'Quantité' : 'Quantity'}
+                </label>
+                <div className="flex items-center bg-white border border-[#D5E1D2] rounded-2xl overflow-hidden shadow-2xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const num = parseFloat(String(quantity)) || 1;
+                      const step = num <= 1 ? 0.25 : (num % 1 === 0 ? 1 : 0.5);
+                      const next = Math.max(0.1, Number((num - step).toFixed(2)));
+                      setQuantity(next);
+                    }}
+                    className="px-3.5 py-2 text-slate-500 hover:bg-slate-100 font-black text-sm select-none cursor-pointer"
+                    title={lang === 'FR' ? 'Diminuer la quantité' : 'Decrease quantity'}
+                  >
+                    -
+                  </button>
+                  <input
+                    type="number"
+                    step="any"
+                    min="0.001"
+                    required
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    onBlur={() => {
+                      const num = parseFloat(String(quantity));
+                      if (isNaN(num) || num <= 0) {
+                        setQuantity(1);
+                      } else {
+                        setQuantity(Number(num.toFixed(3)));
+                      }
+                    }}
+                    className="w-full text-center py-2 text-sm font-bold text-[#133E3B] focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const num = parseFloat(String(quantity)) || 0;
+                      const step = num < 1 ? 0.25 : (num % 1 === 0 ? 1 : 0.5);
+                      const next = Number((num + step).toFixed(2));
+                      setQuantity(next);
+                    }}
+                    className="px-3.5 py-2 text-slate-500 hover:bg-slate-100 font-black text-sm select-none cursor-pointer"
+                    title={lang === 'FR' ? 'Augmenter la quantité' : 'Increase quantity'}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#0D3B37] mb-1">
+                  {lang === 'FR' ? 'Unité (Métrique, Impérial ou Pack)' : 'Unit (Metric, Imperial or Pack)'}
+                </label>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="text"
+                    value={unit}
+                    onChange={(e) => setUnit(e.target.value)}
+                    placeholder={
+                      lang === 'FR'
+                        ? 'ex: paquets de 300mg, pack (400g), kg, lbs...'
+                        : 'e.g. Packs of 300mg, pack (400g), kg, lbs...'
+                    }
+                    className="w-full px-3 py-2 rounded-2xl bg-white border border-[#D5E1D2] text-sm font-medium text-[#133E3B] focus:outline-none focus:ring-2 focus:ring-teal-600 shadow-2xs"
+                  />
+                </div>
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-[#0D3B37] mb-1">
-                {lang === 'FR' ? 'Unité' : 'Unit'}
-              </label>
-              <div className="flex items-center gap-1">
-                <input
-                  type="text"
-                  value={unit}
-                  onChange={(e) => setUnit(e.target.value)}
-                  placeholder={lang === 'FR' ? 'unités, paquet, kg...' : 'pcs, pack, lbs...'}
-                  className="w-full px-3 py-2 rounded-2xl bg-white border border-[#D5E1D2] text-sm font-medium text-[#133E3B] focus:outline-none focus:ring-2 focus:ring-teal-600 shadow-2xs"
-                />
+            {/* Unit Category Selector & Quick Chips */}
+            <div className="bg-[#FAFDF9] border border-[#E3ECE1] rounded-xl p-2 space-y-1.5">
+              <div className="flex items-center justify-between gap-1 overflow-x-auto pb-0.5 scrollbar-none">
+                <div className="flex items-center gap-1 text-[10px] font-bold text-[#4F6C68]">
+                  <Scale className="w-3 h-3 text-teal-600 shrink-0" />
+                  <span className="shrink-0">{lang === 'FR' ? 'Système :' : 'System:'}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  {(
+                    [
+                      { id: 'metric', labelEn: 'Metric (g, kg, mg, ml)', labelFr: 'Métrique (g, kg, mg, ml)' },
+                      { id: 'imperial', labelEn: 'Imperial (oz, lbs, fl oz)', labelFr: 'Impérial (oz, lbs, tasse)' },
+                      { id: 'composite', labelEn: 'Packs (300mg, 400g...)', labelFr: 'Packs (300mg, 400g...)' },
+                      { id: 'container', labelEn: 'Containers', labelFr: 'Contenants' },
+                    ] as const
+                  ).map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setUnitCategory(cat.id)}
+                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all shrink-0 cursor-pointer ${
+                        unitCategory === cat.id
+                          ? 'bg-teal-700 text-white shadow-2xs'
+                          : 'bg-[#ECE8DD] text-[#556F6B] hover:bg-[#E2DDD0]'
+                      }`}
+                    >
+                      {lang === 'FR' ? cat.labelFr : cat.labelEn}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="flex gap-1 mt-1 overflow-x-auto pb-0.5 scrollbar-none">
-                {(lang === 'FR' ? ['unités', 'paquet', 'boîte', 'bouteille', 'kg', 'g', 'lbs'] : COMMON_UNITS.slice(0, 5)).map((u) => (
-                  <button
-                    key={u}
-                    type="button"
-                    onClick={() => setUnit(u)}
-                    className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#EAE3D4] text-[#4F6C68] hover:bg-[#DFD6C5]"
-                  >
-                    {u}
-                  </button>
-                ))}
+
+              {/* Quick Unit Chips based on Selected Category */}
+              <div className="flex flex-wrap gap-1 pt-0.5 max-h-24 overflow-y-auto">
+                {(lang === 'FR' ? UNIT_PRESETS_FR : UNIT_PRESETS_EN)
+                  .filter((p) => p.category === unitCategory)
+                  .map((preset) => (
+                    <button
+                      key={preset.val}
+                      type="button"
+                      onClick={() => setUnit(preset.val)}
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+                        unit.toLowerCase() === preset.val.toLowerCase()
+                          ? 'bg-teal-600 text-white ring-1 ring-teal-700'
+                          : 'bg-white border border-[#D5E1D2] text-[#3B5A55] hover:bg-teal-50 hover:border-teal-300'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+              </div>
+
+              <div className="text-[10px] text-[#698B84] italic">
+                {lang === 'FR'
+                  ? '💡 Exemple : 2 paquets de 300mg de salami, 1.5 lbs de fromage, 500g, 400ml.'
+                  : '💡 Example: 2 Packs of 300mg of salami, 1.5 lbs of cheese, 500g, 400ml.'}
               </div>
             </div>
           </div>
@@ -553,6 +740,50 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
                 className="w-full px-3.5 py-2.5 rounded-2xl bg-white border border-[#D5E1D2] text-sm font-medium text-[#133E3B] focus:outline-none focus:ring-2 focus:ring-teal-600 shadow-2xs"
               />
             </div>
+
+            {/* Smart Expiration Standards Recommendation (CFIA / MAPAQ / EFSA) */}
+            {smartRecommendation && (
+              <div className="mt-2 p-2.5 rounded-2xl bg-emerald-50/80 border border-emerald-200/80 text-xs">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-extrabold text-emerald-950 text-[11px]">
+                          {lang === 'FR' ? 'Norme de conservation sûre' : 'Safe Storage Standard'}
+                        </span>
+                        <span className="px-1.5 py-0.2 rounded bg-emerald-200/80 text-emerald-900 font-black text-[9px]">
+                          {smartRecommendation.matchedRule.foodSafetyAgency}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-emerald-800 leading-tight mt-0.5">
+                        {lang === 'FR'
+                          ? smartRecommendation.matchedRule.cfiaStandardFr
+                          : smartRecommendation.matchedRule.cfiaStandardEn}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleApplySmartRecommendation}
+                    className={`px-2.5 py-1 rounded-xl text-[10px] font-black shrink-0 transition-all flex items-center gap-1 cursor-pointer shadow-2xs ${
+                      expirationDate === smartRecommendation.suggestedDate
+                        ? 'bg-emerald-700 text-white'
+                        : 'bg-white text-emerald-800 border border-emerald-300 hover:bg-emerald-100'
+                    }`}
+                    title={lang === 'FR' ? 'Appliquer cette recommandation' : 'Apply this standard suggestion'}
+                  >
+                    <Sparkles className="w-3 h-3 text-emerald-500" />
+                    <span>
+                      {expirationDate === smartRecommendation.suggestedDate
+                        ? (lang === 'FR' ? 'Appliqué' : 'Applied')
+                        : (lang === 'FR' ? 'Suggérer' : 'Use Smart')}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Notes */}

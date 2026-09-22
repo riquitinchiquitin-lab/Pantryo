@@ -22,10 +22,14 @@ import {
   Square,
   Refrigerator,
   BookmarkPlus,
+  CalendarRange,
 } from 'lucide-react';
 import { PlannedMeal, MealType, InventoryItem, PlannedMealIngredient } from '../types';
 import { getFoodVisual } from '../utils/foodVisuals';
 import { useLanguage } from '../utils/i18n';
+import { SmartMealSuggestionsModal } from './SmartMealSuggestionsModal';
+import { MealPlanShoppingListModal } from './MealPlanShoppingListModal';
+import { ScrollableRow } from './ScrollableRow';
 
 interface MealPlannerViewProps {
   householdId: string;
@@ -36,6 +40,7 @@ interface MealPlannerViewProps {
   onDeleteMeal: (mealId: string) => Promise<boolean>;
   onAddIngredientsToGrocery?: (ingredients: Array<{ name: string; quantity: number; unit: string; category?: string }>) => void;
   onOpenRecipes?: () => void;
+  onNavigateToGrocery?: () => void;
 }
 
 export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
@@ -47,6 +52,7 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
   onDeleteMeal,
   onAddIngredientsToGrocery,
   onOpenRecipes,
+  onNavigateToGrocery,
 }) => {
   const { t, lang } = useLanguage();
 
@@ -68,6 +74,13 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMeal, setEditingMeal] = useState<PlannedMeal | null>(null);
   const [selectedSlotType, setSelectedSlotType] = useState<MealType>('DINNER');
+
+  // Smart Suggestions Modal State
+  const [isSuggestionsModalOpen, setIsSuggestionsModalOpen] = useState(false);
+  const [suggestionsInitialSlot, setSuggestionsInitialSlot] = useState<MealType>('DINNER');
+
+  // Meal Plan Shopping List Modal State
+  const [isShoppingListModalOpen, setIsShoppingListModalOpen] = useState(false);
 
   // Form State
   const [mealTitle, setMealTitle] = useState('');
@@ -262,6 +275,56 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
     }
   };
 
+  const handlePlanSuggestedMeal = async (params: {
+    title: string;
+    mealType: MealType;
+    date: string;
+    prepTimeMinutes: number;
+    servings: number;
+    imageUrl?: string;
+    notes?: string;
+    recipeUrl?: string;
+    ingredients: PlannedMealIngredient[];
+    addMissingToGrocery: boolean;
+  }) => {
+    const resolvedImage = params.imageUrl || getFoodVisual(params.title).defaultImage;
+
+    await onAddMeal({
+      householdId,
+      title: params.title,
+      date: params.date,
+      mealType: params.mealType,
+      servings: params.servings,
+      prepTimeMinutes: params.prepTimeMinutes,
+      notes: params.notes || '',
+      imageUrl: resolvedImage,
+      recipeUrl: params.recipeUrl,
+      isCooked: false,
+      ingredients: params.ingredients,
+    });
+
+    if (params.addMissingToGrocery && onAddIngredientsToGrocery) {
+      const missing = params.ingredients.filter((i) => !i.inStock);
+      if (missing.length > 0) {
+        onAddIngredientsToGrocery(
+          missing.map((m) => ({
+            name: m.name.replace(/\(.*\)/, '').trim(),
+            quantity: m.quantity || 1,
+            unit: m.unit || 'pcs',
+            category: 'Pantry Staples',
+          }))
+        );
+      }
+    }
+
+    setSuccessToast(
+      lang === 'FR'
+        ? `✨ Repas "${params.title}" planifié avec succès !`
+        : `✨ Meal "${params.title}" planned successfully!`
+    );
+    setTimeout(() => setSuccessToast(null), 3500);
+  };
+
   const handleToggleCooked = async (meal: PlannedMeal) => {
     await onUpdateMeal(meal.id, { isCooked: !meal.isCooked });
     setSuccessToast(
@@ -338,7 +401,36 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              id="btn-header-generate-shopping-list"
+              onClick={() => setIsShoppingListModalOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-teal-50 border border-teal-300 hover:bg-teal-100 text-teal-900 text-xs font-bold shadow-2xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+              title={
+                lang === 'FR'
+                  ? "Générer la liste d'épicerie selon vos repas planifiés et l'inventaire en stock"
+                  : 'Generate shopping list based on planned meals and current kitchen inventory'
+              }
+            >
+              <ShoppingBag className="w-3.5 h-3.5 text-teal-700" />
+              <span>{lang === 'FR' ? "Générer liste d'épicerie" : 'Generate Shopping List'}</span>
+            </button>
+            <button
+              id="btn-header-smart-suggestions"
+              onClick={() => {
+                setSuggestionsInitialSlot('DINNER');
+                setIsSuggestionsModalOpen(true);
+              }}
+              className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-teal-700 to-emerald-700 hover:from-teal-800 hover:to-emerald-800 text-white text-xs font-black shadow-sm flex items-center gap-1.5 transition-all active:scale-95"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+              <span>{lang === 'FR' ? 'Suggestions Intelligentes' : 'Smart Suggestions'}</span>
+              {expiringItems.length > 0 && (
+                <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-amber-300 text-teal-950 text-[10px] font-black">
+                  {expiringItems.length}
+                </span>
+              )}
+            </button>
             <button
               onClick={() => setSelectedDate(todayStr)}
               className="px-3 py-1.5 rounded-xl border border-[#D5CDBC] bg-[#F8F5EC] text-xs font-bold text-[#133E3B] hover:bg-[#EFEAE0] transition-colors flex items-center gap-1.5 shadow-2xs"
@@ -521,13 +613,26 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
           )}
         </div>
 
-        <button
-          onClick={() => handleOpenAddModal('DINNER')}
-          className="px-3 py-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold flex items-center gap-1 shadow-2xs transition-all active:scale-95"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          {lang === 'FR' ? 'Planifier un Repas' : 'Plan Meal'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            id="btn-day-smart-suggestions"
+            onClick={() => {
+              setSuggestionsInitialSlot('DINNER');
+              setIsSuggestionsModalOpen(true);
+            }}
+            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-800 hover:to-teal-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all active:scale-95"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+            <span>{lang === 'FR' ? 'Suggérer Repas' : 'Suggest Meal'}</span>
+          </button>
+          <button
+            onClick={() => handleOpenAddModal('DINNER')}
+            className="px-3 py-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold flex items-center gap-1 shadow-2xs transition-all active:scale-95"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>{lang === 'FR' ? 'Planifier Manuel' : 'Plan Manual'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Smart Kitchen Suggestions: Expiring Items */}
@@ -542,16 +647,28 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                   : `Ingredients to use up (${expiringItems.length})`}
               </span>
             </div>
-            {onOpenRecipes && (
+            <div className="flex items-center gap-2">
               <button
-                onClick={onOpenRecipes}
-                className="text-[11px] font-bold text-amber-800 hover:text-amber-950 flex items-center gap-1"
+                onClick={() => {
+                  setSuggestionsInitialSlot('DINNER');
+                  setIsSuggestionsModalOpen(true);
+                }}
+                className="text-[11px] font-bold text-amber-950 bg-amber-200/80 hover:bg-amber-200 px-2.5 py-1 rounded-xl flex items-center gap-1 transition-colors shadow-2xs"
               >
-                {lang === 'FR' ? 'Idées Recettes' : 'Find Recipes'} <ArrowRight className="w-3 h-3" />
+                <Sparkles className="w-3 h-3 text-amber-700" />
+                <span>{lang === 'FR' ? 'Sauver avec une recette' : 'Rescue with Recipe'}</span>
               </button>
-            )}
+              {onOpenRecipes && (
+                <button
+                  onClick={onOpenRecipes}
+                  className="text-[11px] font-bold text-amber-800 hover:text-amber-950 flex items-center gap-1"
+                >
+                  {lang === 'FR' ? 'Idées Recettes' : 'Find Recipes'} <ArrowRight className="w-3 h-3" />
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+          <ScrollableRow className="pb-1 text-xs" showChevrons={true}>
             {expiringItems.slice(0, 5).map((item) => (
               <button
                 key={item.id}
@@ -570,7 +687,7 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                 </span>
               </button>
             ))}
-          </div>
+          </ScrollableRow>
         </div>
       )}
 
@@ -592,23 +709,51 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                       : (lang === 'FR' ? `${meals.length} planifié${meals.length > 1 ? 's' : ''}` : `${meals.length} planned`)}
                   </span>
                 </div>
-                <button
-                  onClick={() => handleOpenAddModal(type)}
-                  className="p-1 rounded-lg text-slate-500 hover:text-teal-700 hover:bg-[#F3EFE6] transition-colors"
-                  title={`${lang === 'FR' ? 'Ajouter' : 'Add'} ${label}`}
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    id={`btn-suggest-slot-${type.toLowerCase()}`}
+                    onClick={() => {
+                      setSuggestionsInitialSlot(type);
+                      setIsSuggestionsModalOpen(true);
+                    }}
+                    className="p-1 rounded-lg text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50 transition-colors flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 border border-emerald-200/60 bg-emerald-50/50"
+                    title={`${lang === 'FR' ? 'Suggérer pour' : 'Suggest for'} ${label}`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                    <span className="hidden sm:inline">{lang === 'FR' ? 'Suggérer' : 'Suggest'}</span>
+                  </button>
+                  <button
+                    onClick={() => handleOpenAddModal(type)}
+                    className="p-1 rounded-lg text-slate-500 hover:text-teal-700 hover:bg-[#F3EFE6] transition-colors"
+                    title={`${lang === 'FR' ? 'Ajouter' : 'Add'} ${label}`}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
               {meals.length === 0 ? (
-                <button
-                  onClick={() => handleOpenAddModal(type)}
-                  className="w-full py-3 px-4 rounded-2xl border-2 border-dashed border-[#E5DFD0] text-center text-xs font-semibold text-[#82998C] hover:text-teal-800 hover:border-teal-300 hover:bg-teal-50/20 transition-all flex items-center justify-center gap-2"
-                >
-                  <Plus className="w-3.5 h-3.5 text-teal-600" />
-                  {lang === 'FR' ? `Planifier ${label} pour ce jour` : `Plan ${label} for this day`}
-                </button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSuggestionsInitialSlot(type);
+                      setIsSuggestionsModalOpen(true);
+                    }}
+                    className="py-2.5 px-3 rounded-2xl bg-gradient-to-r from-teal-50 to-emerald-50 hover:from-teal-100 hover:to-emerald-100 border border-teal-200 text-center text-xs font-bold text-teal-900 transition-all flex items-center justify-center gap-1.5 shadow-2xs active:scale-95"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+                    <span>{lang === 'FR' ? `✨ Suggérer ${label} anti-gaspillage` : `✨ Suggest ${label} (Zero-Waste)`}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenAddModal(type)}
+                    className="py-2.5 px-3 rounded-2xl border border-dashed border-[#E5DFD0] text-center text-xs font-semibold text-[#82998C] hover:text-teal-800 hover:border-teal-300 hover:bg-white transition-all flex items-center justify-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-slate-400" />
+                    <span>{lang === 'FR' ? `Planifier manuellement` : `Plan manually`}</span>
+                  </button>
+                </div>
               ) : (
                 <div className="space-y-2.5">
                   {meals.map((meal) => {
@@ -757,26 +902,63 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
         })}
       </div>
 
-      {/* Add / Edit Meal Modal */}
+      {/* Add / Edit Meal Modal (Full Screen with Exit Button) */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
-          <div className="relative w-full max-w-lg bg-[#FAF7EE] border border-[#E0D9C8] rounded-3xl shadow-2xl p-6 text-[#133E3B] space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-[#E8E2D5]">
-              <div className="flex items-center gap-2">
-                <ChefHat className="w-5 h-5 text-teal-700" />
-                <h3 className="text-base font-black text-[#0D3B37]">
-                  {editingMeal
-                    ? (lang === 'FR' ? 'Modifier le Repas Planifié' : 'Edit Planned Meal')
-                    : (lang === 'FR' ? `Planifier un Repas pour le ${selectedDate}` : `Plan a Meal for ${selectedDate}`)}
-                </h3>
-              </div>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-white border border-[#E0D9C8] text-slate-500 hover:text-slate-800 flex items-center justify-center"
-              >
-                <X className="w-4 h-4" />
-              </button>
+        <div className="fixed inset-0 z-50 bg-[#FAF7EE] flex flex-col w-full h-full overflow-hidden text-[#133E3B] animate-fade-in">
+          {/* Header */}
+          <div className="px-5 py-3.5 border-b border-[#E8E2D5] flex items-center justify-between bg-white/90 backdrop-blur-xs shrink-0">
+            <div className="flex items-center gap-2">
+              <ChefHat className="w-5 h-5 text-teal-700" />
+              <h3 className="text-sm sm:text-base font-black text-[#0D3B37]">
+                {editingMeal
+                  ? (lang === 'FR' ? 'Modifier le Repas Planifié' : 'Edit Planned Meal')
+                  : (lang === 'FR' ? `Planifier un Repas pour le ${selectedDate}` : `Plan a Meal for ${selectedDate}`)}
+              </h3>
             </div>
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              className="px-3.5 py-1.5 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs"
+              title={lang === 'FR' ? 'Quitter' : 'Exit'}
+            >
+              <X className="w-4 h-4" />
+              <span>{lang === 'FR' ? 'Quitter' : 'Exit'}</span>
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 max-w-2xl mx-auto w-full">
+            {/* Quick Inspiration Banner */}
+            {!editingMeal && (
+              <div className="mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 flex items-center justify-between gap-3 shadow-2xs">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-teal-100 flex items-center justify-center shrink-0">
+                    <Sparkles className="w-4 h-4 text-teal-800" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-teal-950">
+                      {lang === 'FR' ? 'Besoin d’inspiration anti-gaspillage ?' : 'Need zero-waste inspiration?'}
+                    </h4>
+                    <p className="text-[11px] text-[#527470]">
+                      {lang === 'FR'
+                        ? 'Laissez l’IA explorer votre inventaire et le web pour vous.'
+                        : 'Let AI explore your inventory and the web for you.'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsModalOpen(false);
+                    setSuggestionsInitialSlot(mealType);
+                    setIsSuggestionsModalOpen(true);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold shrink-0 flex items-center gap-1 shadow-2xs active:scale-95"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>{lang === 'FR' ? 'Suggestions' : 'Suggestions'}</span>
+                </button>
+              </div>
+            )}
 
             <form onSubmit={handleSaveMeal} className="space-y-4">
               {/* Title */}
@@ -931,6 +1113,26 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Smart Meal Suggestions Modal (Anti-Waste, User Recipes & Web Search) */}
+      <SmartMealSuggestionsModal
+        isOpen={isSuggestionsModalOpen}
+        onClose={() => setIsSuggestionsModalOpen(false)}
+        inventory={items}
+        currentDate={selectedDate}
+        initialMealType={suggestionsInitialSlot}
+        onPlanMeal={handlePlanSuggestedMeal}
+      />
+
+      {/* Meal Plan Shopping List Modal with Kitchen Cross-Check */}
+      <MealPlanShoppingListModal
+        isOpen={isShoppingListModalOpen}
+        onClose={() => setIsShoppingListModalOpen(false)}
+        plannedMeals={plannedMeals}
+        inventoryItems={items}
+        onAddIngredientsToGrocery={onAddIngredientsToGrocery}
+        onNavigateToGrocery={onNavigateToGrocery}
+      />
     </div>
   );
 };

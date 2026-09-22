@@ -3,45 +3,56 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: kitchen_komrade_app
+    container_name: pantryo_app
     restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - DATABASE_URL=postgresql://komrade_admin:komrade_secure_pass@db:5432/kitchen_komrade?schema=public
+      - DATABASE_URL=postgresql://pantryo_admin:pantryo_secure_pass@db:5432/pantryo?schema=public
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - APP_URL=${APP_URL:-https://pantryo.yknet.org}
     depends_on:
       db:
         condition: service_healthy
     networks:
-      - komrade_net
+      - pantryo_net
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: pantryo_tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:-eyJhIjoiZDRmZTljYWVjMTcyMDdkYzE5MmZmMTNiODVhNTdjOTMiLCJ0IjoiODk2NTZjMDktZmIxMS00ZGUxLTg5YWYtMzMxN2I5NTg3MTZhIiwicyI6Ik5XWmxPV1ZpWkdJdE1tTXlOaTAwTkRWbUxXSmlNemt0WkRVNE5HRTJaR0ZoTURkaiJ9}
+    depends_on:
+      - app
+    networks:
+      - pantryo_net
 
   db:
     image: postgres:16-alpine
-    container_name: kitchen_komrade_db
+    container_name: pantryo_db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: komrade_admin
-      POSTGRES_PASSWORD: komrade_secure_pass
-      POSTGRES_DB: kitchen_komrade
+      POSTGRES_USER: pantryo_admin
+      POSTGRES_PASSWORD: pantryo_secure_pass
+      POSTGRES_DB: pantryo
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U komrade_admin -d kitchen_komrade"]
+      test: ["CMD-SHELL", "pg_isready -U pantryo_admin -d pantryo"]
       interval: 5s
       timeout: 5s
       retries: 5
     networks:
-      - komrade_net
+      - pantryo_net
 
 volumes:
   postgres_data:
     driver: local
 
 networks:
-  komrade_net:
+  pantryo_net:
     driver: bridge

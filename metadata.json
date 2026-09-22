@@ -1,6 +1,6 @@
 {
   "name": "Pantryo",
-  "description": "Smart bento-style food inventory tracking with meal planning calendar, visual meat and seafood cuts subcategories with web photography, and responsive desktop, tablet, and mobile viewing modes.",
+  "description": "Smart food inventory tracking with grocery receipt parsing, photo/paste OCR scanning, meal planning calendar with date-to-date shopping list generation cross-checked against kitchen stock, visual food cuts, and multilingual French and English support.",
   "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

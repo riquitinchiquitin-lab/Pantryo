@@ -5,97 +5,58 @@ import {
   Sparkles,
   Check,
   AlertCircle,
-  AlertTriangle,
   RefreshCw,
   X,
-  ArrowRight,
-  ShieldCheck,
-  Snowflake,
-  Refrigerator,
-  Boxes,
   Plus,
-  Edit2,
-  CheckCheck,
   FileText,
-  Tag,
-  Calendar,
   Barcode,
   Search,
+  CheckCircle2,
+  ChevronUp,
+  ChevronDown,
+  Trash2,
+  Sparkle,
+  ArrowRight,
 } from 'lucide-react';
-import { ScannedItemCandidate, ScanResponse } from '../types';
+import { ScannedItemCandidate, InventoryItem } from '../types';
 import { FoodVisualBadge } from './FoodVisualBadge';
-import { PantryoLogo } from './PantryoLogo';
 import { useLanguage, getCategoryLocalizedName, getLocationLocalizedName } from '../utils/i18n';
 
 interface CameraScannerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onItemAdded: (item: any) => void;
+  onItemAdded: (item: InventoryItem) => void;
   currentUser: { id: string; name: string };
   onOpenManualAdd?: () => void;
+  initialMode?: 'snap' | 'receipt' | 'barcode' | 'upload' | 'presets';
+}
+
+interface SessionItem {
+  id: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  locationName: string;
+  categoryName: string;
+  notes?: string;
+  addedAt: string;
 }
 
 const SAMPLE_PRESETS = [
   {
     name: 'Produce & Dairy Cart',
-    description: 'Fresh Strawberries, Oat Milk & Greek Yogurt',
-    label: '🍓 Milk & Berries',
-    mockItems: [
-      {
-        name: 'Organic Whole Milk',
-        category: 'Dairy & Eggs',
-        quantity: 1,
-        unit: 'carton (1 gal)',
-        recommendedLocation: 'Fridge' as const,
-        storageReason: 'Must maintain 35°F - 38°F to prevent souring.',
-        estimatedShelfLifeDays: 7,
-        monthsFrozenShelfLife: 3,
-        confidence: 0.98,
-        storageTip: 'Store on middle shelf; avoid refrigerator door.',
-      },
-      {
-        name: 'Fresh Strawberries',
-        category: 'Produce',
-        quantity: 1,
-        unit: 'clamshell (1 lb)',
-        recommendedLocation: 'Fridge' as const,
-        storageReason: 'High moisture and mold risk at room temperature.',
-        estimatedShelfLifeDays: 4,
-        monthsFrozenShelfLife: 10,
-        confidence: 0.95,
-        storageTip: 'Do not wash until immediately before eating.',
-      },
+    label: '🍓 Milk & Fresh Berries',
+    items: [
+      { name: 'Organic Whole Milk', category: 'Dairy & Eggs', quantity: 1, unit: 'carton (1 gal)', recommendedLocation: 'Fridge' as const, shelfLife: 7 },
+      { name: 'Fresh Strawberries', category: 'Produce', quantity: 1, unit: 'clamshell (1 lb)', recommendedLocation: 'Fridge' as const, shelfLife: 4 },
     ],
   },
   {
-    name: 'Freezer Protein Haul',
-    description: 'Ground Beef & Salmon Fillets',
-    label: '🥩 Beef & Salmon',
-    mockItems: [
-      {
-        name: 'Grass-Fed Ground Beef 85/15',
-        category: 'Meat & Seafood',
-        quantity: 2,
-        unit: 'lbs',
-        recommendedLocation: 'Freezer' as const,
-        storageReason: 'Keeps nutrient integrity and halts bacterial growth at 0°F.',
-        estimatedShelfLifeDays: 2,
-        monthsFrozenShelfLife: 6,
-        confidence: 0.97,
-        storageTip: 'Wrap tightly or vacuum seal to prevent freezer burn.',
-      },
-      {
-        name: 'Wild Atlantic Salmon Fillet',
-        category: 'Meat & Seafood',
-        quantity: 1.5,
-        unit: 'lbs',
-        recommendedLocation: 'Freezer' as const,
-        storageReason: 'Fish oil oxidizes rapidly; freeze at 0°F if not cooking within 24h.',
-        estimatedShelfLifeDays: 2,
-        monthsFrozenShelfLife: 4,
-        confidence: 0.94,
-        storageTip: 'Defrost in refrigerator 12 hours before searing.',
-      },
+    name: 'Pantry Cans',
+    label: '🥫 Tomato Soup & Beans',
+    items: [
+      { name: 'Aylmer Tomato Soup', category: 'Pantry Staples', quantity: 2, unit: 'cans (284ml)', recommendedLocation: 'Pantry' as const, shelfLife: 365 },
+      { name: 'Black Beans', category: 'Pantry Staples', quantity: 1, unit: 'can (540ml)', recommendedLocation: 'Pantry' as const, shelfLife: 365 },
     ],
   },
 ];
@@ -106,337 +67,408 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
   onItemAdded,
   currentUser,
   onOpenManualAdd,
+  initialMode = 'snap',
 }) => {
-  const { t, lang } = useLanguage();
-  const [activeMode, setActiveMode] = useState<'snap' | 'barcode' | 'upload' | 'presets'>('snap');
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [isScanning, setIsScanning] = useState(false);
-  const [scanResult, setScanResult] = useState<ScanResponse | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [selectedCandidates, setSelectedCandidates] = useState<ScannedItemCandidate[]>([]);
-  const [isAddingAll, setIsAddingAll] = useState(false);
-  const [addedNames, setAddedNames] = useState<Set<string>>(new Set());
+  const { lang } = useLanguage();
 
-  // UPC Barcode manual lookup state
+  // Mode: 'photo' | 'receipt' | 'barcode'
+  const [activeMode, setActiveMode] = useState<'photo' | 'receipt' | 'barcode'>('photo');
+
+  // Background processing states
+  const [activeJobsCount, setActiveJobsCount] = useState(0);
+  const [sessionItems, setSessionItems] = useState<SessionItem[]>([]);
+  const [latestToast, setLatestToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
+  const [isTrayExpanded, setIsTrayExpanded] = useState(false);
+
+  // Barcode / Receipt auxiliary inputs
   const [upcInput, setUpcInput] = useState('');
   const [isLookingUpUpc, setIsLookingUpUpc] = useState(false);
   const [upcError, setUpcError] = useState<string | null>(null);
-  const [geminiConnected, setGeminiConnected] = useState<boolean | null>(null);
+  const [receiptText, setReceiptText] = useState('');
+  const [isParsingReceipt, setIsParsingReceipt] = useState(false);
+  const [showPresets, setShowPresets] = useState(false);
 
-  // Cache for any barcode detected via client-side BarcodeDetector API
-  const detectedBarcodeRef = useRef<string | null>(null);
-
-  // Hidden native file inputs (one for direct camera capture, one for gallery file picking)
+  // Native hidden file inputs
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
+  const toastTimeoutRef = useRef<any>(null);
 
-  // Reset states on open
+  // Sync mode when opened
   useEffect(() => {
     if (isOpen) {
-      setImagePreview(null);
-      setScanResult(null);
-      setErrorMessage(null);
-      setUpcError(null);
-      setUpcInput('');
-      setSelectedCandidates([]);
-      setAddedNames(new Set());
-      detectedBarcodeRef.current = null;
-      setActiveMode('snap');
-
-      // Check backend API key configuration status
-      fetch('/api/health')
-        .then((res) => res.json())
-        .then((data) => {
-          setGeminiConnected(Boolean(data.geminiConfigured));
-        })
-        .catch(() => {
-          setGeminiConnected(false);
-        });
-    }
-  }, [isOpen]);
-
-  const handleLookupUpc = async (codeToLookup?: string) => {
-    const code = (codeToLookup || upcInput).trim().replace(/[^0-9]/g, '');
-    if (!code || code.length < 6) {
-      setUpcError('Please enter a valid 8 to 14 digit UPC or EAN barcode number.');
-      return;
-    }
-
-    setIsLookingUpUpc(true);
-    setUpcError(null);
-    setErrorMessage(null);
-
-    try {
-      const res = await fetch(`/api/v1/inventory/barcode/${code}`);
-      const data = await res.json();
-      if (!res.ok || !data.success || !data.item) {
-        throw new Error(data.error || 'Barcode could not be found.');
+      if (initialMode === 'receipt') {
+        setActiveMode('receipt');
+      } else if (initialMode === 'barcode') {
+        setActiveMode('barcode');
+      } else {
+        setActiveMode('photo');
       }
-
-      setSelectedCandidates([data.item]);
-      setScanResult({
-        success: true,
-        summary: `Found product for UPC #${code} via ${
-          data.source === 'open_food_facts' ? 'Open Food Facts database' : data.source === 'inventory_cache' ? 'Inventory' : 'UPC Scan'
-        }`,
-        itemsCount: 1,
-        items: [data.item],
-        scannedAt: new Date().toISOString(),
-      });
-    } catch (err: any) {
-      setUpcError(err.message || 'Error looking up barcode.');
-    } finally {
-      setIsLookingUpUpc(false);
+      setLatestToast(null);
+      setUpcInput('');
+      setUpcError(null);
+      setReceiptText('');
+      setShowPresets(false);
     }
+  }, [isOpen, initialMode]);
+
+  const showToast = (message: string, type: 'success' | 'info' | 'error' = 'info', duration = 4000) => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setLatestToast({ message, type });
+    toastTimeoutRef.current = setTimeout(() => {
+      setLatestToast(null);
+    }, duration);
   };
 
-  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    detectedBarcodeRef.current = null;
-
-    // Read and compress image client-side to max 1600px dimension for sharp OCR label and expiration date reading
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      const img = new Image();
-      img.onload = async () => {
-        // Run client-side hardware BarcodeDetector if supported in the browser
-        if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
-          try {
-            const detector = new (window as any).BarcodeDetector({
-              formats: ['upc_a', 'upc_e', 'ean_13', 'ean_8', 'code_128', 'qr_code'],
-            });
-            const detected = await detector.detect(img);
-            if (detected && detected.length > 0 && detected[0]?.rawValue) {
-              const rawDigits = detected[0].rawValue.replace(/[^0-9]/g, '');
-              if (rawDigits.length >= 6) {
-                detectedBarcodeRef.current = rawDigits;
-                console.info('[Pantryo] Native BarcodeDetector identified UPC:', rawDigits);
-              }
+  // Compress image client-side to keep uploads fast and light
+  const compressFile = (file: File, maxDim = 1600): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string;
+        const img = new Image();
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
             }
-          } catch (e) {
-            // Gracefully proceed to Gemini Multimodal OCR
           }
-        }
-
-        const maxDim = 1600;
-        let { width, height } = img;
-        if (width > maxDim || height > maxDim) {
-          if (width > height) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', 0.9));
           } else {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
+            resolve(dataUrl);
           }
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.92);
-          setImagePreview(compressedDataUrl);
-          triggerAiScan(compressedDataUrl);
-        } else {
-          setImagePreview(dataUrl);
-          triggerAiScan(dataUrl);
-        }
+        };
+        img.onerror = () => resolve(dataUrl);
+        img.src = dataUrl;
       };
-      img.onerror = () => {
-        setImagePreview(dataUrl);
-        triggerAiScan(dataUrl);
-      };
-      img.src = dataUrl;
-    };
-    reader.readAsDataURL(file);
-    // Reset file input value so selecting the same photo triggers onChange again
-    e.target.value = '';
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    });
   };
 
-  const triggerAiScan = async (base64Img: string) => {
-    setIsScanning(true);
-    setErrorMessage(null);
-    setScanResult(null);
-    setAddedNames(new Set());
+  // Save single candidate to backend API and notify parent
+  const saveCandidateToInventory = async (candidate: ScannedItemCandidate): Promise<InventoryItem> => {
+    const days = candidate.estimatedShelfLifeDays || 7;
+    const exp = candidate.printedExpirationDate
+      ? new Date(candidate.printedExpirationDate).toISOString()
+      : candidate.suggestedExpirationDate
+      ? new Date(candidate.suggestedExpirationDate).toISOString()
+      : new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+
+    const notes = [
+      candidate.detectedText ? `OCR: "${candidate.detectedText}"` : null,
+      candidate.price ? `Price: ${candidate.price}` : null,
+      candidate.storageTip || candidate.storageReason,
+    ]
+      .filter(Boolean)
+      .join(' • ') || (lang === 'FR' ? 'Ajouté par vision IA' : 'Added via Picture Vision');
+
+    const chosenName =
+      lang === 'FR'
+        ? (candidate as any).nameFr || candidate.name
+        : (candidate as any).nameEn || candidate.name;
+
+    const payload = {
+      name: chosenName,
+      quantity: candidate.quantity || 1,
+      unit: candidate.unit || 'pcs',
+      locationName: candidate.recommendedLocation || 'Fridge',
+      categoryName: candidate.category || 'Produce',
+      expirationDate: exp,
+      monthsFrozenShelfLife: candidate.monthsFrozenShelfLife || 6,
+      notes,
+      barcode: candidate.barcode || null,
+      addedById: currentUser.id,
+    };
+
+    const res = await fetch('/api/v1/inventory/item', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Failed to save item');
+    }
+
+    return data.item;
+  };
+
+  // Process a single photo in the background without blocking the UI
+  const processPhotoInBackground = async (compressedDataUrl: string, isReceipt = false) => {
+    setActiveJobsCount((prev) => prev + 1);
+    showToast(
+      lang === 'FR'
+        ? '⚡ Photo en cours de lecture en arrière-plan...'
+        : '⚡ Reading photo in background...',
+      'info',
+      8000
+    );
 
     try {
-      const response = await fetch('/api/v1/inventory/scan', {
+      const endpoint = isReceipt ? '/api/v1/inventory/scan-receipt-photo' : '/api/v1/inventory/scan';
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          imageBase64: base64Img,
+          imageBase64: compressedDataUrl,
           mimeType: 'image/jpeg',
+          language: lang,
         }),
       });
 
       const data = await response.json();
       if (!response.ok || !data.success) {
-        throw new Error(data.error || data.details || 'Failed to process vision scan');
+        throw new Error(data.error || data.details || 'Analysis failed');
       }
 
-      // If client-side BarcodeDetector found a UPC that Gemini missed, enrich the candidate
-      const items = (data.items || []).map((item: ScannedItemCandidate) => {
-        if (!item.barcode && detectedBarcodeRef.current) {
-          return { ...item, barcode: detectedBarcodeRef.current };
+      const items: ScannedItemCandidate[] = data.items || [];
+      if (items.length === 0) {
+        showToast(
+          lang === 'FR'
+            ? 'Aucun aliment reconnu sur cette photo. Prenez-en une autre !'
+            : 'No food items detected in that picture. Try another angle!',
+          'error'
+        );
+        return;
+      }
+
+      // Automatically save each recognized item to the database in the background!
+      const addedThisBatch: SessionItem[] = [];
+      for (const itemCandidate of items) {
+        try {
+          const savedItem = await saveCandidateToInventory(itemCandidate);
+          onItemAdded(savedItem);
+          addedThisBatch.push({
+            id: savedItem.id,
+            name: savedItem.name,
+            quantity: savedItem.quantity,
+            unit: savedItem.unit,
+            locationName: itemCandidate.recommendedLocation || 'Fridge',
+            categoryName: itemCandidate.category || 'Produce',
+            notes: savedItem.notes,
+            addedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          });
+        } catch (err) {
+          console.warn('Failed saving candidate:', itemCandidate.name, err);
         }
-        return item;
-      });
-
-      setScanResult({ ...data, items });
-      setSelectedCandidates(items);
-    } catch (err: any) {
-      console.error('Scan error:', err);
-      setErrorMessage(err.message || 'Error communicating with Gemini Vision service.');
-    } finally {
-      setIsScanning(false);
-    }
-  };
-
-  const loadPreset = (preset: typeof SAMPLE_PRESETS[0]) => {
-    // Generate an illustrative canvas image representation
-    const canvas = document.createElement('canvas');
-    canvas.width = 400;
-    canvas.height = 300;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.fillStyle = '#E8EFE6';
-      ctx.fillRect(0, 0, 400, 300);
-      ctx.fillStyle = '#2C3E30';
-      ctx.font = 'bold 20px system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(`Pantryo: ${preset.name}`, 200, 140);
-      ctx.font = '14px system-ui, sans-serif';
-      ctx.fillStyle = '#5A6F5E';
-      ctx.fillText(preset.description, 200, 175);
-      const dataUrl = canvas.toDataURL('image/jpeg');
-      setImagePreview(dataUrl);
-      triggerAiScan(dataUrl);
-    }
-  };
-
-  const handleConfirmSingleItem = async (candidate: ScannedItemCandidate) => {
-    try {
-      const days = candidate.estimatedShelfLifeDays || 7;
-      const exp = candidate.printedExpirationDate
-        ? new Date(candidate.printedExpirationDate).toISOString()
-        : candidate.suggestedExpirationDate
-        ? new Date(candidate.suggestedExpirationDate).toISOString()
-        : new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
-
-      const notes = [
-        candidate.detectedText ? `OCR: "${candidate.detectedText}"` : null,
-        candidate.storageTip || candidate.storageReason,
-      ]
-        .filter(Boolean)
-        .join(' • ');
-
-      const payload = {
-        name: candidate.name,
-        quantity: candidate.quantity,
-        unit: candidate.unit,
-        locationName: candidate.recommendedLocation,
-        categoryName: candidate.category,
-        expirationDate: exp,
-        monthsFrozenShelfLife: candidate.monthsFrozenShelfLife || 6,
-        notes: notes || 'Added via Gemini OCR Scan',
-        barcode: candidate.barcode || null,
-        addedById: currentUser.id,
-      };
-
-      const res = await fetch('/api/v1/inventory/item', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const resData = await res.json();
-      if (!res.ok || !resData.success) {
-        throw new Error(resData.error || 'Failed to save item');
       }
 
-      onItemAdded(resData.item);
-      setAddedNames((prev) => new Set([...prev, candidate.name]));
+      if (addedThisBatch.length > 0) {
+        setSessionItems((prev) => [...addedThisBatch, ...prev]);
+        const namesSummary = addedThisBatch.map((i) => i.name).join(', ');
+        showToast(
+          lang === 'FR'
+            ? `✓ Ajouté en arrière-plan : ${namesSummary}`
+            : `✓ Added in background: ${namesSummary}`,
+          'success',
+          5000
+        );
+      }
     } catch (err: any) {
-      alert(`Error saving item: ${err.message}`);
+      console.error('Background photo scan error:', err);
+      showToast(
+        lang === 'FR'
+          ? `Erreur de numérisation : ${err.message || 'Impossible de lire la photo'}`
+          : `Scan error: ${err.message || 'Failed to read photo'}`,
+        'error'
+      );
+    } finally {
+      setActiveJobsCount((prev) => Math.max(0, prev - 1));
     }
   };
 
-  const handleAddAllCandidates = async () => {
-    if (selectedCandidates.length === 0) return;
-    setIsAddingAll(true);
+  // Handle files selected (Camera or Gallery)
+  const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>, isReceipt = false) => {
+    const fileList: File[] = Array.from(e.target.files || []);
+    if (fileList.length === 0) return;
 
-    const itemsToAdd = selectedCandidates.map((c) => {
-      const days = c.estimatedShelfLifeDays || 7;
-      const exp = c.printedExpirationDate
-        ? new Date(c.printedExpirationDate).toISOString()
-        : c.suggestedExpirationDate
-        ? new Date(c.suggestedExpirationDate).toISOString()
-        : new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+    // Reset input so taking the exact same photo or file works immediately again
+    e.target.value = '';
 
-      const notes = [
-        c.detectedText ? `OCR: "${c.detectedText}"` : null,
-        c.storageTip || c.storageReason,
-      ]
-        .filter(Boolean)
-        .join(' • ') || 'Added via Gemini OCR Vision Scan';
+    // Process each photo in background
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
+      const compressed = await compressFile(file, isReceipt ? 2000 : 1600);
+      if (compressed) {
+        // Kick off background job - camera stays active and ready for more!
+        processPhotoInBackground(compressed, isReceipt);
+      }
+    }
+  };
 
-      return {
-        name: c.name,
-        quantity: c.quantity,
-        unit: c.unit,
-        locationType: (c.recommendedLocation.toUpperCase() as 'FRIDGE' | 'FREEZER' | 'PANTRY') || 'FRIDGE',
-        categoryName: c.category,
-        expirationDate: exp,
-        barcode: c.barcode || null,
-        notes,
-      };
-    });
+  // Barcode Lookup handler
+  const handleLookupUpc = async (codeToLookup?: string) => {
+    const code = (codeToLookup || upcInput).trim().replace(/[^0-9]/g, '');
+    if (!code || code.length < 6) {
+      setUpcError(lang === 'FR' ? 'Entrez un code-barres valide (8 à 14 chiffres).' : 'Enter a valid 8-14 digit UPC or EAN code.');
+      return;
+    }
+
+    setIsLookingUpUpc(true);
+    setUpcError(null);
 
     try {
-      const res = await fetch('/api/v1/inventory/bulk-items', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: itemsToAdd,
-          userId: currentUser.id,
-        }),
-      });
+      const res = await fetch(`/api/v1/inventory/barcode/${code}?language=${lang}`);
       const data = await res.json();
-      if (data.success) {
-        selectedCandidates.forEach((c) => onItemAdded(c));
-        setAddedNames(new Set(selectedCandidates.map((c) => c.name)));
-        setTimeout(() => {
-          onClose();
-        }, 1200);
+      if (!res.ok || !data.success || !data.item) {
+        throw new Error(data.error || 'Barcode could not be found.');
       }
+
+      const itemCandidate = data.item;
+      const savedItem = await saveCandidateToInventory(itemCandidate);
+      onItemAdded(savedItem);
+
+      const sessionEntry: SessionItem = {
+        id: savedItem.id,
+        name: savedItem.name,
+        quantity: savedItem.quantity,
+        unit: savedItem.unit,
+        locationName: itemCandidate.recommendedLocation || 'Pantry',
+        categoryName: itemCandidate.category || 'Pantry Staples',
+        addedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+
+      setSessionItems((prev) => [sessionEntry, ...prev]);
+      setUpcInput('');
+      showToast(
+        lang === 'FR'
+          ? `✓ Code-barres ajouté : ${savedItem.name}`
+          : `✓ Added barcode item: ${savedItem.name}`,
+        'success'
+      );
     } catch (err: any) {
-      alert(`Error saving items: ${err.message}`);
+      setUpcError(err.message || 'Failed to lookup barcode.');
     } finally {
-      setIsAddingAll(false);
+      setIsLookingUpUpc(false);
     }
   };
 
-  const updateCandidateField = (index: number, field: keyof ScannedItemCandidate, value: any) => {
-    setSelectedCandidates((prev) => {
-      const copy = [...prev];
-      copy[index] = { ...copy[index], [field]: value };
-      return copy;
-    });
+  // Receipt text parser handler
+  const handleParseReceiptText = async () => {
+    const raw = receiptText.trim();
+    if (!raw) return;
+
+    setIsParsingReceipt(true);
+    showToast(
+      lang === 'FR' ? '⚡ Analyse du reçu en cours...' : '⚡ Parsing receipt text...',
+      'info'
+    );
+
+    try {
+      const response = await fetch('/api/v1/inventory/scan-receipt-text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ receiptText: raw, language: lang }),
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to parse receipt text');
+      }
+
+      const items: ScannedItemCandidate[] = data.items || [];
+      const addedThisBatch: SessionItem[] = [];
+
+      for (const itemCandidate of items) {
+        try {
+          const savedItem = await saveCandidateToInventory(itemCandidate);
+          onItemAdded(savedItem);
+          addedThisBatch.push({
+            id: savedItem.id,
+            name: savedItem.name,
+            quantity: savedItem.quantity,
+            unit: savedItem.unit,
+            locationName: itemCandidate.recommendedLocation || 'Fridge',
+            categoryName: itemCandidate.category || 'Produce',
+            addedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          });
+        } catch (err) {
+          console.warn('Failed saving receipt item:', itemCandidate.name, err);
+        }
+      }
+
+      if (addedThisBatch.length > 0) {
+        setSessionItems((prev) => [...addedThisBatch, ...prev]);
+        setReceiptText('');
+        showToast(
+          lang === 'FR'
+            ? `✓ ${addedThisBatch.length} articles du reçu ajoutés !`
+            : `✓ Added ${addedThisBatch.length} receipt items!`,
+          'success'
+        );
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Failed to parse receipt text', 'error');
+    } finally {
+      setIsParsingReceipt(false);
+    }
+  };
+
+  // Load sample preset directly
+  const handleLoadPreset = async (preset: (typeof SAMPLE_PRESETS)[0]) => {
+    setShowPresets(false);
+    showToast(lang === 'FR' ? `Ajout de l'exemple : ${preset.name}...` : `Adding preset haul: ${preset.name}...`, 'info');
+
+    const addedThisBatch: SessionItem[] = [];
+    for (const pItem of preset.items) {
+      try {
+        const savedItem = await saveCandidateToInventory({
+          name: pItem.name,
+          category: pItem.category,
+          quantity: pItem.quantity,
+          unit: pItem.unit,
+          recommendedLocation: pItem.recommendedLocation,
+          estimatedShelfLifeDays: pItem.shelfLife,
+          monthsFrozenShelfLife: 6,
+          storageReason: 'Added from test preset',
+        });
+        onItemAdded(savedItem);
+        addedThisBatch.push({
+          id: savedItem.id,
+          name: savedItem.name,
+          quantity: savedItem.quantity,
+          unit: savedItem.unit,
+          locationName: pItem.recommendedLocation,
+          categoryName: pItem.category,
+          addedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        });
+      } catch (e) {
+        console.warn('Error loading preset item', e);
+      }
+    }
+
+    if (addedThisBatch.length > 0) {
+      setSessionItems((prev) => [...addedThisBatch, ...prev]);
+      showToast(
+        lang === 'FR'
+          ? `✓ ${addedThisBatch.length} articles d'exemple ajoutés au stock !`
+          : `✓ Added ${addedThisBatch.length} sample items to inventory!`,
+        'success'
+      );
+    }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
-      {/* Hidden file inputs for direct native camera and gallery file upload */}
+    <div className="fixed inset-0 z-50 bg-[#FAF7EE] flex flex-col w-full h-full overflow-hidden text-[#133E3B] animate-fade-in">
+      {/* Hidden File Inputs for Native Camera Shutter & Gallery */}
       <input
         type="file"
         ref={cameraInputRef}
-        onChange={handleFileSelected}
+        onChange={(e) => handleFilesSelected(e, activeMode === 'receipt')}
         accept="image/*"
         capture="environment"
         className="hidden"
@@ -444,552 +476,398 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
       <input
         type="file"
         ref={galleryInputRef}
-        onChange={handleFileSelected}
+        onChange={(e) => handleFilesSelected(e, activeMode === 'receipt')}
         accept="image/*"
+        multiple
         className="hidden"
       />
 
-      <div className="relative w-full max-w-xl max-h-[92vh] overflow-y-auto bg-[#FAF7EE] border border-[#E0D9C8] rounded-3xl shadow-2xl p-5 sm:p-6 text-[#133E3B]">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between pb-3.5 border-b border-[#E8E2D5]">
-          <div className="flex items-center gap-3">
-            <PantryoLogo size={38} />
+      <div className="relative w-full max-w-2xl mx-auto h-full flex flex-col overflow-hidden">
+        {/* Top Header with explicit Exit button */}
+        <div className="px-5 py-3.5 border-b border-[#E8E2D5] flex items-center justify-between bg-white/90 backdrop-blur-xs shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-teal-800 text-white flex items-center justify-center shadow-xs">
+              <Camera className="w-4 h-4" />
+            </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base sm:text-lg font-black tracking-tight text-[#0D3B37]">
-                  {lang === 'FR' ? 'SCANNER & AJOUTER !' : 'SNAP & ADD! Vision Scanner'}
-                </h2>
-                {geminiConnected === true && (
-                  <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100/80 border border-emerald-300 px-2 py-0.5 rounded-full">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    {lang === 'FR' ? 'IA en direct active' : 'Live AI Active'}
-                  </span>
-                )}
-                {geminiConnected === false && (
-                  <span
-                    className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full"
-                    title={lang === 'FR' ? "Clé GEMINI_API_KEY non configurée sur le serveur" : "GEMINI_API_KEY is not configured in your server environment"}
-                  >
-                    <AlertTriangle className="w-3 h-3 text-amber-600" />
-                    {lang === 'FR' ? 'Mode Démo' : 'Demo Mode (No API Key)'}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-[#527470]">
-                {lang === 'FR'
-                  ? 'Propulsé par Google Gemini Flash Vision Multimodale & ROC'
-                  : 'Powered by Google Gemini Flash Multimodal Vision & OCR'}
+              <h2 className="text-sm font-black text-[#0D3B37] leading-tight">
+                {lang === 'FR' ? 'Ajout par Photo' : 'Add by Picture'}
+              </h2>
+              <p className="text-[11px] text-[#527470]">
+                {lang === 'FR' ? 'Ajout continu en arrière-plan' : 'Continuous background scanning'}
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white border border-[#E0D9C8] text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
+
+          <div className="flex items-center gap-2">
+            {sessionItems.length > 0 && (
+              <span className="text-[11px] font-black px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300">
+                {lang === 'FR' ? `✓ ${sessionItems.length} ajoutés` : `✓ ${sessionItems.length} added`}
+              </span>
+            )}
+            <button
+              onClick={onClose}
+              className="px-3.5 py-1.5 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs"
+              title={lang === 'FR' ? 'Quitter' : 'Exit'}
+            >
+              <X className="w-4 h-4" />
+              <span>{lang === 'FR' ? 'Quitter' : 'Exit'}</span>
+            </button>
+          </div>
         </div>
 
-        {/* Source Switcher Tabs */}
-        {!imagePreview && (
-          <div className="grid grid-cols-4 gap-1.5 p-1.5 my-3.5 bg-[#EDF3EC] rounded-2xl">
+        {/* Mode Selector (Subtle, secondary switch) */}
+        <div className="px-5 pt-2 pb-1 shrink-0 flex items-center justify-between">
+          <div className="inline-flex p-1 bg-[#EBE5D6] rounded-xl text-xs font-bold">
             <button
-              onClick={() => setActiveMode('snap')}
-              className={`py-2 px-2 text-xs font-bold rounded-xl flex items-center justify-center gap-1 transition-all ${
-                activeMode === 'snap' ? 'bg-white text-[#0D3B37] shadow-2xs' : 'text-[#607464] hover:text-[#0D3B37]'
+              type="button"
+              onClick={() => setActiveMode('photo')}
+              className={`px-3 py-1 rounded-lg flex items-center gap-1.5 transition-all ${
+                activeMode === 'photo'
+                  ? 'bg-white text-[#0D3B37] shadow-xs'
+                  : 'text-[#607464] hover:text-[#0D3B37]'
               }`}
             >
               <Camera className="w-3.5 h-3.5" />
-              <span>{lang === 'FR' ? 'Caméra' : 'Camera'}</span>
+              <span>{lang === 'FR' ? 'Photo d’aliments' : 'Food Photos'}</span>
             </button>
             <button
+              type="button"
+              onClick={() => setActiveMode('receipt')}
+              className={`px-3 py-1 rounded-lg flex items-center gap-1.5 transition-all ${
+                activeMode === 'receipt'
+                  ? 'bg-white text-amber-900 shadow-xs'
+                  : 'text-[#607464] hover:text-amber-900'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5 text-amber-700" />
+              <span>{lang === 'FR' ? 'Reçu' : 'Receipt'}</span>
+            </button>
+            <button
+              type="button"
               onClick={() => setActiveMode('barcode')}
-              className={`py-2 px-2 text-xs font-bold rounded-xl flex items-center justify-center gap-1 transition-all ${
-                activeMode === 'barcode' ? 'bg-white text-[#0D3B37] shadow-2xs' : 'text-[#607464] hover:text-[#0D3B37]'
+              className={`px-3 py-1 rounded-lg flex items-center gap-1.5 transition-all ${
+                activeMode === 'barcode'
+                  ? 'bg-white text-blue-900 shadow-xs'
+                  : 'text-[#607464] hover:text-blue-900'
               }`}
             >
               <Barcode className="w-3.5 h-3.5 text-blue-700" />
-              <span>{lang === 'FR' ? 'Code UPC' : 'UPC Code'}</span>
-            </button>
-            <button
-              onClick={() => setActiveMode('upload')}
-              className={`py-2 px-2 text-xs font-bold rounded-xl flex items-center justify-center gap-1 transition-all ${
-                activeMode === 'upload' ? 'bg-white text-[#0D3B37] shadow-2xs' : 'text-[#607464] hover:text-[#0D3B37]'
-              }`}
-            >
-              <Upload className="w-3.5 h-3.5" />
-              <span>{lang === 'FR' ? 'Téléverser' : 'Upload'}</span>
-            </button>
-            <button
-              onClick={() => setActiveMode('presets')}
-              className={`py-2 px-2 text-xs font-bold rounded-xl flex items-center justify-center gap-1 transition-all ${
-                activeMode === 'presets' ? 'bg-white text-[#0D3B37] shadow-2xs' : 'text-[#607464] hover:text-[#0D3B37]'
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>{lang === 'FR' ? 'Exemples' : 'Presets'}</span>
+              <span>{lang === 'FR' ? 'Code-barres' : 'Barcode'}</span>
             </button>
           </div>
-        )}
 
-        {/* Camera Snap Mode (Native camera shutter via capture="environment") */}
-        {activeMode === 'snap' && !imagePreview && (
-          <div className="p-6 sm:p-8 rounded-3xl bg-white border border-[#D5E1D2] text-center space-y-4 shadow-2xs">
-            <div className="w-16 h-16 mx-auto rounded-3xl bg-teal-50 border border-teal-200 text-teal-800 flex items-center justify-center shadow-xs">
-              <Camera className="w-8 h-8" />
+          {sessionItems.length > 0 && (
+            <span className="text-xs font-extrabold text-[#0D3B37]">
+              {sessionItems.length} {lang === 'FR' ? 'ajouté(s)' : 'added'}
+            </span>
+          )}
+        </div>
+
+        {/* Live Status Pill (Continuous Background Activity) */}
+        <div className="px-5 py-1.5 shrink-0">
+          {latestToast ? (
+            <div
+              className={`p-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 transition-all shadow-xs animate-scale-in ${
+                latestToast.type === 'success'
+                  ? 'bg-emerald-100 border border-emerald-300 text-emerald-950'
+                  : latestToast.type === 'error'
+                  ? 'bg-rose-100 border border-rose-300 text-rose-950'
+                  : 'bg-teal-100/90 border border-teal-300 text-teal-950'
+              }`}
+            >
+              {latestToast.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+              ) : latestToast.type === 'error' ? (
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              ) : (
+                <RefreshCw className="w-4 h-4 text-teal-700 animate-spin shrink-0" />
+              )}
+              <span className="truncate flex-1">{latestToast.message}</span>
             </div>
-
-            <div className="space-y-1">
-              <h3 className="font-extrabold text-sm sm:text-base text-[#0D3B37]">
-                {lang === 'FR' ? 'Prendre une photo avec votre caméra' : 'Take Photo with Your Camera'}
-              </h3>
-              <p className="text-xs text-[#527470] max-w-sm mx-auto">
+          ) : activeJobsCount > 0 ? (
+            <div className="p-2.5 rounded-2xl bg-teal-100/90 border border-teal-300 text-teal-950 text-xs font-bold flex items-center gap-2 shadow-xs animate-pulse">
+              <RefreshCw className="w-4 h-4 text-teal-700 animate-spin shrink-0" />
+              <span className="flex-1">
                 {lang === 'FR'
-                  ? "Ouvre la caméra instantanément. Reconnaît les produits, étiquettes, reçus d'épicerie, codes-barres et dates de péremption."
-                  : 'Opens your camera instantly. Reads product names, packaging labels, grocery receipts, barcodes, and printed expiration stamps.'}
-              </p>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 mt-1 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] font-semibold text-emerald-800">
-                <FileText className="w-3 h-3 text-emerald-600" />
-                <span>
-                  {lang === 'FR'
-                    ? 'ROC & Code-barres : Lit les emballages, codes UPC, reçus et dates « EXP »'
-                    : 'OCR & Barcode: Reads package labels, UPC digits, receipts & "EXP" dates'}
-                </span>
+                  ? `Analyse en arrière-plan (${activeJobsCount} photo${activeJobsCount > 1 ? 's' : ''})... Continuez à photographier !`
+                  : `Adding in background (${activeJobsCount} photo${activeJobsCount > 1 ? 's' : ''})... Keep snapping!`}
+              </span>
+            </div>
+          ) : (
+            <div className="p-2 rounded-xl bg-[#F0EBE0] text-[#527470] text-[11px] font-medium text-center">
+              {lang === 'FR'
+                ? '📸 Prenez des photos en continu. Vos aliments s’ajoutent en arrière-plan sans vous arrêter.'
+                : '📸 Snap photos one after another. Items are saved in the background without interrupting you.'}
+            </div>
+          )}
+        </div>
+
+        {/* Main Content Area */}
+        <div className="flex-1 overflow-y-auto px-5 py-2 space-y-4">
+          {/* PHOTO MODE (Simplified & Continuous) */}
+          {activeMode === 'photo' && (
+            <div className="flex flex-col items-center space-y-4">
+              {/* Clean Camera Capture Shutter Card */}
+              <div className="w-full relative rounded-3xl bg-white border-2 border-teal-700/20 hover:border-teal-600 p-6 flex flex-col items-center text-center transition-all shadow-xs">
+                {/* Large Shutter Buttons */}
+                <div className="flex items-center justify-center gap-6 my-2">
+                  {/* Gallery/Library Option */}
+                  <button
+                    type="button"
+                    onClick={() => galleryInputRef.current?.click()}
+                    className="w-14 h-14 rounded-2xl bg-[#FAF7EE] hover:bg-[#F2ECE0] border-2 border-[#D5E1D2] text-[#0D3B37] flex flex-col items-center justify-center gap-0.5 shadow-xs transition-transform active:scale-95"
+                    title={lang === 'FR' ? 'Choisir des photos' : 'Pick from library'}
+                  >
+                    <Upload className="w-5 h-5 text-teal-800" />
+                    <span className="text-[9px] font-extrabold text-[#527470]">
+                      {lang === 'FR' ? 'Galerie' : 'Gallery'}
+                    </span>
+                  </button>
+
+                  {/* Main Shutter Button */}
+                  <button
+                    id="scanner-continuous-shutter-btn"
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="w-22 h-22 rounded-full bg-gradient-to-tr from-[#0D3B37] via-[#0E766E] to-teal-500 text-white flex flex-col items-center justify-center shadow-xl border-4 border-[#FAF7EE] ring-4 ring-teal-600/30 hover:scale-105 active:scale-90 transition-all"
+                    title={lang === 'FR' ? 'Prendre une photo' : 'Take photo'}
+                  >
+                    <Camera className="w-9 h-9 stroke-[2.2]" />
+                  </button>
+                </div>
+
+                <div className="space-y-1 mt-2">
+                  <p className="text-sm font-extrabold text-[#0D3B37]">
+                    {lang === 'FR' ? 'Appuyez pour photographier' : 'Tap to take a picture'}
+                  </p>
+                  <p className="text-xs text-[#527470] max-w-sm mx-auto">
+                    {lang === 'FR'
+                      ? 'Prenez une photo, puis une autre : les aliments s’enregistrent automatiquement en arrière-plan sans bloquer l’écran.'
+                      : 'Snap one picture, then another: foods are recognized and saved automatically in the background.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* LIVE FEED OF ADDED ITEMS (Always visible directly, no nested hidden drawer) */}
+              <div className="w-full rounded-3xl border border-[#E0D9C8] bg-white overflow-hidden shadow-xs">
+                <div className="px-4 py-3 bg-[#FAF7EE] border-b border-[#E8E2D5] flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black text-[#0D3B37]">
+                      {lang === 'FR' ? 'Aliments ajoutés en arrière-plan' : 'Items Added in Background'}
+                    </span>
+                    <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-teal-100 text-teal-900 border border-teal-200">
+                      {sessionItems.length}
+                    </span>
+                  </div>
+
+                  {activeJobsCount > 0 && (
+                    <span className="text-[11px] font-bold text-teal-700 flex items-center gap-1.5 animate-pulse">
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                      {lang === 'FR' ? 'Analyse...' : 'Reading...'}
+                    </span>
+                  )}
+                </div>
+
+                <div className="p-3 divide-y divide-[#F0EBE0] max-h-64 overflow-y-auto">
+                  {sessionItems.length === 0 ? (
+                    <div className="py-6 text-center text-slate-400 space-y-1">
+                      <p className="text-xs font-medium">
+                        {lang === 'FR'
+                          ? 'Aucun aliment pour l’instant.'
+                          : 'No items added yet.'}
+                      </p>
+                      <p className="text-[11px] text-[#527470]">
+                        {lang === 'FR'
+                          ? 'Prenez votre première photo ci-dessus !'
+                          : 'Snap your first picture above to get started!'}
+                      </p>
+                    </div>
+                  ) : (
+                    sessionItems.map((item) => (
+                      <div key={item.id} className="py-2.5 flex items-center justify-between gap-3 animate-fade-in">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <FoodVisualBadge itemName={item.name} categoryName={item.categoryName} size="sm" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-[#0D3B37] truncate">{item.name}</p>
+                            <p className="text-[10px] text-[#527470]">
+                              {item.quantity} {item.unit} • {getLocationLocalizedName(item.locationName, lang)} • {item.addedAt}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-extrabold text-emerald-800 bg-emerald-100/90 border border-emerald-200 px-2.5 py-0.5 rounded-full shrink-0">
+                          {lang === 'FR' ? '✓ Ajouté' : '✓ Added'}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             </div>
+          )}
 
-            <div className="pt-2 flex flex-col sm:flex-row gap-2.5 justify-center">
-              <button
-                onClick={() => cameraInputRef.current?.click()}
-                className="py-3 px-6 rounded-2xl bg-[#0E766E] hover:bg-[#0B5C56] text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs active:scale-98 transition-all"
-              >
-                <Camera className="w-4 h-4" />
-                <span>{lang === 'FR' ? 'Prendre en Photo' : 'Snap Grocery Photo'}</span>
-              </button>
+          {/* RECEIPT MODE */}
+          {activeMode === 'receipt' && (
+            <div className="flex flex-col items-center space-y-4">
+              <div className="w-full relative rounded-3xl bg-white border-2 border-amber-600/30 p-6 flex flex-col items-center text-center shadow-xs">
+                <div className="flex items-center justify-center gap-6 my-2">
+                  <button
+                    type="button"
+                    onClick={() => galleryInputRef.current?.click()}
+                    className="w-14 h-14 rounded-2xl bg-[#FAF7EE] hover:bg-[#F2ECE0] border border-[#D5E1D2] text-[#0D3B37] flex flex-col items-center justify-center gap-0.5 shadow-xs transition-transform active:scale-95"
+                  >
+                    <Upload className="w-5 h-5 text-amber-700" />
+                    <span className="text-[9px] font-extrabold text-[#527470]">
+                      {lang === 'FR' ? 'Galerie' : 'Gallery'}
+                    </span>
+                  </button>
 
-              <button
-                onClick={() => galleryInputRef.current?.click()}
-                className="py-3 px-5 rounded-2xl bg-[#FAF7EE] hover:bg-[#F2ECE0] text-[#0D3B37] font-bold text-xs sm:text-sm border border-[#D5E1D2] flex items-center justify-center gap-2 transition-all"
-              >
-                <Upload className="w-4 h-4 text-teal-700" />
-                <span>{lang === 'FR' ? 'Choisir dans la Galerie' : 'Pick from Gallery'}</span>
-              </button>
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="w-20 h-20 rounded-full bg-gradient-to-tr from-amber-700 via-amber-600 to-yellow-500 text-white flex flex-col items-center justify-center shadow-xl border-4 border-[#FAF7EE] ring-4 ring-amber-500/30 hover:scale-105 active:scale-90 transition-all"
+                  >
+                    <FileText className="w-8 h-8 stroke-[2.2]" />
+                  </button>
+                </div>
+
+                <div className="space-y-1 mt-2">
+                  <p className="text-sm font-extrabold text-[#0D3B37]">
+                    {lang === 'FR' ? 'Photographier le reçu d’épicerie' : 'Snap Grocery Receipt'}
+                  </p>
+                  <p className="text-xs text-[#527470]">
+                    {lang === 'FR'
+                      ? 'L’OCR lit les articles et les ajoute en arrière-plan.'
+                      : 'OCR extracts items and saves them in the background.'}
+                  </p>
+                </div>
+
+                {/* Paste receipt text */}
+                <div className="w-full pt-4 mt-3 border-t border-[#F0EBE0] space-y-2 text-left">
+                  <p className="text-[11px] font-bold text-[#0D3B37]">
+                    {lang === 'FR' ? 'Ou coller le texte du reçu :' : 'Or paste receipt text:'}
+                  </p>
+                  <div className="flex gap-2">
+                    <textarea
+                      rows={2}
+                      value={receiptText}
+                      onChange={(e) => setReceiptText(e.target.value)}
+                      placeholder="Ex: 114890 ORG MILK 7.99&#10;POITRINES POULET 12.80"
+                      className="flex-1 p-2 text-xs font-mono bg-[#FAF7EE] border border-[#D5E1D2] rounded-xl text-[#0D3B37] placeholder:text-slate-400 focus:outline-none focus:border-amber-600"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleParseReceiptText}
+                      disabled={isParsingReceipt || !receiptText.trim()}
+                      className="px-3 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold text-xs shrink-0 transition-all"
+                    >
+                      {isParsingReceipt ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <span>{lang === 'FR' ? 'Ajouter' : 'Parse'}</span>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
+          )}
 
-            {onOpenManualAdd && (
-              <div className="pt-2 border-t border-[#F2ECE0]">
+          {/* BARCODE MODE */}
+          {activeMode === 'barcode' && (
+            <div className="p-5 rounded-3xl bg-white border border-[#D5E1D2] space-y-3 shadow-xs text-center">
+              <div className="w-12 h-12 mx-auto rounded-2xl bg-blue-50 border border-blue-200 text-blue-800 flex items-center justify-center">
+                <Barcode className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs font-black text-[#0D3B37]">
+                  {lang === 'FR' ? 'Scanner ou Entrer un Code-barres' : 'Scan or Enter Barcode'}
+                </p>
+                <p className="text-[11px] text-[#527470]">
+                  {lang === 'FR'
+                    ? 'Prenez le code en photo ou tapez les chiffres pour l’ajouter automatiquement.'
+                    : 'Snap barcode photo or enter digits to add instantly in the background.'}
+                </p>
+              </div>
+
+              <div className="flex justify-center gap-2 pt-1">
                 <button
-                  onClick={() => {
-                    onClose();
-                    onOpenManualAdd();
-                  }}
-                  className="text-xs font-bold text-teal-800 hover:text-teal-900 underline underline-offset-2"
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="py-2 px-4 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all"
                 >
-                  {lang === 'FR' ? 'Ou saisir manuellement avec le clavier >' : 'Or enter food item manually with keyboard >'}
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>{lang === 'FR' ? 'Photo du Code-barres' : 'Snap Barcode Photo'}</span>
                 </button>
               </div>
-            )}
-          </div>
-        )}
 
-        {/* UPC Barcode Scan / Lookup Mode */}
-        {activeMode === 'barcode' && !imagePreview && (
-          <div className="p-5 sm:p-7 rounded-3xl bg-white border border-[#D5E1D2] space-y-4 shadow-2xs">
-            <div className="text-center space-y-1">
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-blue-50 border border-blue-200 text-blue-800 flex items-center justify-center shadow-xs">
-                <Barcode className="w-7 h-7" />
-              </div>
-              <h3 className="font-extrabold text-sm sm:text-base text-[#0D3B37]">
-                {lang === 'FR' ? 'Scanner ou Saisir un Code-Barres UPC / EAN' : 'Scan or Enter UPC / EAN Barcode'}
-              </h3>
-              <p className="text-xs text-[#527470] max-w-sm mx-auto">
-                {lang === 'FR'
-                  ? 'Lit directement les codes 12 chiffres UPC ou 13 chiffres EAN. Interroge les registres alimentaires mondiaux (Open Food Facts).'
-                  : 'Directly reads 12-digit UPC or 13-digit EAN barcodes. Resolves against global food registries (Open Food Facts) and your household stock.'}
-              </p>
-            </div>
-
-            {/* Direct Camera Shutter on Barcode */}
-            <div className="flex flex-col sm:flex-row gap-2 justify-center">
-              <button
-                onClick={() => cameraInputRef.current?.click()}
-                className="py-2.5 px-5 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all"
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleLookupUpc();
+                }}
+                className="space-y-2 pt-2 text-left"
               >
-                <Camera className="w-3.5 h-3.5" />
-                <span>{lang === 'FR' ? 'Photographier le Code-Barres' : 'Snap Barcode Photo'}</span>
-              </button>
-            </div>
-
-            <div className="relative flex py-1 items-center">
-              <div className="flex-grow border-t border-slate-200"></div>
-              <span className="flex-shrink mx-3 text-[11px] font-semibold text-slate-400">
-                {lang === 'FR' ? 'ou entrer les chiffres du code' : 'or enter barcode digits'}
-              </span>
-              <div className="flex-grow border-t border-slate-200"></div>
-            </div>
-
-            {/* Manual Numeric Input */}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleLookupUpc();
-              }}
-              className="space-y-2"
-            >
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Barcode className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <div className="flex gap-2">
                   <input
                     type="text"
                     inputMode="numeric"
                     pattern="[0-9]*"
                     value={upcInput}
                     onChange={(e) => setUpcInput(e.target.value)}
-                    placeholder="e.g. 011110816850 or 073420000115"
-                    className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-[#D5E1D2] focus:border-blue-600 focus:outline-none text-xs font-mono font-bold text-[#0D3B37] placeholder:text-slate-400 bg-[#FAF7EE]"
+                    placeholder="e.g. 011110816850"
+                    className="flex-1 px-3 py-2 text-xs font-mono font-bold bg-[#FAF7EE] border border-[#D5E1D2] rounded-xl focus:border-blue-600 focus:outline-none text-[#0D3B37]"
                   />
+                  <button
+                    type="submit"
+                    disabled={isLookingUpUpc || !upcInput.trim()}
+                    className="px-4 py-2 rounded-xl bg-[#0D3B37] hover:bg-[#072421] disabled:opacity-50 text-white text-xs font-bold transition-all"
+                  >
+                    {isLookingUpUpc ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <span>{lang === 'FR' ? 'Ajouter' : 'Add'}</span>}
+                  </button>
                 </div>
-                <button
-                  type="submit"
-                  disabled={isLookingUpUpc || !upcInput.trim()}
-                  className="py-2.5 px-4 rounded-xl bg-[#0D3B37] hover:bg-[#072421] disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 transition-all"
-                >
-                  {isLookingUpUpc ? (
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Search className="w-3.5 h-3.5" />
-                  )}
-                  <span>{lang === 'FR' ? 'Rechercher' : 'Look Up'}</span>
-                </button>
-              </div>
-
-              {upcError && (
-                <p className="text-[11px] font-medium text-rose-600 flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3 shrink-0" />
-                  {upcError}
-                </p>
-              )}
-
-              {/* Quick Preset Barcode Chips */}
-              <div className="pt-2">
-                <p className="text-[10px] font-bold text-slate-400 mb-1.5">
-                  {lang === 'FR' ? "Tester des codes d'exemples :" : 'Try sample barcode codes:'}
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {[
-                    { label: '032601000142 (Spinach)', code: '032601000142' },
-                    { label: '073420000115 (Barilla Pasta)', code: '073420000115' },
-                    { label: '5201051001018 (Feta Cheese)', code: '5201051001018' },
-                  ].map((chip) => (
-                    <button
-                      key={chip.code}
-                      type="button"
-                      onClick={() => {
-                        setUpcInput(chip.code);
-                        handleLookupUpc(chip.code);
-                      }}
-                      className="text-[10px] font-mono font-medium px-2 py-1 rounded-lg bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-900 border border-slate-200 transition-colors"
-                    >
-                      {chip.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* Upload Mode */}
-        {activeMode === 'upload' && !imagePreview && (
-          <div
-            onClick={() => galleryInputRef.current?.click()}
-            className="flex flex-col items-center justify-center p-8 sm:p-10 border-2 border-dashed border-[#B8CEB4] hover:border-teal-600 bg-white hover:bg-teal-50/40 rounded-3xl cursor-pointer transition-all group text-center space-y-3 shadow-2xs"
-          >
-            <div className="w-14 h-14 rounded-2xl bg-teal-50 group-hover:bg-teal-100 text-teal-800 flex items-center justify-center transition-colors">
-              <Upload className="w-7 h-7" />
+                {upcError && <p className="text-[11px] text-rose-600 font-medium">{upcError}</p>}
+              </form>
             </div>
-            <div>
-              <p className="font-extrabold text-sm text-[#0D3B37]">
-                {lang === 'FR' ? 'Cliquer ou glisser une photo ici' : 'Click or drag food photo here'}
-              </p>
-              <p className="text-xs text-[#527470] mt-1 max-w-xs mx-auto">
-                {lang === 'FR'
-                  ? "Téléversez des photos de reçus d'épicerie, étagères de réfrigérateur ou emballages (JPG, PNG, WebP)"
-                  : 'Upload photos of grocery receipts, open fridge shelves, or food packages (JPG, PNG, WebP)'}
-              </p>
-            </div>
+          )}
+        </div>
+
+        {/* Bottom Footer / Done Button */}
+        <div className="p-4 border-t border-[#E8E2D5] bg-white/90 backdrop-blur-xs flex items-center justify-between gap-3 shrink-0">
+          {onOpenManualAdd ? (
             <button
               type="button"
-              className="py-2 px-4 rounded-xl bg-teal-700 text-white text-xs font-bold shadow-2xs"
-            >
-              {lang === 'FR' ? 'Parcourir les Fichiers' : 'Browse Files'}
-            </button>
-          </div>
-        )}
-
-        {/* Presets Mode */}
-        {activeMode === 'presets' && !imagePreview && (
-          <div className="space-y-3">
-            <p className="text-xs font-medium text-[#527470]">
-              {lang === 'FR'
-                ? "Testez l'inférence multimodale Gemini Vision instantanément avec des exemples de panier :"
-                : 'Test Gemini Multimodal Vision inference instantly with sample kitchen cart hauls:'}
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {SAMPLE_PRESETS.map((p, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => loadPreset(p)}
-                  className="flex flex-col text-left p-4 rounded-2xl border border-[#D5E1D2] bg-white hover:border-teal-600 hover:shadow-xs transition-all group"
-                >
-                  <span className="text-sm font-extrabold text-[#0D3B37] group-hover:text-teal-800">
-                    {p.label}
-                  </span>
-                  <span className="text-xs text-[#527470] mt-1 line-clamp-2">{p.description}</span>
-                  <div className="mt-3 flex items-center text-xs font-bold text-teal-700 gap-1">
-                    {lang === 'FR' ? 'Scanner cet exemple' : 'Scan Preset'} <ArrowRight className="w-3.5 h-3.5" />
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Image Preview & Scanning Spinner */}
-        {imagePreview && (
-          <div className="my-3 relative rounded-2xl overflow-hidden bg-slate-900 border border-[#D5E1D2] max-h-48 flex items-center justify-center">
-            <img src={imagePreview} alt="Captured food" className="w-full h-48 object-contain" />
-            <button
               onClick={() => {
-                setImagePreview(null);
-                setScanResult(null);
-                setSelectedCandidates([]);
+                onClose();
+                onOpenManualAdd();
               }}
-              className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-white hover:bg-black/80"
-              title={lang === 'FR' ? 'Changer de photo' : 'Change photo'}
+              className="text-xs font-bold text-teal-800 hover:text-teal-900 underline underline-offset-2"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
+              {lang === 'FR' ? 'Saisie manuelle >' : 'Manual keyboard add >'}
             </button>
-          </div>
-        )}
+          ) : (
+            <div />
+          )}
 
-        {isScanning && (
-          <div className="my-4 p-6 rounded-3xl bg-white border border-[#D5E1D2] flex flex-col items-center text-center shadow-xs">
-            <div className="w-10 h-10 rounded-full border-3 border-teal-200 border-t-teal-700 animate-spin mb-3" />
-            <p className="font-extrabold text-[#0D3B37] text-sm">
-              {lang === 'FR' ? 'Gemini ROC lit vos courses...' : 'Gemini Multimodal OCR Reading Groceries...'}
-            </p>
-            <p className="text-xs text-[#527470] max-w-sm mt-1">
-              {lang === 'FR'
-                ? "Reconnaissance des noms d'aliments, étiquettes, reçus et dates « EXP / Meilleur avant »."
-                : 'Extracting product names, packaging labels, grocery receipts, and stamped "EXP / Best By" dates.'}
-            </p>
-          </div>
-        )}
-
-        {/* Error Notification with Friendly Recovery */}
-        {errorMessage && (
-          <div className="my-4 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs flex items-start gap-2.5">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-700" />
-            <div className="space-y-2 flex-1">
-              <p className="font-bold">{lang === 'FR' ? 'Avis de Numérisation' : 'Scan Notice'}</p>
-              <p>{errorMessage}</p>
-              <div className="flex gap-2 pt-1">
-                <button
-                  onClick={() => {
-                    setImagePreview(null);
-                    setErrorMessage(null);
-                  }}
-                  className="py-1 px-2.5 bg-white border border-rose-300 rounded-lg text-[11px] font-bold text-rose-800 hover:bg-rose-100"
-                >
-                  {lang === 'FR' ? 'Réessayer' : 'Try Again'}
-                </button>
-                {onOpenManualAdd && (
-                  <button
-                    onClick={() => {
-                      onClose();
-                      onOpenManualAdd();
-                    }}
-                    className="py-1 px-2.5 bg-rose-700 text-white rounded-lg text-[11px] font-bold hover:bg-rose-800"
-                  >
-                    {lang === 'FR' ? 'Saisir manuellement' : 'Enter Item Manually'}
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Scan Results & Candidate Cards */}
-        {scanResult && selectedCandidates.length > 0 && (
-          <div className="mt-4 space-y-3">
-            {scanResult.demoMode && (
-              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 text-xs space-y-2 shadow-2xs">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-bold text-amber-900">
-                      {lang === 'FR' ? 'Pourquoi ces 2 mêmes articles apparaissent-ils ?' : 'Why are these same 2 items showing?'}
-                    </p>
-                    <p className="text-[11px] text-amber-800/90 mt-0.5 leading-relaxed">
-                      {lang === 'FR'
-                        ? "Votre serveur n'a pas la variable GEMINI_API_KEY configurée, des exemples de démonstration ont été chargés."
-                        : 'Your server does not have GEMINI_API_KEY set in its environment, so it loaded sample demonstration items.'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-teal-700" />
-                <h3 className="text-sm font-black text-[#0D3B37]">
-                  {lang === 'FR' ? `Aliments Détectés (${selectedCandidates.length})` : `Detected Items (${selectedCandidates.length})`}
-                </h3>
-              </div>
-              <button
-                onClick={handleAddAllCandidates}
-                disabled={isAddingAll}
-                className="py-1.5 px-3 rounded-xl bg-[#0E766E] hover:bg-[#0B5C56] text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 disabled:opacity-50"
-              >
-                <CheckCheck className="w-3.5 h-3.5" />
-                <span>
-                  {isAddingAll
-                    ? (lang === 'FR' ? 'Ajout en cours...' : 'Adding All...')
-                    : (lang === 'FR' ? `Tout Ajouter (${selectedCandidates.length})` : `Add All (${selectedCandidates.length})`)}
-                </span>
-              </button>
-            </div>
-
-            <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
-              {selectedCandidates.map((candidate, idx) => {
-                const isAdded = addedNames.has(candidate.name);
-
-                return (
-                  <div
-                    key={idx}
-                    className={`p-3.5 rounded-2xl bg-white border transition-all ${
-                      isAdded ? 'border-emerald-300 bg-emerald-50/40' : 'border-[#D5E1D2] hover:border-teal-500 shadow-2xs'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                        <FoodVisualBadge
-                          itemName={candidate.name}
-                          categoryName={candidate.category}
-                          size="sm"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <input
-                            type="text"
-                            value={candidate.name}
-                            onChange={(e) => updateCandidateField(idx, 'name', e.target.value)}
-                            className="font-bold text-xs text-[#0D3B37] bg-transparent border-b border-transparent hover:border-slate-300 focus:border-teal-600 focus:outline-none w-full"
-                          />
-                          <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                            <span className="text-[10px] font-bold text-[#527470]">
-                              {candidate.quantity} {candidate.unit}
-                            </span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 font-semibold">
-                              {getCategoryLocalizedName(candidate.category, lang)}
-                            </span>
-                            {candidate.brand && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-50 text-teal-800 font-bold flex items-center gap-1">
-                                <Tag className="w-2.5 h-2.5 text-teal-600" />
-                                {candidate.brand}
-                              </span>
-                            )}
-                            {candidate.printedExpirationDate && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 font-extrabold flex items-center gap-1">
-                                <Calendar className="w-2.5 h-2.5 text-emerald-700" />
-                                {lang === 'FR' ? 'Pér:' : 'Exp:'} {candidate.printedExpirationDate}
-                              </span>
-                            )}
-                            {candidate.barcode && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-800 font-mono font-bold flex items-center gap-1">
-                                <Barcode className="w-2.5 h-2.5 text-blue-600" />
-                                UPC: {candidate.barcode}
-                              </span>
-                            )}
-                          </div>
-                          {candidate.detectedText && (
-                            <div className="mt-1 text-[10px] text-slate-600 bg-slate-100/80 border border-slate-200 rounded-md px-1.5 py-0.5 flex items-center gap-1 truncate max-w-xs">
-                              <FileText className="w-2.5 h-2.5 text-slate-500 shrink-0" />
-                              <span className="truncate">{lang === 'FR' ? 'ROC Étiquette :' : 'Label OCR:'} "{candidate.detectedText}"</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Storage Location Selector */}
-                      <select
-                        value={candidate.recommendedLocation}
-                        onChange={(e) =>
-                          updateCandidateField(idx, 'recommendedLocation', e.target.value as any)
-                        }
-                        className="text-[10px] font-bold px-2 py-1 rounded-xl bg-[#FAF7EE] border border-[#D5E1D2] text-[#0D3B37] focus:outline-none"
-                      >
-                        <option value="Fridge">{lang === 'FR' ? 'Frigo' : 'Fridge'}</option>
-                        <option value="Freezer">{lang === 'FR' ? 'Congélateur' : 'Freezer'}</option>
-                        <option value="Pantry">{lang === 'FR' ? 'Garde-manger' : 'Pantry'}</option>
-                      </select>
-                    </div>
-
-                    <div className="mt-2 text-[10px] text-[#527470] bg-[#FAF7EE] p-2 rounded-xl flex items-center justify-between">
-                      <span>
-                        {lang === 'FR'
-                          ? `Conservation : ~${candidate.estimatedShelfLifeDays}j (${candidate.monthsFrozenShelfLife}m congelé)`
-                          : `Shelf Life: ~${candidate.estimatedShelfLifeDays}d (or ${candidate.monthsFrozenShelfLife}m frozen)`}
-                      </span>
-                      <button
-                        onClick={() => handleConfirmSingleItem(candidate)}
-                        disabled={isAdded}
-                        className={`py-1 px-2.5 rounded-lg font-bold flex items-center gap-1 transition-all ${
-                          isAdded
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-[#0E766E] hover:bg-[#0B5C56] text-white shadow-2xs'
-                        }`}
-                      >
-                        {isAdded ? (
-                          <>
-                            <Check className="w-3 h-3 text-emerald-700" />
-                            <span>{lang === 'FR' ? 'Ajouté' : 'Added'}</span>
-                          </>
-                        ) : (
-                          <>
-                            <Plus className="w-3 h-3" />
-                            <span>{lang === 'FR' ? 'Ajouter' : 'Add'}</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="pt-2 flex justify-between items-center text-xs text-[#527470]">
-              <button
-                onClick={() => {
-                  setImagePreview(null);
-                  setScanResult(null);
-                }}
-                className="flex items-center gap-1 text-teal-800 font-bold hover:underline"
-              >
-                <RefreshCw className="w-3.5 h-3.5" /> {lang === 'FR' ? 'Scanner une autre photo' : 'Scan another photo'}
-              </button>
-              <button
-                onClick={onClose}
-                className="py-1.5 px-4 bg-[#EDF3EC] hover:bg-[#E2ECE0] text-[#0D3B37] font-bold rounded-xl transition-all"
-              >
-                {lang === 'FR' ? 'Fermer' : 'Done'}
-              </button>
-            </div>
-          </div>
-        )}
+          <button
+            id="scanner-done-footer-btn"
+            type="button"
+            onClick={onClose}
+            className="px-6 py-2.5 rounded-2xl bg-[#0E766E] hover:bg-[#0B5C56] text-white font-black text-xs shadow-md transition-all active:scale-95 flex items-center gap-1.5"
+          >
+            <Check className="w-4 h-4 stroke-[2.5]" />
+            <span>
+              {sessionItems.length > 0
+                ? lang === 'FR'
+                  ? `Terminer (${sessionItems.length} article${sessionItems.length > 1 ? 's' : ''})`
+                  : `Done (${sessionItems.length} item${sessionItems.length > 1 ? 's' : ''})`
+                : lang === 'FR'
+                ? 'Fermer'
+                : 'Done'}
+            </span>
+          </button>
+        </div>
       </div>
     </div>
   );
 };
-

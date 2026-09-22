@@ -3,7 +3,10 @@ const CACHE_NAME = 'pantryo-v2';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/pantryo-logo.svg',
-  '/pantryo-logo.png'
+  '/pantryo-logo.png',
+  '/apple-touch-icon.png',
+  '/pwa-192x192.png',
+  '/pwa-512x512.png'
 ];
 
 self.addEventListener('install', (event) => {
