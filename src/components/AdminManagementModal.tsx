@@ -25,12 +25,14 @@ import {
   HardDrive,
   Info,
   X,
+  Camera,
 } from 'lucide-react';
 import { User, DatabaseStats, DatabaseBackupPackage } from '../types';
 import { useLanguage } from '../utils/i18n';
 import { Fido2SecurityPanel } from './Fido2SecurityPanel';
 import { NistPasswordValidator } from './NistPasswordValidator';
 import { generatePassphrase } from '../utils/nistPassword';
+import { ChangeAvatarModal } from './ChangeAvatarModal';
 
 const DEFAULT_DATABASE_STATS: DatabaseStats = {
   status: 'HEALTHY',
@@ -122,6 +124,46 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
   const [selectedUserForPassword, setSelectedUserForPassword] = useState<User | null>(null);
   const [newPasswordValue, setNewPasswordValue] = useState('');
   const [showNewPasswordValue, setShowNewPasswordValue] = useState(true);
+
+  // Change Avatar State
+  const [selectedUserForAvatar, setSelectedUserForAvatar] = useState<User | null>(null);
+
+  const handleAvatarUpdate = async (userToUpdate: User, newAvatarUrl: string) => {
+    try {
+      const res = await fetch(`/api/v1/admin/users/${encodeURIComponent(userToUpdate.id)}/avatar`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': currentUser?.role || 'ADMIN',
+          'x-user-id': currentUser?.id || 'usr_yan',
+        },
+        body: JSON.stringify({ avatarUrl: newAvatarUrl }),
+      });
+      if (res.ok) {
+        setUsersList((prev) =>
+          prev.map((u) => (u.id === userToUpdate.id ? { ...u, avatarUrl: newAvatarUrl } : u))
+        );
+        if (currentUser.id === userToUpdate.id && onUserChange) {
+          onUserChange({ ...currentUser, avatarUrl: newAvatarUrl });
+        }
+        setStatusMessage({
+          text:
+            lang === 'FR'
+              ? `Photo de profil mise à jour pour ${userToUpdate.name}`
+              : `Profile picture updated for ${userToUpdate.name}`,
+          type: 'success',
+        });
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to update avatar');
+      }
+    } catch (err: any) {
+      setStatusMessage({
+        text: err.message || (lang === 'FR' ? 'Erreur lors de la mise à jour' : 'Error updating avatar'),
+        type: 'error',
+      });
+    }
+  };
 
   // Fetch Database Stats & Users
   const fetchStatsAndUsers = async (retryCount = 0) => {
@@ -968,14 +1010,25 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                         className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-[#FAF7EE]/50 transition-colors"
                       >
                         <div className="flex items-center gap-3">
-                          <img
-                            src={
-                              u.avatarUrl ||
-                              'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80'
-                            }
-                            alt={u.name}
-                            className="w-10 h-10 rounded-full object-cover border border-[#D5CEBD] shrink-0"
-                          />
+                          <div className="relative group/avatar shrink-0">
+                            <img
+                              src={
+                                u.avatarUrl ||
+                                'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80'
+                              }
+                              alt={u.name}
+                              className="w-11 h-11 rounded-full object-cover border border-[#D5CEBD] shrink-0 cursor-pointer hover:opacity-90"
+                              onClick={() => setSelectedUserForAvatar(u)}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setSelectedUserForAvatar(u)}
+                              className="absolute -bottom-1 -right-1 p-1 rounded-full bg-slate-800 hover:bg-emerald-600 text-white shadow-xs transition-colors cursor-pointer"
+                              title={lang === 'FR' ? 'Modifier l’avatar' : 'Change avatar'}
+                            >
+                              <Camera className="w-2.5 h-2.5" />
+                            </button>
+                          </div>
                           <div>
                             <div className="flex items-center gap-2">
                               <span className="font-bold text-sm text-[#0D3B37]">{u.name}</span>
@@ -1065,9 +1118,16 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                   className="p-5 rounded-2xl bg-white border border-teal-300 shadow-lg space-y-4 animate-fade-in"
                 >
                   <div className="flex items-center justify-between border-b border-[#EFEAE0] pb-2">
-                    <h4 className="font-bold text-sm text-[#0D3B37]">
-                      {lang === 'FR' ? 'Ajouter un nouveau membre' : 'Add New Household Member'}
-                    </h4>
+                    <div>
+                      <h4 className="font-bold text-sm text-[#0D3B37]">
+                        {lang === 'FR' ? 'Ajouter un nouveau membre' : 'Add New Household Member'}
+                      </h4>
+                      <p className="text-[11px] text-teal-800">
+                        {lang === 'FR'
+                          ? 'À sa première connexion, le nouveau membre devra obligatoirement changer ce mot de passe temporaire et enregistrer sa clé Passkey/FIDO2.'
+                          : 'Upon first login, the new member will be required to create a new password and enroll their Passkey/FIDO2 key.'}
+                      </p>
+                    </div>
                     <button
                       type="button"
                       onClick={() => setShowAddUserModal(false)}
@@ -1509,6 +1569,19 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
             {lang === 'FR' ? 'Fermer la console' : 'Close Console'}
           </button>
         </div>
+
+        {/* Change Avatar Modal for Admin User Management */}
+        {selectedUserForAvatar && (
+          <ChangeAvatarModal
+            isOpen={Boolean(selectedUserForAvatar)}
+            user={selectedUserForAvatar}
+            onClose={() => setSelectedUserForAvatar(null)}
+            onSaveAvatar={(newAvatarUrl) => {
+              handleAvatarUpdate(selectedUserForAvatar, newAvatarUrl);
+              setSelectedUserForAvatar(null);
+            }}
+          />
+        )}
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Upload, Check, X, RefreshCw, Sparkles, Image as ImageIcon } from 'lucide-react';
 import { User } from '../types';
 import { useLanguage } from '../utils/i18n';
@@ -76,9 +76,15 @@ export const ChangeAvatarModal: React.FC<ChangeAvatarModalProps> = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  useEffect(() => {
+    if (user.avatarUrl) {
+      setSelectedAvatar(user.avatarUrl);
+    }
+  }, [user.avatarUrl, isOpen]);
+
   if (!isOpen) return null;
 
-  // Handle local file upload (converts to base64 Data URL)
+  // Handle local file upload (converts & compresses to 256x256 base64 Data URL)
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -91,10 +97,31 @@ export const ChangeAvatarModal: React.FC<ChangeAvatarModalProps> = ({
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === 'string') {
-        setSelectedAvatar(reader.result);
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const size = 256;
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            // Draw cropped center square
+            const minDim = Math.min(img.width, img.height);
+            const sx = (img.width - minDim) / 2;
+            const sy = (img.height - minDim) / 2;
+            ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, size, size);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+            setSelectedAvatar(dataUrl);
+          } else {
+            setSelectedAvatar(reader.result as string);
+          }
+        };
+        img.src = reader.result;
       }
     };
     reader.readAsDataURL(file);
+    // Reset input value so same file can be re-selected if desired
+    e.target.value = '';
   };
 
   // Start live webcam capture

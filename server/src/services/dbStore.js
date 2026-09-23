@@ -15,33 +15,26 @@ const ENCRYPTED_DB_FILE = path.join(DATA_DIR, "pantryo_database.enc");
 const SERVER_MASTER_KEY =
   process.env.DB_ENCRYPTION_KEY || "pantryo-master-secret-key-2026-aes256gcm-secure";
 
-const SEED_HOUSEHOLD_ID = "hh_yan_kriz_01";
+const SEED_HOUSEHOLD_ID = "hh_pantryo_main";
 
-// Default seed passwords:
-// Yan (Admin): "admin123"
-// Kriz (Member): "kriz123"
+// Default clean-install administrator account:
+// Username: "admin"
+// Password: "pantryo"
+// Upon first login, forces personalized username, name, and new password, removing default password.
 const DEFAULT_USERS = [
   {
-    id: "usr_yan",
-    name: "Yan",
-    email: "yan@example.com",
+    id: "usr_admin",
+    name: "Administrator",
+    email: "admin",
     role: "ADMIN",
-    passwordHash: hashPassword("admin123"),
+    passwordHash: hashPassword("pantryo"),
     avatarUrl:
       "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80",
     createdAt: new Date().toISOString(),
     fido2Enforced: true,
-  },
-  {
-    id: "usr_kriz",
-    name: "Kriz",
-    email: "kriz@example.com",
-    role: "MEMBER",
-    passwordHash: hashPassword("kriz123"),
-    avatarUrl:
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80",
-    createdAt: new Date().toISOString(),
-    fido2Enforced: true,
+    mustChangePassword: true,
+    mustSetupProfile: true,
+    isDefaultAdmin: true,
   },
 ];
 
@@ -387,15 +380,15 @@ class EncryptedDatabaseStore {
   constructor() {
     this.household = {
       id: SEED_HOUSEHOLD_ID,
-      name: "The Yan & Kriz Kitchen",
-      inviteCode: "PANTRY-YK77",
+      name: "My Kitchen",
+      inviteCode: "PANTRY-KITCHEN",
     };
     this.users = [...DEFAULT_USERS];
     this.locations = [...DEFAULT_LOCATIONS];
     this.categories = [...DEFAULT_CATEGORIES];
-    this.items = [...DEFAULT_ITEMS];
-    this.plannedMeals = [...DEFAULT_PLANNED_MEALS];
-    this.customRecipes = [...DEFAULT_RECIPES];
+    this.items = [];
+    this.plannedMeals = [];
+    this.customRecipes = [];
     this.groceryItems = [];
     this.savedLists = [];
     this.lastBackupAt = null;
@@ -420,16 +413,16 @@ class EncryptedDatabaseStore {
         const parsed = JSON.parse(encryptedFileContent);
         const decrypted = decryptData(parsed, SERVER_MASTER_KEY);
 
-        if (decrypted && decrypted.items) {
+        if (decrypted && Array.isArray(decrypted.users)) {
           this.household = decrypted.household || this.household;
-          this.users = decrypted.users || this.users;
+          this.users = decrypted.users;
           this.locations = decrypted.locations || this.locations;
           this.categories = decrypted.categories || this.categories;
-          this.items = decrypted.items || this.items;
-          this.plannedMeals = decrypted.plannedMeals || this.plannedMeals;
-          this.customRecipes = decrypted.customRecipes || this.customRecipes;
-          this.groceryItems = decrypted.groceryItems || this.groceryItems;
-          this.savedLists = decrypted.savedLists || this.savedLists;
+          this.items = Array.isArray(decrypted.items) ? decrypted.items : [];
+          this.plannedMeals = Array.isArray(decrypted.plannedMeals) ? decrypted.plannedMeals : [];
+          this.customRecipes = Array.isArray(decrypted.customRecipes) ? decrypted.customRecipes : [];
+          this.groceryItems = Array.isArray(decrypted.groceryItems) ? decrypted.groceryItems : [];
+          this.savedLists = Array.isArray(decrypted.savedLists) ? decrypted.savedLists : [];
           this.lastBackupAt = decrypted.lastBackupAt || null;
           this.lastRestoreAt = decrypted.lastRestoreAt || null;
           this.fido2Policy = {
@@ -441,21 +434,30 @@ class EncryptedDatabaseStore {
           // Policy enforcement: all users must use FIDO2
           this.users.forEach((u) => {
             u.fido2Enforced = true;
+            if (u.isDefaultAdmin && (u.mustSetupProfile || u.mustChangePassword)) {
+              u.passwordHash = hashPassword("pantryo");
+            }
           });
 
           this.persistToEncryptedDisk();
 
           console.log(
-            `[Pantryo DB] Successfully loaded and decrypted encrypted database with ${this.items.length} items. Policy: All users must use FIDO2.`
+            `[Pantryo DB] Successfully loaded encrypted database with ${this.items.length} items, ${this.customRecipes.length} recipes, ${this.users.length} users.`
           );
           return;
         }
       }
     } catch (err) {
-      console.warn("[Pantryo DB] Could not load existing encrypted database, starting with seed data:", err.message);
+      console.warn("[Pantryo DB] Could not load existing encrypted database, starting with clean install:", err.message);
     }
 
-    // Persist default seed data encrypted to disk on first run
+    // Clean install initial state: no default recipes, grocery lists, or inventory
+    this.items = [];
+    this.plannedMeals = [];
+    this.customRecipes = [];
+    this.groceryItems = [];
+    this.savedLists = [];
+    this.users = [...DEFAULT_USERS];
     this.users.forEach((u) => {
       u.fido2Enforced = true;
     });
@@ -714,11 +716,15 @@ class EncryptedDatabaseStore {
       }
     }
 
-    const { passwordHash, recoveryCodes, ...rawSafeUser } = user;
+    const { passwordHash, recoveryCodes, totpSecret, ...rawSafeUser } = user;
     const safeUser = {
       ...rawSafeUser,
       fido2Enabled: Boolean(user.fido2Enabled && user.fido2Credentials?.length > 0),
       fido2Enforced: Boolean(user.fido2Enforced),
+      totpEnabled: Boolean(user.totpEnabled && user.totpSecret),
+      mustChangePassword: Boolean(user.mustChangePassword),
+      mustSetupProfile: Boolean(user.mustSetupProfile),
+      isDefaultAdmin: Boolean(user.isDefaultAdmin),
       fido2Credentials: (user.fido2Credentials || []).map((c) => ({
         id: c.id,
         friendlyName: c.friendlyName,
@@ -729,6 +735,24 @@ class EncryptedDatabaseStore {
       recoveryCodesRemaining: (user.recoveryCodes || []).length,
     };
     return { success: true, user: safeUser };
+  }
+
+  setTotpSecret(userId, secret) {
+    const user = this.users.find((u) => u.id === userId);
+    if (!user) throw new Error("User not found");
+    user.totpSecret = secret;
+    user.totpEnabled = true;
+    this.persistToEncryptedDisk();
+    return true;
+  }
+
+  disableTotp(userId) {
+    const user = this.users.find((u) => u.id === userId);
+    if (!user) throw new Error("User not found");
+    user.totpSecret = null;
+    user.totpEnabled = false;
+    this.persistToEncryptedDisk();
+    return true;
   }
 
   createUser(name, email, role = "MEMBER", password = "password123", avatarUrl = null) {
@@ -744,6 +768,9 @@ class EncryptedDatabaseStore {
       createdAt: new Date().toISOString(),
       fido2Enforced: true,
       fido2Enabled: false,
+      mustChangePassword: true,
+      mustSetupProfile: false,
+      isDefaultAdmin: false,
       fido2Credentials: [],
       recoveryCodes: [],
     };
@@ -755,10 +782,44 @@ class EncryptedDatabaseStore {
     return safeUser;
   }
 
+  completeAdminSetup(userId, newUsername, newName, newPassword, avatarUrl = null) {
+    const user = this.users.find((u) => u.id === userId);
+    if (!user) throw new Error("User not found");
+    if (newUsername) user.email = newUsername.trim().toLowerCase();
+    if (newName) user.name = newName.trim();
+    if (newPassword) user.passwordHash = hashPassword(newPassword);
+    if (avatarUrl) user.avatarUrl = avatarUrl;
+    user.mustChangePassword = false;
+    user.mustSetupProfile = false;
+    user.isDefaultAdmin = false;
+    this.persistToEncryptedDisk();
+    const { passwordHash: _, recoveryCodes: __, ...safeUser } = user;
+    return safeUser;
+  }
+
+  completeUserPasswordChange(userId, newPassword) {
+    const user = this.users.find((u) => u.id === userId);
+    if (!user) throw new Error("User not found");
+    user.passwordHash = hashPassword(newPassword);
+    user.mustChangePassword = false;
+    this.persistToEncryptedDisk();
+    const { passwordHash: _, recoveryCodes: __, ...safeUser } = user;
+    return safeUser;
+  }
+
   updateUserRole(userId, newRole) {
     const user = this.users.find((u) => u.id === userId);
     if (!user) throw new Error("User not found");
     user.role = newRole.toUpperCase() === "ADMIN" ? "ADMIN" : "MEMBER";
+    this.persistToEncryptedDisk();
+    const { passwordHash: _, ...safeUser } = user;
+    return safeUser;
+  }
+
+  updateUserAvatar(userId, newAvatarUrl) {
+    const user = this.users.find((u) => u.id === userId);
+    if (!user) throw new Error("User not found");
+    user.avatarUrl = newAvatarUrl;
     this.persistToEncryptedDisk();
     const { passwordHash: _, ...safeUser } = user;
     return safeUser;

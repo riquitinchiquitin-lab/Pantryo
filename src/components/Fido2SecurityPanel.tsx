@@ -15,6 +15,7 @@ import {
   Cpu,
   Laptop,
   Smartphone,
+  QrCode,
   Sparkles,
 } from 'lucide-react';
 import { User, Fido2CredentialInfo, Fido2PolicyInfo } from '../types';
@@ -48,6 +49,16 @@ export const Fido2SecurityPanel: React.FC<Fido2SecurityPanelProps> = ({
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
   const [recoveryCodesList, setRecoveryCodesList] = useState<string[]>([]);
   const [copiedCodes, setCopiedCodes] = useState(false);
+
+  // 6-digit TOTP state
+  const [totpSetupData, setTotpSetupData] = useState<{
+    secret: string;
+    otpAuthUri: string;
+    currentSampleCode: string;
+  } | null>(null);
+  const [totpCodeInput, setTotpCodeInput] = useState('');
+  const [copiedSecret, setCopiedSecret] = useState(false);
+  const [showTotpModal, setShowTotpModal] = useState(false);
 
   // In-UI Confirmation Modals (guaranteed to work in sandboxed iframes)
   const [keyToDelete, setKeyToDelete] = useState<{ id: string; name: string } | null>(null);
@@ -240,6 +251,78 @@ export const Fido2SecurityPanel: React.FC<Fido2SecurityPanelProps> = ({
       setStatusNotice({
         type: 'error',
         text: err.message || (lang === 'FR' ? 'Erreur lors de la réinitialisation' : 'Failed to reset keys'),
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Start 6-digit TOTP Setup
+  const handleStartTotpSetup = async () => {
+    try {
+      setActionLoading(true);
+      setStatusNotice(null);
+      const data = await fido2Client.setupTotp(selectedUserId);
+      setTotpSetupData({
+        secret: data.secret,
+        otpAuthUri: data.otpAuthUri,
+        currentSampleCode: data.currentSampleCode,
+      });
+      setTotpCodeInput('');
+      setShowTotpModal(true);
+    } catch (err: any) {
+      setStatusNotice({
+        type: 'error',
+        text: err.message || 'Impossible de démarrer la configuration 2FA 6 chiffres',
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Confirm 6-digit TOTP Setup
+  const handleConfirmTotpSetup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!totpSetupData || !totpCodeInput.trim()) return;
+
+    try {
+      setActionLoading(true);
+      setStatusNotice(null);
+      const result = await fido2Client.confirmTotp(
+        selectedUserId,
+        totpSetupData.secret,
+        totpCodeInput.trim()
+      );
+
+      if (result.success) {
+        setStatusNotice({
+          type: 'success',
+          text:
+            lang === 'FR'
+              ? '2ème facteur à 6 chiffres activé avec succès !'
+              : '6-digit 2nd factor successfully activated!',
+        });
+        setShowTotpModal(false);
+        setTotpSetupData(null);
+        await loadFido2Status(selectedUserId);
+
+        if (result.recoveryCodes && result.recoveryCodes.length > 0) {
+          setRecoveryCodesList(result.recoveryCodes);
+          setShowRecoveryModal(true);
+        }
+
+        if (onUserUpdated && selectedUserId === user.id) {
+          onUserUpdated({
+            ...user,
+            totpEnabled: true,
+            isCompliant: true,
+          });
+        }
+      }
+    } catch (err: any) {
+      setStatusNotice({
+        type: 'error',
+        text: err.message || 'Code à 6 chiffres incorrect ou expiré',
       });
     } finally {
       setActionLoading(false);
@@ -587,6 +670,57 @@ export const Fido2SecurityPanel: React.FC<Fido2SecurityPanelProps> = ({
               <span>{lang === 'FR' ? 'Test Sandbox' : 'Sandbox Test'}</span>
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Alternative 2nd Factor: 6-Digit TOTP Authenticator */}
+      <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 flex items-center justify-center shrink-0">
+              <Smartphone className="w-5 h-5 text-amber-700" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="font-bold text-xs text-[#0D3B37] uppercase tracking-wider">
+                  {lang === 'FR'
+                    ? '2ème Facteur à 6 Chiffres (TOTP)'
+                    : '6-Digit 2nd Factor (TOTP)'}
+                </h4>
+                {fido2Status?.totpEnabled ? (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-black border border-emerald-200">
+                    {lang === 'FR' ? 'ACTIF' : 'ACTIVE'}
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[9px] font-bold">
+                    {lang === 'FR' ? 'NON CONFIGURÉ' : 'NOT CONFIGURED'}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-[#527470] mt-0.5">
+                {lang === 'FR'
+                  ? 'Pour les utilisateurs sans clé FIDO2 / Passkey : connexion par mot de passe + code à 6 chiffres via application d’authentification.'
+                  : 'For users without a FIDO2 / Passkey: login with password + 6-digit code via authenticator app.'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={handleStartTotpSetup}
+            disabled={actionLoading}
+            className="px-4 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer disabled:opacity-50 whitespace-nowrap self-start sm:self-auto"
+          >
+            <QrCode className="w-3.5 h-3.5" />
+            <span>
+              {fido2Status?.totpEnabled
+                ? lang === 'FR'
+                  ? 'Reconfigurer Code 6 Chiffres'
+                  : 'Reconfigure 6-Digit Code'
+                : lang === 'FR'
+                ? 'Activer Code 6 Chiffres'
+                : 'Enable 6-Digit Code'}
+            </span>
+          </button>
         </div>
       </div>
 
@@ -986,6 +1120,118 @@ export const Fido2SecurityPanel: React.FC<Fido2SecurityPanelProps> = ({
                 <span>{lang === 'FR' ? 'Générer' : 'Generate'}</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6-Digit TOTP Setup Modal */}
+      {showTotpModal && totpSetupData && (
+        <div className="fixed inset-0 z-60 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-[#FAF7EE] text-[#0D3B37] w-full max-w-md rounded-3xl border border-[#D5CEBD] shadow-2xl p-6 space-y-4">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-800 border border-amber-300 flex items-center justify-center shrink-0">
+                  <Smartphone className="w-5 h-5 text-amber-700" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-[#0D3B37]">
+                    {lang === 'FR'
+                      ? 'Configurer le Code à 6 Chiffres (2FA)'
+                      : 'Configure 6-Digit 2FA Code'}
+                  </h3>
+                  <p className="text-xs text-[#527470] mt-0.5">
+                    {lang === 'FR'
+                      ? 'Google Authenticator, Microsoft Authenticator, 1Password'
+                      : 'Google Authenticator, Microsoft Authenticator, 1Password'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowTotpModal(false)}
+                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmTotpSetup} className="space-y-3">
+              <div className="p-3.5 rounded-2xl bg-white border border-[#E0D9C8] space-y-2">
+                <label className="block text-[11px] font-bold text-[#0D3B37]">
+                  {lang === 'FR' ? '1. Clé secrète à copier dans votre app :' : '1. Secret key to copy into your app:'}
+                </label>
+                <div className="flex items-center justify-between p-2 rounded-xl bg-[#FAF7EE] border border-[#D5CEBD]">
+                  <code className="font-mono text-xs font-bold text-teal-950 tracking-wider break-all select-all">
+                    {totpSetupData.secret}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(totpSetupData.secret);
+                      setCopiedSecret(true);
+                      setTimeout(() => setCopiedSecret(false), 2000);
+                    }}
+                    className="ml-2 px-2.5 py-1 rounded bg-white border border-teal-200 text-teal-800 text-[10px] font-bold shrink-0 cursor-pointer flex items-center gap-1"
+                  >
+                    {copiedSecret ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedSecret ? 'Copié' : 'Copier'}</span>
+                  </button>
+                </div>
+
+                <div className="p-2 rounded-xl bg-teal-50 border border-teal-200 text-[11px] text-teal-900 flex items-center justify-between">
+                  <span>
+                    {lang === 'FR' ? 'Code d’essai en cours :' : 'Current test code:'}{' '}
+                    <strong className="font-mono">{totpSetupData.currentSampleCode}</strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setTotpCodeInput(totpSetupData.currentSampleCode)}
+                    className="px-2 py-0.5 rounded bg-teal-800 text-white text-[10px] font-bold cursor-pointer hover:bg-teal-900"
+                  >
+                    {lang === 'FR' ? 'Insérer le code' : 'Insert code'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-white border border-[#E0D9C8] space-y-2">
+                <label className="block text-[11px] font-bold text-[#0D3B37]">
+                  {lang === 'FR' ? '2. Entrez le code à 6 chiffres affiché :' : '2. Enter the displayed 6-digit code:'}
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  required
+                  autoFocus
+                  value={totpCodeInput}
+                  onChange={(e) => setTotpCodeInput(e.target.value.replace(/\D/g, ''))}
+                  placeholder="000000"
+                  className="w-full px-3 py-2 rounded-xl bg-[#FAF7EE] border border-[#D5CEBD] text-center font-mono font-black text-xl tracking-widest text-[#0D3B37] focus:outline-none focus:ring-2 focus:ring-teal-700"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowTotpModal(false)}
+                  className="flex-1 py-2.5 rounded-xl bg-slate-200 text-slate-800 font-bold text-xs cursor-pointer"
+                >
+                  {lang === 'FR' ? 'Annuler' : 'Cancel'}
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading || totpCodeInput.length !== 6}
+                  className="flex-1 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-md"
+                >
+                  {actionLoading ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                  )}
+                  <span>{lang === 'FR' ? 'Activer le 2FA' : 'Activate 2FA'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

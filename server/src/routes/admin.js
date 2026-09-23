@@ -129,14 +129,18 @@ router.post("/reset", (req, res) => {
 router.get("/users", (req, res) => {
   try {
     const isGlobalEnforced = dbStore.fido2Policy?.allUsersRequired ?? true;
-    const safeUsers = dbStore.users.map(({ passwordHash, recoveryCodes, ...u }) => {
+    const safeUsers = dbStore.users.map(({ passwordHash, recoveryCodes, totpSecret, ...u }) => {
       const hasCreds = Boolean(u.fido2Enabled && u.fido2Credentials?.length > 0);
       return {
         ...u,
         fido2Enabled: hasCreds,
         fido2Enforced: isGlobalEnforced || Boolean(u.fido2Enforced),
-        isCompliant: hasCreds,
-        requiresEnrollment: !hasCreds,
+        totpEnabled: Boolean(u.totpEnabled && u.totpSecret),
+        isCompliant: hasCreds || Boolean(u.totpEnabled && u.totpSecret),
+        requiresEnrollment: !hasCreds && !u.totpEnabled,
+        mustChangePassword: Boolean(u.mustChangePassword),
+        mustSetupProfile: Boolean(u.mustSetupProfile),
+        isDefaultAdmin: Boolean(u.isDefaultAdmin),
         fido2Credentials: (u.fido2Credentials || []).map((c) => ({
           id: c.id,
           friendlyName: c.friendlyName,
@@ -291,6 +295,21 @@ router.put("/users/:id/role", (req, res) => {
 });
 
 /**
+ * PUT /api/v1/admin/users/:id/avatar
+ * Updates a user's profile avatar picture (URL or Base64 data URL)
+ */
+router.put("/users/:id/avatar", (req, res) => {
+  try {
+    const { avatarUrl } = req.body;
+    if (!avatarUrl) return res.status(400).json({ error: "Avatar URL is required" });
+    const updated = dbStore.updateUserAvatar(req.params.id, avatarUrl);
+    res.json(updated);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
  * POST /api/v1/admin/users/:id/password
  * Resets or updates a user's password with NIST SP 800-63B verification
  */
@@ -326,6 +345,98 @@ router.post("/users/:id/password", async (req, res) => {
         nistCompliant: validation.nistCompliant,
         recommendation: validation.warnings[0] || null,
       },
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/v1/admin/users/:id/complete-setup
+ * Onboarding endpoint for default admin:
+ * Replaces default "admin" / "pnatryo" with personalized username and password, removing default credentials.
+ */
+router.post("/users/:id/complete-setup", async (req, res) => {
+  try {
+    const { newUsername, newName, newPassword, avatarUrl } = req.body;
+    if (!newUsername || !newPassword) {
+      return res.status(400).json({ error: "Personalized username and new password are required" });
+    }
+
+    const user = dbStore.users.find((u) => u.id === req.params.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    // Validate new password against NIST SP 800-63B
+    const validation = await validatePasswordNist(newPassword, {
+      name: newName || user.name,
+      email: newUsername,
+      username: newUsername.split("@")[0],
+    });
+
+    if (!validation.isValid) {
+      return res.status(400).json({
+        error: validation.errors[0],
+        errors: validation.errors,
+        validation,
+      });
+    }
+
+    const updatedUser = dbStore.completeAdminSetup(
+      req.params.id,
+      newUsername,
+      newName || newUsername,
+      validation.normalized,
+      avatarUrl || null
+    );
+
+    res.json({
+      success: true,
+      message: "Personalized administrator account successfully initialized. Default password has been removed.",
+      user: updatedUser,
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/v1/admin/users/:id/change-password
+ * Mandatory password change endpoint for users upon first login
+ */
+router.post("/users/:id/change-password", async (req, res) => {
+  try {
+    const { newPassword } = req.body;
+    if (!newPassword) {
+      return res.status(400).json({ error: "New password is required" });
+    }
+
+    const user = dbStore.users.find((u) => u.id === req.params.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    // Validate new password against NIST SP 800-63B
+    const validation = await validatePasswordNist(newPassword, {
+      name: user.name,
+      email: user.email,
+      username: user.email?.split("@")[0],
+    });
+
+    if (!validation.isValid) {
+      return res.status(400).json({
+        error: validation.errors[0],
+        errors: validation.errors,
+        validation,
+      });
+    }
+
+    const updatedUser = dbStore.completeUserPasswordChange(
+      req.params.id,
+      validation.normalized
+    );
+
+    res.json({
+      success: true,
+      message: "Password changed successfully.",
+      user: updatedUser,
     });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -376,8 +487,9 @@ router.post("/login", async (req, res) => {
     const user = authResult.user;
     const isGlobalEnforced = dbStore.fido2Policy?.allUsersRequired ?? true;
     const hasCreds = Boolean(user.fido2Enabled && user.fido2Credentials && user.fido2Credentials.length > 0);
+    const hasTotp = Boolean(user.totpEnabled);
 
-    // If global policy or user policy mandates FIDO2:
+    // If global policy or user policy mandates 2FA (FIDO2 or 6-digit TOTP):
     if (isGlobalEnforced || user.fido2Enforced) {
       if (hasCreds) {
         return res.json({
@@ -386,17 +498,28 @@ router.post("/login", async (req, res) => {
           authType: "FIDO2_WEBAUTHN",
           userId: user.id,
           user,
+          hasTotp,
           message: "FIDO2 2FA verification required for all users.",
+        });
+      } else if (hasTotp) {
+        return res.json({
+          success: true,
+          requires2FA: true,
+          authType: "TOTP_6DIGIT",
+          userId: user.id,
+          user,
+          hasTotp: true,
+          message: "2ème facteur à 6 chiffres requis.",
         });
       } else {
         return res.json({
           success: true,
           requires2FA: true,
           requiresEnrollment: true,
-          authType: "FIDO2_ENROLLMENT_REQUIRED",
+          authType: "2FA_ENROLLMENT_REQUIRED",
           userId: user.id,
           user,
-          message: "FIDO2 security key registration is mandatory for all users.",
+          message: "Enrôlement 2FA (Passkey ou Code à 6 chiffres) obligatoire.",
         });
       }
     }

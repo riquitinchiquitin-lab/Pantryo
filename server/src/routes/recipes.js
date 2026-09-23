@@ -13,55 +13,10 @@ import { dbStore } from "../services/dbStore.js";
 const router = express.Router();
 
 /**
- * In-memory custom recipe store
+ * Custom recipe store initialized empty for clean install
  * Persists user-added recipes across client views and reloads
  */
-let customRecipesStore = [
-  {
-    id: "rec_sample_yt_01",
-    title: "Crispy Garlic Butter Steak Bites & Golden Potatoes",
-    titleFr: "Bouchées de steak au beurre d'ail et pommes de terre dorées",
-    ricardoUrlEn: "https://www.youtube.com/watch?v=17XjG6x5g2I",
-    ricardoUrlFr: "https://www.youtube.com/watch?v=17XjG6x5g2I",
-    youtubeUrl: "https://www.youtube.com/watch?v=17XjG6x5g2I",
-    youtubeVideoId: "17XjG6x5g2I",
-    imageUrl: "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=600&q=80",
-    time: "25 mins",
-    prepTime: "10 mins",
-    cookTime: "15 mins",
-    servings: "4 servings",
-    difficulty: "Easy",
-    difficultyFr: "Facile",
-    calories: "510 kcal",
-    source: "YouTube",
-    isRicardoOfficial: false,
-    isCustom: true,
-    descriptionEn: "Tender beef seared to caramelized perfection with foaming garlic herb butter and crispy potatoes.",
-    descriptionFr: "Bœuf fondant saisi à point avec un beurre d'ail persillé moussant et des pommes de terre croustillantes.",
-    tags: ["YouTube Recipe", "High-Protein", "20-Min Meal", "Skillet Favorite"],
-    ingredients: [
-      { name: "Grass-Fed Ground Beef 85/15", nameFr: "Cubes de bœuf frais", amount: "1.5 lbs (700g)", inKitchenItemName: "Grass-Fed Ground Beef 85/15", category: "Meat & Seafood", locationType: "FREEZER" },
-      { name: "Unsalted Butter", nameFr: "Beurre doux", amount: "3 tbsp", category: "Dairy & Eggs", locationType: "FRIDGE" },
-      { name: "Fresh Garlic Cloves", nameFr: "Gousses d'ail", amount: "4 cloves minced", category: "Produce", locationType: "PANTRY" },
-      { name: "Baby Potatoes", nameFr: "Pommes de terre grelots", amount: "1 lb halved", category: "Produce", locationType: "PANTRY" },
-      { name: "Fresh Rosemary & Parsley", nameFr: "Romarin et persil frais", amount: "2 tbsp", category: "Produce", locationType: "FRIDGE" },
-    ],
-    instructionsEn: [
-      "Sear beef cubes in a hot cast-iron skillet with a splash of olive oil for 3-4 minutes until nicely browned. Transfer to a plate.",
-      "Add halved baby potatoes to the skillet with a splash of water and butter. Cover and steam-fry for 10 minutes until golden and tender.",
-      "Toss beef back into the skillet, add garlic, butter, and chopped herbs. Baste for 2 minutes until aromatic.",
-      "Garnish with freshly cracked black pepper and sea salt; serve immediately.",
-    ],
-    instructionsFr: [
-      "Saisir les cubes de bœuf dans une poêle en fonte chaude 3 à 4 minutes jusqu'à belle coloration. Réserver.",
-      "Ajouter les pommes de terre grelots avec un peu d'eau et de beurre. Couvrir et cuire 10 minutes.",
-      "Remettre la viande dans la poêle avec l'ail, le beurre et les herbes. Arroser 2 minutes.",
-      "Garnir de poivre et de fleur de sel, servir sans attendre.",
-    ],
-    suggestedPantryNeeds: ["Baby Potatoes", "Fresh Rosemary"],
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-  },
-];
+let customRecipesStore = [];
 
 /**
  * POST /api/v1/recipes/ai-parse
@@ -181,10 +136,12 @@ router.post("/custom", (req, res) => {
  */
 router.delete("/custom/:id", (req, res) => {
   const { id } = req.params;
-  const initialLength = customRecipesStore.length;
+  const initialLength = dbStore.customRecipes.length;
+  dbStore.customRecipes = dbStore.customRecipes.filter((r) => r.id !== id);
   customRecipesStore = customRecipesStore.filter((r) => r.id !== id);
+  dbStore.persistToEncryptedDisk();
 
-  if (customRecipesStore.length === initialLength) {
+  if (dbStore.customRecipes.length === initialLength && customRecipesStore.length === initialLength) {
     return res.status(404).json({ success: false, error: "Recipe not found" });
   }
 

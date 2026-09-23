@@ -12,6 +12,7 @@ export interface Fido2Status {
   allUsersRequired?: boolean;
   isCompliant?: boolean;
   requiresEnrollment?: boolean;
+  totpEnabled?: boolean;
   credentialsCount: number;
   credentials: Fido2CredentialInfo[];
   recoveryCodesRemaining: number;
@@ -401,5 +402,69 @@ export const fido2Client = {
 
   authenticateHardwareKey(userIdOrUsername: string): Promise<AuthenticationResult> {
     return this.authenticateKey(userIdOrUsername);
+  },
+
+  /**
+   * Request a new 6-digit TOTP secret and setup details
+   */
+  async setupTotp(userId: string): Promise<{
+    success: boolean;
+    secret: string;
+    otpAuthUri: string;
+    currentSampleCode: string;
+    message?: string;
+  }> {
+    const res = await fetch("/api/v1/auth/fido2/totp/setup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Failed to initialize 2nd factor setup");
+    }
+    return res.json();
+  },
+
+  /**
+   * Confirm and activate 6-digit TOTP 2FA
+   */
+  async confirmTotp(
+    userId: string,
+    secret: string,
+    code: string
+  ): Promise<RegistrationResult> {
+    const res = await fetch("/api/v1/auth/fido2/totp/confirm", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, secret, code }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Invalid 6-digit verification code");
+    }
+    return res.json();
+  },
+
+  /**
+   * Verify a 6-digit TOTP code during login
+   */
+  async verifyTotp(
+    userIdOrUsername: string,
+    code: string
+  ): Promise<AuthenticationResult> {
+    const res = await fetch("/api/v1/auth/fido2/totp/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: userIdOrUsername, code }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Invalid 6-digit code");
+    }
+    return res.json();
   },
 };

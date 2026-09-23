@@ -22,8 +22,12 @@ export interface User {
   fido2Enforced?: boolean;
   isCompliant?: boolean;
   requiresEnrollment?: boolean;
+  mustChangePassword?: boolean;
+  mustSetupProfile?: boolean;
+  isDefaultAdmin?: boolean;
   fido2Credentials?: Fido2CredentialInfo[];
   recoveryCodesRemaining?: number;
+  totpEnabled?: boolean;
 }
 
 export interface Fido2PolicyInfo {

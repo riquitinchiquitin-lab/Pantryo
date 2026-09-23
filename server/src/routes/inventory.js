@@ -142,144 +142,10 @@ const getMonthsAgoDate = (offsetMonths) => {
   return d.toISOString();
 };
 
-// Realistic seed inventory
-let itemsStore = [
-  {
-    id: "item_001",
-    name: "Oat Milk (Barista Blend)",
-    quantity: 1,
-    unit: "carton",
-    householdId: SEED_HOUSEHOLD_ID,
-    locationId: "loc_fridge",
-    categoryId: "cat_dairy",
-    addedById: "usr_yan",
-    status: "ACTIVE",
-    expirationDate: getRelativeDate(2), // Expiring in 2 days!
-    frozenAt: null,
-    monthsFrozenShelfLife: 3,
-    defrostedAt: null,
-    imageUrl: "https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=300&q=80",
-    notes: "Opened Sunday, keep cold on top shelf",
-    createdAt: getRelativeDate(-3),
-    updatedAt: getRelativeDate(-1),
-  },
-  {
-    id: "item_002",
-    name: "Organic Strawberries",
-    quantity: 1,
-    unit: "pack (400g)",
-    householdId: SEED_HOUSEHOLD_ID,
-    locationId: "loc_fridge",
-    categoryId: "cat_produce",
-    addedById: "usr_kriz",
-    status: "ACTIVE",
-    expirationDate: getRelativeDate(1), // Expiring in 1 day!
-    frozenAt: null,
-    monthsFrozenShelfLife: 8,
-    defrostedAt: null,
-    imageUrl: "https://images.unsplash.com/photo-1464965911861-746a04b4bca6?auto=format&fit=crop&w=300&q=80",
-    notes: "Wash before eating",
-    createdAt: getRelativeDate(-4),
-    updatedAt: getRelativeDate(-1),
-  },
-  {
-    id: "item_003",
-    name: "Grass-Fed Ground Beef 85/15",
-    quantity: 2,
-    unit: "lbs",
-    householdId: SEED_HOUSEHOLD_ID,
-    locationId: "loc_freezer",
-    categoryId: "cat_meat",
-    addedById: "usr_yan",
-    status: "ACTIVE",
-    expirationDate: getRelativeDate(120),
-    frozenAt: getMonthsAgoDate(2.5), // Frozen 2.5 months ago
-    monthsFrozenShelfLife: 6, // 6 months shelf life
-    defrostedAt: null,
-    imageUrl: "https://images.unsplash.com/photo-1603048588665-791ca8aea617?auto=format&fit=crop&w=300&q=80",
-    notes: "Vacuum sealed portion packs",
-    createdAt: getMonthsAgoDate(2.5),
-    updatedAt: getMonthsAgoDate(2.5),
-  },
-  {
-    id: "item_004",
-    name: "Wild Salmon Fillets",
-    quantity: 4,
-    unit: "portions",
-    householdId: SEED_HOUSEHOLD_ID,
-    locationId: "loc_freezer",
-    categoryId: "cat_meat",
-    addedById: "usr_kriz",
-    status: "ACTIVE",
-    expirationDate: getRelativeDate(90),
-    frozenAt: getMonthsAgoDate(4.2), // Frozen 4.2 months ago
-    monthsFrozenShelfLife: 5, // Approaching shelf life limit!
-    defrostedAt: null,
-    imageUrl: "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=300&q=80",
-    notes: "Alaskan sockeye",
-    createdAt: getMonthsAgoDate(4.2),
-    updatedAt: getMonthsAgoDate(4.2),
-  },
-  {
-    id: "item_005",
-    name: "San Marzano Canned Tomatoes",
-    quantity: 3,
-    unit: "cans (28oz)",
-    householdId: SEED_HOUSEHOLD_ID,
-    locationId: "loc_pantry",
-    categoryId: "cat_pantry",
-    addedById: "usr_yan",
-    status: "ACTIVE",
-    expirationDate: getRelativeDate(360),
-    frozenAt: null,
-    monthsFrozenShelfLife: null,
-    defrostedAt: null,
-    imageUrl: "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=300&q=80",
-    notes: "For weekend pasta marinara",
-    createdAt: getRelativeDate(-14),
-    updatedAt: getRelativeDate(-14),
-  },
-  {
-    id: "item_006",
-    name: "Greek Yogurt (0% Fat)",
-    quantity: 1,
-    unit: "tub (900g)",
-    householdId: SEED_HOUSEHOLD_ID,
-    locationId: "loc_fridge",
-    categoryId: "cat_dairy",
-    addedById: "usr_kriz",
-    status: "ACTIVE",
-    expirationDate: getRelativeDate(5),
-    frozenAt: null,
-    monthsFrozenShelfLife: 2,
-    defrostedAt: null,
-    imageUrl: "https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=300&q=80",
-    notes: "For morning smoothies",
-    createdAt: getRelativeDate(-2),
-    updatedAt: getRelativeDate(-2),
-  },
-];
+// Clean install: no default inventory items on new install
+let itemsStore = [];
 
-let activityLogs = [
-  {
-    id: "log_001",
-    action: "ITEM_CREATED",
-    details: { itemName: "Oat Milk (Barista Blend)", location: "Fridge" },
-    itemId: "item_001",
-    userId: "usr_yan",
-    householdId: SEED_HOUSEHOLD_ID,
-    createdAt: getRelativeDate(-3),
-  },
-  {
-    id: "log_002",
-    action: "ITEM_CREATED",
-    details: { itemName: "Organic Strawberries", location: "Fridge" },
-    itemId: "item_002",
-    userId: "usr_kriz",
-    householdId: SEED_HOUSEHOLD_ID,
-    createdAt: getRelativeDate(-4),
-  },
-];
+let activityLogs = [];
 
 /**
  * POST /api/v1/inventory/scan
@@ -627,7 +493,7 @@ router.get("/household/:id", (req, res) => {
           color: "#F3E8FF",
           imageUrl: "https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?auto=format&fit=crop&w=600&q=80",
         };
-        const addedBy = USERS.find((u) => u.id === item.addedById) || { name: "Unknown", avatarUrl: null };
+        const addedBy = (dbStore.users || []).find((u) => u.id === item.addedById) || { name: "Household Member", avatarUrl: null };
 
         // Expiration calculation
         let daysUntilExpiration = null;
@@ -1153,86 +1019,8 @@ function getIsoDateOffset(daysOffset = 0) {
   return d.toISOString().split('T')[0];
 }
 
-let plannedMealsStore = [
-  {
-    id: "meal_001",
-    householdId: SEED_HOUSEHOLD_ID,
-    title: "Herb Butter Pan-Seared Salmon",
-    date: getIsoDateOffset(0), // Today
-    mealType: "DINNER",
-    recipeName: "Pan-Seared Atlantic Salmon with Garlic Greens",
-    imageUrl: "https://images.unsplash.com/photo-1467003909585-2f8a72700288?auto=format&fit=crop&w=600&q=80",
-    servings: 2,
-    prepTimeMinutes: 25,
-    notes: "Uses Wild Salmon Fillets from Freezer and Organic Baby Spinach from Fridge",
-    isCooked: false,
-    ingredients: [
-      { name: "Wild Salmon Fillets", quantity: 2, unit: "portions", inStock: true },
-      { name: "Organic Baby Spinach", quantity: 1, unit: "box", inStock: true },
-      { name: "Garlic & Butter", quantity: 1, unit: "tbsp", inStock: true },
-    ],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "meal_002",
-    householdId: SEED_HOUSEHOLD_ID,
-    title: "Slow-Cooked Beef Bolognese Pasta",
-    date: getIsoDateOffset(1), // Tomorrow
-    mealType: "DINNER",
-    recipeName: "Hearty Bolognese with San Marzano Tomatoes",
-    imageUrl: "https://images.unsplash.com/photo-1551462147-ff29053bfc14?auto=format&fit=crop&w=600&q=80",
-    servings: 4,
-    prepTimeMinutes: 45,
-    notes: "Uses Ground Beef and San Marzano Canned Tomatoes from Pantry",
-    isCooked: false,
-    ingredients: [
-      { name: "Ground Beef", quantity: 1, unit: "pack (500g)", inStock: true },
-      { name: "San Marzano Canned Tomatoes", quantity: 2, unit: "cans", inStock: true },
-      { name: "Bronze-Cut Spaghetti", quantity: 1, unit: "box", inStock: true },
-    ],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "meal_003",
-    householdId: SEED_HOUSEHOLD_ID,
-    title: "Greek Yogurt Parfait with Honey",
-    date: getIsoDateOffset(1), // Tomorrow Breakfast
-    mealType: "BREAKFAST",
-    recipeName: "Protein Morning Parfait",
-    imageUrl: "https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=600&q=80",
-    servings: 2,
-    prepTimeMinutes: 5,
-    notes: "High protein quick breakfast",
-    isCooked: false,
-    ingredients: [
-      { name: "Greek Yogurt (0% Fat)", quantity: 200, unit: "g", inStock: true },
-      { name: "Fresh Strawberries", quantity: 1, unit: "cup", inStock: true },
-    ],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "meal_004",
-    householdId: SEED_HOUSEHOLD_ID,
-    title: "Crispy Searing Pork Chops & Rosemary",
-    date: getIsoDateOffset(3),
-    mealType: "DINNER",
-    recipeName: "Skillet Pork Chops",
-    imageUrl: "https://images.unsplash.com/photo-1432139555190-58524dae6a55?auto=format&fit=crop&w=600&q=80",
-    servings: 2,
-    prepTimeMinutes: 30,
-    notes: "Pair with roasted potatoes or salad",
-    isCooked: false,
-    ingredients: [
-      { name: "Pork Chops", quantity: 2, unit: "chops", inStock: true },
-      { name: "Rosemary & Garlic", quantity: 1, unit: "bundle", inStock: false },
-    ],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
+// Clean install: no default meals/recipes on new install
+let plannedMealsStore = [];
 
 // Helper to sync meals to encrypted storage
 const syncMealsToEncryptedDisk = () => {

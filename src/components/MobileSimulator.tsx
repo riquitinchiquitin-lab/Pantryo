@@ -45,6 +45,7 @@ import {
   Utensils,
   FileText,
   X,
+  LogOut,
 } from 'lucide-react';
 import { InventoryItem, User, PlannedMeal } from '../types';
 import { FoodVisualBadge } from './FoodVisualBadge';
@@ -61,6 +62,8 @@ import { PantryoLogo } from './PantryoLogo';
 import { ScrollableRow } from './ScrollableRow';
 import { AdminManagementModal } from './AdminManagementModal';
 import { AdminRestrictedModal } from './AdminRestrictedModal';
+import { LoginSplash } from './LoginSplash';
+import { ChangeAvatarModal } from './ChangeAvatarModal';
 import {
   useLanguage,
   LanguageSwitcher,
@@ -69,63 +72,23 @@ import {
   getLocationLocalizedName,
 } from '../utils/i18n';
 
-const INITIAL_GROCERY_ITEMS: GroceryCartItem[] = [
-  {
-    id: 'g_1',
-    name: 'Fresh Organic Eggs',
-    category: 'Dairy & Eggs',
-    quantity: 1,
-    unit: 'dozen',
-    locationType: 'FRIDGE',
-    inCart: true,
-  },
-  {
-    id: 'g_2',
-    name: 'Frozen Wild Blueberries',
-    category: 'Frozen Foods',
-    quantity: 1,
-    unit: 'bag',
-    locationType: 'FREEZER',
-    inCart: true,
-  },
-  {
-    id: 'g_3',
-    name: 'Extra Virgin Olive Oil',
-    category: 'Pantry Staples',
-    quantity: 1,
-    unit: 'bottle',
-    locationType: 'PANTRY',
-    inCart: false,
-  },
-  {
-    id: 'g_4',
-    name: 'Almond Flour',
-    category: 'Bakery',
-    quantity: 1,
-    unit: 'bag',
-    locationType: 'PANTRY',
-    inCart: false,
-  },
-];
+const INITIAL_GROCERY_ITEMS: GroceryCartItem[] = [];
 
 const LOCAL_STORAGE_MEMBERS_KEY = 'kitchen_komrade_household_members';
+const LOCAL_STORAGE_ACTIVE_USER_ID = 'pantryo_active_user_id';
 
 const DEFAULT_MEMBERS: User[] = [
   {
-    id: 'usr_yan',
-    name: 'Yan',
-    email: 'yan@example.com',
+    id: 'usr_admin',
+    name: 'Administrator',
+    email: 'admin',
     role: 'ADMIN',
     avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-    fido2Enabled: true,
-  },
-  {
-    id: 'usr_kriz',
-    name: 'Kriz',
-    email: 'kriz@example.com',
-    role: 'MEMBER',
-    avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80',
     fido2Enabled: false,
+    fido2Enforced: true,
+    mustChangePassword: true,
+    mustSetupProfile: true,
+    isDefaultAdmin: true,
   },
 ];
 
@@ -135,13 +98,30 @@ function getStoredMembers(): User[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        // If stored members only contain old demo members without admin, replace with DEFAULT_MEMBERS
+        const hasAdmin = parsed.some((u: User) => u.role === 'ADMIN' || u.id === 'usr_admin');
+        if (hasAdmin) {
+          return parsed;
+        }
       }
     }
   } catch (e) {
     console.error('Failed reading household members from localStorage:', e);
   }
   return DEFAULT_MEMBERS;
+}
+
+function getInitialActiveUser(members: User[]): User | null {
+  try {
+    const savedId = localStorage.getItem(LOCAL_STORAGE_ACTIVE_USER_ID);
+    if (savedId) {
+      const found = members.find((m) => m.id === savedId);
+      if (found) return found;
+    }
+  } catch (e) {
+    console.error('Failed reading active user from localStorage:', e);
+  }
+  return null;
 }
 
 interface MobileSimulatorProps {
@@ -162,10 +142,34 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   const [selectedSubCategory, setSelectedSubCategory] = useState<string | 'ALL'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [householdMembers, setHouseholdMembers] = useState<User[]>(getStoredMembers);
-  const [currentUser, setCurrentUser] = useState<User>(() => {
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const list = getStoredMembers();
-    return list[0] || DEFAULT_MEMBERS[0];
+    return getInitialActiveUser(list);
   });
+
+  const handleLogin = (user: User) => {
+    setCurrentUser(user);
+    try {
+      localStorage.setItem(LOCAL_STORAGE_ACTIVE_USER_ID, user.id);
+    } catch (e) {
+      console.error('Failed saving active user:', e);
+    }
+    setBannerNotice(
+      lang === 'FR'
+        ? `Bienvenue, ${user.name} !`
+        : `Welcome back, ${user.name}!`
+    );
+    setTimeout(() => setBannerNotice(null), 3000);
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    try {
+      localStorage.removeItem(LOCAL_STORAGE_ACTIVE_USER_ID);
+    } catch (e) {
+      console.error('Failed clearing active user:', e);
+    }
+  };
 
   const handleUpdateMember = (updatedUser: User) => {
     setHouseholdMembers((prev) => {
@@ -178,10 +182,22 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
       return updatedList;
     });
 
-    if (currentUser.id === updatedUser.id) {
+    if (currentUser && currentUser.id === updatedUser.id) {
       setCurrentUser(updatedUser);
     }
+
+    // Persist avatar or user changes to server if avatarUrl is provided
+    if (updatedUser.avatarUrl) {
+      fetch(`/api/v1/admin/users/${encodeURIComponent(updatedUser.id)}/avatar`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatarUrl: updatedUser.avatarUrl }),
+      }).catch((err) => {
+        console.warn('Could not persist avatar to server:', err);
+      });
+    }
   };
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [plannedMeals, setPlannedMeals] = useState<PlannedMeal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -323,7 +339,31 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
     }
   };
 
+  // Fetch household users from server
+  const fetchHouseholdMembers = async () => {
+    try {
+      const res = await fetch('/api/v1/admin/users');
+      if (res.ok) {
+        const users = await res.json();
+        if (Array.isArray(users) && users.length > 0) {
+          setHouseholdMembers(users);
+          try {
+            localStorage.setItem(LOCAL_STORAGE_MEMBERS_KEY, JSON.stringify(users));
+          } catch (e) {}
+          // If current user is updated, sync it
+          if (currentUser) {
+            const found = users.find((u: User) => u.id === currentUser.id);
+            if (found) setCurrentUser(found);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed fetching users from server:', e);
+    }
+  };
+
   useEffect(() => {
+    fetchHouseholdMembers();
     fetchInventory();
     fetchPlannedMeals();
   }, []);
@@ -555,6 +595,21 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   const freezerCount = items.filter((i) => i.locationType === 'FREEZER').length;
   const leftoversCount = items.filter((i) => i.isLeftover).length;
 
+  if (!currentUser) {
+    return (
+      <LoginSplash
+        onLoginSuccess={handleLogin}
+        householdMembers={householdMembers}
+        onMembersUpdated={(updatedList) => {
+          setHouseholdMembers(updatedList);
+          try {
+            localStorage.setItem(LOCAL_STORAGE_MEMBERS_KEY, JSON.stringify(updatedList));
+          } catch (e) {}
+        }}
+      />
+    );
+  }
+
   return (
     <div className="relative w-full max-w-7xl mx-auto text-[#133E3B] flex flex-col min-h-screen sm:min-h-[850px] sm:rounded-3xl border-0 sm:border sm:border-[#E5DFD0] sm:shadow-lg bg-[#FAF7EE] overflow-hidden">
       {/* App Top Bar - Ultra-compact, spacious on tablet and desktop, zero overlapping or text-wrapping */}
@@ -729,18 +784,40 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               </button>
             )}
 
-            {/* User Pill */}
+            {/* User Pill with Avatar Change Trigger */}
+            <div className="flex items-center gap-1 bg-white/95 border border-[#E0D9C8] rounded-xl p-1 lg:px-2 lg:py-1 shadow-2xs shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsAvatarModalOpen(true)}
+                className="relative group/avatar cursor-pointer shrink-0"
+                title={lang === 'FR' ? 'Changer votre photo de profil' : 'Change your profile picture'}
+              >
+                <img
+                  src={currentUser.avatarUrl}
+                  alt={currentUser.name}
+                  className="w-6 h-6 rounded-full object-cover shrink-0 border border-teal-600/30 group-hover/avatar:opacity-80 transition-opacity"
+                />
+                <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
+                  <Camera className="w-3 h-3 text-white" />
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveNav('sync')}
+                className="text-xs font-bold text-[#0D3B37] hover:text-teal-800 transition-colors hidden lg:inline cursor-pointer px-1"
+                title={currentUser.name}
+              >
+                {currentUser.name}
+              </button>
+            </div>
+
+            {/* Logout Button */}
             <button
-              onClick={() => setActiveNav('sync')}
-              className="p-1 lg:px-2.5 lg:py-1 rounded-xl bg-white/95 border border-[#E0D9C8] shadow-2xs hover:bg-white transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
-              title={currentUser.name}
+              onClick={handleLogout}
+              className="p-1.5 rounded-xl border border-[#E0D9C8] bg-white/80 hover:bg-red-50 hover:text-red-700 hover:border-red-200 text-[#527470] shadow-2xs transition-colors shrink-0 cursor-pointer"
+              title={lang === 'FR' ? 'Déconnexion' : 'Log out'}
             >
-              <img
-                src={currentUser.avatarUrl}
-                alt={currentUser.name}
-                className="w-5 h-5 rounded-full object-cover shrink-0"
-              />
-              <span className="text-xs font-bold text-[#0D3B37] hidden lg:inline">{currentUser.name}</span>
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -1617,6 +1694,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             onSwitchUser={setCurrentUser}
             members={householdMembers}
             onUpdateMember={handleUpdateMember}
+            onLogout={handleLogout}
             onOpenAdmin={() => {
               if (currentUser.role === 'ADMIN') {
                 setIsAdminModalOpen(true);
@@ -1853,6 +1931,20 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             <ChefHat className="w-4 h-4" />
             <span>{t('nav_cooking')}</span>
           </button>
+
+          {/* Tab 5: Family & Profile */}
+          <button
+            onClick={() => {
+              setIsAddMenuOpen(false);
+              setActiveNav('sync');
+            }}
+            className={`flex flex-col items-center justify-center flex-1 py-1 gap-0.5 text-[10px] font-bold transition-colors ${
+              activeNav === 'sync' ? 'text-teal-700' : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>{t('nav_family')}</span>
+          </button>
         </div>
       </nav>
 
@@ -1955,6 +2047,29 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
           setTimeout(() => setBannerNotice(null), 3500);
         }}
       />
+
+      {/* Direct User Avatar Change Modal */}
+      {isAvatarModalOpen && currentUser && (
+        <ChangeAvatarModal
+          isOpen={isAvatarModalOpen}
+          user={currentUser}
+          onClose={() => setIsAvatarModalOpen(false)}
+          onSaveAvatar={(newAvatarUrl) => {
+            const updatedUser: User = {
+              ...currentUser,
+              avatarUrl: newAvatarUrl,
+            };
+            handleUpdateMember(updatedUser);
+            setIsAvatarModalOpen(false);
+            setBannerNotice(
+              lang === 'FR'
+                ? 'Photo de profil mise à jour avec succès !'
+                : 'Profile picture updated successfully!'
+            );
+            setTimeout(() => setBannerNotice(null), 3500);
+          }}
+        />
+      )}
     </div>
   );
 };

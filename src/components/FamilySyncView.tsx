@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Copy, Check, Shield, Clock, Plus, UserCheck, ArrowRightLeft, Key, ShieldAlert, ShieldCheck, Camera } from 'lucide-react';
+import { Users, Copy, Check, Shield, Clock, Plus, UserCheck, ArrowRightLeft, Key, ShieldAlert, ShieldCheck, Camera, LogOut } from 'lucide-react';
 import { User, ActivityLogItem } from '../types';
 import { useLanguage, getLocationLocalizedName } from '../utils/i18n';
 import { Fido2AuthModal } from './Fido2AuthModal';
@@ -11,6 +11,7 @@ interface FamilySyncViewProps {
   members: User[];
   onOpenAdmin?: () => void;
   onUpdateMember?: (user: User) => void;
+  onLogout?: () => void;
 }
 
 export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
@@ -19,6 +20,7 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
   members,
   onOpenAdmin,
   onUpdateMember,
+  onLogout,
 }) => {
   const { t, lang } = useLanguage();
   const [copied, setCopied] = useState(false);
@@ -89,15 +91,29 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
   return (
     <div className="space-y-5 pb-20 animate-fade-in">
       {/* Header */}
-      <div>
-        <h2 className="text-xl font-bold tracking-tight text-[#233527]">
-          {lang === 'FR' ? 'Synchronisation Familiale & Foyer' : 'Family Sync & Household'}
-        </h2>
-        <p className="text-xs text-[#5D7060]">
-          {lang === 'FR'
-            ? 'Accès partagé pour colocataires et familles'
-            : 'Multi-tenant access for roommates and families'}
-        </p>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight text-[#233527]">
+            {lang === 'FR' ? 'Synchronisation Familiale & Foyer' : 'Family Sync & Household'}
+          </h2>
+          <p className="text-xs text-[#5D7060]">
+            {lang === 'FR'
+              ? 'Accès partagé pour colocataires et familles'
+              : 'Multi-tenant access for roommates and families'}
+          </p>
+        </div>
+
+        {onLogout && (
+          <button
+            type="button"
+            onClick={onLogout}
+            className="px-3 py-1.5 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-95 shrink-0"
+            title={lang === 'FR' ? 'Déconnexion du compte' : 'Log out of account'}
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>{lang === 'FR' ? 'Déconnexion' : 'Log Out'}</span>
+          </button>
+        )}
       </div>
 
       {/* Household Invite Box */}
@@ -199,10 +215,9 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
           {members.map((member) => {
             const isActive = member.id === currentUser.id;
             return (
-              <button
+              <div
                 key={member.id}
-                onClick={() => handleMemberClick(member)}
-                className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between gap-2.5 transition-all cursor-pointer ${
+                className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between gap-2.5 transition-all ${
                   isActive
                     ? 'bg-white border-emerald-500 shadow-md ring-2 ring-emerald-500/20'
                     : 'bg-[#F2F6F0] border-[#D9E4D6] hover:bg-white hover:border-slate-300'
@@ -213,21 +228,22 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
                     <img
                       src={member.avatarUrl}
                       alt={member.name}
-                      className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-xs"
+                      className="w-11 h-11 rounded-full object-cover border-2 border-white shadow-xs cursor-pointer hover:opacity-90"
+                      onClick={() => setAvatarModalUser(member)}
                     />
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setAvatarModalUser(member);
-                      }}
+                      onClick={() => setAvatarModalUser(member)}
                       className="absolute -bottom-1 -right-1 p-1 rounded-full bg-slate-800 hover:bg-emerald-600 text-white shadow-xs transition-colors cursor-pointer"
                       title={lang === 'FR' ? 'Changer la photo de profil' : 'Change profile picture'}
                     >
                       <Camera className="w-2.5 h-2.5" />
                     </button>
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div
+                    className="flex-1 min-w-0 cursor-pointer"
+                    onClick={() => handleMemberClick(member)}
+                  >
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-sm text-[#233527] truncate">{member.name}</span>
                       {isActive && <UserCheck className="w-4 h-4 text-emerald-600 shrink-0" />}
@@ -240,7 +256,10 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
                   </div>
                 </div>
 
-                <div className="pt-1 border-t border-[#E5EFE2] flex items-center justify-between text-[10px]">
+                <div
+                  className="pt-1 border-t border-[#E5EFE2] flex items-center justify-between text-[10px] cursor-pointer"
+                  onClick={() => handleMemberClick(member)}
+                >
                   {member.fido2Enabled ? (
                     <span className="inline-flex items-center gap-1 font-bold text-emerald-700">
                       <ShieldCheck className="w-3 h-3 text-emerald-600" />
@@ -256,7 +275,7 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
                     {isActive ? (lang === 'FR' ? 'Actuel' : 'Active') : (lang === 'FR' ? 'Basculer ➜' : 'Switch ➜')}
                   </span>
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>

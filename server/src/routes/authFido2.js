@@ -1,6 +1,12 @@
 import express from "express";
 import { dbStore } from "../services/dbStore.js";
 import { fido2Service } from "../services/fido2Service.js";
+import {
+  generateTotpSecret,
+  generateTotpCode,
+  verifyTotpCode,
+  generateOtpAuthUri,
+} from "../services/totpService.js";
 
 const router = express.Router();
 
@@ -75,13 +81,15 @@ router.get("/status/:userId", (req, res) => {
 
     const isGlobalEnforced = dbStore.fido2Policy?.allUsersRequired ?? true;
     const hasCredentials = Boolean(user.fido2Enabled && credentials.length > 0);
+    const hasTotp = Boolean(user.totpEnabled && user.totpSecret);
 
     res.json({
       fido2Enabled: hasCredentials,
       fido2Enforced: isGlobalEnforced || Boolean(user.fido2Enforced),
       allUsersRequired: isGlobalEnforced,
-      isCompliant: hasCredentials,
-      requiresEnrollment: isGlobalEnforced && !hasCredentials,
+      totpEnabled: hasTotp,
+      isCompliant: hasCredentials || hasTotp,
+      requiresEnrollment: isGlobalEnforced && !hasCredentials && !hasTotp,
       credentialsCount: credentials.length,
       credentials,
       recoveryCodesRemaining: (user.recoveryCodes || []).length,
@@ -454,6 +462,128 @@ router.post("/toggle-enforcement", (req, res) => {
       success: true,
       fido2Enforced: user.fido2Enforced,
       allUsersRequired: dbStore.fido2Policy?.allUsersRequired ?? true,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * ============================================================================
+ * 2ND FACTOR (TOTP) 6-DIGIT CODE AUTHENTICATION
+ * ============================================================================
+ */
+
+/**
+ * POST /api/v1/auth/fido2/totp/setup
+ * Generates a new 6-digit TOTP secret and QR code URI for authenticator apps
+ * (Google Authenticator, Microsoft Authenticator, 1Password, Bitwarden, etc.)
+ */
+router.post("/totp/setup", (req, res) => {
+  try {
+    const { userId } = req.body;
+    const user = findUser(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const secret = generateTotpSecret(20);
+    const otpAuthUri = generateOtpAuthUri(user.email || user.name, "Pantryo", secret);
+    // Provide a sample current code for instant in-browser test convenience
+    const currentSampleCode = generateTotpCode(secret);
+
+    res.json({
+      success: true,
+      secret,
+      otpAuthUri,
+      currentSampleCode,
+      message: "Scan the secret or QR code into your authenticator app.",
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/v1/auth/fido2/totp/confirm
+ * Confirms and activates TOTP 6-digit 2FA by verifying the first 6-digit code
+ */
+router.post("/totp/confirm", (req, res) => {
+  try {
+    const { userId, secret, code } = req.body;
+    const user = findUser(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    if (!secret || !code) {
+      return res.status(400).json({ error: "Secret and 6-digit verification code are required" });
+    }
+
+    const isValid = verifyTotpCode(secret, code);
+    if (!isValid) {
+      return res.status(400).json({
+        error: "Code 6 chiffres invalide ou expiré. Veuillez vérifier l'heure de votre appareil.",
+      });
+    }
+
+    // Save secret to user and enable TOTP
+    dbStore.setTotpSecret(user.id, secret);
+
+    // If user didn't have recovery codes, generate them now
+    let recoveryCodes = null;
+    if (!user.recoveryCodes || user.recoveryCodes.length === 0) {
+      recoveryCodes = fido2Service.generateNewRecoveryCodes(user);
+    }
+
+    const { passwordHash: _, recoveryCodes: __, totpSecret: ___, ...safeUser } = user;
+    safeUser.totpEnabled = true;
+    safeUser.isCompliant = true;
+
+    res.json({
+      success: true,
+      verified: true,
+      user: safeUser,
+      recoveryCodes,
+      message: "2ème facteur à 6 chiffres configuré avec succès !",
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/v1/auth/fido2/totp/verify
+ * Verifies a 6-digit 2FA code during login
+ */
+router.post("/totp/verify", (req, res) => {
+  try {
+    const { userId, username, code } = req.body;
+    const user = findUser(userId || username);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (!user.totpSecret) {
+      return res.status(400).json({ error: "Le 2ème facteur à 6 chiffres n'est pas activé sur ce compte" });
+    }
+
+    const isValid = verifyTotpCode(user.totpSecret, code);
+    if (!isValid) {
+      return res.status(400).json({
+        error: "Code à 6 chiffres incorrect ou expiré. Vérifiez votre application d'authentification.",
+      });
+    }
+
+    const { passwordHash: _, recoveryCodes: __, totpSecret: ___, ...safeUser } = user;
+    safeUser.totpEnabled = true;
+    const token = `totp_tok_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+
+    res.json({
+      success: true,
+      verified: true,
+      user: safeUser,
+      token,
+      message: "Authentification à 2 facteurs (6 chiffres) validée avec succès.",
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
