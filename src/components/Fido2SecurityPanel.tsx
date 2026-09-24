@@ -17,10 +17,12 @@ import {
   Smartphone,
   QrCode,
   Sparkles,
+  X,
 } from 'lucide-react';
 import { User, Fido2CredentialInfo, Fido2PolicyInfo } from '../types';
 import { fido2Client, Fido2Status } from '../services/fido2Client';
 import { useLanguage } from '../utils/i18n';
+import { canUseSandboxBypass } from '../utils/installStatus';
 
 interface Fido2SecurityPanelProps {
   user: User;
@@ -113,6 +115,17 @@ export const Fido2SecurityPanel: React.FC<Fido2SecurityPanelProps> = ({
 
       let result;
       if (simulated) {
+        if (!canUseSandboxBypass()) {
+          setStatusNotice({
+            type: 'error',
+            text:
+              lang === 'FR'
+                ? 'Le simulateur sandbox est désactivé sur une application installée. Veuillez utiliser une vraie clé Passkey ou code TOTP.'
+                : 'Sandbox simulator is disabled in installed application mode. Please use a hardware Passkey or TOTP code.',
+          });
+          setActionLoading(false);
+          return;
+        }
         result = await fido2Client.simulateEnroll(selectedUserId, nickname);
       } else {
         result = await fido2Client.registerKey(selectedUserId, nickname);
@@ -590,7 +603,7 @@ export const Fido2SecurityPanel: React.FC<Fido2SecurityPanelProps> = ({
         )}
 
         {/* Iframe Hint Banner */}
-        {webAuthnSupport.isIframe && (
+        {webAuthnSupport.isIframe && canUseSandboxBypass() && (
           <div className="mt-4 p-3 rounded-xl bg-sky-50 border border-sky-200 text-xs text-sky-900 flex items-start gap-2.5">
             <Laptop className="w-4 h-4 text-sky-700 shrink-0 mt-0.5" />
             <div className="space-y-1">
@@ -656,19 +669,21 @@ export const Fido2SecurityPanel: React.FC<Fido2SecurityPanelProps> = ({
               <span>{lang === 'FR' ? 'Enregistrer Clé FIDO2' : 'Enroll FIDO2 Key'}</span>
             </button>
 
-            <button
-              onClick={() => handleRegisterHardwareKey(true)}
-              disabled={actionLoading}
-              title={
-                lang === 'FR'
-                  ? 'Simule une clé cryptographique FIDO2 pour tester sans matériel'
-                  : 'Simulate a FIDO2 token for instant sandbox testing'
-              }
-              className="px-3 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 whitespace-nowrap"
-            >
-              <Cpu className="w-3.5 h-3.5 text-amber-700" />
-              <span>{lang === 'FR' ? 'Test Sandbox' : 'Sandbox Test'}</span>
-            </button>
+            {canUseSandboxBypass() && (
+              <button
+                onClick={() => handleRegisterHardwareKey(true)}
+                disabled={actionLoading}
+                title={
+                  lang === 'FR'
+                    ? 'Simule une clé cryptographique FIDO2 pour tester sans matériel'
+                    : 'Simulate a FIDO2 token for instant sandbox testing'
+                }
+                className="px-3 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 whitespace-nowrap"
+              >
+                <Cpu className="w-3.5 h-3.5 text-amber-700" />
+                <span>{lang === 'FR' ? 'Test Sandbox' : 'Sandbox Test'}</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

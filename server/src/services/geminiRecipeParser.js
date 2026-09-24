@@ -1,8 +1,9 @@
 import { GoogleGenAI, Type } from "@google/genai";
+import Tesseract from "tesseract.js";
 
 /**
  * Pantryo - Gemini Recipe Parser Service
- * Uses Google Gemini (gemini-3.8-flash via @google/genai) to parse recipes from:
+ * Uses Google Gemini (gemini-3.8-flash via @google/genai) and Tesseract OCR to parse recipes from:
  * 1. YouTube video links / transcripts / descriptions
  * 2. Personal recipe text / notes
  * 3. Photos of cookbook pages, handwritten recipe cards, or magazine clippings
@@ -54,15 +55,17 @@ export async function parseRecipeFromText({
   const apiKey = process.env.GEMINI_API_KEY;
 
   // Fallback demo parser if API key is not configured
-  if (!apiKey) {
-    return generateFallbackRecipe({
-      rawText: text,
+  if (!apiKey || apiKey.length < 10) {
+    const directRecipe = parseRecipeTextDirectly(text, {
+      language,
+      source: youtubeUrl ? "YouTube" : source,
       youtubeUrl,
       youtubeId,
-      source: youtubeUrl ? "YouTube" : source,
-      language,
-      reason: "Gemini API key not configured yet. Demo extraction populated.",
     });
+    return {
+      success: true,
+      recipe: directRecipe,
+    };
   }
 
   const ai = getGeminiClient();
@@ -186,16 +189,17 @@ ${text || "Classic homemade comfort recipe"}`;
       }),
     };
   } catch (error) {
-    console.error("[Gemini Recipe Parser] Error parsing text:", error);
-    // Graceful fallback on API error
-    return generateFallbackRecipe({
-      rawText: text,
+    console.error("[Gemini Recipe Parser] Error parsing text via AI, falling back to direct culinary parser:", error);
+    const directRecipe = parseRecipeTextDirectly(text, {
+      language,
+      source: youtubeUrl ? "YouTube" : source,
       youtubeUrl,
       youtubeId,
-      source: youtubeUrl ? "YouTube" : source,
-      language,
-      reason: `AI parsing note: ${error.message}. Generated structured fallback.`,
     });
+    return {
+      success: true,
+      recipe: directRecipe,
+    };
   }
 }
 
@@ -208,21 +212,16 @@ export async function parseRecipeFromPhoto({
   notes = "",
   language = "EN",
 }) {
+  const cleanBase64 = imageBase64.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, "").trim();
+  const imageUrl = imageBase64.startsWith("data:") ? imageBase64 : `data:${mimeType};base64,${imageBase64}`;
   const apiKey = process.env.GEMINI_API_KEY;
 
-  if (!apiKey) {
-    return generateFallbackRecipe({
-      rawText: notes || "Scanned Recipe Card",
-      source: "Photo Import",
-      language,
-      reason: "Gemini API key pending in environment. Demo scan results populated.",
-    });
-  }
+  // 1. If Gemini API key is configured and appears valid, try Gemini Vision first
+  if (apiKey && apiKey.trim().length > 15 && !apiKey.startsWith("your_")) {
+    try {
+      const ai = getGeminiClient();
 
-  const cleanBase64 = imageBase64.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, "").trim();
-  const ai = getGeminiClient();
-
-  const systemInstruction = `You are Pantryo's OCR and AI vision culinary expert.
+      const systemInstruction = `You are Pantryo's OCR and AI vision culinary expert.
 Your task is to inspect photos of handwritten family recipe cards, printed cookbook pages, magazine clippings, or food packaging.
 
 1. Transcribe the text from the photo with extreme precision.
@@ -245,97 +244,130 @@ Your task is to inspect photos of handwritten family recipe cards, printed cookb
 
 Respond strictly in JSON following the schema.`;
 
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
-      contents: {
-        parts: [
-          {
-            inlineData: {
-              mimeType: mimeType || "image/jpeg",
-              data: cleanBase64,
-            },
-          },
-          {
-            text: `Carefully read this recipe photo and convert it into a structured recipe JSON. Additional user context/notes: ${notes || "None"}.`,
-          },
-        ],
-      },
-      config: {
-        systemInstruction,
-        temperature: 0.2,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            title: { type: Type.STRING },
-            titleFr: { type: Type.STRING },
-            descriptionEn: { type: Type.STRING },
-            descriptionFr: { type: Type.STRING },
-            prepTime: { type: Type.STRING },
-            cookTime: { type: Type.STRING },
-            totalTime: { type: Type.STRING },
-            servings: { type: Type.STRING },
-            difficulty: { type: Type.STRING },
-            difficultyFr: { type: Type.STRING },
-            calories: { type: Type.STRING },
-            tags: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING },
-            },
-            ingredients: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  name: { type: Type.STRING },
-                  nameFr: { type: Type.STRING },
-                  amount: { type: Type.STRING },
-                  category: { type: Type.STRING },
-                  locationType: { type: Type.STRING },
-                },
-                required: ["name", "amount", "category", "locationType"],
+      const response = await ai.models.generateContent({
+        model: "gemini-3.8-flash",
+        contents: {
+          parts: [
+            {
+              inlineData: {
+                mimeType: mimeType || "image/jpeg",
+                data: cleanBase64,
               },
             },
-            instructionsEn: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING },
+            {
+              text: `Carefully read this recipe photo and convert it into a structured recipe JSON. Additional user context/notes: ${notes || "None"}.`,
             },
-            instructionsFr: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING },
-            },
-          },
-          required: ["title", "descriptionEn", "ingredients", "instructionsEn"],
+          ],
         },
-      },
-    });
+        config: {
+          systemInstruction,
+          temperature: 0.2,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING },
+              titleFr: { type: Type.STRING },
+              descriptionEn: { type: Type.STRING },
+              descriptionFr: { type: Type.STRING },
+              prepTime: { type: Type.STRING },
+              cookTime: { type: Type.STRING },
+              totalTime: { type: Type.STRING },
+              servings: { type: Type.STRING },
+              difficulty: { type: Type.STRING },
+              difficultyFr: { type: Type.STRING },
+              calories: { type: Type.STRING },
+              tags: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+              },
+              ingredients: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    name: { type: Type.STRING },
+                    nameFr: { type: Type.STRING },
+                    amount: { type: Type.STRING },
+                    category: { type: Type.STRING },
+                    locationType: { type: Type.STRING },
+                  },
+                  required: ["name", "amount", "category", "locationType"],
+                },
+              },
+              instructionsEn: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+              },
+              instructionsFr: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+              },
+            },
+            required: ["title", "descriptionEn", "ingredients", "instructionsEn"],
+          },
+        },
+      });
 
-    const rawText = response.text;
-    let cleanJson = rawText.trim();
-    if (cleanJson.startsWith("```json")) {
-      cleanJson = cleanJson.replace(/^```json\s*/, "").replace(/\s*```$/, "");
-    } else if (cleanJson.startsWith("```")) {
-      cleanJson = cleanJson.replace(/^```\s*/, "").replace(/\s*```$/, "");
+      const rawText = response.text;
+      if (rawText) {
+        let cleanJson = rawText.trim();
+        if (cleanJson.startsWith("```json")) {
+          cleanJson = cleanJson.replace(/^```json\s*/, "").replace(/\s*```$/, "");
+        } else if (cleanJson.startsWith("```")) {
+          cleanJson = cleanJson.replace(/^```\s*/, "").replace(/\s*```$/, "");
+        }
+
+        const parsed = JSON.parse(cleanJson);
+        return {
+          success: true,
+          recipe: normalizeRecipeOutput(parsed, {
+            source: "Photo Import",
+            imageUrl,
+          }),
+        };
+      }
+    } catch (error) {
+      console.warn("[Gemini Recipe Parser] Gemini Vision attempt failed, switching to local OCR & Parser:", error.message);
+    }
+  }
+
+  // 2. High-precision Tesseract OCR fallback: reads actual handwritten cards & cookbook pages
+  console.info("[Gemini Recipe Parser] Running Tesseract OCR on recipe image...");
+  try {
+    const imageBuffer = Buffer.from(cleanBase64, "base64");
+    const ocrResult = await Tesseract.recognize(imageBuffer, "eng+fra");
+    const ocrText = ocrResult?.data?.text?.trim() || "";
+    console.info(`[Gemini Recipe Parser] Tesseract extracted ${ocrText.length} characters.`);
+
+    const combinedText = (ocrText + (notes ? "\n" + notes : "")).trim();
+    if (!combinedText || combinedText.length < 8) {
+      throw new Error(
+        language === "FR"
+          ? "Aucun texte lisible détecté sur cette photo. Assurez-vous d'un bon éclairage et que la recette écrite est bien nette, ou entrez le texte dans l'onglet Texte / Notes."
+          : "No readable recipe text was detected on this photo. Please ensure good lighting and clear handwriting/print, or enter the text in the Text tab."
+      );
     }
 
-    const parsed = JSON.parse(cleanJson);
+    const structuredRecipe = parseRecipeTextDirectly(combinedText, {
+      language,
+      source: "Photo Import",
+      imageUrl,
+    });
 
     return {
       success: true,
-      recipe: normalizeRecipeOutput(parsed, {
-        source: "Photo Import",
-        imageUrl: imageBase64.startsWith("data:") ? imageBase64 : `data:${mimeType};base64,${imageBase64}`,
-      }),
+      recipe: structuredRecipe,
+      ocrText,
     };
-  } catch (error) {
-    console.error("[Gemini Recipe Parser] Error parsing photo:", error);
-    return generateFallbackRecipe({
-      rawText: notes || "Scanned Recipe",
-      source: "Photo Import",
-      language,
-      reason: `AI Photo extraction notice: ${error.message}. Generated fallback.`,
-    });
+  } catch (ocrError) {
+    console.error("[Gemini Recipe Parser] OCR extraction failed:", ocrError.message);
+    throw new Error(
+      ocrError.message ||
+        (language === "FR"
+          ? "Impossible d'extraire la recette de cette photo. Vérifiez la netteté de l'image."
+          : "Unable to extract recipe from this photo. Please check image clarity.")
+    );
   }
 }
 
@@ -401,7 +433,198 @@ function normalizeRecipeOutput(parsed, extra = {}) {
 }
 
 /**
- * Generates an intelligent mock/fallback recipe when API key is missing or for instant testing
+ * Intelligent parser that converts text or OCR output into a structured RicardoRecipe
+ */
+export function parseRecipeTextDirectly(text, { language = "EN", source = "Personal", imageUrl = null, youtubeUrl = null, youtubeId = null, reason = "" } = {}) {
+  const clean = (text || "").trim();
+  if (!clean || clean.length < 5) {
+    throw new Error(
+      language === "FR"
+        ? "Texte ou photo insuffisants pour extraire une recette. Veuillez fournir une photo nette ou du texte plus détaillé."
+        : "Insufficient text or photo to extract a recipe. Please provide a clear photo or more detailed text."
+    );
+  }
+
+  const lines = clean
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+
+  // Extract Title candidate
+  let titleCandidate = "";
+  for (let i = 0; i < Math.min(lines.length, 5); i++) {
+    const l = lines[i];
+    const prefixMatch = l.match(/^(?:recette|recipe|titre|title)\s*[:\-]\s*(.+)$/i);
+    if (prefixMatch) {
+      titleCandidate = prefixMatch[1].trim();
+      break;
+    }
+  }
+
+  // If no prefix, pick the first line that is not a generic header
+  if (!titleCandidate) {
+    for (let i = 0; i < Math.min(lines.length, 4); i++) {
+      const l = lines[i];
+      if (!/^(?:ingr|direct|instruct|step|étap|temps|time|serv|port|prep|cuiss)/i.test(l) && l.length > 2 && l.length < 70) {
+        titleCandidate = l.replace(/^[-*•#\d.]+\s*/, "").trim();
+        break;
+      }
+    }
+  }
+  if (!titleCandidate || titleCandidate.length < 3) {
+    titleCandidate = language === "FR" ? "Recette maison scannée" : "Scanned Homemade Recipe";
+  }
+
+  // Extract prep/cook time and servings
+  let prepTime = "15 mins";
+  let cookTime = "25 mins";
+  let servings = "4";
+
+  for (const line of lines) {
+    const prepMatch = line.match(/(?:prep(?:aration)?|prép(?:aration)?)\s*[:\-]?\s*(\d+\s*(?:min|m|h|hr|minutes?|heures?))/i);
+    if (prepMatch) prepTime = prepMatch[1].trim();
+
+    const cookMatch = line.match(/(?:cook(?:ing)?|cuisson)\s*[:\-]?\s*(\d+\s*(?:min|m|h|hr|minutes?|heures?))/i);
+    if (cookMatch) cookTime = cookMatch[1].trim();
+
+    const servMatch = line.match(/(?:servings?|portions?|pour)\s*[:\-]?\s*(\d+(?:\s*[-àa]\s*\d+)?\s*(?:personnes?|portions?|servings?)?)/i);
+    if (servMatch) servings = servMatch[1].trim();
+  }
+
+  // Section splitting
+  const ingredients = [];
+  const instructions = [];
+  let currentSection = "ingredients";
+
+  const ingredientKeywords = /^(?:ingr[ée]dients?|composants?|what you need|items?|ingredients list)/i;
+  const instructionKeywords = /^(?:instructions?|[ée]tapes?|directions?|pr[ée]paration|m[ée]thode|steps?|procedure|cooking steps|r[ée]alisation)/i;
+
+  for (const line of lines) {
+    if (line === titleCandidate || line.toLowerCase().startsWith("title:") || line.toLowerCase().startsWith("titre:")) {
+      continue;
+    }
+
+    if (ingredientKeywords.test(line)) {
+      currentSection = "ingredients";
+      continue;
+    }
+    if (instructionKeywords.test(line)) {
+      currentSection = "instructions";
+      continue;
+    }
+
+    const isStepNumber = /^(\d+[\.\)]|step\s*\d+|étape\s*\d+)/i.test(line);
+    const hasCookingAction = /\b(mélanger|cuire|faire chauffer|préchauffer|enfourner|verser|ajouter|assaisonner|battre|sauter|rôtir|mijoter|mix|cook|bake|heat|preheat|stir|pour|add|season|whisk|sauté|simmer|roast|fry)\b/i.test(line);
+
+    if (isStepNumber || (hasCookingAction && line.length > 25)) {
+      currentSection = "instructions";
+    }
+
+    if (currentSection === "ingredients") {
+      const cleanLine = line.replace(/^[-*•+–—\s]+/, "").trim();
+      if (cleanLine.length < 2) continue;
+
+      const amountRegex = /^((?:\d+(?:[.,/]\d+)?(?:\s*-\s*\d+)?|\d+\/\d+|\d+\s+\d+\/\d+|un|une|one|a|half|demi)\s*(?:c\.\s*à\s*(?:soupe|café|thé)|cuill[eè]res?\s*à\s*(?:soupe|café|thé)|tbsp|tsp|tbs|t|c\.|cups?|tasses?|ml|cl|dl|l|litres?|liters?|g|gr|kg|kilos?|oz|ounces?|lbs?|livres?|pinc[ée]es?|pinch|gousses?|cloves?|tranches?|slices?|bo[iî]tes?|cans?|paquets?|packets?|sachets?|morceaux?|pieces?)?)\s*(?:de\s+|d'|of\s+)?(.*)$/i;
+      const match = cleanLine.match(amountRegex);
+
+      let amount = "To taste";
+      let name = cleanLine;
+
+      if (match && match[1] && match[2] && match[2].trim().length > 1) {
+        amount = match[1].trim();
+        name = match[2].trim();
+      }
+
+      const lowerName = name.toLowerCase();
+      let category = "Pantry";
+      let locationType = "PANTRY";
+
+      if (/(beurre|butter|lait|milk|cream|crème|cheese|fromage|egg|oeuf|œuf|yogourt|yogurt)/.test(lowerName)) {
+        category = "Dairy & Eggs";
+        locationType = "FRIDGE";
+      } else if (/(chicken|poulet|beef|boeuf|bœuf|pork|porc|fish|poisson|shrimp|crevette|salmon|saumon|steak|meat|viande|bacon|dinde|turkey)/.test(lowerName)) {
+        category = "Meat & Seafood";
+        locationType = "FRIDGE";
+      } else if (/(pomme|apple|onion|oignon|garlic|ail|tomate|tomato|spinach|épinard|carrot|carotte|potato|pomme de terre|citron|lemon|lime|herbe|herb|basil|parsley|persil|rosemary|romarin|salade|lettuce|poivron|pepper|champignon|mushroom)/.test(lowerName)) {
+        category = "Produce";
+        locationType = /(potato|pomme de terre|onion|oignon|garlic|ail)/.test(lowerName) ? "PANTRY" : "FRIDGE";
+      } else if (/(ice cream|glace|congel|frozen|petits pois surgel)/.test(lowerName)) {
+        category = "Frozen Foods";
+        locationType = "FREEZER";
+      } else if (/(pain|bread|baguette|croissant|tortilla|brioche|croûte|crust|pâte)/.test(lowerName)) {
+        category = "Bakery";
+        locationType = "PANTRY";
+      } else if (/(flour|farine|sugar|sucre|oil|huile|vinegar|vinaigre|pasta|pâtes|rice|riz|salt|sel|poivre|pepper|bouillon|broth|sauce|spices|épices|vanilla|vanille|levure|yeast)/.test(lowerName)) {
+        category = "Pantry";
+        locationType = "PANTRY";
+      }
+
+      ingredients.push({
+        name,
+        nameFr: name,
+        amount,
+        category,
+        locationType,
+      });
+    } else {
+      const cleanStep = line.replace(/^[-*•\d.)\s]+/, "").trim();
+      if (cleanStep.length > 5) {
+        instructions.push(cleanStep);
+      }
+    }
+  }
+
+  if (ingredients.length === 0 && instructions.length > 0) {
+    ingredients.push({
+      name: titleCandidate,
+      nameFr: titleCandidate,
+      amount: "1 portion",
+      category: "Pantry",
+      locationType: "PANTRY",
+    });
+  }
+  if (instructions.length === 0) {
+    instructions.push(
+      language === "FR"
+        ? "Préparer tous les ingrédients selon la recette. Cuire et servir chaud."
+        : "Prepare all ingredients according to recipe directions. Cook and serve hot."
+    );
+  }
+
+  const recipeId = `rec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  return {
+    id: recipeId,
+    title: titleCandidate,
+    titleFr: titleCandidate,
+    ricardoUrlEn: youtubeUrl || "",
+    ricardoUrlFr: youtubeUrl || "",
+    youtubeUrl: youtubeUrl || null,
+    youtubeVideoId: youtubeId || null,
+    imageUrl: imageUrl || (youtubeId ? `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg` : "https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=600&q=80"),
+    time: cookTime,
+    prepTime,
+    cookTime,
+    servings,
+    difficulty: "Easy",
+    difficultyFr: "Facile",
+    calories: "450 kcal",
+    source,
+    isRicardoOfficial: false,
+    isCustom: true,
+    descriptionEn: `Homemade ${titleCandidate} digitized from your personal recipe.`,
+    descriptionFr: `${titleCandidate} maison numérisée à partir de votre fiche de recette.`,
+    tags: [source, "Custom Recipe", "Home Cooking"],
+    ingredients,
+    instructionsEn: instructions,
+    instructionsFr: instructions,
+    suggestedPantryNeeds: ingredients.filter((i) => i.locationType === "PANTRY").map((i) => i.name).slice(0, 3),
+    rawOcrText: clean,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Generates an intelligent recipe by parsing rawText directly instead of returning static mock data
  */
 function generateFallbackRecipe({
   rawText = "",
@@ -411,69 +634,18 @@ function generateFallbackRecipe({
   language = "EN",
   reason = "Demo parsed recipe",
 }) {
-  const isYoutube = Boolean(youtubeUrl || youtubeId);
-  const title = isYoutube
-    ? "Crispy Garlic Butter Steak Bites with Potatoes"
-    : rawText.split("\n")[0]?.slice(0, 45) || "Grandma's Savory Herb Roasted Chicken";
-
-  const fallback = {
-    title,
-    titleFr: isYoutube
-      ? "Bouchées de bifteck au beurre à l'ail et pommes de terre croustillantes"
-      : "Poulet rôti aux herbes savoureuses de grand-maman",
-    descriptionEn: isYoutube
-      ? "Tender steak cubes caramelized in fragrant garlic herb butter alongside crispy golden skillet potatoes."
-      : "A timeless homestyle chicken dish seasoned with fragrant rosemary, thyme, garlic, and fresh lemon.",
-    descriptionFr: isYoutube
-      ? "Cubes de bœuf tendres caramélisés dans un beurre d'ail moussant avec des pommes de terre dorées."
-      : "Un plat réconfortant assaisonné au romarin frais, au thym, à l'ail et au citron.",
-    prepTime: "15 mins",
-    cookTime: "20 mins",
-    totalTime: "35 mins",
-    servings: "4 servings",
-    difficulty: "Easy",
-    difficultyFr: "Facile",
-    calories: "520 kcal",
-    tags: [isYoutube ? "YouTube Recipe" : "Family Recipe", "Weeknight Dinner", "High-Protein", "Skillet Meal"],
-    ingredients: isYoutube
-      ? [
-          { name: "Grass-Fed Ground Beef 85/15", nameFr: "Bœuf coupé en cubes", amount: "1.5 lbs (700g)", category: "Meat & Seafood", locationType: "FREEZER" },
-          { name: "Baby Yellow Potatoes", nameFr: "Petites pommes de terre jaunes", amount: "1 lb halved", category: "Produce", locationType: "PANTRY" },
-          { name: "Unsalted Butter", nameFr: "Beurre non salé", amount: "3 tbsp", category: "Dairy & Eggs", locationType: "FRIDGE" },
-          { name: "Fresh Garlic Cloves", nameFr: "Gousses d'ail hachées", amount: "4 cloves minced", category: "Produce", locationType: "PANTRY" },
-          { name: "Fresh Rosemary & Parsley", nameFr: "Romarin et persil frais", amount: "2 tbsp chopped", category: "Produce", locationType: "FRIDGE" },
-          { name: "Olive Oil & Sea Salt", nameFr: "Huile d'olive et sel de mer", amount: "1 tbsp oil, 1 tsp salt", category: "Pantry", locationType: "PANTRY" },
-        ]
-      : [
-          { name: "Whole Chicken or Thighs", nameFr: "Hauts de cuisse de poulet", amount: "4 portions (800g)", category: "Meat & Seafood", locationType: "FRIDGE" },
-          { name: "Fresh Lemon & Garlic", nameFr: "Citron frais et ail", amount: "1 lemon, 4 cloves", category: "Produce", locationType: "PANTRY" },
-          { name: "Olive Oil", nameFr: "Huile d'olive extra-vierge", amount: "2 tbsp", category: "Pantry", locationType: "PANTRY" },
-          { name: "Baby Carrots & Potatoes", nameFr: "Petites carottes et pommes de terre", amount: "2 cups", category: "Produce", locationType: "FRIDGE" },
-          { name: "Dried Thyme & Rosemary", nameFr: "Thym et romarin séchés", amount: "1 tsp each", category: "Pantry", locationType: "PANTRY" },
-        ],
-    instructionsEn: [
-      "In a large cast iron skillet over medium-high heat, sear the meat cubes with a splash of olive oil until deep brown and caramelized on all sides (3-4 mins). Set aside on a warm plate.",
-      "In the same hot skillet, add potatoes with 1 tbsp butter and a pinch of salt. Cook covered for 10-12 minutes until fork-tender and crispy golden.",
-      "Reduce heat to medium. Return meat to skillet and toss with minced garlic, fresh herbs, and remaining butter until foaming and fragrant (2 mins).",
-      "Remove from heat immediately, garnish with freshly cracked black pepper and parsley, and serve hot.",
-    ],
-    instructionsFr: [
-      "Dans une grande poêle en fonte à feu vif, faire saisir les cubes de viande avec un filet d'huile jusqu'à ce qu'ils soient bien dorés (3-4 min). Réserver.",
-      "Dans la même poêle, ajouter les pommes de terre et du beurre. Cuire à couvert 10 à 12 minutes jusqu'à tendreté.",
-      "Baisser à feu moyen, remettre la viande avec l'ail haché et les herbes fraîches; mélanger 2 minutes.",
-      "Garnir de persil frais et de poivre du moulin, puis servir chaud immédiatement.",
-    ],
-  };
+  const directRecipe = parseRecipeTextDirectly(rawText || "Homemade Family Dish\n1 cup flour\nMix and bake", {
+    language,
+    source: youtubeUrl ? "YouTube" : source,
+    youtubeUrl,
+    youtubeId,
+    reason,
+  });
 
   return {
     success: true,
     notice: reason,
-    recipe: normalizeRecipeOutput(fallback, {
-      youtubeUrl,
-      youtubeId,
-      source: isYoutube ? "YouTube" : source,
-      imageUrl: youtubeId ? `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg` : undefined,
-    }),
+    recipe: directRecipe,
   };
 }
 

@@ -5,6 +5,7 @@ import {
   startAuthentication,
 } from "@simplewebauthn/browser";
 import { User, Fido2CredentialInfo, Fido2PolicyInfo } from "../types";
+import { isAppInstalledOrStandalone, canUseSandboxBypass } from "../utils/installStatus";
 
 export interface Fido2Status {
   fido2Enabled: boolean;
@@ -45,6 +46,7 @@ export const fido2Client = {
     supported: boolean;
     platformAuthenticator: boolean;
     isIframe: boolean;
+    isInstalled: boolean;
   }> {
     const supported = browserSupportsWebAuthn();
     let platformAuth = false;
@@ -55,11 +57,13 @@ export const fido2Client = {
         platformAuth = false;
       }
     }
-    const isIframe = typeof window !== "undefined" && window.self !== window.top;
+    const isInstalled = isAppInstalledOrStandalone();
+    const isIframe = canUseSandboxBypass();
     return {
       supported,
       platformAuthenticator: platformAuth,
       isIframe,
+      isInstalled,
     };
   },
 
@@ -207,9 +211,18 @@ export const fido2Client = {
     userId: string,
     friendlyName: string = "Virtual FIDO2 Security Token"
   ): Promise<RegistrationResult> {
+    if (isAppInstalledOrStandalone()) {
+      throw new Error(
+        "Virtual/sandbox bypass is strictly forbidden in installed application mode. Physical hardware Passkey or 6-digit TOTP code is required."
+      );
+    }
+
     const res = await fetch("/api/v1/auth/fido2/simulate-enroll", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-pwa-standalone": isAppInstalledOrStandalone() ? "true" : "false",
+      },
       body: JSON.stringify({ userId, friendlyName }),
     });
 
@@ -228,9 +241,18 @@ export const fido2Client = {
     userIdOrUsername: string,
     credentialId: string
   ): Promise<AuthenticationResult> {
+    if (isAppInstalledOrStandalone()) {
+      throw new Error(
+        "Virtual/sandbox bypass is strictly forbidden in installed application mode. Physical hardware Passkey or 6-digit TOTP code is required."
+      );
+    }
+
     const res = await fetch("/api/v1/auth/fido2/auth-verify", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-pwa-standalone": isAppInstalledOrStandalone() ? "true" : "false",
+      },
       body: JSON.stringify({
         userId: userIdOrUsername,
         response: { id: credentialId },
@@ -411,7 +433,7 @@ export const fido2Client = {
     success: boolean;
     secret: string;
     otpAuthUri: string;
-    currentSampleCode: string;
+    currentSampleCode?: string;
     message?: string;
   }> {
     const res = await fetch("/api/v1/auth/fido2/totp/setup", {

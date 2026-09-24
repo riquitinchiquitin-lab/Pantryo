@@ -17,26 +17,9 @@ const SERVER_MASTER_KEY =
 
 const SEED_HOUSEHOLD_ID = "hh_pantryo_main";
 
-// Default clean-install administrator account:
-// Username: "admin"
-// Password: "pantryo"
-// Upon first login, forces personalized username, name, and new password, removing default password.
-const DEFAULT_USERS = [
-  {
-    id: "usr_admin",
-    name: "Administrator",
-    email: "admin",
-    role: "ADMIN",
-    passwordHash: hashPassword("pantryo"),
-    avatarUrl:
-      "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80",
-    createdAt: new Date().toISOString(),
-    fido2Enforced: true,
-    mustChangePassword: true,
-    mustSetupProfile: true,
-    isDefaultAdmin: true,
-  },
-];
+// Clean-install configuration: Zero saved users upon installation.
+// The user creates their personalized primary administrator account during initial onboarding.
+const DEFAULT_USERS = [];
 
 const DEFAULT_LOCATIONS = [
   { id: "loc_fridge", name: "Fridge", type: "FRIDGE", householdId: SEED_HOUSEHOLD_ID },
@@ -432,11 +415,10 @@ class EncryptedDatabaseStore {
           };
 
           // Policy enforcement: all users must use FIDO2
+          // Ensure no default mock admin accounts persist - installed app must have no saved users
+          this.users = this.users.filter((u) => !u.isDefaultAdmin && u.id !== "usr_admin");
           this.users.forEach((u) => {
             u.fido2Enforced = true;
-            if (u.isDefaultAdmin && (u.mustSetupProfile || u.mustChangePassword)) {
-              u.passwordHash = hashPassword("pantryo");
-            }
           });
 
           this.persistToEncryptedDisk();

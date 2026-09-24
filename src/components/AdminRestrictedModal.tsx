@@ -16,6 +16,7 @@ import {
 import { User } from '../types';
 import { useLanguage } from '../utils/i18n';
 import { fido2Client, Fido2Status } from '../services/fido2Client';
+import { canUseSandboxBypass } from '../utils/installStatus';
 
 interface AdminRestrictedModalProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ interface AdminRestrictedModalProps {
   currentUser: User;
   adminUser?: User;
   onSwitchToAdmin: () => void;
+  isInstalled?: boolean;
 }
 
 export const AdminRestrictedModal: React.FC<AdminRestrictedModalProps> = ({
@@ -31,6 +33,7 @@ export const AdminRestrictedModal: React.FC<AdminRestrictedModalProps> = ({
   currentUser,
   adminUser,
   onSwitchToAdmin,
+  isInstalled = false,
 }) => {
   const { lang } = useLanguage();
   const [adminPassword, setAdminPassword] = useState('');
@@ -71,6 +74,15 @@ export const AdminRestrictedModal: React.FC<AdminRestrictedModalProps> = ({
 
       let result;
       if (simulated) {
+        if (!canUseSandboxBypass(isInstalled)) {
+          setErrorMessage(
+            lang === 'FR'
+              ? 'Le contournement en sandbox est interdit sur une application installée. Veuillez utiliser votre clé de sécurité physique ou un code de secours.'
+              : 'Sandbox testing bypass is disabled in installed mode. Please use your physical security key or emergency recovery code.'
+          );
+          setIsAuthenticating(false);
+          return;
+        }
         const credId = fido2Status?.credentials?.[0]?.id || 'sim_fido2_test';
         result = await fido2Client.simulateAuthenticate(targetAdminId, credId);
       } else {
@@ -264,9 +276,15 @@ export const AdminRestrictedModal: React.FC<AdminRestrictedModalProps> = ({
               onClick={() => {
                 if (hasFido2 && fido2Status?.fido2Enforced) {
                   handleFido2Verification(false);
-                } else {
+                } else if (canUseSandboxBypass(isInstalled)) {
                   onSwitchToAdmin();
                   onClose();
+                } else {
+                  setErrorMessage(
+                    lang === 'FR'
+                      ? 'Veuillez saisir le mot de passe administrateur ci-dessous pour confirmer votre identité.'
+                      : 'Please enter the administrator password below to verify your identity.'
+                  );
                 }
               }}
               className="px-3 py-1.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center gap-1.5 transition-transform active:scale-95 shadow-xs cursor-pointer"
@@ -304,16 +322,18 @@ export const AdminRestrictedModal: React.FC<AdminRestrictedModalProps> = ({
                   <span>{lang === 'FR' ? 'Vérifier Clé FIDO2' : 'Verify FIDO2 Key'}</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => handleFido2Verification(true)}
-                  disabled={isAuthenticating}
-                  title={lang === 'FR' ? 'Test instantané en sandbox' : 'Instant test in sandbox'}
-                  className="px-3 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 whitespace-nowrap"
-                >
-                  <Cpu className="w-3.5 h-3.5 text-amber-700" />
-                  <span>{lang === 'FR' ? 'Test Sandbox' : 'Sandbox Test'}</span>
-                </button>
+                {canUseSandboxBypass(isInstalled) && (
+                  <button
+                    type="button"
+                    onClick={() => handleFido2Verification(true)}
+                    disabled={isAuthenticating}
+                    title={lang === 'FR' ? 'Test instantané en sandbox' : 'Instant test in sandbox'}
+                    className="px-3 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 whitespace-nowrap"
+                  >
+                    <Cpu className="w-3.5 h-3.5 text-amber-700" />
+                    <span>{lang === 'FR' ? 'Test Sandbox' : 'Sandbox Test'}</span>
+                  </button>
+                )}
               </div>
 
               <div className="pt-1 text-center">

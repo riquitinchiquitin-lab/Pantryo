@@ -17,6 +17,7 @@ import {
   Trash2,
   Sparkle,
   ArrowRight,
+  ChefHat,
 } from 'lucide-react';
 import { ScannedItemCandidate, InventoryItem } from '../types';
 import { FoodVisualBadge } from './FoodVisualBadge';
@@ -28,7 +29,7 @@ interface CameraScannerModalProps {
   onItemAdded: (item: InventoryItem) => void;
   currentUser: { id: string; name: string };
   onOpenManualAdd?: () => void;
-  initialMode?: 'snap' | 'receipt' | 'barcode' | 'upload' | 'presets';
+  initialMode?: 'snap' | 'receipt' | 'barcode' | 'upload' | 'presets' | 'recipe';
 }
 
 interface SessionItem {
@@ -71,8 +72,8 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
 }) => {
   const { lang } = useLanguage();
 
-  // Mode: 'photo' | 'receipt' | 'barcode'
-  const [activeMode, setActiveMode] = useState<'photo' | 'receipt' | 'barcode'>('photo');
+  // Mode: 'photo' | 'receipt' | 'barcode' | 'recipe'
+  const [activeMode, setActiveMode] = useState<'photo' | 'receipt' | 'barcode' | 'recipe'>('photo');
 
   // Background processing states
   const [activeJobsCount, setActiveJobsCount] = useState(0);
@@ -100,6 +101,9 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
         setActiveMode('receipt');
       } else if (initialMode === 'barcode') {
         setActiveMode('barcode');
+      } else if (initialMode === 'recipe') {
+        setActiveMode('recipe');
+        setTimeout(() => cameraInputRef.current?.click(), 100);
       } else {
         setActiveMode('photo');
       }
@@ -289,8 +293,88 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
     }
   };
 
+  // Process written recipe scan in background
+  const processRecipeInBackground = async (compressedDataUrl: string) => {
+    setActiveJobsCount((prev) => prev + 1);
+    showToast(
+      lang === 'FR'
+        ? '⚡ Numérisation de la recette écrite (OCR / IA)...'
+        : '⚡ Scanning written recipe (OCR / AI)...',
+      'info',
+      8000
+    );
+
+    try {
+      const res = await fetch('/api/v1/recipes/ai-parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'photo',
+          imageBase64: compressedDataUrl,
+          mimeType: 'image/jpeg',
+          language: lang,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success || !data.recipe) {
+        throw new Error(data.error || 'Failed to scan recipe');
+      }
+
+      const rec = data.recipe;
+
+      // Sync with backend
+      await fetch('/api/v1/recipes/custom', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rec),
+      }).catch((e) => console.warn('Could not sync recipe to server:', e));
+
+      // Sync with localStorage
+      try {
+        const stored = JSON.parse(localStorage.getItem('kitchen_komrade_custom_recipes') || '[]');
+        const updated = [rec, ...stored.filter((r: any) => r.id !== rec.id)];
+        localStorage.setItem('kitchen_komrade_custom_recipes', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('LocalStorage save error:', e);
+      }
+
+      const displayTitle = lang === 'FR' && rec.titleFr ? rec.titleFr : rec.title;
+      const sessionEntry: SessionItem = {
+        id: rec.id,
+        name: `📖 ${displayTitle}`,
+        quantity: rec.ingredients?.length || 1,
+        unit: lang === 'FR' ? 'ingrédients' : 'ingredients',
+        locationName: 'Recipes',
+        categoryName: 'Custom Recipe',
+        notes: rec.instructionsEn?.[0] || '',
+        addedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+
+      setSessionItems((prev) => [sessionEntry, ...prev]);
+      showToast(
+        lang === 'FR'
+          ? `✓ Recette enregistrée : ${displayTitle}`
+          : `✓ Recipe digitized: ${displayTitle}`,
+        'success',
+        6000
+      );
+    } catch (err: any) {
+      console.error('Recipe scan error:', err);
+      showToast(
+        lang === 'FR'
+          ? `Erreur recette : ${err.message || 'Impossible de lire la photo'}`
+          : `Recipe error: ${err.message || 'Failed to read photo'}`,
+        'error',
+        6000
+      );
+    } finally {
+      setActiveJobsCount((prev) => Math.max(0, prev - 1));
+    }
+  };
+
   // Handle files selected (Camera or Gallery)
-  const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>, isReceipt = false) => {
+  const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList: File[] = Array.from(e.target.files || []);
     if (fileList.length === 0) return;
 
@@ -300,10 +384,15 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
     // Process each photo in background
     for (let i = 0; i < fileList.length; i++) {
       const file = fileList[i];
-      const compressed = await compressFile(file, isReceipt ? 2000 : 1600);
+      const isReceipt = activeMode === 'receipt';
+      const isRecipe = activeMode === 'recipe';
+      const compressed = await compressFile(file, isReceipt || isRecipe ? 2000 : 1600);
       if (compressed) {
-        // Kick off background job - camera stays active and ready for more!
-        processPhotoInBackground(compressed, isReceipt);
+        if (isRecipe) {
+          processRecipeInBackground(compressed);
+        } else {
+          processPhotoInBackground(compressed, isReceipt);
+        }
       }
     }
   };
@@ -468,7 +557,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
       <input
         type="file"
         ref={cameraInputRef}
-        onChange={(e) => handleFilesSelected(e, activeMode === 'receipt')}
+        onChange={handleFilesSelected}
         accept="image/*"
         capture="environment"
         className="hidden"
@@ -476,7 +565,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
       <input
         type="file"
         ref={galleryInputRef}
-        onChange={(e) => handleFilesSelected(e, activeMode === 'receipt')}
+        onChange={handleFilesSelected}
         accept="image/*"
         multiple
         className="hidden"
@@ -555,6 +644,21 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
               <Barcode className="w-3.5 h-3.5 text-blue-700" />
               <span>{lang === 'FR' ? 'Code-barres' : 'Barcode'}</span>
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveMode('recipe');
+                setTimeout(() => cameraInputRef.current?.click(), 100);
+              }}
+              className={`px-3 py-1 rounded-lg flex items-center gap-1.5 transition-all ${
+                activeMode === 'recipe'
+                  ? 'bg-white text-emerald-900 shadow-xs'
+                  : 'text-[#607464] hover:text-emerald-900'
+              }`}
+            >
+              <ChefHat className="w-3.5 h-3.5 text-emerald-700" />
+              <span>{lang === 'FR' ? 'Recette' : 'Recipe'}</span>
+            </button>
           </div>
 
           {sessionItems.length > 0 && (
@@ -605,8 +709,8 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
 
         {/* Main Content Area */}
         <div className="flex-1 overflow-y-auto px-5 py-2 space-y-4">
-          {/* PHOTO MODE (Simplified & Continuous) */}
-          {activeMode === 'photo' && (
+          {/* PHOTO OR RECIPE MODE (Simplified & Continuous) */}
+          {(activeMode === 'photo' || activeMode === 'recipe') && (
             <div className="flex flex-col items-center space-y-4">
               {/* Clean Camera Capture Shutter Card */}
               <div className="w-full relative rounded-3xl bg-white border-2 border-teal-700/20 hover:border-teal-600 p-6 flex flex-col items-center text-center transition-all shadow-xs">
@@ -630,21 +734,31 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                     id="scanner-continuous-shutter-btn"
                     type="button"
                     onClick={() => cameraInputRef.current?.click()}
-                    className="w-22 h-22 rounded-full bg-gradient-to-tr from-[#0D3B37] via-[#0E766E] to-teal-500 text-white flex flex-col items-center justify-center shadow-xl border-4 border-[#FAF7EE] ring-4 ring-teal-600/30 hover:scale-105 active:scale-90 transition-all"
+                    className="w-22 h-22 rounded-full bg-gradient-to-tr from-[#0D3B37] via-[#0E766E] to-teal-500 text-white flex flex-col items-center justify-center shadow-xl border-4 border-[#FAF7EE] ring-4 ring-teal-600/30 hover:scale-105 active:scale-90 transition-all cursor-pointer"
                     title={lang === 'FR' ? 'Prendre une photo' : 'Take photo'}
                   >
-                    <Camera className="w-9 h-9 stroke-[2.2]" />
+                    {activeMode === 'recipe' ? (
+                      <ChefHat className="w-9 h-9 stroke-[2.2]" />
+                    ) : (
+                      <Camera className="w-9 h-9 stroke-[2.2]" />
+                    )}
                   </button>
                 </div>
 
                 <div className="space-y-1 mt-2">
                   <p className="text-sm font-extrabold text-[#0D3B37]">
-                    {lang === 'FR' ? 'Appuyez pour photographier' : 'Tap to take a picture'}
+                    {activeMode === 'recipe'
+                      ? (lang === 'FR' ? 'Photographiez votre fiche ou page de recette' : 'Snap your written recipe card or cookbook')
+                      : (lang === 'FR' ? 'Appuyez pour photographier' : 'Tap to take a picture')}
                   </p>
                   <p className="text-xs text-[#527470] max-w-sm mx-auto">
-                    {lang === 'FR'
-                      ? 'Prenez une photo, puis une autre : les aliments s’enregistrent automatiquement en arrière-plan sans bloquer l’écran.'
-                      : 'Snap one picture, then another: foods are recognized and saved automatically in the background.'}
+                    {activeMode === 'recipe'
+                      ? (lang === 'FR'
+                        ? 'L’IA et l’OCR numérisent la recette et l’enregistrent directement dans vos Idées Repas.'
+                        : 'AI & OCR will digitize the recipe and save it directly to your kitchen recipe collection.')
+                      : (lang === 'FR'
+                        ? 'Prenez une photo, puis une autre : les aliments s’enregistrent automatiquement en arrière-plan sans bloquer l’écran.'
+                        : 'Snap one picture, then another: foods are recognized and saved automatically in the background.')}
                   </p>
                 </div>
               </div>
@@ -654,7 +768,9 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                 <div className="px-4 py-3 bg-[#FAF7EE] border-b border-[#E8E2D5] flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-black text-[#0D3B37]">
-                      {lang === 'FR' ? 'Aliments ajoutés en arrière-plan' : 'Items Added in Background'}
+                      {activeMode === 'recipe'
+                        ? (lang === 'FR' ? 'Recettes & articles numérisés' : 'Digitized Recipes & Items')
+                        : (lang === 'FR' ? 'Aliments ajoutés en arrière-plan' : 'Items Added in Background')}
                     </span>
                     <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-teal-100 text-teal-900 border border-teal-200">
                       {sessionItems.length}

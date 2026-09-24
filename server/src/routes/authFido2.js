@@ -256,10 +256,17 @@ router.post("/verify-recovery-code", (req, res) => {
 
 /**
  * POST /api/v1/auth/fido2/simulate-enroll
- * Fast virtual enrollment for testing without hardware
+ * Fast virtual enrollment for testing without hardware (prohibited when installed)
  */
 router.post("/simulate-enroll", (req, res) => {
   try {
+    const isInstalledClient = req.headers["x-pwa-standalone"] === "true" || req.query.installed === "true";
+    if (isInstalledClient) {
+      return res.status(403).json({
+        error: "Virtual testing bypass is strictly disabled when the application is installed. Real hardware Passkey (Touch ID, Face ID, YubiKey) or 6-digit TOTP code is required.",
+      });
+    }
+
     const { userId, friendlyName } = req.body;
     const user = findUser(userId);
     if (!user) {
@@ -285,10 +292,17 @@ router.post("/simulate-enroll", (req, res) => {
 
 /**
  * POST /api/v1/auth/fido2/simulate-auth
- * Fast virtual authentication challenge for sandbox testing
+ * Fast virtual authentication challenge for sandbox testing (prohibited when installed)
  */
 router.post("/simulate-auth", (req, res) => {
   try {
+    const isInstalledClient = req.headers["x-pwa-standalone"] === "true" || req.query.installed === "true";
+    if (isInstalledClient) {
+      return res.status(403).json({
+        error: "Virtual testing bypass is strictly disabled when the application is installed. Real hardware Passkey (Touch ID, Face ID, YubiKey) or 6-digit TOTP code is required.",
+      });
+    }
+
     const { userId, credentialId } = req.body;
     const user = findUser(userId);
     if (!user) {
@@ -489,14 +503,11 @@ router.post("/totp/setup", (req, res) => {
 
     const secret = generateTotpSecret(20);
     const otpAuthUri = generateOtpAuthUri(user.email || user.name, "Pantryo", secret);
-    // Provide a sample current code for instant in-browser test convenience
-    const currentSampleCode = generateTotpCode(secret);
 
     res.json({
       success: true,
       secret,
       otpAuthUri,
-      currentSampleCode,
       message: "Scan the secret or QR code into your authenticator app.",
     });
   } catch (err) {

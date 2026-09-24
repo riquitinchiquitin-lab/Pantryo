@@ -1,4 +1,5 @@
 import express from "express";
+import Tesseract from "tesseract.js";
 import { analyzeFoodImage, analyzeReceiptText, analyzeReceiptImage } from "../services/geminiVision.js";
 import { dbStore } from "../services/dbStore.js";
 
@@ -167,75 +168,94 @@ router.post("/scan", async (req, res) => {
     const isApiKeyConfigured = Boolean(
       apiKey &&
       apiKey !== "MY_GEMINI_API_KEY" &&
-      apiKey.trim().length > 0 &&
+      apiKey.trim().length > 15 &&
       !apiKey.startsWith("your_")
     );
 
-    // If Gemini API Key is not yet configured, provide seamless demo candidates without throwing 500 error
-    if (!isApiKeyConfigured) {
-      console.info("[Inventory Route] GEMINI_API_KEY is not configured in environment. Returning demonstration scan items.");
+    if (isApiKeyConfigured) {
+      try {
+        const result = await analyzeFoodImage(imageBase64, mimeType, language);
+        return res.status(200).json(result);
+      } catch (err) {
+        console.warn("[Inventory Route] Gemini vision call failed, falling back to OCR:", err.message);
+      }
+    }
+
+    // High-precision OCR fallback on food packaging labels
+    const cleanBase64 = imageBase64.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, "").trim();
+    const imageBuffer = Buffer.from(cleanBase64, "base64");
+    let ocrText = "";
+    try {
+      const ocrResult = await Tesseract.recognize(imageBuffer, "eng+fra");
+      ocrText = ocrResult?.data?.text?.trim() || "";
+    } catch (e) {
+      console.warn("[Inventory Route] Tesseract food OCR error:", e.message);
+    }
+
+    if (ocrText && ocrText.length > 3) {
+      const lines = ocrText.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 2);
+      const firstLine = lines[0] || (language === "FR" ? "Aliment scanné" : "Scanned Item");
+      const cleanName = firstLine.replace(/[^a-zA-Z0-9\sÀ-ÿ'-]/g, "").trim().slice(0, 45) || (language === "FR" ? "Aliment scanné" : "Scanned Item");
+
+      // Infer category & storage location from OCR text
+      const lower = ocrText.toLowerCase();
+      let category = language === "FR" ? "Garde-manger" : "Pantry Staples";
+      let recommendedLocation = "Pantry";
+      let shelfLife = 30;
+
+      if (/(lait|milk|beurre|butter|cream|crème|cheese|fromage|yogourt|yogurt|egg|oeuf|œuf)/.test(lower)) {
+        category = language === "FR" ? "Produits laitiers & œufs" : "Dairy & Eggs";
+        recommendedLocation = "Fridge";
+        shelfLife = 10;
+      } else if (/(poulet|chicken|boeuf|beef|porc|pork|saumon|salmon|poisson|fish|viande|meat)/.test(lower)) {
+        category = language === "FR" ? "Viandes & Poissons" : "Meat & Seafood";
+        recommendedLocation = "Fridge";
+        shelfLife = 4;
+      } else if (/(pomme|apple|salade|lettuce|tomate|tomato|carotte|carrot|légume|vegetable|fruit|épinard|spinach)/.test(lower)) {
+        category = language === "FR" ? "Produits frais" : "Produce";
+        recommendedLocation = "Fridge";
+        shelfLife = 7;
+      } else if (/(surgelé|frozen|glace|ice cream)/.test(lower)) {
+        category = language === "FR" ? "Surgelés" : "Frozen Foods";
+        recommendedLocation = "Freezer";
+        shelfLife = 180;
+      }
+
       return res.status(200).json({
         success: true,
-        summary: language === "FR"
-          ? "Avis : Clé API Gemini en attente dans l'environnement. Résultats de numérisation de démonstration chargés."
-          : "Notice: Gemini API Key pending in environment. Demonstration scan results loaded.",
-        demoMode: true,
-        itemsCount: 2,
+        summary: language === "FR" ? `Étiquette reconnue par OCR : ${cleanName}` : `Label recognized by OCR: ${cleanName}`,
+        itemsCount: 1,
         items: [
           {
-            name: language === "FR" ? "Épinards frais bio" : "Organic Baby Spinach",
-            nameFr: "Épinards frais bio",
-            nameEn: "Organic Baby Spinach",
-            brand: "Earthbound Farm",
-            category: language === "FR" ? "Produits frais" : "Produce",
+            name: cleanName,
+            nameFr: cleanName,
+            nameEn: cleanName,
+            category,
             quantity: 1,
-            unit: language === "FR" ? "bac (500g)" : "box (500g)",
-            recommendedLocation: "Fridge",
-            storageReason: language === "FR"
-              ? "Les jeunes pousses sensibles à l'humidité restent croquantes à 2°C."
-              : "Moisture-sensitive leafy greens stay crisp at 36°F.",
-            estimatedShelfLifeDays: 5,
-            monthsFrozenShelfLife: 10,
-            confidence: 0.94,
-            storageTip: language === "FR"
-              ? "Ajoutez un essuie-tout sec dans le bac pour absorber la condensation."
-              : "Add a dry paper towel in the tub to absorb condensation.",
-            suggestedExpirationDate: getRelativeDate(5).split("T")[0],
-            detectedText: "ORGANIC BABY SPINACH 500G - UPC 032601000142",
-            barcode: "032601000142",
-            printedExpirationDate: getRelativeDate(5).split("T")[0],
+            unit: language === "FR" ? "unité" : "unit",
+            recommendedLocation,
+            storageReason: language === "FR" ? "Détecté d'après l'emballage" : "Detected from packaging label",
+            estimatedShelfLifeDays: shelfLife,
+            monthsFrozenShelfLife: 6,
+            confidence: 0.88,
+            suggestedExpirationDate: getRelativeDate(shelfLife).split("T")[0],
+            detectedText: ocrText.slice(0, 100),
           },
-          {
-            name: language === "FR" ? "Fromage Féta grecque en saumure" : "Greek Feta Cheese in Brine",
-            nameFr: "Fromage Féta grecque en saumure",
-            nameEn: "Greek Feta Cheese in Brine",
-            brand: "Dodoni",
-            category: language === "FR" ? "Produits laitiers & œufs" : "Dairy & Eggs",
-            quantity: 1,
-            unit: language === "FR" ? "bloc (200g)" : "block (200g)",
-            recommendedLocation: "Fridge",
-            storageReason: language === "FR"
-              ? "La saumure préserve la texture et empêche le développement des moisissures."
-              : "Submerged brine preserves texture and prevents mold.",
-            estimatedShelfLifeDays: 14,
-            monthsFrozenShelfLife: 3,
-            confidence: 0.96,
-            storageTip: language === "FR"
-              ? "Assurez-vous que le fromage reste toujours entièrement immergé dans la saumure."
-              : "Ensure cheese is always completely immersed in the brine.",
-            suggestedExpirationDate: getRelativeDate(14).split("T")[0],
-            detectedText: "AUTHENTIC GREEK FETA IN BRINE 200G - EAN 5201051001018",
-            barcode: "5201051001018",
-            printedExpirationDate: getRelativeDate(14).split("T")[0],
-          }
         ],
         scannedAt: new Date().toISOString(),
       });
     }
 
-    // Call the production Gemini Flash Vision service
-    const result = await analyzeFoodImage(imageBase64, mimeType, language);
-    return res.status(200).json(result);
+    // If no text or food detected, notify user cleanly rather than adding fake items
+    return res.status(200).json({
+      success: true,
+      summary: language === "FR"
+        ? "Aucun aliment ou texte d'étiquette détecté sur cette photo. Prenez une photo plus nette ou utilisez la saisie manuelle."
+        : "No food label or item text detected in this photo. Please take a clearer photo or use manual add.",
+      itemsCount: 0,
+      items: [],
+      scannedAt: new Date().toISOString(),
+    });
   } catch (error) {
     console.error("[Inventory Route] /scan processing error:", error.message || error);
 

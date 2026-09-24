@@ -19,13 +19,17 @@ import {
 import { User } from '../types';
 import { fido2Client, Fido2Status } from '../services/fido2Client';
 import { useLanguage } from '../utils/i18n';
+import { canUseSandboxBypass } from '../utils/installStatus';
 
 interface Fido2AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   targetUser: User;
   mode: 'VERIFY' | 'ENROLL_MANDATORY';
+  preferredMethod?: 'fido' | 'totp' | 'recovery';
+  loginType?: 'password' | 'passkey';
   onSuccess: (updatedUser?: User) => void;
+  isInstalled?: boolean;
 }
 
 export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
@@ -33,7 +37,10 @@ export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
   onClose,
   targetUser,
   mode,
+  preferredMethod,
+  loginType,
   onSuccess,
+  isInstalled = false,
 }) => {
   const { lang } = useLanguage();
   const [fido2Status, setFido2Status] = useState<Fido2Status | null>(null);
@@ -42,6 +49,7 @@ export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [keyNickname, setKeyNickname] = useState('');
+  const [webAuthnSupported, setWebAuthnSupported] = useState(true);
 
   // Active sub-view:
   // In ENROLL mode: 'choose' | 'fido' | 'totp'
@@ -53,7 +61,6 @@ export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
   const [totpSetupData, setTotpSetupData] = useState<{
     secret: string;
     otpAuthUri: string;
-    currentSampleCode: string;
   } | null>(null);
   const [totpCodeInput, setTotpCodeInput] = useState('');
   const [copiedSecret, setCopiedSecret] = useState(false);
@@ -64,6 +71,12 @@ export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
   // Enrollment success - recovery codes display
   const [generatedCodes, setGeneratedCodes] = useState<string[] | null>(null);
   const [copiedCodes, setCopiedCodes] = useState(false);
+
+  useEffect(() => {
+    fido2Client.checkSupport().then((res) => {
+      setWebAuthnSupported(res.supported);
+    });
+  }, []);
 
   useEffect(() => {
     if (isOpen && targetUser) {
@@ -82,14 +95,35 @@ export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
         .getStatus(targetUser.id)
         .then((status) => {
           setFido2Status(status);
-          // If verifying and user only has TOTP or has both, default accordingly
-          if (status.totpEnabled && (!status.fido2Enabled || status.credentialsCount === 0)) {
-            setVerifyMethod('totp');
-          } else {
-            setVerifyMethod('fido');
+          const hasTotp = Boolean(status.totpEnabled);
+          const hasFido = Boolean(status.fido2Enabled && status.credentialsCount > 0);
+
+          // Priority logic:
+          // 1. If preferredMethod is explicitly specified, use it.
+          // 2. If user signed in with password, default directly to 6-digit TOTP.
+          // 3. If WebAuthn is unsupported on current browser, default directly to 6-digit TOTP.
+          // 4. If user only has TOTP and no Passkey credentials, default to 6-digit TOTP.
+          // 5. Otherwise default to Passkey.
+          let initialMethod: 'fido' | 'totp' | 'recovery' = 'fido';
+          if (preferredMethod) {
+            initialMethod = preferredMethod;
+          } else if (loginType === 'password') {
+            initialMethod = 'totp';
+          } else if (!webAuthnSupported) {
+            initialMethod = 'totp';
+          } else if (hasTotp && !hasFido) {
+            initialMethod = 'totp';
           }
+
+          setVerifyMethod(initialMethod);
+
           if (mode === 'ENROLL_MANDATORY') {
-            setEnrollMethod('choose');
+            if (loginType === 'password' || !webAuthnSupported || preferredMethod === 'totp') {
+              setEnrollMethod('totp');
+              handleStartTotpSetup();
+            } else {
+              setEnrollMethod('choose');
+            }
           }
         })
         .catch((err) => {
@@ -99,7 +133,7 @@ export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
           setLoading(false);
         });
     }
-  }, [isOpen, targetUser, lang, mode]);
+  }, [isOpen, targetUser, lang, mode, preferredMethod, loginType, webAuthnSupported]);
 
   if (!isOpen || !targetUser) return null;
 
@@ -114,6 +148,15 @@ export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
 
       let result;
       if (simulated) {
+        if (!canUseSandboxBypass(isInstalled)) {
+          setErrorMessage(
+            lang === 'FR'
+              ? 'Le contournement en sandbox est interdit sur une application installée. Utilisez votre clé Passkey physique ou le code à 6 chiffres.'
+              : 'Sandbox testing bypass is disabled in installed mode. Please use your physical Passkey or 6-digit TOTP code.'
+          );
+          setActionLoading(false);
+          return;
+        }
         const credId = fido2Status?.credentials?.[0]?.id || 'sim_fido2_test';
         result = await fido2Client.simulateAuthenticate(targetUser.id, credId);
       } else {
@@ -161,6 +204,15 @@ export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
 
       let result;
       if (simulated) {
+        if (!canUseSandboxBypass(isInstalled)) {
+          setErrorMessage(
+            lang === 'FR'
+              ? 'L’enrôlement virtuel en sandbox est désactivé sur l’application installée. Veuillez utiliser une clé Passkey matérielle ou le code à 6 chiffres.'
+              : 'Virtual sandbox enrollment is disabled in installed mode. Please use a hardware Passkey or 6-digit TOTP code.'
+          );
+          setActionLoading(false);
+          return;
+        }
         result = await fido2Client.simulateEnroll(targetUser.id, nickname);
       } else {
         result = await fido2Client.registerHardwareKey(targetUser.id, nickname);
@@ -210,7 +262,6 @@ export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
       setTotpSetupData({
         secret: data.secret,
         otpAuthUri: data.otpAuthUri,
-        currentSampleCode: data.currentSampleCode,
       });
       setEnrollMethod('totp');
     } catch (err: any) {
@@ -661,18 +712,20 @@ export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
                       </span>
                     </button>
 
-                    <button
-                      onClick={() => handleEnrollKey(true)}
-                      disabled={actionLoading}
-                      className="w-full py-2.5 rounded-2xl bg-white hover:bg-teal-50 text-teal-900 border border-teal-300 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                    >
-                      <Cpu className="w-4 h-4 text-teal-700" />
-                      <span>
-                        {lang === 'FR'
-                          ? 'Enregistrer Clé Virtuelle (Sandbox IFrame)'
-                          : 'Enroll Virtual Key (Sandbox IFrame)'}
-                      </span>
-                    </button>
+                    {canUseSandboxBypass(isInstalled) && (
+                      <button
+                        onClick={() => handleEnrollKey(true)}
+                        disabled={actionLoading}
+                        className="w-full py-2.5 rounded-2xl bg-white hover:bg-teal-50 text-teal-900 border border-teal-300 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                      >
+                        <Cpu className="w-4 h-4 text-teal-700" />
+                        <span>
+                          {lang === 'FR'
+                            ? 'Enregistrer Clé Virtuelle (Sandbox IFrame)'
+                            : 'Enroll Virtual Key (Sandbox IFrame)'}
+                        </span>
+                      </button>
+                    )}
 
                     <button
                       type="button"
@@ -702,9 +755,22 @@ export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
 
                     <p className="text-[11px] text-[#527470]">
                       {lang === 'FR'
-                        ? 'Saisissez cette clé secrète dans votre application (Google Authenticator, Microsoft Authenticator, 1Password) :'
-                        : 'Enter this secret key in your authenticator app:'}
+                        ? 'Scannez le QR code ci-dessous ou saisissez la clé manuelle dans votre application (Google Authenticator, Microsoft Authenticator, 1Password) :'
+                        : 'Scan the QR code below or enter the key manually into your authenticator app:'}
                     </p>
+
+                    {/* Visual QR Code */}
+                    <div className="flex flex-col items-center justify-center p-2.5 bg-[#FAF7EE] rounded-xl border border-slate-200">
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(totpSetupData.otpAuthUri)}`}
+                        alt="QR Code"
+                        className="w-32 h-32 rounded-lg bg-white p-1 border border-slate-200"
+                        loading="lazy"
+                      />
+                      <span className="text-[10px] text-[#527470] mt-1 font-medium">
+                        {lang === 'FR' ? 'Scannez avec Google ou Microsoft Authenticator' : 'Scan with Google or Microsoft Authenticator'}
+                      </span>
+                    </div>
 
                     <div className="flex items-center justify-between p-2 rounded-xl bg-[#FAF7EE] border border-[#D5CEBD]">
                       <code className="font-mono text-xs font-bold text-teal-950 tracking-wider break-all select-all">
@@ -721,21 +787,6 @@ export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
                       >
                         {copiedSecret ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
                         <span>{copiedSecret ? 'Copié' : 'Copier'}</span>
-                      </button>
-                    </div>
-
-                    {/* Instant Demo Helper Button */}
-                    <div className="p-2 rounded-xl bg-teal-50 border border-teal-200 text-[11px] text-teal-900 flex items-center justify-between">
-                      <span>
-                        {lang === 'FR' ? 'Code d’essai actuel :' : 'Current test code:'}{' '}
-                        <strong className="font-mono">{totpSetupData.currentSampleCode}</strong>
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setTotpCodeInput(totpSetupData.currentSampleCode)}
-                        className="px-2 py-0.5 rounded bg-teal-800 text-white text-[10px] font-bold cursor-pointer hover:bg-teal-900"
-                      >
-                        {lang === 'FR' ? 'Insérer le code' : 'Insert code'}
                       </button>
                     </div>
                   </div>
@@ -864,16 +915,36 @@ export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
                       </span>
                     </button>
 
+                    {canUseSandboxBypass(isInstalled) && (
+                      <button
+                        onClick={() => handleAuthenticateFido(true)}
+                        disabled={actionLoading}
+                        className="w-full py-2.5 rounded-2xl bg-white hover:bg-teal-50 text-teal-900 border border-teal-300 font-bold text-xs flex items-center justify-center gap-2 transition-all active:scale-98 cursor-pointer disabled:opacity-50"
+                      >
+                        <Cpu className="w-4 h-4 text-teal-700" />
+                        <span>
+                          {lang === 'FR'
+                            ? 'Valider Clé Virtuelle (Sandbox)'
+                            : 'Validate Virtual Key (Sandbox)'}
+                        </span>
+                      </button>
+                    )}
+
                     <button
-                      onClick={() => handleAuthenticateFido(true)}
-                      disabled={actionLoading}
-                      className="w-full py-2.5 rounded-2xl bg-white hover:bg-teal-50 text-teal-900 border border-teal-300 font-bold text-xs flex items-center justify-center gap-2 transition-all active:scale-98 cursor-pointer disabled:opacity-50"
+                      type="button"
+                      onClick={() => {
+                        setVerifyMethod('totp');
+                        if (fido2Status && !fido2Status.totpEnabled && !totpSetupData) {
+                          handleStartTotpSetup();
+                        }
+                      }}
+                      className="w-full py-2 px-3 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer mt-1"
                     >
-                      <Cpu className="w-4 h-4 text-teal-700" />
+                      <Smartphone className="w-4 h-4 text-amber-700" />
                       <span>
                         {lang === 'FR'
-                          ? 'Valider Clé Virtuelle (Sandbox)'
-                          : 'Validate Virtual Key (Sandbox)'}
+                          ? "Pas de Passkey sur cet appareil ? Utiliser le code à 6 chiffres"
+                          : "No passkey on this device? Use 6-digit code"}
                       </span>
                     </button>
                   </div>
@@ -882,50 +953,182 @@ export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
 
               {/* TAB 2: 6-DIGIT CODE (TOTP) */}
               {verifyMethod === 'totp' && (
-                <form
-                  onSubmit={handleVerifyTotp}
-                  className="p-4 rounded-2xl bg-white border border-[#E0D9C8] space-y-3 animate-fade-in"
-                >
-                  <div className="flex items-center gap-2">
-                    <Smartphone className="w-4 h-4 text-teal-700" />
-                    <h4 className="font-bold text-xs text-[#0D3B37]">
-                      {lang === 'FR'
-                        ? 'Entrez le code à 6 chiffres'
-                        : 'Enter the 6-Digit Code'}
-                    </h4>
-                  </div>
-                  <p className="text-[11px] text-[#527470]">
-                    {lang === 'FR'
-                      ? 'Consultez votre application d’authentification (Google Authenticator, etc.) et saisissez le code temporaire à 6 chiffres.'
-                      : 'Check your authenticator app and enter the temporary 6-digit code.'}
-                  </p>
+                <>
+                  {/* If user does NOT have TOTP configured yet and hasn't started setup */}
+                  {fido2Status && !fido2Status.totpEnabled && !totpSetupData && (
+                    <div className="p-4 rounded-2xl bg-white border border-[#E0D9C8] space-y-3 animate-fade-in">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center font-bold shrink-0">
+                          <Smartphone className="w-5 h-5 text-amber-700" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-xs text-[#0D3B37]">
+                            {lang === 'FR'
+                              ? 'Configuration du 2ème facteur à 6 chiffres'
+                              : '6-Digit 2nd Factor Activation'}
+                          </h4>
+                          <span className="text-[10px] text-teal-800 font-semibold">
+                            {lang === 'FR'
+                              ? 'Obligatoire sans clé Passkey'
+                              : 'Required when no Passkey is present'}
+                          </span>
+                        </div>
+                      </div>
 
-                  <div>
-                    <input
-                      type="text"
-                      maxLength={6}
-                      required
-                      autoFocus
-                      value={totpCodeInput}
-                      onChange={(e) => setTotpCodeInput(e.target.value.replace(/\D/g, ''))}
-                      placeholder="000000"
-                      className="w-full px-3 py-2 rounded-xl bg-[#FAF7EE] border border-[#D5CEBD] text-center font-mono font-black text-xl tracking-widest text-[#0D3B37] focus:outline-none focus:ring-2 focus:ring-teal-700"
-                    />
-                  </div>
+                      <p className="text-[11px] text-[#527470] leading-relaxed">
+                        {lang === 'FR'
+                          ? "Vous n'avez pas de clé Passkey sur cet appareil et aucun 2ème facteur à 6 chiffres n'a encore été associé à votre compte. Configurez votre application d'authentification (Google Authenticator, Microsoft Authenticator) pour compléter votre connexion :"
+                          : "You have no passkey on this device and no 6-digit authenticator configured yet. Set up your authenticator app now to complete your secure login:"}
+                      </p>
 
-                  <button
-                    type="submit"
-                    disabled={actionLoading || totpCodeInput.length !== 6}
-                    className="w-full py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-md"
-                  >
-                    {actionLoading ? (
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                    )}
-                    <span>{lang === 'FR' ? 'Valider le code' : 'Verify code'}</span>
-                  </button>
-                </form>
+                      <button
+                        type="button"
+                        onClick={handleStartTotpSetup}
+                        disabled={actionLoading}
+                        className="w-full py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:opacity-50"
+                      >
+                        {actionLoading ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <QrCode className="w-3.5 h-3.5" />
+                        )}
+                        <span>
+                          {lang === 'FR'
+                            ? 'Activer le code à 6 chiffres maintenant'
+                            : 'Activate 6-digit code now'}
+                        </span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* If user is setting up TOTP right here from verification mode */}
+                  {fido2Status && !fido2Status.totpEnabled && totpSetupData && (
+                    <form onSubmit={handleConfirmTotp} className="p-4 rounded-2xl bg-white border border-[#E0D9C8] space-y-3 animate-fade-in">
+                      <div className="flex items-center gap-2">
+                        <Smartphone className="w-4 h-4 text-teal-700" />
+                        <h4 className="font-bold text-xs text-[#0D3B37]">
+                          {lang === 'FR'
+                            ? 'Ajoutez votre application d’authentification'
+                            : 'Link your authenticator app'}
+                        </h4>
+                      </div>
+
+                      {/* Visual QR Code */}
+                      <div className="flex flex-col items-center justify-center p-2.5 bg-[#FAF7EE] rounded-xl border border-slate-200">
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(totpSetupData.otpAuthUri)}`}
+                          alt="QR Code"
+                          className="w-32 h-32 rounded-lg bg-white p-1 border border-slate-200"
+                          loading="lazy"
+                        />
+                        <span className="text-[10px] text-[#527470] mt-1 font-medium">
+                          {lang === 'FR' ? 'Scannez avec Google ou Microsoft Authenticator' : 'Scan with Google or Microsoft Authenticator'}
+                        </span>
+                      </div>
+
+                      {/* Manual Secret Key */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-[#527470] uppercase">
+                          {lang === 'FR' ? 'Ou saisie manuelle de la clé :' : 'Or enter key manually:'}
+                        </label>
+                        <div className="flex items-center justify-between p-2 rounded-xl bg-[#FAF7EE] border border-[#D5CEBD]">
+                          <code className="font-mono text-xs font-bold text-teal-950 tracking-wider break-all select-all">
+                            {totpSetupData.secret}
+                          </code>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(totpSetupData.secret);
+                              setCopiedSecret(true);
+                              setTimeout(() => setCopiedSecret(false), 2000);
+                            }}
+                            className="ml-2 px-2 py-1 rounded bg-white border border-teal-200 text-teal-800 text-[10px] font-bold shrink-0 cursor-pointer flex items-center gap-1"
+                          >
+                            {copiedSecret ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                            <span>{copiedSecret ? 'Copié' : 'Copier'}</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="block text-[11px] font-bold text-[#0D3B37]">
+                          {lang === 'FR' ? 'Entrez le code à 6 chiffres affiché :' : 'Enter the displayed 6-digit code:'}
+                        </label>
+                        <input
+                          type="text"
+                          maxLength={6}
+                          required
+                          autoFocus
+                          value={totpCodeInput}
+                          onChange={(e) => setTotpCodeInput(e.target.value.replace(/\D/g, ''))}
+                          placeholder="000000"
+                          className="w-full px-3 py-2 rounded-xl bg-[#FAF7EE] border border-[#D5CEBD] text-center font-mono font-black text-xl tracking-widest text-[#0D3B37] focus:outline-none focus:ring-2 focus:ring-teal-700"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={actionLoading || totpCodeInput.length !== 6}
+                        className="w-full py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-md"
+                      >
+                        {actionLoading ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                        )}
+                        <span>{lang === 'FR' ? 'Activer et se connecter' : 'Activate & Sign In'}</span>
+                      </button>
+                    </form>
+                  )}
+
+                  {/* If user already HAS TOTP configured */}
+                  {fido2Status?.totpEnabled && (
+                    <form
+                      onSubmit={handleVerifyTotp}
+                      className="p-4 rounded-2xl bg-white border border-[#E0D9C8] space-y-3 animate-fade-in"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Smartphone className="w-4 h-4 text-teal-700" />
+                        <h4 className="font-bold text-xs text-[#0D3B37]">
+                          {lang === 'FR'
+                            ? 'Entrez le code à 6 chiffres'
+                            : 'Enter the 6-Digit Code'}
+                        </h4>
+                      </div>
+                      <p className="text-[11px] text-[#527470]">
+                        {lang === 'FR'
+                          ? 'Consultez votre application d’authentification (Google Authenticator, etc.) et saisissez le code temporaire à 6 chiffres.'
+                          : 'Check your authenticator app and enter the temporary 6-digit code.'}
+                      </p>
+
+                      <div>
+                        <input
+                          type="text"
+                          maxLength={6}
+                          required
+                          autoFocus
+                          value={totpCodeInput}
+                          onChange={(e) => setTotpCodeInput(e.target.value.replace(/\D/g, ''))}
+                          placeholder="000000"
+                          className="w-full px-3 py-2 rounded-xl bg-[#FAF7EE] border border-[#D5CEBD] text-center font-mono font-black text-xl tracking-widest text-[#0D3B37] focus:outline-none focus:ring-2 focus:ring-teal-700"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={actionLoading || totpCodeInput.length !== 6}
+                        className="w-full py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-md"
+                      >
+                        {actionLoading ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                        )}
+                        <span>{lang === 'FR' ? 'Valider le code' : 'Verify code'}</span>
+                      </button>
+                    </form>
+                  )}
+                </>
               )}
 
               {/* TAB 3: EMERGENCY RECOVERY CODE */}

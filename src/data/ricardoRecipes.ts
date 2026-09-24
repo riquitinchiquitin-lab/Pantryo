@@ -38,6 +38,7 @@ export interface RicardoRecipe {
   instructionsFr: string[];
   tags: string[];
   suggestedPantryNeeds: string[];
+  rawOcrText?: string;
   mealTypes?: MealType[];
   safeCooking?: {
     internalTempC: number;

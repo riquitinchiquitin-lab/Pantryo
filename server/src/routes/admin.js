@@ -37,9 +37,94 @@ export function requireAdmin(req, res, next) {
     }
   }
 
-  // In local preview/dev, allow request if explicit bypass isn't required, but return warning
-  return next();
+  // Reject unauthorized access - no bypass allowed in production or installed mode
+  return res.status(403).json({
+    error: "Administrator authorization required. Access denied.",
+  });
 }
+
+/**
+ * GET /api/v1/auth/status or /api/v1/admin/status
+ * Returns system initialization status and sanitized user list
+ */
+router.get("/status", (req, res) => {
+  const initialized = dbStore.users.length > 0;
+  const safeUsers = dbStore.users.map(({ passwordHash, recoveryCodes, totpSecret, ...u }) => ({
+    ...u,
+    fido2Enabled: Boolean(u.fido2Enabled && u.fido2Credentials?.length > 0),
+    fido2Enforced: Boolean(u.fido2Enforced),
+    totpEnabled: Boolean(u.totpEnabled && u.totpSecret),
+  }));
+
+  res.json({
+    initialized,
+    userCount: dbStore.users.length,
+    users: safeUsers,
+  });
+});
+
+/**
+ * POST /api/v1/auth/setup-admin
+ * Initial setup endpoint: creates the primary household administrator account.
+ * Only permitted when NO users exist in the system (clean install).
+ */
+router.post("/setup-admin", async (req, res) => {
+  try {
+    if (dbStore.users.length > 0) {
+      return res.status(403).json({
+        error: "Initial setup has already been completed. An administrator account already exists.",
+      });
+    }
+
+    const { name, username, email, password, avatarUrl } = req.body;
+    const cleanUsername = (username || email || "").trim();
+    if (!cleanUsername || !password) {
+      return res.status(400).json({ error: "Username and password are required" });
+    }
+
+    if (cleanUsername.toLowerCase() === "admin") {
+      return res.status(400).json({
+        error: "Generic username 'admin' is not permitted. Please choose your personalized username or email.",
+      });
+    }
+
+    // Validate new password against NIST SP 800-63B
+    const validation = await validatePasswordNist(password, {
+      name: name || cleanUsername,
+      email: email || cleanUsername,
+      username: cleanUsername.split("@")[0],
+    });
+
+    if (!validation.isValid) {
+      return res.status(400).json({
+        error: validation.errors[0],
+        errors: validation.errors,
+        validation,
+      });
+    }
+
+    const newAdmin = dbStore.createUser(
+      name || cleanUsername,
+      email || cleanUsername,
+      "ADMIN",
+      validation.normalized,
+      avatarUrl || null
+    );
+
+    newAdmin.mustChangePassword = false;
+    newAdmin.mustSetupProfile = false;
+    newAdmin.isDefaultAdmin = false;
+    dbStore.persistToEncryptedDisk();
+
+    res.status(201).json({
+      success: true,
+      message: "Primary administrator account created successfully.",
+      user: newAdmin,
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
 
 /**
  * GET /api/v1/admin/stats

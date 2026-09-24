@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   ChefHat,
   Sparkles,
@@ -88,6 +88,75 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
 
   // Add Recipe Modal state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [addModalInitialTab, setAddModalInitialTab] = useState<'url' | 'youtube' | 'text' | 'photo'>('url');
+  const [addModalAutoCam, setAddModalAutoCam] = useState(false);
+  const [capturedRecipePhoto, setCapturedRecipePhoto] = useState<string | null>(null);
+  const directRecipeCamRef = useRef<HTMLInputElement | null>(null);
+
+  const openRecipeScan = () => {
+    // Instantly launch camera shutter in direct user click gesture
+    if (directRecipeCamRef.current) {
+      directRecipeCamRef.current.click();
+    } else {
+      setCapturedRecipePhoto(null);
+      setAddModalInitialTab('photo');
+      setIsAddModalOpen(true);
+    }
+  };
+
+  const handleDirectRecipePhotoCaptured = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 2000;
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL('image/jpeg', 0.9);
+          setCapturedRecipePhoto(compressed);
+        } else {
+          setCapturedRecipePhoto(dataUrl);
+        }
+        setAddModalInitialTab('photo');
+        setAddModalAutoCam(false);
+        setIsAddModalOpen(true);
+      };
+      img.onerror = () => {
+        setCapturedRecipePhoto(dataUrl);
+        setAddModalInitialTab('photo');
+        setAddModalAutoCam(false);
+        setIsAddModalOpen(true);
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const openRecipeAdd = () => {
+    setCapturedRecipePhoto(null);
+    setAddModalInitialTab('url');
+    setAddModalAutoCam(false);
+    setIsAddModalOpen(true);
+  };
 
   // Custom user-added recipes (persisted in localStorage + synced with backend)
   const [customRecipes, setCustomRecipes] = useState<RicardoRecipe[]>(() => {
@@ -585,13 +654,24 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="px-3.5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md active:scale-95 transition-all shrink-0"
-        >
-          <Plus className="w-4 h-4 stroke-[3]" />
-          <span>{lang === 'FR' ? '+ Recette' : '+ Add Recipe'}</span>
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={openRecipeScan}
+            className="px-3 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-700 text-white font-black text-xs flex items-center gap-1.5 shadow-md active:scale-95 transition-all cursor-pointer"
+            title={lang === 'FR' ? 'Scanner une recette écrite avec la caméra' : 'Scan written recipe with camera'}
+          >
+            <Camera className="w-4 h-4 text-teal-200 stroke-[2.5]" />
+            <span>{lang === 'FR' ? 'Scanner recette' : 'Scan Recipe'}</span>
+          </button>
+
+          <button
+            onClick={openRecipeAdd}
+            className="px-3.5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md active:scale-95 transition-all shrink-0 cursor-pointer"
+          >
+            <Plus className="w-4 h-4 stroke-[3]" />
+            <span>{lang === 'FR' ? '+ Recette' : '+ Add Recipe'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Notice Alert */}
@@ -1762,7 +1842,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
           </a>
 
           <button
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={openRecipeAdd}
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black transition-all shadow-xs active:scale-95"
           >
             <Youtube className="w-3.5 h-3.5" />
@@ -1771,12 +1851,28 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
         </div>
       </div>
 
+      {/* Hidden file input directly attached to camera shutter */}
+      <input
+        type="file"
+        ref={directRecipeCamRef}
+        accept="image/*"
+        capture="environment"
+        onChange={handleDirectRecipePhotoCaptured}
+        className="hidden"
+      />
+
       {/* Add Recipe Modal */}
       <AddRecipeModal
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setCapturedRecipePhoto(null);
+        }}
         onRecipeSaved={handleSaveRecipe}
         lang={lang}
+        initialTab={addModalInitialTab}
+        autoOpenCam={addModalAutoCam}
+        initialPhotoBase64={capturedRecipePhoto}
       />
     </div>
   );

@@ -77,9 +77,9 @@ router.post("/ai-parse", async (req, res) => {
     return res.status(200).json(result);
   } catch (error) {
     console.error("[Recipes Route] /ai-parse failed:", error);
-    return res.status(500).json({
+    return res.status(400).json({
       success: false,
-      error: "Failed to parse recipe with AI",
+      error: error.message || "Failed to parse recipe",
       details: error.message,
     });
   }

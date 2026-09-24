@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Home,
   ShoppingCart,
@@ -64,6 +64,8 @@ import { AdminManagementModal } from './AdminManagementModal';
 import { AdminRestrictedModal } from './AdminRestrictedModal';
 import { LoginSplash } from './LoginSplash';
 import { ChangeAvatarModal } from './ChangeAvatarModal';
+import { AddRecipeModal } from './AddRecipeModal';
+import { isAppInstalledOrStandalone } from '../utils/installStatus';
 import {
   useLanguage,
   LanguageSwitcher,
@@ -77,20 +79,8 @@ const INITIAL_GROCERY_ITEMS: GroceryCartItem[] = [];
 const LOCAL_STORAGE_MEMBERS_KEY = 'kitchen_komrade_household_members';
 const LOCAL_STORAGE_ACTIVE_USER_ID = 'pantryo_active_user_id';
 
-const DEFAULT_MEMBERS: User[] = [
-  {
-    id: 'usr_admin',
-    name: 'Administrator',
-    email: 'admin',
-    role: 'ADMIN',
-    avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-    fido2Enabled: false,
-    fido2Enforced: true,
-    mustChangePassword: true,
-    mustSetupProfile: true,
-    isDefaultAdmin: true,
-  },
-];
+// Clean installation: zero saved users upon installation.
+const DEFAULT_MEMBERS: User[] = [];
 
 function getStoredMembers(): User[] {
   try {
@@ -98,24 +88,24 @@ function getStoredMembers(): User[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // If stored members only contain old demo members without admin, replace with DEFAULT_MEMBERS
-        const hasAdmin = parsed.some((u: User) => u.role === 'ADMIN' || u.id === 'usr_admin');
-        if (hasAdmin) {
-          return parsed;
+        // Strip out any default mock accounts
+        const realMembers = parsed.filter((u: User) => !u.isDefaultAdmin && u.id !== 'usr_admin');
+        if (realMembers.length > 0) {
+          return realMembers;
         }
       }
     }
   } catch (e) {
     console.error('Failed reading household members from localStorage:', e);
   }
-  return DEFAULT_MEMBERS;
+  return [];
 }
 
 function getInitialActiveUser(members: User[]): User | null {
   try {
     const savedId = localStorage.getItem(LOCAL_STORAGE_ACTIVE_USER_ID);
     if (savedId) {
-      const found = members.find((m) => m.id === savedId);
+      const found = members.find((m) => m.id === savedId && !m.isDefaultAdmin && m.id !== 'usr_admin');
       if (found) return found;
     }
   } catch (e) {
@@ -136,6 +126,63 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   isInstalled = false,
 }) => {
   const { t, lang } = useLanguage();
+  const isInstalledEffective = Boolean(isInstalled || isAppInstalledOrStandalone());
+
+  // Direct camera input for recipe scanning (triggers native camera app immediately)
+  const directRecipeCamInputRef = useRef<HTMLInputElement | null>(null);
+  const [isRecipeAddModalOpen, setIsRecipeAddModalOpen] = useState(false);
+  const [recipeScanPhoto, setRecipeScanPhoto] = useState<string | null>(null);
+
+  const handleOpenRecipeCameraScan = () => {
+    setIsAddMenuOpen(false);
+    setRecipeScanPhoto(null);
+    if (directRecipeCamInputRef.current) {
+      directRecipeCamInputRef.current.click();
+    } else {
+      setIsRecipeAddModalOpen(true);
+    }
+  };
+
+  const handleRecipePhotoCaptured = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 2000;
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        const compressed = ctx
+          ? (() => {
+              ctx.drawImage(img, 0, 0, width, height);
+              return canvas.toDataURL('image/jpeg', 0.9);
+            })()
+          : dataUrl;
+
+        setRecipeScanPhoto(compressed);
+        setIsRecipeAddModalOpen(true);
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  };
+
   const [activeNav, setActiveNav] = useState<'home' | 'meals' | 'grocery' | 'cooking' | 'sync'>('home');
   const [filterLocation, setFilterLocation] = useState<'ALL' | 'FRIDGE' | 'PANTRY' | 'FREEZER' | 'EXPIRING'>('ALL');
   const [selectedFoodType, setSelectedFoodType] = useState<string | 'ALL'>('ALL');
@@ -146,6 +193,34 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
     const list = getStoredMembers();
     return getInitialActiveUser(list);
   });
+
+  // Strict enforcement: When installed, purge any template mock users and ensure clean slate
+  useEffect(() => {
+    if (isInstalledEffective) {
+      try {
+        const raw = localStorage.getItem(LOCAL_STORAGE_MEMBERS_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            const purged = parsed.filter((u: User) => !u.isDefaultAdmin && u.id !== 'usr_admin');
+            if (purged.length !== parsed.length) {
+              if (purged.length === 0) {
+                localStorage.removeItem(LOCAL_STORAGE_MEMBERS_KEY);
+                localStorage.removeItem(LOCAL_STORAGE_ACTIVE_USER_ID);
+                setHouseholdMembers([]);
+                setCurrentUser(null);
+              } else {
+                localStorage.setItem(LOCAL_STORAGE_MEMBERS_KEY, JSON.stringify(purged));
+                setHouseholdMembers(purged);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Error purging mock users in installed mode:', e);
+      }
+    }
+  }, [isInstalledEffective]);
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
@@ -606,6 +681,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             localStorage.setItem(LOCAL_STORAGE_MEMBERS_KEY, JSON.stringify(updatedList));
           } catch (e) {}
         }}
+        isInstalled={isInstalledEffective}
       />
     );
   }
@@ -1806,6 +1882,27 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               </div>
             </button>
 
+            {/* Option 4: Scan Written Recipe (Camera / OCR) */}
+            <button
+              type="button"
+              onClick={handleOpenRecipeCameraScan}
+              className="w-full p-4 rounded-3xl bg-white hover:bg-[#F6F2E8] border-2 border-[#E5DFD0] hover:border-emerald-500 flex items-center gap-4 text-left transition-all active:scale-[0.98] shadow-xs group"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-emerald-700 group-hover:bg-emerald-800 text-white flex items-center justify-center shadow-xs shrink-0 transition-colors">
+                <ChefHat className="w-6 h-6 text-emerald-100" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-extrabold text-[#0D3B37]">
+                  {lang === 'FR' ? 'Scanner une recette écrite' : 'Scan Written Recipe'}
+                </p>
+                <p className="text-xs text-[#527470]">
+                  {lang === 'FR'
+                    ? 'Prenez en photo une fiche manuscrite ou un livre de cuisine'
+                    : 'Photograph a handwritten card or cookbook page'}
+                </p>
+              </div>
+            </button>
+
             {/* Option 4: Leftovers & Prepared Foods (Health Canada & European Standards) */}
             <button
               type="button"
@@ -2034,6 +2131,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         onClose={() => setIsAdminRestrictedOpen(false)}
         currentUser={currentUser}
         adminUser={householdMembers.find((m) => m.role === 'ADMIN') || householdMembers[0]}
+        isInstalled={isInstalledEffective}
         onSwitchToAdmin={() => {
           const admin = householdMembers.find((m) => m.role === 'ADMIN') || householdMembers[0];
           setCurrentUser(admin);
@@ -2070,6 +2168,39 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
           }}
         />
       )}
+
+      {/* Dedicated native camera input for recipe scanning */}
+      <input
+        type="file"
+        ref={directRecipeCamInputRef}
+        accept="image/*"
+        capture="environment"
+        onChange={handleRecipePhotoCaptured}
+        className="hidden"
+      />
+
+      {/* Full-screen Recipe Review & Save Modal from Camera Scanner */}
+      <AddRecipeModal
+        isOpen={isRecipeAddModalOpen}
+        onClose={() => {
+          setIsRecipeAddModalOpen(false);
+          setRecipeScanPhoto(null);
+        }}
+        onRecipeSaved={(newRecipe) => {
+          setIsRecipeAddModalOpen(false);
+          setRecipeScanPhoto(null);
+          setActiveNav('cooking');
+          setBannerNotice(
+            lang === 'FR'
+              ? `✓ Recette enregistrée : ${newRecipe.titleFr || newRecipe.title}`
+              : `✓ Recipe saved: ${newRecipe.title}`
+          );
+          setTimeout(() => setBannerNotice(null), 4000);
+        }}
+        lang={lang}
+        initialTab="photo"
+        initialPhotoBase64={recipeScanPhoto}
+      />
     </div>
   );
 };

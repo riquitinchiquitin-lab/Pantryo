@@ -3,10 +3,11 @@ import { MobileSimulator } from './components/MobileSimulator';
 import { PantryoLogo } from './components/PantryoLogo';
 import { Share, X } from 'lucide-react';
 import { LanguageProvider, useLanguage } from './utils/i18n';
+import { isAppInstalledOrStandalone } from './utils/installStatus';
 
 function AppContent() {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
-  const [isInstalled, setIsInstalled] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(() => isAppInstalledOrStandalone());
   const [showIosInstallModal, setShowIosInstallModal] = useState(false);
   const { t, lang } = useLanguage();
 

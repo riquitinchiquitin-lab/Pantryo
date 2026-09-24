@@ -24,6 +24,8 @@ import {
   BookmarkPlus,
   Compass,
   Eye,
+  Video,
+  RefreshCw,
 } from 'lucide-react';
 import { RicardoRecipe, RecipeIngredient } from '../data/ricardoRecipes';
 import { useLanguage } from '../utils/i18n';
@@ -38,6 +40,9 @@ interface AddRecipeModalProps {
   onClose: () => void;
   onRecipeSaved: (recipe: RicardoRecipe) => void;
   lang?: 'EN' | 'FR';
+  initialTab?: 'url' | 'youtube' | 'text' | 'photo';
+  autoOpenCam?: boolean;
+  initialPhotoBase64?: string | null;
 }
 
 export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
@@ -45,12 +50,15 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
   onClose,
   onRecipeSaved,
   lang: propLang,
+  initialTab = 'url',
+  autoOpenCam = false,
+  initialPhotoBase64 = null,
 }) => {
   const { lang: globalLang } = useLanguage();
   const lang = propLang || globalLang;
 
   // Tabs: url, youtube, text, photo
-  const [activeTab, setActiveTab] = useState<'url' | 'youtube' | 'text' | 'photo'>('url');
+  const [activeTab, setActiveTab] = useState<'url' | 'youtube' | 'text' | 'photo'>(initialTab);
 
   // Input states
   const [webUrl, setWebUrl] = useState('');
@@ -59,6 +67,15 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
   const [recipeText, setRecipeText] = useState('');
   const [photoBase64, setPhotoBase64] = useState<string | null>(null);
   const [photoMimeType, setPhotoMimeType] = useState('image/jpeg');
+
+  // Camera & Live Viewfinder refs & states
+  const cameraAppInputRef = React.useRef<HTMLInputElement | null>(null);
+  const galleryInputRef = React.useRef<HTMLInputElement | null>(null);
+  const videoRef = React.useRef<HTMLVideoElement | null>(null);
+  const streamRef = React.useRef<MediaStream | null>(null);
+  const [isLiveCameraActive, setIsLiveCameraActive] = useState(false);
+  const [cameraFacingMode, setCameraFacingMode] = useState<'environment' | 'user'>('environment');
+  const [cameraError, setCameraError] = useState<string | null>(null);
 
   // Auto-translate preference on import (defaults to true)
   const [autoTranslateOnImport, setAutoTranslateOnImport] = useState(true);
@@ -84,12 +101,196 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
   // Review & Edit state after AI has parsed
   const [parsedRecipe, setParsedRecipe] = useState<RicardoRecipe | null>(null);
 
-  // Load recipe websites on mount or open
+  // Stop live camera stream cleanly
+  const stopLiveCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    setIsLiveCameraActive(false);
+  };
+
+  // Start live in-app camera viewfinder
+  const startLiveCamera = async (facing: 'environment' | 'user' = cameraFacingMode) => {
+    setCameraError(null);
+    stopLiveCamera();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: facing },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+      }
+      setCameraFacingMode(facing);
+      setIsLiveCameraActive(true);
+    } catch (err: any) {
+      console.error('Live camera error:', err);
+      setCameraError(
+        lang === 'FR'
+          ? "Impossible d'accéder au flux vidéo direct. Utilisez le bouton 'Ouvrir l'application Caméra' natif ci-dessous."
+          : "Could not access live camera stream. Please use the native 'Open Camera App' button below."
+      );
+      setIsLiveCameraActive(false);
+    }
+  };
+
+  // Toggle front/back camera
+  const toggleFacingMode = () => {
+    const nextFacing = cameraFacingMode === 'environment' ? 'user' : 'environment';
+    startLiveCamera(nextFacing);
+  };
+
+  // Snap photo from in-app live camera viewfinder
+  // Function to execute photo parsing immediately
+  const triggerPhotoImport = async (base64Data: string) => {
+    setIsParsing(true);
+    setParsedRecipe(null);
+    setParsingStep(
+      lang === 'FR'
+        ? 'Numérisation OCR & extraction IA de votre fiche recette...'
+        : 'Running OCR & AI extraction on your recipe card...'
+    );
+    setErrorMsg(null);
+    try {
+      const res = await fetch('/api/v1/recipes/ai-parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'photo',
+          language: lang,
+          imageBase64: base64Data,
+          mimeType: 'image/jpeg',
+          autoTranslate: autoTranslateOnImport,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to parse recipe photo');
+      }
+
+      setParsedRecipe(data.recipe);
+    } catch (err: any) {
+      console.error('AI Parse/Import failed:', err);
+      setErrorMsg(err.message || 'Error communicating with AI service');
+    } finally {
+      setIsParsing(false);
+      setParsingStep('');
+    }
+  };
+
+  // Snap photo from in-app live camera viewfinder
+  const captureLiveSnapshot = () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const width = video.videoWidth || 1280;
+    const height = video.videoHeight || 720;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(video, 0, 0, width, height);
+      const dataUri = canvas.toDataURL('image/jpeg', 0.9);
+      setPhotoBase64(dataUri);
+      setPhotoMimeType('image/jpeg');
+      setErrorMsg(null);
+      triggerPhotoImport(dataUri);
+    }
+    stopLiveCamera();
+  };
+
+  // Handle files selected from native camera input or gallery
+  const handlePhotoPicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset value so snapping the same angle again triggers onChange
+    e.target.value = '';
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        const maxDim = 1600;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        const compressedUri = ctx
+          ? (() => {
+              ctx.drawImage(img, 0, 0, width, height);
+              return canvas.toDataURL('image/jpeg', 0.9);
+            })()
+          : (event.target?.result as string);
+
+        setPhotoBase64(compressedUri);
+        setPhotoMimeType('image/jpeg');
+        setErrorMsg(null);
+        triggerPhotoImport(compressedUri);
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Stop camera when closing modal or switching tabs
+  useEffect(() => {
+    if (!isOpen || activeTab !== 'photo') {
+      stopLiveCamera();
+    }
+  }, [isOpen, activeTab]);
+
+  // Load recipe websites on mount or open and sync initial tab
   useEffect(() => {
     if (isOpen) {
       setStoredWebsites(getStoredRecipeWebsites());
+      if (initialPhotoBase64) {
+        setPhotoBase64(initialPhotoBase64);
+        setActiveTab('photo');
+        setParsedRecipe(null);
+        triggerPhotoImport(initialPhotoBase64);
+      } else if (initialTab) {
+        setActiveTab(initialTab);
+        if (initialTab !== 'photo') {
+          setParsedRecipe(null);
+        }
+      }
+    } else {
+      setParsedRecipe(null);
+      setPhotoBase64(null);
+      setErrorMsg(null);
+      setParsingStep('');
+      setIsParsing(false);
     }
-  }, [isOpen]);
+  }, [isOpen, initialTab, initialPhotoBase64]);
+
+  // If autoOpenCam is enabled and no photo has been provided yet, open camera shutter
+  useEffect(() => {
+    if (isOpen && activeTab === 'photo' && autoOpenCam && !photoBase64 && !initialPhotoBase64) {
+      const timer = setTimeout(() => {
+        cameraAppInputRef.current?.click();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, activeTab, autoOpenCam, photoBase64, initialPhotoBase64]);
 
   if (!isOpen) return null;
 
@@ -475,11 +676,16 @@ Instructions:
       });
       const data = await res.json();
       const saved = data.success ? data.recipe : parsedRecipe;
+      setParsedRecipe(null);
+      setPhotoBase64(null);
       onRecipeSaved(saved);
       onClose();
     } catch (err) {
       console.error('Failed to save recipe to backend:', err);
-      onRecipeSaved(parsedRecipe);
+      const fallback = parsedRecipe;
+      setParsedRecipe(null);
+      setPhotoBase64(null);
+      onRecipeSaved(fallback);
       onClose();
     }
   };
@@ -1071,11 +1277,31 @@ Instructions:
             {/* TAB 4: PHOTO / SCAN */}
             {activeTab === 'photo' && (
               <div className="space-y-3 animate-fade-in p-4 bg-white border border-[#D5E1D2] rounded-2xl shadow-2xs">
+                {/* Hidden native camera and gallery inputs */}
+                <input
+                  type="file"
+                  ref={cameraAppInputRef}
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handlePhotoPicked}
+                  className="hidden"
+                />
+                <input
+                  type="file"
+                  ref={galleryInputRef}
+                  accept="image/*"
+                  onChange={handlePhotoPicked}
+                  className="hidden"
+                />
+
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-black text-[#1E3022]">
-                    {lang === 'FR'
-                      ? 'Photo d’un livre de cuisine ou fiche recette'
-                      : 'Cookbook Page or Recipe Card Photo'}
+                  <label className="text-xs font-black text-[#1E3022] flex items-center gap-1.5">
+                    <Camera className="w-4 h-4 text-emerald-700" />
+                    <span>
+                      {lang === 'FR'
+                        ? 'Photo d’un livre de cuisine ou fiche recette manuscrite'
+                        : 'Cookbook Page or Handwritten Recipe Card'}
+                    </span>
                   </label>
                   <button
                     type="button"
@@ -1087,47 +1313,180 @@ Instructions:
                   </button>
                 </div>
 
-                <div className="p-4 border-2 border-dashed border-[#CADBC7] rounded-2xl bg-[#F8FAF6] text-center space-y-3">
-                  {photoBase64 ? (
-                    <div className="space-y-2">
-                      <div className="h-44 max-w-sm mx-auto rounded-xl overflow-hidden border border-[#D5E1D2] bg-white shadow-xs">
-                        <img
-                          src={photoBase64}
-                          alt="Recipe capture"
-                          className="w-full h-full object-contain"
-                        />
+                {cameraError && (
+                  <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>{cameraError}</span>
+                  </div>
+                )}
+
+                {/* 1. Live Camera Viewfinder State */}
+                {isLiveCameraActive ? (
+                  <div className="space-y-3 p-3 bg-slate-950 rounded-2xl border-2 border-emerald-500 shadow-md text-white text-center">
+                    <div className="flex items-center justify-between px-1">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span>{lang === 'FR' ? 'Caméra active' : 'Live Camera'}</span>
                       </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={toggleFacingMode}
+                          className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[11px] font-bold flex items-center gap-1 transition-colors"
+                          title={lang === 'FR' ? 'Changer de caméra' : 'Flip camera'}
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                          <span>{lang === 'FR' ? 'Changer' : 'Flip'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={stopLiveCamera}
+                          className="p-1 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+                          title={lang === 'FR' ? 'Fermer caméra' : 'Close camera'}
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="relative w-full h-64 sm:h-72 rounded-xl overflow-hidden bg-black flex items-center justify-center">
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className="w-full h-full object-cover"
+                      />
+                      {/* Framing guides overlay */}
+                      <div className="absolute inset-4 border-2 border-emerald-400/60 rounded-xl pointer-events-none flex flex-col justify-between p-2">
+                        <div className="flex justify-between">
+                          <span className="w-4 h-4 border-t-2 border-l-2 border-emerald-400" />
+                          <span className="w-4 h-4 border-t-2 border-r-2 border-emerald-400" />
+                        </div>
+                        <p className="text-[10px] text-white/90 bg-black/60 px-2.5 py-1 rounded-full mx-auto backdrop-blur-xs font-bold">
+                          {lang === 'FR' ? 'Cadrez la fiche de recette ici' : 'Frame recipe card here'}
+                        </p>
+                        <div className="flex justify-between">
+                          <span className="w-4 h-4 border-b-2 border-l-2 border-emerald-400" />
+                          <span className="w-4 h-4 border-b-2 border-r-2 border-emerald-400" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Shutter Button */}
+                    <div className="flex items-center justify-center pt-1">
                       <button
                         type="button"
-                        onClick={() => setPhotoBase64(null)}
-                        className="text-[11px] text-rose-600 hover:underline font-bold"
+                        onClick={captureLiveSnapshot}
+                        className="px-6 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center gap-2 shadow-lg active:scale-95 transition-all"
                       >
-                        {lang === 'FR' ? 'Changer de photo' : 'Choose another photo'}
+                        <Camera className="w-4 h-4 stroke-[2.5]" />
+                        <span>{lang === 'FR' ? 'Prendre la photo' : 'Capture Recipe Photo'}</span>
                       </button>
                     </div>
-                  ) : (
-                    <div className="space-y-2 py-4">
-                      <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto">
-                        <Camera className="w-6 h-6" />
-                      </div>
-                      <p className="text-xs font-bold text-[#1E3022]">
-                        {lang === 'FR'
-                          ? 'Prenez en photo une page de recette ou importez une image'
-                          : 'Snap a cookbook page or upload a recipe image'}
-                      </p>
-                      <label className="inline-block px-4 py-2 rounded-xl bg-[#1E3022] hover:bg-black text-white text-xs font-bold cursor-pointer transition-all shadow-xs">
-                        <Upload className="w-3.5 h-3.5 inline mr-1.5" />
-                        <span>{lang === 'FR' ? 'Parcourir les fichiers' : 'Browse Files'}</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleFileUpload}
-                          className="hidden"
-                        />
-                      </label>
+                  </div>
+                ) : photoBase64 ? (
+                  /* 2. Photo Captured / Loaded Preview */
+                  <div className="p-4 border-2 border-dashed border-emerald-300 rounded-2xl bg-[#F8FAF6] text-center space-y-3">
+                    <div className="h-48 max-w-sm mx-auto rounded-xl overflow-hidden border border-[#D5E1D2] bg-white shadow-xs relative">
+                      <img
+                        src={photoBase64}
+                        alt="Recipe capture"
+                        className="w-full h-full object-contain"
+                      />
                     </div>
-                  )}
-                </div>
+                    <div className="space-y-2 pt-1 max-w-sm mx-auto">
+                      <button
+                        type="button"
+                        onClick={() => triggerPhotoImport(photoBase64)}
+                        disabled={isParsing}
+                        className="w-full py-2.5 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-black text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-98 cursor-pointer"
+                      >
+                        <Sparkles className="w-4 h-4 text-emerald-200" />
+                        <span>
+                          {lang === 'FR'
+                            ? 'Numériser la recette avec l’IA & OCR'
+                            : 'Digitize Recipe with AI & OCR'}
+                        </span>
+                      </button>
+
+                      <div className="flex items-center justify-center">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPhotoBase64(null);
+                            setErrorMsg(null);
+                          }}
+                          className="text-xs text-rose-600 hover:underline font-bold flex items-center gap-1"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>{lang === 'FR' ? 'Changer / Reprendre la photo' : 'Retake / Choose another photo'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* 3. Action Hub for Snapping Written Recipes */
+                  <div className="space-y-3 py-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Native Camera App Launcher */}
+                      <button
+                        type="button"
+                        onClick={() => cameraAppInputRef.current?.click()}
+                        className="p-5 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white flex flex-col items-center text-center gap-2 shadow-sm transition-all active:scale-[0.98] group cursor-pointer"
+                      >
+                        <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Camera className="w-6 h-6 text-white stroke-[2.5]" />
+                        </div>
+                        <span className="text-xs font-black">
+                          {lang === 'FR' ? 'Ouvrir l’application Caméra' : 'Open Camera App'}
+                        </span>
+                        <span className="text-[11px] text-emerald-100 opacity-90 leading-tight">
+                          {lang === 'FR'
+                            ? 'Déclenche l’appareil photo natif de votre téléphone'
+                            : 'Directly launches your phone’s camera shutter'}
+                        </span>
+                      </button>
+
+                      {/* Live In-App Viewfinder */}
+                      <button
+                        type="button"
+                        onClick={() => startLiveCamera('environment')}
+                        className="p-5 rounded-2xl bg-[#1E3022] hover:bg-black text-white flex flex-col items-center text-center gap-2 shadow-sm transition-all active:scale-[0.98] group cursor-pointer"
+                      >
+                        <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Video className="w-6 h-6 text-teal-200 stroke-[2.2]" />
+                        </div>
+                        <span className="text-xs font-black">
+                          {lang === 'FR' ? 'Viseur Caméra en direct' : 'Live Camera Viewfinder'}
+                        </span>
+                        <span className="text-[11px] text-slate-300 opacity-90 leading-tight">
+                          {lang === 'FR'
+                            ? 'Affichage vidéo à l’écran avec guide de cadrage'
+                            : 'Interactive on-screen viewfinder with alignment frame'}
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* Gallery or File Picker fallback */}
+                    <div className="text-center pt-1">
+                      <button
+                        type="button"
+                        onClick={() => galleryInputRef.current?.click()}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-[#CADBC7] hover:border-emerald-600 bg-white text-[#1E3022] text-xs font-bold transition-all shadow-2xs hover:bg-[#F8FAF6] cursor-pointer"
+                      >
+                        <Upload className="w-3.5 h-3.5 text-emerald-700" />
+                        <span>{lang === 'FR' ? 'Choisir une photo dans la galerie / fichiers' : 'Pick photo from gallery / files'}</span>
+                      </button>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-[#F0EBE0]/80 text-[#527470] text-[11px] text-center leading-relaxed">
+                      {lang === 'FR'
+                        ? '✨ L’IA et l’OCR analysent vos photos de fiches manuscrites ou de livres de cuisine pour extraire automatiquement le titre, les ingrédients et les instructions.'
+                        : '✨ AI & OCR scan your handwritten recipe cards and cookbook pages to automatically extract title, ingredients, and step-by-step instructions.'}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1260,6 +1619,23 @@ Instructions:
                     {parsedRecipe.servings}
                   </span>
                 </div>
+
+                {parsedRecipe.rawOcrText && (
+                  <div className="mt-3 p-3 rounded-xl bg-[#F8FAF6] border border-[#CADBC7] text-xs space-y-1.5 text-left">
+                    <div className="flex items-center justify-between">
+                      <p className="font-extrabold text-[#1E3022] flex items-center gap-1.5 text-[11px]">
+                        <FileText className="w-3.5 h-3.5 text-emerald-700" />
+                        <span>{lang === 'FR' ? 'Texte extrait de la photo :' : 'Text extracted from photo:'}</span>
+                      </p>
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                        OCR / Vision
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[#475C4B] line-clamp-4 whitespace-pre-wrap font-mono bg-white p-2 rounded-lg border border-[#D5E1D2]">
+                      {parsedRecipe.rawOcrText}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
