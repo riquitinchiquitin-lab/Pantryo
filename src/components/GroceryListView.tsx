@@ -11,7 +11,7 @@ import {
   ArrowRight,
   RotateCcw,
 } from 'lucide-react';
-import { InventoryItem, SavedGroceryListItem } from '../types';
+import { InventoryItem, SavedGroceryListItem, StorageType } from '../types';
 import { FoodVisualBadge } from './FoodVisualBadge';
 import { getFoodVisual } from '../utils/foodVisuals';
 import { SavedListsModal } from './SavedListsModal';
@@ -23,7 +23,7 @@ export interface GroceryCartItem {
   category: string;
   quantity: number;
   unit: string;
-  locationType: 'FRIDGE' | 'FREEZER' | 'PANTRY';
+  locationType: StorageType;
   inCart: boolean;
   autoSuggested?: boolean;
   notes?: string;
@@ -38,7 +38,7 @@ interface GroceryListViewProps {
       name: string;
       quantity: number;
       unit: string;
-      locationType: 'FRIDGE' | 'FREEZER' | 'PANTRY';
+      locationType: StorageType;
       categoryName: string;
       imageUrl?: string;
       notes?: string;

@@ -47,7 +47,7 @@ import {
   X,
   LogOut,
 } from 'lucide-react';
-import { InventoryItem, User, PlannedMeal } from '../types';
+import { InventoryItem, User, PlannedMeal, StorageType } from '../types';
 import { FoodVisualBadge } from './FoodVisualBadge';
 import { InventoryListItem } from './InventoryListItem';
 import { getFoodVisual, ALL_FOOD_CATEGORIES, ALL_SUB_CATEGORIES, ALL_MEAT_SEAFOOD_SUBCATEGORIES } from '../utils/foodVisuals';
@@ -311,7 +311,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
       name: string;
       quantity: number;
       unit: string;
-      locationType: 'FRIDGE' | 'FREEZER' | 'PANTRY';
+      locationType: StorageType;
       categoryName: string;
       imageUrl?: string;
       notes?: string;
@@ -323,7 +323,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           items: itemsToAdd,
-          userId: currentUser.id,
+          userId: currentUser?.id || 'default-user',
         }),
       });
       const data = await res.json();
@@ -364,8 +364,8 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         inCart: true,
         notes:
           lang === 'FR'
-            ? `Réapprovisionnement demandé par ${currentUser.name}`
-            : `Restock requested by ${currentUser.name}`,
+            ? `Réapprovisionnement demandé par ${currentUser?.name || 'Yan'}`
+            : `Restock requested by ${currentUser?.name || 'Yan'}`,
       },
       ...prev,
     ]);
@@ -577,7 +577,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           status: 'CONSUMED',
-          userId: currentUser.id,
+          userId: currentUser?.id || 'default-user',
         }),
       });
       const data = await res.json();
@@ -602,7 +602,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
       const res = await fetch(`/api/v1/inventory/item/${item.id}/defrost`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: currentUser.id }),
+        body: JSON.stringify({ userId: currentUser?.id || 'default-user' }),
       });
       const data = await res.json();
       if (data.success) {
@@ -1736,7 +1736,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
           <CookingIdeasView
             items={items}
             onPlanMeal={handleAddMeal}
-            onNavigateToMealPlanner={() => setActiveNav('mealplanner')}
+            onNavigateToMealPlanner={() => setActiveNav('meals')}
             onAddMissingToGrocery={(missing) => {
               setGroceryItems((prev) => [
                 {

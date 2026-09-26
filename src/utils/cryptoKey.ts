@@ -272,7 +272,7 @@ export async function testKeyWithSubtleCrypto(
     // Import key into SubtleCrypto
     const importedCryptoKey = await window.crypto.subtle.importKey(
       'raw',
-      keyBytes,
+      keyBytes as unknown as BufferSource,
       { name: 'AES-GCM' },
       false,
       ['encrypt', 'decrypt']

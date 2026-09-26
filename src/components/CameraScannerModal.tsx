@@ -261,7 +261,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
             unit: savedItem.unit,
             locationName: itemCandidate.recommendedLocation || 'Fridge',
             categoryName: itemCandidate.category || 'Produce',
-            notes: savedItem.notes,
+            notes: savedItem.notes ?? undefined,
             addedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           });
         } catch (err) {

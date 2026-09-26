@@ -239,6 +239,13 @@ export const translations = {
     install_step_android_desc: 'Tap the menu ⋮ in your browser and select "Install App" or "Add to Home Screen".',
     btn_got_it: 'Got It!',
 
+    // Tooltips
+    add_to_cart_tooltip: 'Add to shopping cart',
+    defrost_tooltip: 'Defrost to fridge (3-day shelf life)',
+    edit_item_tooltip: 'Edit item details',
+    mark_consumed_tooltip: 'Mark item as consumed',
+    delete_item_tooltip: 'Delete item from pantry',
+
     // Units
     unit_pcs: 'pcs',
     unit_pack: 'pack',
@@ -485,6 +492,13 @@ export const translations = {
     install_step_android_title: 'Sur Android (Chrome) ou PC :',
     install_step_android_desc: "Touchez le menu ⋮ dans la barre du navigateur et sélectionnez « Installer l'application » ou « Ajouter à l'écran d'accueil ».",
     btn_got_it: 'Compris !',
+
+    // Tooltips
+    add_to_cart_tooltip: 'Ajouter au panier de courses',
+    defrost_tooltip: 'Décongeler vers le frigo (3 jours de conservation)',
+    edit_item_tooltip: "Modifier les détails de l'aliment",
+    mark_consumed_tooltip: "Marquer l'aliment comme consommé",
+    delete_item_tooltip: "Supprimer l'aliment",
 
     // Units
     unit_pcs: 'unités',

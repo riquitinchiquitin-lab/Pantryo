@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Youtube } from './icons/Youtube';
 import {
   ChefHat,
   Sparkles,
@@ -20,7 +21,6 @@ import {
   Snowflake,
   Boxes,
   Bookmark,
-  Youtube,
   FileText,
   Camera,
   Play,
@@ -328,7 +328,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
 
       if (!matchesSearch) return false;
 
-      if (activeFilter === 'CHEFS' && !(recipe.isRicardoOfficial || recipe.authorName || recipe.source === 'Chef Recipe')) return false;
+      if (activeFilter === 'CHEFS' && !(recipe.isRicardoOfficial || recipe.authorName || (recipe.source as string) === 'Chef Recipe')) return false;
       if (activeFilter === 'RICARDO' && !(recipe.isRicardoOfficial || recipe.source === 'Ricardo Cuisine')) return false;
       if (activeFilter === 'TROISFOISPARJOUR' && !(recipe.source === 'Trois Fois Par Jour' || recipe.authorName?.toLowerCase().includes('marilou'))) return false;
       if (activeFilter === 'JAMIE' && !(recipe.source === 'Jamie Oliver' || recipe.authorName?.toLowerCase().includes('jamie'))) return false;

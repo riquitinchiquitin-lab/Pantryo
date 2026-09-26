@@ -154,7 +154,7 @@ export const SmartMealSuggestionsModal: React.FC<SmartMealSuggestionsModalProps>
         body: JSON.stringify({
           inventory: inventory.map((i) => ({
             name: i.name,
-            category: i.category,
+            category: i.category || i.categoryName,
             daysUntilExpiration: i.daysUntilExpiration,
             isExpiringSoon: i.isExpiringSoon,
             quantity: i.quantity,
@@ -348,7 +348,7 @@ export const SmartMealSuggestionsModal: React.FC<SmartMealSuggestionsModalProps>
           targetMealType: selectedMealType,
           inventory: inventory.map((i) => ({
             name: i.name,
-            category: i.category,
+            category: i.category || i.categoryName,
             daysUntilExpiration: i.daysUntilExpiration,
             isExpiringSoon: i.isExpiringSoon,
           })),

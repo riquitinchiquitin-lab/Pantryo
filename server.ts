@@ -19,7 +19,7 @@ process.on("unhandledRejection", (reason, promise) => {
 
 const app = express();
 const server = http.createServer(app);
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const PORT = 3000;
 
 // Trust reverse proxy headers from Cloudflare Tunnel
 app.set("trust proxy", true);
@@ -46,7 +46,7 @@ app.get("/api/health", (req, res) => {
 });
 
 // Explicit 404 handler for API routes to prevent fallback to index.html
-app.all("/api/*", (req, res) => {
+app.use("/api", (req, res) => {
   res.status(404).json({
     error: `API endpoint not found: ${req.method} ${req.path}`,
     status: 404,
@@ -62,6 +62,7 @@ async function startServer() {
       server: {
         middlewareMode: true,
         hmr: isHmrDisabled ? false : { server },
+        ws: isHmrDisabled ? false : { server },
       },
       appType: "spa",
     });
@@ -69,7 +70,7 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
-    app.get("*", (req, res) => {
+    app.use((req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }

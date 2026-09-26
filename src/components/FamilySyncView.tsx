@@ -353,7 +353,7 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
                   )
                 ) : (
                   lang === 'FR' ? (
-                    <>Ajouté dans {getLocationLocalizedName(log.details.location, lang)} par <strong>{log.details.addedBy}</strong></>
+                    <>Ajouté dans {getLocationLocalizedName(log.details.location || '', lang)} par <strong>{log.details.addedBy}</strong></>
                   ) : (
                     <>Added to {log.details.location} by <strong>{log.details.addedBy}</strong></>
                   )

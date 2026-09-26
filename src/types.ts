@@ -56,6 +56,7 @@ export interface InventoryItem {
   locationName: string;
   locationType: StorageType;
   categoryId?: string;
+  category?: string;
   categoryName: string;
   categoryIcon?: string;
   categoryColor?: string;
@@ -137,7 +138,7 @@ export interface SavedGroceryListItem {
   name: string;
   quantity: number;
   unit: string;
-  locationType: 'FRIDGE' | 'FREEZER' | 'PANTRY';
+  locationType: StorageType;
   category?: string;
 }
 
