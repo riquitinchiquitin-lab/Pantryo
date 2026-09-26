@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgEgg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FEF3C7" />
+      <stop offset="100%" stop-color="#FCD34D" />
+    </linearGradient>
+    <linearGradient id="yolkGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FBBF24" />
+      <stop offset="100%" stop-color="#EA580C" />
+    </linearGradient>
+    <filter id="shadowEgg" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#B45309" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Background Circle -->
+  <circle cx="100" cy="100" r="98" fill="url(#bgEgg)" stroke="#F59E0B" stroke-width="4"/>
+
+  <!-- Egg White -->
+  <g filter="url(#shadowEgg)">
+    <path d="M100 35 C140 32 172 65 168 105 C164 145 138 172 100 172 C62 172 32 142 34 100 C36 58 60 38 100 35 Z" fill="#FFFFFF"/>
+    <!-- Gentle Egg White Curvature / Crispy Edge -->
+    <path d="M100 40 C135 38 164 68 160 105 C156 142 132 166 100 166 C68 166 40 138 42 100 C44 62 65 42 100 40 Z" fill="#F8FAFC"/>
+  </g>
+
+  <!-- Golden Yolk Face -->
+  <g filter="url(#shadowEgg)">
+    <circle cx="100" cy="106" r="38" fill="url(#yolkGrad)"/>
+    <ellipse cx="88" cy="88" rx="14" ry="7" fill="#FDE68A" opacity="0.6"/>
+    <ellipse cx="85" cy="86" rx="5" ry="3" fill="#FFFFFF" opacity="0.8"/>
+  </g>
+
+  <!-- Eyes -->
+  <ellipse cx="86" cy="106" rx="6" ry="8" fill="#18181B"/>
+  <ellipse cx="114" cy="106" rx="6" ry="8" fill="#18181B"/>
+  <circle cx="84" cy="103" r="2.5" fill="#FFFFFF"/>
+  <circle cx="112" cy="103" r="2.5" fill="#FFFFFF"/>
+  <circle cx="88" cy="108" r="1" fill="#FFFFFF"/>
+  <circle cx="116" cy="108" r="1" fill="#FFFFFF"/>
+
+  <!-- Cheeks -->
+  <circle cx="74" cy="116" r="6" fill="#F43F5E" opacity="0.6"/>
+  <circle cx="126" cy="116" r="6" fill="#F43F5E" opacity="0.6"/>
+
+  <!-- Happy Mouth -->
+  <path d="M92 116 Q100 128 108 116 Z" fill="#991B1B"/>
+  <path d="M95 121 Q100 127 105 121 Z" fill="#F43F5E"/>
+
+  <!-- Little Fork & Spatula accessory badge -->
+  <g filter="url(#shadowEgg)" transform="translate(142, 134) rotate(15)">
+    <circle cx="14" cy="14" r="18" fill="#0D9488" stroke="#FFFFFF" stroke-width="2"/>
+    <!-- Chef Hat icon -->
+    <path d="M7 16 C6 13 8 10 11 10 C12 8 16 8 17 10 C20 10 22 13 21 16 Z" fill="#FFFFFF"/>
+    <rect x="8" y="16" width="12" height="4" rx="1" fill="#FFFFFF"/>
+  </g>
+</svg>

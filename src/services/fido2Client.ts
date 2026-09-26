@@ -433,7 +433,6 @@ export const fido2Client = {
     success: boolean;
     secret: string;
     otpAuthUri: string;
-    currentSampleCode?: string;
     message?: string;
   }> {
     const res = await fetch("/api/v1/auth/fido2/totp/setup", {

@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import {
   encryptData,
   decryptData,
@@ -8,12 +9,69 @@ import {
   verifyPassword,
 } from "./cryptoService.js";
 import { validatePasswordNist, normalizeUnicode } from "./nistPasswordValidator.js";
+import { sqlcipherService, getOrCreateInstallationId } from "./sqlcipherService.js";
 
 const DATA_DIR = path.join(process.cwd(), "server", "data");
 const ENCRYPTED_DB_FILE = path.join(DATA_DIR, "pantryo_database.enc");
-// Server master encryption key (uses process.env.DB_ENCRYPTION_KEY or a secure static key)
-const SERVER_MASTER_KEY =
-  process.env.DB_ENCRYPTION_KEY || "pantryo-master-secret-key-2026-aes256gcm-secure";
+const MASTER_KEY_FILE = path.join(DATA_DIR, "db_master_key.meta");
+
+let customActiveKey = null;
+
+export async function generateSecureKey() {
+  // Generates 256-bit cryptographically secure key using Web Crypto SubtleCrypto API
+  if (globalThis.crypto && globalThis.crypto.subtle) {
+    try {
+      const cryptoKey = await globalThis.crypto.subtle.generateKey(
+        { name: "AES-GCM", length: 256 },
+        true,
+        ["encrypt", "decrypt"]
+      );
+      const raw = await globalThis.crypto.subtle.exportKey("raw", cryptoKey);
+      return Buffer.from(raw).toString("hex");
+    } catch (_) {}
+  }
+  return crypto.randomBytes(32).toString("hex");
+}
+
+export function getActiveServerKey() {
+  if (customActiveKey && customActiveKey.length >= 16) {
+    return customActiveKey;
+  }
+  if (process.env.DB_ENCRYPTION_KEY && process.env.DB_ENCRYPTION_KEY.trim().length >= 16) {
+    customActiveKey = process.env.DB_ENCRYPTION_KEY.trim();
+    return customActiveKey;
+  }
+  if (fs.existsSync(MASTER_KEY_FILE)) {
+    try {
+      const savedKey = fs.readFileSync(MASTER_KEY_FILE, "utf8").trim();
+      if (savedKey.length >= 16) {
+        customActiveKey = savedKey;
+        return customActiveKey;
+      }
+    } catch (e) {
+      console.warn("[Pantryo DB] Could not read master key file:", e.message);
+    }
+  }
+  return "pantryo-master-secret-key-2026-aes256gcm-secure";
+}
+
+export function setActiveServerKey(newKey) {
+  if (!newKey || typeof newKey !== "string" || newKey.trim().length < 16) {
+    throw new Error("Encryption key must be at least 16 characters (256-bit recommended)");
+  }
+  customActiveKey = newKey.trim();
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    fs.writeFileSync(MASTER_KEY_FILE, customActiveKey, "utf8");
+  } catch (e) {
+    console.error("[Pantryo DB] Failed to save master key file:", e.message);
+  }
+  return customActiveKey;
+}
+
+const SERVER_MASTER_KEY = getActiveServerKey();
 
 const SEED_HOUSEHOLD_ID = "hh_pantryo_main";
 
@@ -391,10 +449,62 @@ class EncryptedDatabaseStore {
         fs.mkdirSync(DATA_DIR, { recursive: true });
       }
 
+      const activeKey = getActiveServerKey();
+
+      // 1. Initialize local-first SQLite database with SQLCipher
+      try {
+        sqlcipherService.init(activeKey);
+      } catch (sqlErr) {
+        console.warn("[Pantryo DB] Could not init SQLCipher with active key, trying fallback key:", sqlErr.message);
+        try {
+          sqlcipherService.init("pantryo-master-secret-key-2026-aes256gcm-secure");
+        } catch (fbErr) {
+          console.error("[Pantryo DB] SQLCipher init failed:", fbErr.message);
+        }
+      }
+
+      // 2. Try loading snapshot from SQLite SQLCipher
+      const sqliteSnapshot = sqlcipherService.loadSnapshot();
+      if (sqliteSnapshot && Array.isArray(sqliteSnapshot.users) && sqliteSnapshot.users.length > 0) {
+        this.household = sqliteSnapshot.household || this.household;
+        this.users = sqliteSnapshot.users;
+        this.locations = sqliteSnapshot.locations || this.locations;
+        this.categories = sqliteSnapshot.categories || this.categories;
+        this.items = Array.isArray(sqliteSnapshot.items) ? sqliteSnapshot.items : [];
+        this.plannedMeals = Array.isArray(sqliteSnapshot.plannedMeals) ? sqliteSnapshot.plannedMeals : [];
+        this.customRecipes = Array.isArray(sqliteSnapshot.customRecipes) ? sqliteSnapshot.customRecipes : [];
+        this.groceryItems = Array.isArray(sqliteSnapshot.groceryItems) ? sqliteSnapshot.groceryItems : [];
+        this.savedLists = Array.isArray(sqliteSnapshot.savedLists) ? sqliteSnapshot.savedLists : [];
+        this.lastBackupAt = sqliteSnapshot.lastBackupAt || null;
+        this.lastRestoreAt = sqliteSnapshot.lastRestoreAt || null;
+        this.fido2Policy = sqliteSnapshot.fido2Policy || { allUsersRequired: true, enforced: true };
+
+        this.users = this.users.filter((u) => !u.isDefaultAdmin && u.id !== "usr_admin");
+        this.users.forEach((u) => {
+          u.fido2Enforced = true;
+        });
+
+        this.persistToEncryptedDisk();
+        console.log(
+          `[Pantryo DB] Successfully loaded from SQLCipher SQLite database with ${this.items.length} items, ${this.customRecipes.length} recipes, ${this.users.length} users.`
+        );
+        return;
+      }
+
+      // 3. Fallback: Check encrypted JSON database file if existing
       if (fs.existsSync(ENCRYPTED_DB_FILE)) {
         const encryptedFileContent = fs.readFileSync(ENCRYPTED_DB_FILE, "utf8");
         const parsed = JSON.parse(encryptedFileContent);
-        const decrypted = decryptData(parsed, SERVER_MASTER_KEY);
+        let decrypted = null;
+        try {
+          decrypted = decryptData(parsed, activeKey);
+        } catch (decErr) {
+          try {
+            decrypted = decryptData(parsed, "pantryo-master-secret-key-2026-aes256gcm-secure");
+          } catch (e) {
+            console.warn("[Pantryo DB] Decrypt error:", decErr.message);
+          }
+        }
 
         if (decrypted && Array.isArray(decrypted.users)) {
           this.household = decrypted.household || this.household;
@@ -415,7 +525,6 @@ class EncryptedDatabaseStore {
           };
 
           // Policy enforcement: all users must use FIDO2
-          // Ensure no default mock admin accounts persist - installed app must have no saved users
           this.users = this.users.filter((u) => !u.isDefaultAdmin && u.id !== "usr_admin");
           this.users.forEach((u) => {
             u.fido2Enforced = true;
@@ -424,7 +533,7 @@ class EncryptedDatabaseStore {
           this.persistToEncryptedDisk();
 
           console.log(
-            `[Pantryo DB] Successfully loaded encrypted database with ${this.items.length} items, ${this.customRecipes.length} recipes, ${this.users.length} users.`
+            `[Pantryo DB] Successfully imported legacy encrypted database into SQLCipher SQLite with ${this.items.length} items, ${this.customRecipes.length} recipes, ${this.users.length} users.`
           );
           return;
         }
@@ -446,7 +555,40 @@ class EncryptedDatabaseStore {
     this.persistToEncryptedDisk();
   }
 
-  persistToEncryptedDisk() {
+  async generateEncryptionKey() {
+    return await generateSecureKey();
+  }
+
+  getActiveKey() {
+    return getActiveServerKey();
+  }
+
+  setEncryptionKey(newKey) {
+    if (!newKey || typeof newKey !== "string" || newKey.trim().length < 16) {
+      throw new Error("Encryption key must be at least 16 characters (256-bit recommended)");
+    }
+    const cleanKey = newKey.trim();
+
+    // 1. Rekey local-first SQLite database with SQLCipher (page-level re-encryption)
+    try {
+      sqlcipherService.rekey(cleanKey);
+    } catch (rekeyErr) {
+      console.warn("[Pantryo DB] SQLite rekey warning, re-initializing:", rekeyErr.message);
+      try {
+        sqlcipherService.init(cleanKey);
+      } catch (initErr) {
+        console.error("[Pantryo DB] SQLite re-init failed:", initErr.message);
+      }
+    }
+
+    // 2. Set master active server key
+    setActiveServerKey(cleanKey);
+
+    // 3. Persist current snapshot to encrypted storage
+    return this.persistToEncryptedDisk(cleanKey);
+  }
+
+  persistToEncryptedDisk(customKey = null) {
     try {
       if (!fs.existsSync(DATA_DIR)) {
         fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -455,6 +597,8 @@ class EncryptedDatabaseStore {
       const snapshot = {
         schemaVersion: "1.0",
         app: "Pantryo",
+        databaseEngine: "SQLite 3 with SQLCipher",
+        installationId: sqlcipherService.installationId,
         updatedAt: new Date().toISOString(),
         household: this.household,
         users: this.users,
@@ -470,7 +614,12 @@ class EncryptedDatabaseStore {
         fido2Policy: this.fido2Policy || { allUsersRequired: true, enforced: true },
       };
 
-      const encrypted = encryptData(snapshot, SERVER_MASTER_KEY);
+      // 1. Save to local-first SQLite SQLCipher tables
+      sqlcipherService.saveSnapshot(snapshot);
+
+      // 2. Save encrypted AES-256-GCM file snapshot
+      const keyToUse = customKey || getActiveServerKey();
+      const encrypted = encryptData(snapshot, keyToUse);
       fs.writeFileSync(ENCRYPTED_DB_FILE, JSON.stringify(encrypted, null, 2), "utf8");
       return true;
     } catch (err) {
@@ -746,7 +895,7 @@ class EncryptedDatabaseStore {
       passwordHash: hashPassword(password),
       avatarUrl:
         avatarUrl ||
-        `https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80`,
+        "/avatars/chef-cat.svg",
       createdAt: new Date().toISOString(),
       fido2Enforced: true,
       fido2Enabled: false,
@@ -826,15 +975,23 @@ class EncryptedDatabaseStore {
       fileSizeKb = 0;
     }
 
+    const sqliteStats = sqlcipherService.getStats();
+
     return {
       status: "HEALTHY",
+      databaseEngine: "SQLite 3 with SQLCipher",
+      sqlite: sqliteStats,
       encryption: {
-        algorithm: "AES-256-GCM",
+        algorithm: "SQLCipher (AES-256-CBC, PBKDF2/HMAC-SHA512) & AES-256-GCM",
+        cipher: "SQLCipher",
         atRest: true,
         authenticated: true,
-        keyDerivation: "PBKDF2-SHA256 (100,000 rounds)",
-        storageLocation: "server/data/pantryo_database.enc",
-        fileSizeKb,
+        pageLevelEncrypted: true,
+        keyDerivation: "PBKDF2-HMAC-SHA512 (SQLCipher page KDF) + scrypt/PBKDF2",
+        storageLocation: "server/data/pantryo_sqlcipher.db",
+        fileSizeKb: sqliteStats.fileSizeKb || fileSizeKb,
+        hasCustomKey: Boolean(customActiveKey || fs.existsSync(MASTER_KEY_FILE) || process.env.DB_ENCRYPTION_KEY),
+        installationId: sqliteStats.installationId,
       },
       twoFactor: {
         standard: "FIDO2 / WebAuthn Level 3",

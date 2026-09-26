@@ -232,13 +232,30 @@ export interface RecipeWebsiteSource {
 
 export interface DatabaseStats {
   status: string;
+  databaseEngine?: string;
+  sqlite?: {
+    engine?: string;
+    cipher?: string;
+    isEncrypted?: boolean;
+    storageFile?: string;
+    fileSizeKb?: number;
+    pageCount?: number;
+    pageSize?: number;
+    journalMode?: string;
+    sqliteVersion?: string;
+    installationId?: string;
+    tableCounts?: Record<string, number>;
+  };
   encryption: {
     algorithm: string;
+    cipher?: string;
     atRest: boolean;
     authenticated: boolean;
+    pageLevelEncrypted?: boolean;
     keyDerivation: string;
     storageLocation: string;
     fileSizeKb: number;
+    installationId?: string;
   };
   twoFactor?: {
     standard: string;

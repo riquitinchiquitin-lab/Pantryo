@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgCat" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FED7AA" />
+      <stop offset="100%" stop-color="#FB923C" />
+    </linearGradient>
+    <linearGradient id="catBody" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FDBA74" />
+      <stop offset="100%" stop-color="#EA580C" />
+    </linearGradient>
+    <filter id="shadowCat" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#7C2D12" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Background Circle -->
+  <circle cx="100" cy="100" r="98" fill="url(#bgCat)" stroke="#EA580C" stroke-width="4"/>
+
+  <!-- Stars / culinary sparkle -->
+  <path d="M40 45 L42 49 L46 51 L42 53 L40 57 L38 53 L34 51 L38 49 Z" fill="#FEF08A" opacity="0.8"/>
+  <path d="M165 40 L166.5 43 L170 44.5 L166.5 46 L165 49 L163.5 46 L160 44.5 L163.5 43 Z" fill="#FEF08A" opacity="0.8"/>
+
+  <!-- Cat Ears -->
+  <g filter="url(#shadowCat)">
+    <!-- Left Ear -->
+    <polygon points="56,76 38,32 78,50" fill="#EA580C"/>
+    <polygon points="58,70 46,40 74,52" fill="#F472B6"/>
+    <!-- Right Ear -->
+    <polygon points="144,76 162,32 122,50" fill="#EA580C"/>
+    <polygon points="142,70 154,40 126,52" fill="#F472B6"/>
+
+    <!-- Cat Head & Body -->
+    <path d="M45,175 C45,120 60,78 100,78 C140,78 155,120 155,175 C155,190 45,190 45,175 Z" fill="url(#catBody)"/>
+    <ellipse cx="100" cy="120" rx="46" ry="40" fill="#FDBA74"/>
+    <!-- White Muzzle -->
+    <ellipse cx="100" cy="132" rx="28" ry="20" fill="#FFFBEB"/>
+  </g>
+
+  <!-- Stripes on Forehead -->
+  <path d="M100 84 L100 96 M92 88 L94 98 M108 88 L106 98" stroke="#C2410C" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Eyes -->
+  <g>
+    <ellipse cx="80" cy="116" rx="9" ry="12" fill="#064E3B"/>
+    <ellipse cx="120" cy="116" rx="9" ry="12" fill="#064E3B"/>
+    <!-- Eye Highlights -->
+    <circle cx="77" cy="112" r="3.5" fill="#FFFFFF"/>
+    <circle cx="82" cy="119" r="1.5" fill="#FFFFFF"/>
+    <circle cx="117" cy="112" r="3.5" fill="#FFFFFF"/>
+    <circle cx="122" cy="119" r="1.5" fill="#FFFFFF"/>
+  </g>
+
+  <!-- Cheeks / Blush -->
+  <ellipse cx="68" cy="130" rx="9" ry="6" fill="#FB7185" opacity="0.6"/>
+  <ellipse cx="132" cy="130" rx="9" ry="6" fill="#FB7185" opacity="0.6"/>
+
+  <!-- Nose & Cat Smile -->
+  <polygon points="100,126 95,122 105,122" fill="#F43F5E"/>
+  <path d="M95 126 Q100 131 100 133 Q100 131 105 126" stroke="#9A3412" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M93 133 Q100 139 100 133 Q100 139 107 133" stroke="#9A3412" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+
+  <!-- Whiskers -->
+  <path d="M68 128 L42 124 M68 133 L40 135 M68 138 L44 145" stroke="#FFFBEB" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M132 128 L158 124 M132 133 L160 135 M132 138 L156 145" stroke="#FFFBEB" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Chef Hat -->
+  <g filter="url(#shadowCat)">
+    <!-- Hat Poof Top -->
+    <ellipse cx="74" cy="50" rx="18" ry="16" fill="#FFFFFF"/>
+    <ellipse cx="126" cy="50" rx="18" ry="16" fill="#FFFFFF"/>
+    <ellipse cx="100" cy="42" rx="22" ry="20" fill="#FFFFFF"/>
+    <!-- Hat Base Band -->
+    <rect x="76" y="60" width="48" height="18" rx="4" fill="#F1F5F9" stroke="#E2E8F0" stroke-width="1.5"/>
+    <rect x="78" y="72" width="44" height="4" rx="2" fill="#E11D48"/>
+  </g>
+
+  <!-- Red Scarf / Neckerchief -->
+  <path d="M72 162 C72 162 100 178 128 162 C124 180 100 186 72 162 Z" fill="#E11D48"/>
+  <polygon points="100,172 90,192 100,186 110,192" fill="#BE123C"/>
+</svg>

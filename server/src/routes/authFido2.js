@@ -3,7 +3,6 @@ import { dbStore } from "../services/dbStore.js";
 import { fido2Service } from "../services/fido2Service.js";
 import {
   generateTotpSecret,
-  generateTotpCode,
   verifyTotpCode,
   generateOtpAuthUri,
 } from "../services/totpService.js";

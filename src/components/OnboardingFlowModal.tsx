@@ -35,7 +35,7 @@ export const OnboardingFlowModal: React.FC<OnboardingFlowModalProps> = ({
   // Form states
   const [username, setUsername] = useState(user.email === 'admin' ? '' : user.email);
   const [name, setName] = useState(user.name === 'Administrator' ? '' : user.name);
-  const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80');
+  const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl || '/avatars/chef-cat.svg');
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -255,6 +255,7 @@ export const OnboardingFlowModal: React.FC<OnboardingFlowModalProps> = ({
                   <img
                     src={avatarUrl}
                     alt={name || 'Avatar'}
+                    referrerPolicy="no-referrer"
                     className="w-10 h-10 rounded-full object-cover border border-teal-600/30 shadow-xs"
                   />
                   <div>
@@ -286,6 +287,7 @@ export const OnboardingFlowModal: React.FC<OnboardingFlowModalProps> = ({
                 <img
                   src={avatarUrl}
                   alt={user.name}
+                  referrerPolicy="no-referrer"
                   className="w-10 h-10 rounded-full object-cover border border-teal-600/30 shadow-xs"
                 />
                 <div>

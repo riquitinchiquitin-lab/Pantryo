@@ -76,7 +76,7 @@ router.post("/setup-admin", async (req, res) => {
       });
     }
 
-    const { name, username, email, password, avatarUrl } = req.body;
+    const { name, username, email, password, avatarUrl, dbEncryptionKey } = req.body;
     const cleanUsername = (username || email || "").trim();
     if (!cleanUsername || !password) {
       return res.status(400).json({ error: "Username and password are required" });
@@ -86,6 +86,11 @@ router.post("/setup-admin", async (req, res) => {
       return res.status(400).json({
         error: "Generic username 'admin' is not permitted. Please choose your personalized username or email.",
       });
+    }
+
+    // If custom database encryption key is provided, set it and re-encrypt the storage
+    if (dbEncryptionKey && typeof dbEncryptionKey === "string" && dbEncryptionKey.trim().length >= 16) {
+      dbStore.setEncryptionKey(dbEncryptionKey.trim());
     }
 
     // Validate new password against NIST SP 800-63B
@@ -127,6 +132,49 @@ router.post("/setup-admin", async (req, res) => {
 });
 
 /**
+ * GET /api/v1/admin/generate-key
+ * Generates a 256-bit cryptographically secure AES key for database and backup encryption
+ */
+router.get("/generate-key", async (req, res) => {
+  try {
+    const key = await dbStore.generateEncryptionKey();
+    res.json({
+      success: true,
+      key,
+      algorithm: "AES-256-GCM",
+      entropyBits: 256,
+      subtleCrypto: true,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/v1/admin/set-encryption-key
+ * Re-encrypts the database disk storage with a new user-supplied or generated encryption key
+ */
+router.post("/set-encryption-key", (req, res) => {
+  try {
+    const { encryptionKey } = req.body;
+    if (!encryptionKey || typeof encryptionKey !== "string" || encryptionKey.trim().length < 16) {
+      return res.status(400).json({
+        error: "Encryption key must be at least 16 characters (256-bit recommended).",
+      });
+    }
+
+    dbStore.setEncryptionKey(encryptionKey.trim());
+    res.json({
+      success: true,
+      message: "Database successfully re-encrypted with new key and saved to disk.",
+      algorithm: "AES-256-GCM",
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
  * GET /api/v1/admin/stats
  * Returns database health, encryption status, and entity counts
  */
@@ -141,27 +189,24 @@ router.get("/stats", (req, res) => {
 
 /**
  * GET /api/v1/admin/backup
- * Downloads or exports full database snapshot
- * Query params:
- * - encrypt=true|false
- * - passphrase=...
+ * Downloads full encrypted database snapshot.
+ * Requires an encryption key to download.
  */
 router.get("/backup", (req, res) => {
   try {
-    const shouldEncrypt = req.query.encrypt === "true" || req.query.encrypt === "1";
-    const passphrase = shouldEncrypt ? req.query.passphrase || "" : null;
+    const key = (req.query.passphrase || req.query.key || "").trim();
 
-    if (shouldEncrypt && (!passphrase || passphrase.trim().length === 0)) {
-      return res.status(400).json({ error: "Passphrase is required for encrypted backup" });
+    if (!key || key.length === 0) {
+      return res.status(400).json({
+        error: "An encryption key is required to download the database backup.",
+      });
     }
 
-    const backupPackage = dbStore.exportBackup(passphrase);
+    const backupPackage = dbStore.exportBackup(key);
 
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="pantryo-backup-${new Date().toISOString().split("T")[0]}${
-        shouldEncrypt ? ".pantryo.enc" : ".json"
-      }"`
+      `attachment; filename="pantryo-backup-${new Date().toISOString().split("T")[0]}.pantryo.enc"`
     );
     res.setHeader("Content-Type", "application/json");
     res.json(backupPackage);
@@ -172,17 +217,25 @@ router.get("/backup", (req, res) => {
 
 /**
  * POST /api/v1/admin/restore
- * Restores database from an uploaded JSON or encrypted package
+ * Restores database from an uploaded encrypted package.
+ * Requires the encryption key to decrypt and restore.
  */
 router.post("/restore", (req, res) => {
   try {
-    const { backupPackage, passphrase, mode = "replace" } = req.body;
+    const { backupPackage, passphrase, key, mode = "replace" } = req.body;
+    const decryptionKey = (passphrase || key || "").trim();
 
     if (!backupPackage) {
       return res.status(400).json({ error: "Missing backupPackage in request body" });
     }
 
-    const result = dbStore.restoreBackup(backupPackage, passphrase, mode);
+    if (!decryptionKey || decryptionKey.length === 0) {
+      return res.status(400).json({
+        error: "The encryption key is required to decrypt and restore this backup.",
+      });
+    }
+
+    const result = dbStore.restoreBackup(backupPackage, decryptionKey, mode);
     res.json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });

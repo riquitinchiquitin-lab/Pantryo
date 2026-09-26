@@ -12,6 +12,7 @@ import {
   Key,
   Users,
   Check,
+  Copy,
   AlertTriangle,
   FileText,
   Trash2,
@@ -26,6 +27,7 @@ import {
   Info,
   X,
   Camera,
+  Smartphone,
 } from 'lucide-react';
 import { User, DatabaseStats, DatabaseBackupPackage } from '../types';
 import { useLanguage } from '../utils/i18n';
@@ -33,6 +35,12 @@ import { Fido2SecurityPanel } from './Fido2SecurityPanel';
 import { NistPasswordValidator } from './NistPasswordValidator';
 import { generatePassphrase } from '../utils/nistPassword';
 import { ChangeAvatarModal } from './ChangeAvatarModal';
+import { PWAInstallButton } from './PWAInstallButton';
+import {
+  generateDatabaseEncryptionKey,
+  isValid256BitKey,
+  testKeyWithSubtleCrypto,
+} from '../utils/cryptoKey';
 
 const DEFAULT_DATABASE_STATS: DatabaseStats = {
   status: 'HEALTHY',
@@ -93,9 +101,11 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   // Backup State
-  const [encryptBackup, setEncryptBackup] = useState(true);
-  const [backupPassphrase, setBackupPassphrase] = useState('');
+  const [backupPassphrase, setBackupPassphrase] = useState(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('pantryo_active_db_key')) || '';
+  });
   const [showBackupPassphrase, setShowBackupPassphrase] = useState(false);
+  const [copiedBackupKey, setCopiedBackupKey] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
   // Restore State
@@ -106,6 +116,14 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
   const [restoreMode, setRestoreMode] = useState<'replace' | 'merge'>('replace');
   const [isRestoring, setIsRestoring] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Database Encryption Key Generator & Rotation State
+  const [dbKeyInput, setDbKeyInput] = useState(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('pantryo_active_db_key')) || '';
+  });
+  const [showDbKeyInput, setShowDbKeyInput] = useState(false);
+  const [isUpdatingDbKey, setIsUpdatingDbKey] = useState(false);
+  const [copiedDbKey, setCopiedDbKey] = useState(false);
 
   // Reset State
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -216,11 +234,90 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Handle Export Backup
-  const handleExportBackup = async () => {
-    if (encryptBackup && !backupPassphrase.trim()) {
+  // Key Generator Helpers using SubtleCrypto API
+  const handleGenerateBackupKey = async () => {
+    try {
+      const key = await generateDatabaseEncryptionKey();
+      if (key) {
+        setBackupPassphrase(key);
+        setShowBackupPassphrase(true);
+      }
+    } catch (e) {
+      console.warn('Backup key generation error:', e);
+    }
+  };
+
+  const handleGenerateDbKey = async () => {
+    try {
+      const key = await generateDatabaseEncryptionKey();
+      if (key) {
+        setDbKeyInput(key);
+        setShowDbKeyInput(true);
+      }
+    } catch (e) {
+      console.warn('DB key generation error:', e);
+    }
+  };
+
+  const handleSaveDbEncryptionKey = async () => {
+    if (!dbKeyInput.trim() || dbKeyInput.trim().length < 16) {
       setStatusMessage({
-        text: lang === 'FR' ? 'Veuillez entrer une phrase de passe pour chiffrer la sauvegarde' : 'Please enter a passphrase to encrypt your backup',
+        text:
+          lang === 'FR'
+            ? 'La clé de chiffrement doit comporter au moins 16 caractères (clé 256 bits recommandée).'
+            : 'The encryption key must be at least 16 characters (256-bit recommended).',
+        type: 'error',
+      });
+      return;
+    }
+
+    try {
+      setIsUpdatingDbKey(true);
+      setStatusMessage(null);
+
+      const res = await fetch('/api/v1/admin/set-encryption-key', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': currentUser.role,
+          'x-user-id': currentUser.id,
+        },
+        body: JSON.stringify({ encryptionKey: dbKeyInput.trim() }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to update database encryption key');
+      }
+
+      try {
+        localStorage.setItem('pantryo_active_db_key', dbKeyInput.trim());
+      } catch (e) {}
+
+      setStatusMessage({
+        text:
+          lang === 'FR'
+            ? 'Base de données rechiffrée et enregistrée avec succès sur le disque avec la nouvelle clé (AES-256-GCM) !'
+            : 'Database successfully re-encrypted and saved to disk with new key (AES-256-GCM)!',
+        type: 'success',
+      });
+
+      fetchStatsAndUsers();
+    } catch (err: any) {
+      setStatusMessage({ text: err.message, type: 'error' });
+    } finally {
+      setIsUpdatingDbKey(false);
+    }
+  };
+
+  // Handle Export Backup (Requires encryption key)
+  const handleExportBackup = async () => {
+    if (!backupPassphrase.trim() || backupPassphrase.trim().length < 8) {
+      setStatusMessage({
+        text:
+          lang === 'FR'
+            ? 'Veuillez entrer ou générer une clé de chiffrement pour télécharger la sauvegarde chiffrée (AES-256-GCM).'
+            : 'Please enter or generate an encryption key to download the encrypted backup (AES-256-GCM).',
         type: 'error',
       });
       return;
@@ -231,10 +328,8 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
       setStatusMessage(null);
 
       const params = new URLSearchParams();
-      if (encryptBackup) {
-        params.append('encrypt', 'true');
-        params.append('passphrase', backupPassphrase.trim());
-      }
+      params.append('encrypt', 'true');
+      params.append('passphrase', backupPassphrase.trim());
 
       const res = await fetch(`/api/v1/admin/backup?${params.toString()}`, {
         headers: {
@@ -253,7 +348,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
       const a = document.createElement('a');
       a.href = url;
       const dateStr = new Date().toISOString().split('T')[0];
-      a.download = `pantryo-backup-${dateStr}${encryptBackup ? '.pantryo.enc' : '.json'}`;
+      a.download = `pantryo-backup-${dateStr}.pantryo.enc`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -262,8 +357,8 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
       setStatusMessage({
         text:
           lang === 'FR'
-            ? `Sauvegarde ${encryptBackup ? 'chiffrée (AES-256-GCM)' : 'JSON'} téléchargée avec succès !`
-            : `Backup ${encryptBackup ? 'encrypted (AES-256-GCM)' : 'JSON'} downloaded successfully!`,
+            ? 'Sauvegarde chiffrée (AES-256-GCM) téléchargée avec succès ! Conservez votre clé pour la restauration.'
+            : 'Encrypted backup (AES-256-GCM) downloaded successfully! Keep your key safe for restoring.',
         type: 'success',
       });
 
@@ -290,7 +385,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
         setStatusMessage(null);
       } catch (err) {
         setStatusMessage({
-          text: lang === 'FR' ? 'Fichier de sauvegarde invalide (JSON requis)' : 'Invalid backup file (JSON/Encrypted package required)',
+          text: lang === 'FR' ? 'Fichier de sauvegarde invalide (JSON/enc requis)' : 'Invalid backup file (JSON/Encrypted package required)',
           type: 'error',
         });
         setRestorePackage(null);
@@ -299,19 +394,22 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     reader.readAsText(file);
   };
 
-  // Handle Execute Restore
+  // Handle Execute Restore (Requires encryption key)
   const handleExecuteRestore = async () => {
     if (!restorePackage) {
       setStatusMessage({
-        text: lang === 'FR' ? 'Veuillez d’abord sélectionner un fichier de sauvegarde' : 'Please select a backup file first',
+        text: lang === 'FR' ? 'Veuillez d’abord sélectionner un fichier de sauvegarde (.pantryo.enc)' : 'Please select a backup file first (.pantryo.enc)',
         type: 'error',
       });
       return;
     }
 
-    if (restorePackage.metadata?.isEncrypted && !restorePassphrase.trim()) {
+    if (!restorePassphrase.trim()) {
       setStatusMessage({
-        text: lang === 'FR' ? 'Cette sauvegarde est chiffrée. Veuillez entrer la phrase de passe de déchiffrement.' : 'This backup is encrypted. Please enter the decryption passphrase.',
+        text:
+          lang === 'FR'
+            ? 'Clé de chiffrement requise pour déchiffrer et restaurer cette sauvegarde.'
+            : 'Encryption key is required to decrypt and restore this backup.',
         type: 'error',
       });
       return;
@@ -343,8 +441,8 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
       setStatusMessage({
         text:
           lang === 'FR'
-            ? `Restauration réussie (${data.recordCounts?.items ?? 0} articles synchronisés) !`
-            : `Database restored successfully (${data.recordCounts?.items ?? 0} items synchronized)!`,
+            ? `Restauration réussie (${data.recordCounts?.items ?? 0} articles synchronisés) ! Base de données rechiffrée et sauvegardée.`
+            : `Database restored successfully (${data.recordCounts?.items ?? 0} items synchronized)! Database re-encrypted and saved.`,
         type: 'success',
       });
 
@@ -625,7 +723,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-sm text-[#0D3B37]">
-                        {lang === 'FR' ? 'Base de Données Chiffrée' : 'Encrypted Storage Status'}
+                        {lang === 'FR' ? 'Stockage SQLite avec SQLCipher' : 'SQLite Storage with SQLCipher'}
                       </span>
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -634,8 +732,8 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                     </div>
                     <p className="text-xs text-[#527470] mt-0.5">
                       {lang === 'FR'
-                        ? `Chiffrement : AES-256-GCM au repos (${stats?.encryption?.fileSizeKb ?? 0} Ko)`
-                        : `Encryption: AES-256-GCM at rest (${stats?.encryption?.fileSizeKb ?? 0} KB)`}
+                        ? `Chiffrement : SQLCipher AES-256 au repos (${stats?.sqlite?.fileSizeKb ?? stats?.encryption?.fileSizeKb ?? 0} Ko) • ${stats?.sqlite?.pageCount ?? 0} pages`
+                        : `Encryption: SQLCipher AES-256 at rest (${stats?.sqlite?.fileSizeKb ?? stats?.encryption?.fileSizeKb ?? 0} KB) • ${stats?.sqlite?.pageCount ?? 0} pages`}
                     </p>
                   </div>
                 </div>
@@ -668,6 +766,146 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                 </div>
               </div>
 
+              {/* Database Encryption Key Generator & Storage Card */}
+              <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-800 flex items-center justify-center shrink-0">
+                      <Key className="w-5 h-5 text-teal-700" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-sm text-[#0D3B37] flex items-center gap-2">
+                        <span>
+                          {lang === 'FR'
+                            ? 'Stockage SQLite Local avec SQLCipher (AES-256)'
+                            : 'Local SQLite Storage with SQLCipher (AES-256)'}
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-teal-100 text-teal-800">
+                          {lang === 'FR' ? 'Par installation' : 'Per installation'}
+                        </span>
+                      </h3>
+                      <p className="text-xs text-[#527470]">
+                        {lang === 'FR'
+                          ? `Base de données SQLite chiffrée page par page avec SQLCipher. Installation ID : ${stats?.encryption?.installationId || stats?.sqlite?.installationId || 'inst_locale'}`
+                          : `SQLite database encrypted page-by-page with SQLCipher. Installation ID: ${stats?.encryption?.installationId || stats?.sqlite?.installationId || 'inst_local'}`}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleGenerateDbKey}
+                    className="px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-teal-200"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>{lang === 'FR' ? 'Générer une clé (256-bit)' : 'Generate Key (256-bit)'}</span>
+                  </button>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type={showDbKeyInput ? 'text' : 'password'}
+                      value={dbKeyInput}
+                      onChange={(e) => setDbKeyInput(e.target.value)}
+                      placeholder={lang === 'FR' ? 'Clé de chiffrement (min. 16 caractères / 256 bits)...' : 'Encryption key (min 16 chars / 256 bits)...'}
+                      className="w-full px-3.5 py-2.5 pr-20 text-xs rounded-xl bg-[#FAF7EE] border border-[#D5CEBD] focus:outline-none focus:ring-2 focus:ring-teal-700 font-mono text-[#0D3B37] tracking-wider"
+                    />
+                    <div className="absolute right-2 top-2 flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowDbKeyInput(!showDbKeyInput)}
+                        className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        title={showDbKeyInput ? 'Masquer' : 'Afficher'}
+                      >
+                        {showDbKeyInput ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (dbKeyInput) {
+                            navigator.clipboard.writeText(dbKeyInput);
+                            setCopiedDbKey(true);
+                            setTimeout(() => setCopiedDbKey(false), 2000);
+                          }
+                        }}
+                        className="p-1 text-teal-700 hover:text-teal-900 cursor-pointer"
+                        title={lang === 'FR' ? 'Copier la clé' : 'Copy key'}
+                      >
+                        {copiedDbKey ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleSaveDbEncryptionKey}
+                    disabled={isUpdatingDbKey || !dbKeyInput.trim()}
+                    className="px-4 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 transition-all shadow-xs shrink-0"
+                  >
+                    {isUpdatingDbKey ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Lock className="w-3.5 h-3.5" />
+                    )}
+                    <span>
+                      {lang === 'FR' ? 'Enregistrer & Rechiffrer la Base' : 'Save & Re-encrypt Database'}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Progressive Web App (PWA) Android & iOS Installation Status Card */}
+              <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-800 flex items-center justify-center shrink-0">
+                      <Smartphone className="w-5 h-5 text-teal-700" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-sm text-[#0D3B37] flex items-center gap-2">
+                        <span>
+                          {lang === 'FR'
+                            ? 'Application Mobile & PWA (Android & iOS)'
+                            : 'Mobile Web App & PWA (Android & iOS)'}
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800">
+                          {lang === 'FR' ? 'Compatible Android & iOS' : 'Android & iOS Ready'}
+                        </span>
+                      </h3>
+                      <p className="text-xs text-[#527470]">
+                        {lang === 'FR'
+                          ? 'Pantryo peut être installée comme une véritable application native sur votre écran d’accueil avec accès hors-ligne, icônes adaptatives et notifications.'
+                          : 'Pantryo can be installed directly to your home screen as a standalone application on Android (Chrome) and iOS (Safari).'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <PWAInstallButton variant="pill" />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 text-xs">
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <p className="font-bold text-slate-800 text-[11px]">Android (WebAPK)</p>
+                    <p className="text-slate-600 text-[10px] mt-0.5">
+                      {lang === 'FR' ? 'Icône adaptative masquable 512x512 & installation en 1 clic' : '512x512 maskable adaptive icon & 1-tap installation'}
+                    </p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <p className="font-bold text-slate-800 text-[11px]">iOS (Safari Home Screen)</p>
+                    <p className="text-slate-600 text-[10px] mt-0.5">
+                      {lang === 'FR' ? 'Apple touch icon 180x180 & affichage plein écran sans barre' : '180x180 apple-touch-icon & standalone fullscreen display'}
+                    </p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <p className="font-bold text-slate-800 text-[11px]">Service Worker</p>
+                    <p className="text-slate-600 text-[10px] mt-0.5">
+                      {lang === 'FR' ? 'Gestionnaire actif avec mise en cache locale des assets' : 'Active worker with local asset precaching'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {/* Grid: 2 Columns for Export & Import */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {/* 1. BACKUP (EXPORT) */}
@@ -678,48 +916,88 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                         <Download className="w-4 h-4" />
                       </div>
                       <h3 className="font-bold text-sm text-[#0D3B37]">
-                        {lang === 'FR' ? 'Exporter une Sauvegarde' : 'Export Full Backup'}
+                        {lang === 'FR' ? 'Télécharger une Sauvegarde Chiffrée' : 'Download Encrypted Backup'}
                       </h3>
                     </div>
                     <p className="text-xs text-[#527470]">
                       {lang === 'FR'
-                        ? 'Téléchargez une archive complète de vos stocks, dates de péremption, repas planifiés et recettes.'
-                        : 'Download a complete archive of your stock, expiration records, planned meals, and custom recipes.'}
+                        ? 'Téléchargez une archive chiffrée (AES-256-GCM) de vos stocks, dates de péremption, repas planifiés et recettes.'
+                        : 'Download an encrypted (AES-256-GCM) archive of your pantry stock, expiration dates, planned meals, and recipes.'}
                     </p>
 
-                    <div className="mt-4 space-y-3">
-                      <label className="flex items-center gap-2 text-xs font-medium cursor-pointer text-[#0D3B37]">
-                        <input
-                          type="checkbox"
-                          checked={encryptBackup}
-                          onChange={(e) => setEncryptBackup(e.target.checked)}
-                          className="w-4 h-4 rounded text-teal-700 focus:ring-teal-500 border-[#C9C2B0]"
-                        />
-                        <span>
-                          {lang === 'FR'
-                            ? 'Chiffrer l’archive avec une phrase de passe (AES-256-GCM)'
-                            : 'Encrypt archive with passphrase (AES-256-GCM)'}
-                        </span>
-                      </label>
+                    <div className="mt-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-[#0D3B37] flex items-center gap-1">
+                          <Lock className="w-3 h-3 text-teal-700" />
+                          <span>
+                            {lang === 'FR'
+                              ? 'Clé de chiffrement requise pour télécharger :'
+                              : 'Encryption key required to download:'}
+                          </span>
+                        </label>
+                        <div className="flex items-center gap-1">
+                          {dbKeyInput && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setBackupPassphrase(dbKeyInput);
+                                setShowBackupPassphrase(true);
+                              }}
+                              className="text-[10px] font-bold text-teal-700 hover:text-teal-900 cursor-pointer bg-teal-50 px-2 py-0.5 rounded-lg border border-teal-200"
+                            >
+                              {lang === 'FR' ? 'Clé de la base' : 'Use DB key'}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={handleGenerateBackupKey}
+                            className="text-[10px] font-bold text-teal-700 hover:text-teal-900 cursor-pointer bg-teal-50 px-2 py-0.5 rounded-lg border border-teal-200 flex items-center gap-1"
+                          >
+                            <RefreshCw className="w-2.5 h-2.5" />
+                            <span>{lang === 'FR' ? 'Générer' : 'Generate'}</span>
+                          </button>
+                        </div>
+                      </div>
 
-                      {encryptBackup && (
-                        <div className="relative animate-fade-in">
-                          <input
-                            type={showBackupPassphrase ? 'text' : 'password'}
-                            placeholder={lang === 'FR' ? 'Phrase secrète de chiffrement' : 'Encryption passphrase'}
-                            value={backupPassphrase}
-                            onChange={(e) => setBackupPassphrase(e.target.value)}
-                            className="w-full px-3 py-2 pr-9 text-xs rounded-xl bg-[#FAF7EE] border border-[#D5CEBD] focus:outline-none focus:ring-2 focus:ring-teal-700 font-mono text-[#0D3B37]"
-                          />
+                      <div className="relative">
+                        <input
+                          type={showBackupPassphrase ? 'text' : 'password'}
+                          placeholder={lang === 'FR' ? 'Entrez la clé de chiffrement de la sauvegarde...' : 'Enter backup encryption key...'}
+                          value={backupPassphrase}
+                          onChange={(e) => setBackupPassphrase(e.target.value)}
+                          className="w-full px-3 py-2 pr-16 text-xs rounded-xl bg-[#FAF7EE] border border-[#D5CEBD] focus:outline-none focus:ring-2 focus:ring-teal-700 font-mono text-[#0D3B37] tracking-wider"
+                        />
+                        <div className="absolute right-2 top-2 flex items-center gap-1">
                           <button
                             type="button"
                             onClick={() => setShowBackupPassphrase(!showBackupPassphrase)}
-                            className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                            className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
+                            title={showBackupPassphrase ? 'Masquer' : 'Afficher'}
                           >
                             {showBackupPassphrase ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (backupPassphrase) {
+                                navigator.clipboard.writeText(backupPassphrase);
+                                setCopiedBackupKey(true);
+                                setTimeout(() => setCopiedBackupKey(false), 2000);
+                              }
+                            }}
+                            className="p-1 text-teal-700 hover:text-teal-900 cursor-pointer"
+                            title={lang === 'FR' ? 'Copier' : 'Copy'}
+                          >
+                            {copiedBackupKey ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
                         </div>
-                      )}
+                      </div>
+
+                      <p className="text-[10px] text-[#527470]">
+                        {lang === 'FR'
+                          ? '🔒 Conservez cette clé : elle sera indispensable pour déchiffrer et restaurer votre sauvegarde.'
+                          : '🔒 Save this key: it will be mandatory to decrypt and restore your backup.'}
+                      </p>
                     </div>
                   </div>
 
@@ -734,13 +1012,9 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                       <Download className="w-4 h-4" />
                     )}
                     <span>
-                      {encryptBackup
-                        ? lang === 'FR'
-                          ? 'Télécharger la sauvegarde chiffrée (.pantryo.enc)'
-                          : 'Download Encrypted Backup (.pantryo.enc)'
-                        : lang === 'FR'
-                        ? 'Télécharger la sauvegarde JSON (.json)'
-                        : 'Download JSON Backup (.json)'}
+                      {lang === 'FR'
+                        ? 'Télécharger la Sauvegarde Chiffrée (.pantryo.enc)'
+                        : 'Download Encrypted Backup (.pantryo.enc)'}
                     </span>
                   </button>
                 </div>
@@ -758,8 +1032,8 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                     </div>
                     <p className="text-xs text-[#527470]">
                       {lang === 'FR'
-                        ? 'Restaurez vos données à partir d’un fichier .pantryo.enc chiffré ou d’un export .json.'
-                        : 'Restore your pantry data from an encrypted .pantryo.enc package or a .json export.'}
+                        ? 'Restaurez vos données à partir d’un fichier chiffré .pantryo.enc en fournissant la clé de déchiffrement.'
+                        : 'Restore your pantry data from an encrypted .pantryo.enc package by providing the decryption key.'}
                     </p>
 
                     <div className="mt-4 space-y-3">
@@ -778,7 +1052,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                           <div className="flex items-center justify-between font-bold text-[#0D3B37]">
                             <span>{lang === 'FR' ? 'Fichier analysé :' : 'Analyzed package:'}</span>
                             <span className="text-teal-700">
-                              {restorePackage.metadata?.isEncrypted ? 'Chiffré AES-256-GCM' : 'JSON Standard'}
+                              {restorePackage.metadata?.isEncrypted ? 'Chiffré AES-256-GCM' : 'Archive Détectée'}
                             </span>
                           </div>
                           <p className="text-[11px] text-[#527470]">
@@ -791,27 +1065,51 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                               {restorePackage.metadata?.recordCounts?.plannedMeals ?? 'N/A'}
                             </strong>
                           </p>
-
-                          {restorePackage.metadata?.isEncrypted && (
-                            <div className="relative pt-1.5">
-                              <input
-                                type={showRestorePassphrase ? 'text' : 'password'}
-                                placeholder={lang === 'FR' ? 'Entrez la phrase secrète de déchiffrement' : 'Enter decryption passphrase'}
-                                value={restorePassphrase}
-                                onChange={(e) => setRestorePassphrase(e.target.value)}
-                                className="w-full px-3 py-1.5 pr-8 text-xs rounded-lg bg-white border border-[#D5CEBD] focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono text-[#0D3B37]"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setShowRestorePassphrase(!showRestorePassphrase)}
-                                className="absolute right-2.5 top-3 text-slate-400 hover:text-slate-600 cursor-pointer"
-                              >
-                                {showRestorePassphrase ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                              </button>
-                            </div>
-                          )}
                         </div>
                       )}
+
+                      {/* Always ask for encryption key to restore */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-bold text-[#0D3B37] flex items-center gap-1">
+                            <Key className="w-3 h-3 text-amber-700" />
+                            <span>
+                              {lang === 'FR'
+                                ? 'Clé de chiffrement pour restaurer :'
+                                : 'Encryption key to restore:'}
+                            </span>
+                          </label>
+                          {dbKeyInput && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRestorePassphrase(dbKeyInput);
+                                setShowRestorePassphrase(true);
+                              }}
+                              className="text-[10px] font-bold text-amber-800 hover:text-amber-950 cursor-pointer bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200"
+                            >
+                              {lang === 'FR' ? 'Clé de la base' : 'Use DB key'}
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="relative">
+                          <input
+                            type={showRestorePassphrase ? 'text' : 'password'}
+                            placeholder={lang === 'FR' ? 'Entrez la clé de déchiffrement...' : 'Enter decryption key...'}
+                            value={restorePassphrase}
+                            onChange={(e) => setRestorePassphrase(e.target.value)}
+                            className="w-full px-3 py-2 pr-9 text-xs rounded-xl bg-[#FAF7EE] border border-[#D5CEBD] focus:outline-none focus:ring-2 focus:ring-amber-600 font-mono text-[#0D3B37] tracking-wider"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowRestorePassphrase(!showRestorePassphrase)}
+                            className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                          >
+                            {showRestorePassphrase ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
 
                       {/* Mode choice */}
                       <div className="flex gap-2">
@@ -1012,11 +1310,9 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                         <div className="flex items-center gap-3">
                           <div className="relative group/avatar shrink-0">
                             <img
-                              src={
-                                u.avatarUrl ||
-                                'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80'
-                              }
+                              src={u.avatarUrl || '/avatars/chef-cat.svg'}
                               alt={u.name}
+                              referrerPolicy="no-referrer"
                               className="w-11 h-11 rounded-full object-cover border border-[#D5CEBD] shrink-0 cursor-pointer hover:opacity-90"
                               onClick={() => setSelectedUserForAvatar(u)}
                             />

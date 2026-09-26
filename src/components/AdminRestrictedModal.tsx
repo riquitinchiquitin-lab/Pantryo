@@ -247,11 +247,9 @@ export const AdminRestrictedModal: React.FC<AdminRestrictedModalProps> = ({
           <div className="p-4 rounded-2xl bg-white border border-[#E0D9C8] flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <img
-                src={
-                  adminUser?.avatarUrl ||
-                  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80'
-                }
+                src={adminUser?.avatarUrl || '/avatars/chef-cat.svg'}
                 alt="Admin"
+                referrerPolicy="no-referrer"
                 className="w-9 h-9 rounded-full object-cover border border-[#D5CEBD]"
               />
               <div>

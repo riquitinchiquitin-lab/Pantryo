@@ -13,6 +13,10 @@ import {
   RefreshCw,
   Check,
   Smartphone,
+  Copy,
+  Database,
+  Download,
+  Cpu,
 } from 'lucide-react';
 import { User } from '../types';
 import { PantryoLogo } from './PantryoLogo';
@@ -21,6 +25,15 @@ import { fido2Client } from '../services/fido2Client';
 import { Fido2AuthModal } from './Fido2AuthModal';
 import { OnboardingFlowModal } from './OnboardingFlowModal';
 import { ChangeAvatarModal } from './ChangeAvatarModal';
+import { PWAInstallButton } from './PWAInstallButton';
+import {
+  generateDatabaseKeyDetails,
+  generateDatabaseEncryptionKey,
+  testKeyWithSubtleCrypto,
+  isValid256BitKey,
+  downloadKeyRecoveryCard,
+  DatabaseKeyDetails,
+} from '../utils/cryptoKey';
 
 interface LoginSplashProps {
   onLoginSuccess: (user: User) => void;
@@ -51,10 +64,52 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
   const [initPassword, setInitPassword] = useState('');
   const [initConfirmPassword, setInitConfirmPassword] = useState('');
   const [showInitPassword, setShowInitPassword] = useState(false);
-  const [initAvatarUrl, setInitAvatarUrl] = useState(
-    'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80'
-  );
+  const [initAvatarUrl, setInitAvatarUrl] = useState('/avatars/chef-cat.svg');
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+
+  // Database Encryption Key Generator state (256-bit AES-GCM via SubtleCrypto API)
+  const [initDbKey, setInitDbKey] = useState('');
+  const [dbKeyDetails, setDbKeyDetails] = useState<DatabaseKeyDetails | null>(null);
+  const [isGeneratingDbKey, setIsGeneratingDbKey] = useState(false);
+  const [keyVerifiedWithSubtle, setKeyVerifiedWithSubtle] = useState(false);
+  const [showDbKey, setShowDbKey] = useState(false);
+  const [copiedDbKey, setCopiedDbKey] = useState(false);
+
+  // Generate initial 256-bit key using SubtleCrypto API on mount if clean install
+  useEffect(() => {
+    if (!householdMembers || householdMembers.length === 0) {
+      setIsGeneratingDbKey(true);
+      generateDatabaseKeyDetails()
+        .then(async (details) => {
+          setInitDbKey(details.hexKey);
+          setDbKeyDetails(details);
+          const test = await testKeyWithSubtleCrypto(details.hexKey);
+          if (test.valid) setKeyVerifiedWithSubtle(true);
+        })
+        .catch((err) => {
+          console.warn('[Pantryo Setup] SubtleCrypto initial key generation warning:', err);
+        })
+        .finally(() => {
+          setIsGeneratingDbKey(false);
+        });
+    }
+  }, [householdMembers]);
+
+  const handleGenerateNewDbKey = async () => {
+    try {
+      setIsGeneratingDbKey(true);
+      setKeyVerifiedWithSubtle(false);
+      const details = await generateDatabaseKeyDetails();
+      setInitDbKey(details.hexKey);
+      setDbKeyDetails(details);
+      const test = await testKeyWithSubtleCrypto(details.hexKey);
+      if (test.valid) setKeyVerifiedWithSubtle(true);
+    } catch (e) {
+      console.warn('[Pantryo Setup] Key regeneration error:', e);
+    } finally {
+      setIsGeneratingDbKey(false);
+    }
+  };
 
   // Onboarding Modal state (for admin initialization or user password change)
   const [onboardingUser, setOnboardingUser] = useState<User | null>(null);
@@ -148,6 +203,15 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
       return;
     }
 
+    if (!initDbKey || !isValid256BitKey(initDbKey)) {
+      setError(
+        lang === 'FR'
+          ? 'Veuillez générer ou saisir une clé de chiffrement valide pour la base de données (clé 256 bits / 64 caractères hexadécimaux recommandée, min. 16 caractères).'
+          : 'Please generate or enter a valid database encryption key (256-bit / 64 hex characters recommended, min. 16 characters).'
+      );
+      return;
+    }
+
     try {
       setLoading(true);
       const res = await fetch('/api/v1/auth/setup-admin', {
@@ -158,6 +222,7 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
           username: cleanUsername,
           password: initPassword.trim(),
           avatarUrl: initAvatarUrl,
+          dbEncryptionKey: initDbKey.trim(),
         }),
       });
 
@@ -165,6 +230,10 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
       if (!res.ok) {
         throw new Error(data.error || 'Failed to initialize administrator account');
       }
+
+      try {
+        localStorage.setItem('pantryo_active_db_key', initDbKey.trim());
+      } catch (e) {}
 
       const createdAdmin: User = data.user;
       setSelectedUser(createdAdmin);
@@ -325,7 +394,7 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FAF7EE] via-[#F4EDE0] to-[#EBE3D0] flex flex-col justify-between items-center p-4 sm:p-6 w-full animate-fade-in">
-      {/* Top Header with Language Switcher */}
+      {/* Top Header with Language Switcher & Install Button */}
       <header className="w-full max-w-md flex items-center justify-between py-2">
         <div className="flex items-center gap-2">
           <PantryoLogo size={32} />
@@ -333,7 +402,10 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
             Pantryo
           </span>
         </div>
-        <LanguageSwitcher />
+        <div className="flex items-center gap-2">
+          <PWAInstallButton variant="pill" />
+          <LanguageSwitcher />
+        </div>
       </header>
 
       {/* Main Login Card */}
@@ -371,6 +443,7 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
                   <img
                     src={initAvatarUrl}
                     alt="Avatar"
+                    referrerPolicy="no-referrer"
                     className="w-16 h-16 rounded-full object-cover border-2 border-teal-600 shadow-sm group-hover:opacity-85 transition-opacity"
                   />
                   <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -466,6 +539,102 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
                   placeholder={lang === 'FR' ? 'Retapez votre mot de passe...' : 'Re-type your password...'}
                   className="w-full px-3.5 py-2.5 bg-[#FAF7EE] border border-[#E0D9C8] rounded-xl text-xs sm:text-sm text-[#0D3B37] focus:ring-2 focus:ring-teal-600 focus:bg-white focus:outline-hidden font-mono"
                 />
+              </div>
+
+              {/* Database Encryption Key Generator (SubtleCrypto API - 256-bit SQLite SQLCipher) */}
+              <div className="p-3.5 rounded-2xl bg-teal-50/70 border border-teal-200/80 space-y-2.5 animate-fade-in">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-[#0D3B37] flex items-center gap-1.5">
+                    <Database className="w-3.5 h-3.5 text-teal-700" />
+                    <span>{lang === 'FR' ? 'Clé SQLite SQLCipher au repos (SubtleCrypto 256-bit)' : 'At-Rest SQLite SQLCipher Key (SubtleCrypto 256-bit)'}</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleGenerateNewDbKey}
+                    disabled={isGeneratingDbKey}
+                    className="text-[10px] font-bold text-teal-800 hover:text-teal-950 flex items-center gap-1 cursor-pointer bg-teal-100/70 hover:bg-teal-200/70 px-2 py-0.5 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-2.5 h-2.5 ${isGeneratingDbKey ? 'animate-spin' : ''}`} />
+                    <span>{lang === 'FR' ? 'Régénérer via SubtleCrypto' : 'Regenerate via SubtleCrypto'}</span>
+                  </button>
+                </div>
+
+                <div className="relative">
+                  <input
+                    type={showDbKey ? 'text' : 'password'}
+                    required
+                    value={initDbKey}
+                    onChange={(e) => {
+                      setInitDbKey(e.target.value);
+                      setKeyVerifiedWithSubtle(false);
+                    }}
+                    placeholder="256-bit hexadecimal encryption key..."
+                    className="w-full pl-3 pr-24 py-2 bg-white border border-[#D5CEBD] rounded-xl text-xs text-[#0D3B37] focus:ring-2 focus:ring-teal-600 focus:outline-hidden font-mono tracking-wider"
+                  />
+                  <div className="absolute inset-y-0 right-0 pr-1.5 flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowDbKey(!showDbKey)}
+                      className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      title={showDbKey ? 'Masquer' : 'Afficher'}
+                    >
+                      {showDbKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (initDbKey) {
+                          navigator.clipboard.writeText(initDbKey);
+                          setCopiedDbKey(true);
+                          setTimeout(() => setCopiedDbKey(false), 2000);
+                        }
+                      }}
+                      className="p-1 text-teal-700 hover:text-teal-900 cursor-pointer"
+                      title={lang === 'FR' ? 'Copier la clé' : 'Copy key'}
+                    >
+                      {copiedDbKey ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                    {dbKeyDetails && (
+                      <button
+                        type="button"
+                        onClick={() => downloadKeyRecoveryCard(dbKeyDetails, initName || 'Household Admin')}
+                        className="p-1 text-teal-700 hover:text-teal-900 cursor-pointer"
+                        title={lang === 'FR' ? 'Télécharger la fiche de récupération' : 'Download Key Backup Card'}
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* SubtleCrypto Badges & Security Verification Indicators */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-teal-100/90 text-teal-900 text-[10px] font-bold font-mono">
+                    <Cpu className="w-2.5 h-2.5 text-teal-700" />
+                    <span>SubtleCrypto API</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100/90 text-emerald-900 text-[10px] font-bold">
+                    <Lock className="w-2.5 h-2.5 text-emerald-700" />
+                    <span>256-bit AES-GCM / SQLCipher</span>
+                  </span>
+                  {dbKeyDetails?.fingerprint && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-mono">
+                      <span>ID: #{dbKeyDetails.fingerprint}</span>
+                    </span>
+                  )}
+                  {keyVerifiedWithSubtle && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold">
+                      <ShieldCheck className="w-2.5 h-2.5 text-emerald-600" />
+                      <span>{lang === 'FR' ? 'Vérifié au repos' : 'Verified at-rest'}</span>
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-[10px] text-[#527470] leading-snug">
+                  {lang === 'FR'
+                    ? '🔒 Générée via l’API SubtleCrypto native, cette clé chiffre intégralement votre base SQLite locale au repos (tables utilisateurs, inventaire, restes et recettes chiffrées par page SQLCipher).'
+                    : '🔒 Generated via the native SubtleCrypto API, this 256-bit key encrypts your local SQLite database at-rest (users, inventory, leftovers, and recipe tables encrypted via SQLCipher page-level ciphers).'}
+                </p>
               </div>
 
               {error && (

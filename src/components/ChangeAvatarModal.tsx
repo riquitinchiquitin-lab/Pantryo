@@ -10,7 +10,110 @@ interface ChangeAvatarModalProps {
   onSaveAvatar: (newAvatarUrl: string) => void;
 }
 
-const PRESET_AVATARS = [
+export interface AvatarOption {
+  id: string;
+  labelEn: string;
+  labelFr: string;
+  url: string;
+  tagEn?: string;
+  tagFr?: string;
+  badgeColor?: string;
+}
+
+export const CARTOON_AVATARS: AvatarOption[] = [
+  {
+    id: 'chef_cat',
+    labelEn: 'Chef Cat',
+    labelFr: 'Chef Minou',
+    url: '/avatars/chef-cat.svg',
+    tagEn: 'Master Chef',
+    tagFr: 'Grand Chef',
+    badgeColor: 'bg-orange-100 text-orange-800 border-orange-200',
+  },
+  {
+    id: 'happy_avocado',
+    labelEn: 'Happy Avo',
+    labelFr: 'Guaca-Cool',
+    url: '/avatars/happy-avocado.svg',
+    tagEn: 'Fresh & Green',
+    tagFr: 'Frais & Bio',
+    badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  },
+  {
+    id: 'baker_bear',
+    labelEn: 'Baker Bear',
+    labelFr: 'Ours Boulanger',
+    url: '/avatars/baker-bear.svg',
+    tagEn: 'Croissant Master',
+    tagFr: 'Maître Boulanger',
+    badgeColor: 'bg-amber-100 text-amber-800 border-amber-200',
+  },
+  {
+    id: 'veggie_bunny',
+    labelEn: 'Veggie Bunny',
+    labelFr: 'Lapin Maraîcher',
+    url: '/avatars/veggie-bunny.svg',
+    tagEn: 'Garden Fresh',
+    tagFr: 'Potager Bio',
+    badgeColor: 'bg-green-100 text-green-800 border-green-200',
+  },
+  {
+    id: 'gourmet_fox',
+    labelEn: 'Gourmet Fox',
+    labelFr: 'Renard Gourmet',
+    url: '/avatars/gourmet-fox.svg',
+    tagEn: 'Food Critic',
+    tagFr: 'Critique Gastronome',
+    badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+  },
+  {
+    id: 'chef_penguin',
+    labelEn: 'Pingu Chef',
+    labelFr: 'Pingouin Cuisto',
+    url: '/avatars/chef-penguin.svg',
+    tagEn: 'Pastry Chef',
+    tagFr: 'Chef Pâtissier',
+    badgeColor: 'bg-sky-100 text-sky-800 border-sky-200',
+  },
+  {
+    id: 'sunny_egg',
+    labelEn: 'Sunny Egg',
+    labelFr: 'Œuf Solaire',
+    url: '/avatars/sunny-egg.svg',
+    tagEn: 'Breakfast Champ',
+    tagFr: 'Brunch Gourmand',
+    badgeColor: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  },
+  {
+    id: 'ninja_broccoli',
+    labelEn: 'Ninja Broccoli',
+    labelFr: 'Ninja Brocoli',
+    url: '/avatars/ninja-broccoli.svg',
+    tagEn: 'Kitchen Defender',
+    tagFr: 'Héros Cuistot',
+    badgeColor: 'bg-teal-100 text-teal-800 border-teal-200',
+  },
+  {
+    id: 'boba_panda',
+    labelEn: 'Boba Panda',
+    labelFr: 'Panda Tablier',
+    url: '/avatars/boba-panda.svg',
+    tagEn: 'Sweet Delights',
+    tagFr: 'Gourmandises',
+    badgeColor: 'bg-pink-100 text-pink-800 border-pink-200',
+  },
+  {
+    id: 'chef_hamster',
+    labelEn: 'Chef Hamster',
+    labelFr: 'Hamster Fromage',
+    url: '/avatars/chef-hamster.svg',
+    tagEn: 'Cheese Lover',
+    tagFr: 'Amateur Fromage',
+    badgeColor: 'bg-rose-100 text-rose-800 border-rose-200',
+  },
+];
+
+export const REALISTIC_AVATARS: AvatarOption[] = [
   {
     id: 'chef_1',
     labelEn: 'Executive Chef',
@@ -31,8 +134,8 @@ const PRESET_AVATARS = [
   },
   {
     id: 'smile_woman',
-    labelEn: 'Fresh Market Shopper',
-    labelFr: 'Passionnée du Marché',
+    labelEn: 'Market Shopper',
+    labelFr: 'Passionnée Marché',
     url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=250&q=80',
   },
   {
@@ -55,11 +158,13 @@ const PRESET_AVATARS = [
   },
   {
     id: 'eco_chef',
-    labelEn: 'Zero-Waste Enthusiast',
+    labelEn: 'Zero-Waste Cook',
     labelFr: 'Passionné Anti-Gaspi',
     url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=250&q=80',
   },
 ];
+
+const PRESET_AVATARS = [...CARTOON_AVATARS, ...REALISTIC_AVATARS];
 
 export const ChangeAvatarModal: React.FC<ChangeAvatarModalProps> = ({
   isOpen,
@@ -68,7 +173,8 @@ export const ChangeAvatarModal: React.FC<ChangeAvatarModalProps> = ({
   onSaveAvatar,
 }) => {
   const { lang } = useLanguage();
-  const [selectedAvatar, setSelectedAvatar] = useState<string>(user.avatarUrl || PRESET_AVATARS[0].url);
+  const [activeCategory, setActiveCategory] = useState<'cartoon' | 'realistic'>('cartoon');
+  const [selectedAvatar, setSelectedAvatar] = useState<string>(user.avatarUrl || CARTOON_AVATARS[0].url);
   const [customUrlInput, setCustomUrlInput] = useState<string>('');
   const [isCapturingCamera, setIsCapturingCamera] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -218,19 +324,27 @@ export const ChangeAvatarModal: React.FC<ChangeAvatarModalProps> = ({
         <div className="p-5 space-y-5 overflow-y-auto flex-1">
           {/* Current Avatar Preview */}
           <div className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-[#F3F8F1] border border-[#D9E6D6]">
-            <div className="relative">
+            <div className="relative group">
               <img
                 src={selectedAvatar}
                 alt="Avatar preview"
-                className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md ring-2 ring-emerald-500/30"
+                referrerPolicy="no-referrer"
+                className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md ring-2 ring-emerald-500/30 transition-transform group-hover:scale-105"
               />
               <div className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-emerald-600 text-white shadow-xs">
                 <Check className="w-3.5 h-3.5 stroke-[3]" />
               </div>
             </div>
-            <span className="text-xs font-bold text-[#233527]">
-              {lang === 'FR' ? 'Aperçu de votre avatar' : 'Active Avatar Preview'}
-            </span>
+            <div className="text-center">
+              <span className="text-xs font-bold text-[#233527] block">
+                {lang === 'FR' ? 'Aperçu de votre avatar' : 'Active Avatar Preview'}
+              </span>
+              {CARTOON_AVATARS.some((c) => c.url === selectedAvatar) && (
+                <span className="inline-block mt-1 text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  ✨ {lang === 'FR' ? 'Avatar Cartoon Créatif' : 'Cartoon Avatar'}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Camera Capture Section */}
@@ -321,48 +435,133 @@ export const ChangeAvatarModal: React.FC<ChangeAvatarModalProps> = ({
           </div>
 
           {/* Preset Avatar Gallery */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#556D58] flex items-center gap-1">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#556D58] flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                {lang === 'FR' ? 'Galerie d’avatars culinaires' : 'Culinary Avatars Gallery'}
+                {lang === 'FR' ? 'Choisir un avatar de cuisine' : 'Select a Kitchen Avatar'}
               </span>
-              <span className="text-[10px] text-[#7B947E]">
-                {PRESET_AVATARS.length} {lang === 'FR' ? 'options' : 'options'}
+              <span className="text-[10px] font-bold text-[#557559] bg-[#E8F3E5] px-2 py-0.5 rounded-full">
+                {activeCategory === 'cartoon' ? CARTOON_AVATARS.length : REALISTIC_AVATARS.length} {lang === 'FR' ? 'choix' : 'choices'}
               </span>
             </div>
 
-            <div className="grid grid-cols-4 gap-2.5">
-              {PRESET_AVATARS.map((avatar) => {
-                const isChosen = selectedAvatar === avatar.url;
-                return (
-                  <button
-                    key={avatar.id}
-                    type="button"
-                    onClick={() => setSelectedAvatar(avatar.url)}
-                    className={`relative p-1 rounded-2xl border transition-all flex flex-col items-center gap-1 cursor-pointer ${
-                      isChosen
-                        ? 'border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-500/20 shadow-xs'
-                        : 'border-[#E0EBDD] hover:border-slate-300 hover:bg-slate-50'
-                    }`}
-                  >
-                    <img
-                      src={avatar.url}
-                      alt={lang === 'FR' ? avatar.labelFr : avatar.labelEn}
-                      className="w-12 h-12 rounded-full object-cover"
-                    />
-                    <span className="text-[9px] font-bold text-[#354C38] truncate w-full text-center px-0.5">
-                      {lang === 'FR' ? avatar.labelFr : avatar.labelEn}
-                    </span>
-                    {isChosen && (
-                      <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-xs">
-                        <Check className="w-2.5 h-2.5 stroke-[3]" />
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
+            {/* Category Selector Tabs */}
+            <div className="flex items-center gap-1.5 p-1 bg-[#EEF5EB] rounded-2xl border border-[#D5E4D2]">
+              <button
+                type="button"
+                onClick={() => setActiveCategory('cartoon')}
+                className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  activeCategory === 'cartoon'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-[#4A644D] hover:text-[#1F3323] hover:bg-white/60'
+                }`}
+              >
+                <span>🎨</span>
+                <span>{lang === 'FR' ? 'Avatars Cartoon' : 'Cartoon Avatars'}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${activeCategory === 'cartoon' ? 'bg-white/20' : 'bg-emerald-100 text-emerald-800'}`}>
+                  {CARTOON_AVATARS.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveCategory('realistic')}
+                className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  activeCategory === 'realistic'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-[#4A644D] hover:text-[#1F3323] hover:bg-white/60'
+                }`}
+              >
+                <span>📷</span>
+                <span>{lang === 'FR' ? 'Photos Réalistes' : 'Photos'}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${activeCategory === 'realistic' ? 'bg-white/20' : 'bg-slate-200 text-slate-700'}`}>
+                  {REALISTIC_AVATARS.length}
+                </span>
+              </button>
             </div>
+
+            {/* Avatars Grid */}
+            {activeCategory === 'cartoon' ? (
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-2.5">
+                {CARTOON_AVATARS.map((avatar) => {
+                  const isChosen = selectedAvatar === avatar.url;
+                  return (
+                    <button
+                      key={avatar.id}
+                      type="button"
+                      onClick={() => setSelectedAvatar(avatar.url)}
+                      className={`relative p-2 rounded-2xl border transition-all flex flex-col items-center gap-1.5 cursor-pointer group text-left ${
+                        isChosen
+                          ? 'border-emerald-500 bg-emerald-50/80 ring-2 ring-emerald-500/30 shadow-sm'
+                          : 'border-[#E0EBDD] bg-white hover:border-emerald-300 hover:bg-[#F7FAF6] hover:shadow-xs'
+                      }`}
+                    >
+                      <div className="relative w-14 h-14 rounded-full overflow-hidden shrink-0 border-2 border-white shadow-xs group-hover:scale-105 transition-transform">
+                        <img
+                          src={avatar.url}
+                          alt={lang === 'FR' ? avatar.labelFr : avatar.labelEn}
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+
+                      <div className="w-full text-center">
+                        <span className="text-[10px] font-black text-[#1F3323] truncate block leading-tight">
+                          {lang === 'FR' ? avatar.labelFr : avatar.labelEn}
+                        </span>
+                        {avatar.badgeColor && (
+                          <span
+                            className={`inline-block text-[8px] font-bold px-1.5 py-0.2 rounded-md border mt-0.5 max-w-full truncate ${avatar.badgeColor}`}
+                          >
+                            {lang === 'FR' ? avatar.tagFr : avatar.tagEn}
+                          </span>
+                        )}
+                      </div>
+
+                      {isChosen && (
+                        <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-xs">
+                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="grid grid-cols-4 gap-2.5">
+                {REALISTIC_AVATARS.map((avatar) => {
+                  const isChosen = selectedAvatar === avatar.url;
+                  return (
+                    <button
+                      key={avatar.id}
+                      type="button"
+                      onClick={() => setSelectedAvatar(avatar.url)}
+                      className={`relative p-1 rounded-2xl border transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                        isChosen
+                          ? 'border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-500/20 shadow-xs'
+                          : 'border-[#E0EBDD] hover:border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      <img
+                        src={avatar.url}
+                        alt={lang === 'FR' ? avatar.labelFr : avatar.labelEn}
+                        referrerPolicy="no-referrer"
+                        className="w-12 h-12 rounded-full object-cover"
+                      />
+                      <span className="text-[9px] font-bold text-[#354C38] truncate w-full text-center px-0.5">
+                        {lang === 'FR' ? avatar.labelFr : avatar.labelEn}
+                      </span>
+                      {isChosen && (
+                        <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-xs">
+                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 

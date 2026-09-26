@@ -869,8 +869,9 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 title={lang === 'FR' ? 'Changer votre photo de profil' : 'Change your profile picture'}
               >
                 <img
-                  src={currentUser.avatarUrl}
+                  src={currentUser.avatarUrl || '/avatars/chef-cat.svg'}
                   alt={currentUser.name}
+                  referrerPolicy="no-referrer"
                   className="w-6 h-6 rounded-full object-cover shrink-0 border border-teal-600/30 group-hover/avatar:opacity-80 transition-opacity"
                 />
                 <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
@@ -1592,8 +1593,9 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                       <div className="pt-2 mt-2 border-t border-[#EEF4ED] flex items-center justify-between gap-1">
                         <div className="flex items-center gap-1 min-w-0">
                           <img
-                            src={item.addedByAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80'}
+                            src={item.addedByAvatar || '/avatars/chef-cat.svg'}
                             alt={item.addedByName}
+                            referrerPolicy="no-referrer"
                             className="w-4 h-4 rounded-full object-cover shrink-0"
                           />
                           <span className="text-[10px] font-bold text-[#556D58] truncate max-w-[36px]">
