@@ -1,7 +1,7 @@
 # Pantryo - Production Dockerfile
 # Uses Debian bookworm-slim (glibc) to guarantee 100% compatibility with C++ native modules
 # like better-sqlite3-multiple-ciphers and avoid Alpine/musl SIGSEGV (exit code 139) crashes.
-FROM node:20-bookworm-slim AS builder
+FROM node:22-bookworm-slim AS builder
 
 WORKDIR /app
 
@@ -28,7 +28,7 @@ RUN npm run build
 RUN npm prune --omit=dev
 
 # Production runtime stage
-FROM node:20-bookworm-slim AS runner
+FROM node:22-bookworm-slim AS runner
 
 WORKDIR /app
 ENV NODE_ENV=production
