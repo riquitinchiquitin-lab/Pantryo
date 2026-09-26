@@ -9,6 +9,11 @@ import authFido2Router from "./server/src/routes/authFido2.js";
 
 dotenv.config();
 
+// Ensure DISABLE_HMR is set in development for AI Studio environment
+if (process.env.DISABLE_HMR === undefined) {
+  process.env.DISABLE_HMR = "true";
+}
+
 // Global crash and rejection handlers for robust container diagnostics
 process.on("uncaughtException", (err) => {
   console.error("[Pantryo Server] Uncaught exception:", err);
@@ -62,7 +67,6 @@ async function startServer() {
       server: {
         middlewareMode: true,
         hmr: isHmrDisabled ? false : { server },
-        ws: isHmrDisabled ? false : { server },
       },
       appType: "spa",
     });
