@@ -1,7 +1,6 @@
 import express from "express";
 import path from "path";
 import dotenv from "dotenv";
-import { createServer as createViteServer } from "vite";
 import inventoryRouter from "./server/src/routes/inventory.js";
 import recipesRouter from "./server/src/routes/recipes.js";
 import adminRouter from "./server/src/routes/admin.js";
@@ -9,8 +8,16 @@ import authFido2Router from "./server/src/routes/authFido2.js";
 
 dotenv.config();
 
+// Global crash and rejection handlers for robust container diagnostics
+process.on("uncaughtException", (err) => {
+  console.error("[Pantryo Server] Uncaught exception:", err);
+});
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[Pantryo Server] Unhandled rejection at:", promise, "reason:", reason);
+});
+
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 // Trust reverse proxy headers from Cloudflare Tunnel
 app.set("trust proxy", true);
@@ -45,8 +52,9 @@ app.all("/api/*", (req, res) => {
 });
 
 async function startServer() {
-  // Vite middleware setup
+  // Vite middleware setup (development only)
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
