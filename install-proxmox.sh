@@ -175,22 +175,22 @@ apt-get install -y --no-install-recommends \
   g++ \
   gcc
 
-# Install Node.js 20 if not present or < 20
+# Install Node.js 22 if not present or < 22
 NEED_NODE=false
 if ! command -v node >/dev/null 2>&1; then
   NEED_NODE=true
 else
   NODE_VER=$(node -v | tr -d 'v' | cut -d. -f1)
-  if [[ "$NODE_VER" -lt 20 ]]; then
+  if [[ "$NODE_VER" -lt 22 ]]; then
     NEED_NODE=true
   fi
 fi
 
 if [[ "$NEED_NODE" == "true" ]]; then
-  echo -e "${CYAN}Installing Node.js 20 LTS...${NC}"
+  echo -e "${CYAN}Installing Node.js 22 LTS...${NC}"
   mkdir -p /etc/apt/keyrings
   curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg --yes
-  echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" > /etc/apt/sources.list.d/nodesource.list
+  echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" > /etc/apt/sources.list.d/nodesource.list
   apt-get update -y
   apt-get install -y nodejs
 fi
