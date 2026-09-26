@@ -1,4 +1,5 @@
 import express from "express";
+import http from "http";
 import path from "path";
 import dotenv from "dotenv";
 import inventoryRouter from "./server/src/routes/inventory.js";
@@ -17,6 +18,7 @@ process.on("unhandledRejection", (reason, promise) => {
 });
 
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 // Trust reverse proxy headers from Cloudflare Tunnel
@@ -55,8 +57,12 @@ async function startServer() {
   // Vite middleware setup (development only)
   if (process.env.NODE_ENV !== "production") {
     const { createServer: createViteServer } = await import("vite");
+    const isHmrDisabled = process.env.DISABLE_HMR === "true";
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: isHmrDisabled ? false : { server },
+      },
       appType: "spa",
     });
     app.use(vite.middlewares);
@@ -68,7 +74,7 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  server.listen(PORT, "0.0.0.0", () => {
     console.log(`[Kitchen Komrade] Server running on http://0.0.0.0:${PORT}`);
   });
 }
