@@ -29,6 +29,10 @@ function getGeminiClient() {
   return aiClient;
 }
 
+export function resetGeminiClient() {
+  aiClient = null;
+}
+
 /**
  * Analyzes a food photo and extracts items, storage recommendations, and shelf-life estimations.
  * 

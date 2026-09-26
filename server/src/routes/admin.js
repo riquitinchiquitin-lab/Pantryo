@@ -2,6 +2,8 @@ import express from "express";
 import { dbStore } from "../services/dbStore.js";
 import { validatePasswordNist } from "../services/nistPasswordValidator.js";
 import { rateLimiter } from "../services/rateLimiter.js";
+import { resetGeminiClient as resetVisionGemini } from "../services/geminiVision.js";
+import { resetGeminiClient as resetRecipeGemini } from "../services/geminiRecipeParser.js";
 
 const router = express.Router();
 
@@ -171,6 +173,82 @@ router.post("/set-encryption-key", (req, res) => {
     });
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/v1/admin/settings
+ * Retrieves operational system, network, and integration settings
+ */
+router.get("/settings", (req, res) => {
+  try {
+    const settings = dbStore.getSystemSettings();
+    res.json(settings);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/v1/admin/settings
+ * Updates operational system, network, and integration settings
+ */
+router.post("/settings", (req, res) => {
+  try {
+    const updates = req.body || {};
+    const updatedSettings = dbStore.updateSystemSettings(updates);
+    
+    // Refresh cached Gemini AI clients with updated API key
+    resetVisionGemini();
+    resetRecipeGemini();
+
+    res.json({
+      success: true,
+      message: "Paramètres système et réseau mis à jour avec succès.",
+      settings: updatedSettings,
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/v1/admin/test-gemini
+ * Verifies connectivity of the configured Google Gemini API Key
+ */
+router.post("/test-gemini", async (req, res) => {
+  try {
+    const { apiKey } = req.body;
+    const keyToTest = (apiKey || process.env.GEMINI_API_KEY || "").trim();
+    if (!keyToTest) {
+      return res.status(400).json({ error: "Aucune clé API Gemini fournie à tester." });
+    }
+
+    const { GoogleGenAI } = await import("@google/genai");
+    const testClient = new GoogleGenAI({
+      apiKey: keyToTest,
+      httpOptions: {
+        headers: { "User-Agent": "aistudio-build" },
+      },
+    });
+
+    const response = await testClient.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: "Respond with the word 'OK' to test connectivity.",
+    });
+
+    const reply = response?.text?.trim() || "OK";
+    res.json({
+      success: true,
+      message: "Connexion API Gemini validée avec succès ! Les fonctionnalités Vision & Recettes IA sont opérationnelles.",
+      model: "gemini-2.5-flash",
+      reply,
+    });
+  } catch (err) {
+    res.status(400).json({
+      success: false,
+      error: `Échec du test de clé Gemini: ${err.message || "Clé invalide ou quota dépassé."}`,
+    });
   }
 });
 
@@ -442,6 +520,38 @@ router.put("/users/:id/avatar", (req, res) => {
     if (!avatarUrl) return res.status(400).json({ error: "Avatar URL is required" });
     const updated = dbStore.updateUserAvatar(req.params.id, avatarUrl);
     res.json(updated);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * PUT /api/v1/admin/users/:id/profile
+ * Updates a user's display name and/or personal username/email
+ */
+router.put("/users/:id/profile", (req, res) => {
+  try {
+    const { name, email, username } = req.body;
+    const user = dbStore.users.find((u) => u.id === req.params.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const newName = (name !== undefined ? name : user.name).trim();
+    const newUsername = (username !== undefined ? username : (email !== undefined ? email : user.email)).trim();
+
+    if (!newName) return res.status(400).json({ error: "Display name cannot be empty" });
+    if (!newUsername) return res.status(400).json({ error: "Username or email cannot be empty" });
+
+    // Check duplicate
+    const duplicate = dbStore.users.find(
+      (u) => u.id !== user.id && (u.email.toLowerCase() === newUsername.toLowerCase() || u.name.toLowerCase() === newName.toLowerCase())
+    );
+    if (duplicate) {
+      return res.status(400).json({ error: "Another member is already using that name or username/email" });
+    }
+
+    const updated = dbStore.updateUserProfile(req.params.id, newName, newUsername);
+    const { passwordHash, recoveryCodes, totpSecret, ...safeUser } = updated;
+    res.json(safeUser);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

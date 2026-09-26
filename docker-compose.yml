@@ -25,7 +25,7 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: pantryo_tunnel
     restart: unless-stopped
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:-eyJhIjoiZDRmZTljYWVjMTcyMDdkYzE5MmZmMTNiODVhNTdjOTMiLCJ0IjoiODk2NTZjMDktZmIxMS00ZGUxLTg5YWYtMzMxN2I5NTg3MTZhIiwicyI6Ik5XWmxPV1ZpWkdJdE1tTXlOaTAwTkRWbUxXSmlNemt0WkRVNE5HRTJaR0ZoTURkaiJ9}
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
     depends_on:
       - app
     networks:

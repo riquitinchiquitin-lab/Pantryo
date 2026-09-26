@@ -75,6 +75,68 @@ export default defineConfig(() => {
           type: 'module',
         },
       }),
+      {
+        name: 'vite-suppress-hmr-errors',
+        transformIndexHtml: {
+          order: 'pre',
+          handler() {
+            return [
+              {
+                tag: 'script',
+                injectTo: 'head-prepend',
+                children: `
+                  (function() {
+                    var _origError = console.error;
+                    console.error = function() {
+                      var a = arguments[0];
+                      if (typeof a === 'string' && (a.indexOf('[vite]') !== -1 || a.indexOf('websocket') !== -1 || a.indexOf('WebSocket') !== -1)) return;
+                      return _origError.apply(console, arguments);
+                    };
+                    var OriginalWS = window.WebSocket;
+                    if (!OriginalWS) return;
+                    window.WebSocket = function(url, protocols) {
+                      var isViteHmr = false;
+                      if (typeof protocols === 'string' && (protocols === 'vite-hmr' || protocols === 'vite-ping')) isViteHmr = true;
+                      else if (Array.isArray(protocols) && (protocols.indexOf('vite-hmr') !== -1 || protocols.indexOf('vite-ping') !== -1)) isViteHmr = true;
+                      else if (typeof url === 'string' && (url.indexOf('vite-hmr') !== -1 || url.indexOf('token=') !== -1)) isViteHmr = true;
+                      if (!isViteHmr) return new OriginalWS(url, protocols);
+                      var listeners = {};
+                      var dummy = {
+                        url: url,
+                        protocol: Array.isArray(protocols) ? protocols[0] : (protocols || ''),
+                        readyState: 1,
+                        OPEN: 1,
+                        CONNECTING: 0,
+                        CLOSING: 2,
+                        CLOSED: 3,
+                        send: function() {},
+                        close: function() { dummy.readyState = 3; },
+                        addEventListener: function(event, fn) {
+                          if (!listeners[event]) listeners[event] = [];
+                          listeners[event].push(fn);
+                          if (event === 'open') {
+                            setTimeout(function() { try { fn({ type: 'open', target: dummy }); } catch(e) {} }, 0);
+                          }
+                        },
+                        removeEventListener: function(event, fn) {
+                          if (!listeners[event]) return;
+                          listeners[event] = listeners[event].filter(function(cb) { return cb !== fn; });
+                        }
+                      };
+                      return dummy;
+                    };
+                    window.WebSocket.prototype = OriginalWS.prototype;
+                    window.WebSocket.CONNECTING = 0;
+                    window.WebSocket.OPEN = 1;
+                    window.WebSocket.CLOSING = 2;
+                    window.WebSocket.CLOSED = 3;
+                  })();
+                `,
+              },
+            ];
+          },
+        },
+      },
     ],
     resolve: {
       alias: {

@@ -28,6 +28,17 @@ import {
   X,
   Camera,
   Smartphone,
+  Edit2,
+  User as UserIcon,
+  Globe,
+  Sliders,
+  ExternalLink,
+  Save,
+  CheckCircle2,
+  AlertCircle,
+  Sparkles,
+  Radio,
+  Terminal,
 } from 'lucide-react';
 import { User, DatabaseStats, DatabaseBackupPackage } from '../types';
 import { useLanguage } from '../utils/i18n';
@@ -95,10 +106,43 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
   onDatabaseRestored,
 }) => {
   const { lang } = useLanguage();
-  const [activeTab, setActiveTab] = useState<'backup' | 'users' | 'security'>('backup');
+  const [activeTab, setActiveTab] = useState<'backup' | 'users' | 'security' | 'settings'>('backup');
   const [stats, setStats] = useState<DatabaseStats>(DEFAULT_DATABASE_STATS);
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  // Proxmox & System Integration Settings State
+  const [settings, setSettings] = useState<{
+    appUrl: string;
+    geminiApiKey: string;
+    hasGeminiKey: boolean;
+    cloudflareTunnelToken: string;
+    hasTunnelToken: boolean;
+    expoPublicApiUrl: string;
+    databaseUrl: string;
+    port: number;
+    dbEncryptionKey: string;
+    nodeEnv: string;
+    updatedAt?: string | null;
+  }>({
+    appUrl: '',
+    geminiApiKey: '',
+    hasGeminiKey: false,
+    cloudflareTunnelToken: '',
+    hasTunnelToken: false,
+    expoPublicApiUrl: '',
+    databaseUrl: '',
+    port: 3000,
+    dbEncryptionKey: '',
+    nodeEnv: 'production',
+  });
+  const [showGeminiKey, setShowGeminiKey] = useState(false);
+  const [showTunnelToken, setShowTunnelToken] = useState(false);
+  const [showDbSettingsKey, setShowDbSettingsKey] = useState(false);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [isTestingGemini, setIsTestingGemini] = useState(false);
+  const [geminiTestResult, setGeminiTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [settingsStatus, setSettingsStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Backup State
   const [backupPassphrase, setBackupPassphrase] = useState(() => {
@@ -145,6 +189,57 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
 
   // Change Avatar State
   const [selectedUserForAvatar, setSelectedUserForAvatar] = useState<User | null>(null);
+
+  // Edit Profile State (Full Name & Username/Email)
+  const [selectedUserForProfile, setSelectedUserForProfile] = useState<User | null>(null);
+  const [editProfileName, setEditProfileName] = useState('');
+  const [editProfileUsername, setEditProfileUsername] = useState('');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUserForProfile || !editProfileName.trim() || !editProfileUsername.trim()) return;
+
+    try {
+      setIsSavingProfile(true);
+      const res = await fetch(`/api/v1/admin/users/${encodeURIComponent(selectedUserForProfile.id)}/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': currentUser.role,
+          'x-user-id': currentUser.id,
+        },
+        body: JSON.stringify({
+          name: editProfileName.trim(),
+          username: editProfileUsername.trim(),
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to update profile');
+      }
+
+      const updatedUser = await res.json();
+      setUsersList((prev) =>
+        prev.map((u) => (u.id === updatedUser.id ? { ...u, name: updatedUser.name, email: updatedUser.email } : u))
+      );
+      if (onUserChange && currentUser.id === updatedUser.id) {
+        onUserChange({ ...currentUser, name: updatedUser.name, email: updatedUser.email });
+      }
+
+      setSelectedUserForProfile(null);
+      fetchStatsAndUsers();
+      setStatusMessage({
+        text: lang === 'FR' ? `Profil mis à jour pour ${updatedUser.name}` : `Profile updated for ${updatedUser.name}`,
+        type: 'success',
+      });
+    } catch (err: any) {
+      setStatusMessage({ text: err.message, type: 'error' });
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
 
   const handleAvatarUpdate = async (userToUpdate: User, newAvatarUrl: string) => {
     try {
@@ -225,10 +320,115 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     }
   };
 
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch('/api/v1/admin/settings', {
+        headers: {
+          Accept: 'application/json',
+          'x-user-role': currentUser?.role || 'ADMIN',
+          'x-user-id': currentUser?.id || 'usr_yan',
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSettings(data);
+      }
+    } catch (err) {
+      console.warn('Settings fetch note:', err);
+    }
+  };
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingSettings(true);
+    setSettingsStatus(null);
+    try {
+      const res = await fetch('/api/v1/admin/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': currentUser?.role || 'ADMIN',
+          'x-user-id': currentUser?.id || 'usr_yan',
+        },
+        body: JSON.stringify(settings),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to update settings');
+      }
+      setSettings(data.settings);
+      setSettingsStatus({
+        type: 'success',
+        message:
+          lang === 'FR'
+            ? 'Paramètres système, Proxmox & réseau sauvegardés avec succès.'
+            : 'System, Proxmox & network settings saved successfully.',
+      });
+      fetchStatsAndUsers();
+    } catch (err: any) {
+      setSettingsStatus({
+        type: 'error',
+        message: err.message || (lang === 'FR' ? 'Erreur lors de la sauvegarde.' : 'Error saving settings.'),
+      });
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
+
+  const handleTestGeminiKey = async () => {
+    setIsTestingGemini(true);
+    setGeminiTestResult(null);
+    try {
+      const res = await fetch('/api/v1/admin/test-gemini', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': currentUser?.role || 'ADMIN',
+          'x-user-id': currentUser?.id || 'usr_yan',
+        },
+        body: JSON.stringify({ apiKey: settings.geminiApiKey }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Test failed');
+      }
+      setGeminiTestResult({
+        success: true,
+        message:
+          data.message ||
+          (lang === 'FR'
+            ? 'Connexion réussie avec Google Gemini !'
+            : 'Successfully connected to Google Gemini!'),
+      });
+    } catch (err: any) {
+      setGeminiTestResult({
+        success: false,
+        message: err.message || (lang === 'FR' ? 'Échec du test de connexion' : 'Connection test failed'),
+      });
+    } finally {
+      setIsTestingGemini(false);
+    }
+  };
+
+  const handleGenerateSettingsDbKey = async () => {
+    try {
+      const key = await generateDatabaseEncryptionKey();
+      if (key) {
+        setSettings((prev) => ({ ...prev, dbEncryptionKey: key }));
+        setShowDbSettingsKey(true);
+      }
+    } catch (e) {
+      console.warn('Settings DB key generation error:', e);
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       fetchStatsAndUsers();
+      fetchSettings();
       setStatusMessage(null);
+      setSettingsStatus(null);
+      setGeminiTestResult(null);
     }
   }, [isOpen, currentUser]);
 
@@ -706,6 +906,21 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
           >
             <Lock className="w-4 h-4" />
             <span>{lang === 'FR' ? 'Sécurité & 2FA FIDO2' : 'Security & FIDO2 2FA'}</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('settings');
+              fetchSettings();
+            }}
+            className={`px-4 py-2 rounded-t-xl font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer whitespace-nowrap border-b-2 ${
+              activeTab === 'settings'
+                ? 'border-teal-800 text-teal-900 bg-[#FAF7EE]'
+                : 'border-transparent text-[#527470] hover:text-[#0D3B37]'
+            }`}
+          >
+            <Globe className="w-4 h-4" />
+            <span>{lang === 'FR' ? 'Système, Proxmox & Réseau' : 'System, Proxmox & Network'}</span>
           </button>
         </div>
 
@@ -1378,6 +1593,20 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                             </button>
                           )}
 
+                          {/* Edit Profile (Name & Username/Email) */}
+                          <button
+                            onClick={() => {
+                              setSelectedUserForProfile(u);
+                              setEditProfileName(u.name);
+                              setEditProfileUsername(u.email);
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-[#FAF7EE] hover:bg-[#EFEAE0] text-[#0D3B37] border border-[#D5CEBD] font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                            title={lang === 'FR' ? 'Modifier le nom complet et l’identifiant' : 'Edit display name and username/email'}
+                          >
+                            <Edit2 className="w-3.5 h-3.5 text-teal-700" />
+                            <span>{lang === 'FR' ? 'Modifier' : 'Edit'}</span>
+                          </button>
+
                           {/* Role Toggle Button */}
                           <button
                             onClick={() => handleUpdateRole(u.id, u.role)}
@@ -1406,6 +1635,87 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                   })}
                 </div>
               </div>
+
+              {/* Edit User Profile Dialog */}
+              {selectedUserForProfile && (
+                <form
+                  onSubmit={handleSaveProfile}
+                  className="p-5 rounded-2xl bg-white border border-teal-400 shadow-lg space-y-4 animate-fade-in"
+                >
+                  <div className="flex items-center justify-between border-b border-[#EFEAE0] pb-2">
+                    <div>
+                      <h4 className="font-bold text-sm text-[#0D3B37]">
+                        {lang === 'FR' ? 'Modifier le Profil du Membre' : 'Edit Member Profile'}
+                      </h4>
+                      <p className="text-[11px] text-[#527470]">
+                        {lang === 'FR'
+                          ? 'Modifiez le nom d’affichage ou l’identifiant / courriel de connexion.'
+                          : 'Modify the display name or login username / email address.'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedUserForProfile(null)}
+                      className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <label className="block font-bold text-[#0D3B37] mb-1">
+                        {lang === 'FR' ? 'Nom ou Prénom' : 'Full Name or Display Name'}
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={editProfileName}
+                        onChange={(e) => setEditProfileName(e.target.value)}
+                        placeholder="e.g. Alex Johnson"
+                        className="w-full px-3 py-2 rounded-xl bg-[#FAF7EE] border border-[#D5CEBD] focus:outline-none focus:ring-2 focus:ring-teal-700 font-semibold text-slate-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-[#0D3B37] mb-1">
+                        {lang === 'FR' ? 'Identifiant personnel ou Courriel' : 'Personal Username or Email'}
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={editProfileUsername}
+                        onChange={(e) => setEditProfileUsername(e.target.value)}
+                        placeholder="e.g. alex or alex@home.local"
+                        className="w-full px-3 py-2 rounded-xl bg-[#FAF7EE] border border-[#D5CEBD] focus:outline-none focus:ring-2 focus:ring-teal-700 font-mono text-slate-800"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2 border-t border-[#EFEAE0]">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedUserForProfile(null)}
+                      className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs cursor-pointer transition-colors"
+                    >
+                      {lang === 'FR' ? 'Annuler' : 'Cancel'}
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSavingProfile}
+                      className="px-4 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 disabled:opacity-50 text-white font-bold text-xs shadow-sm cursor-pointer transition-all"
+                    >
+                      {isSavingProfile ? (
+                        <span className="flex items-center gap-1.5">
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>{lang === 'FR' ? 'Enregistrement...' : 'Saving...'}</span>
+                        </span>
+                      ) : (
+                        <span>{lang === 'FR' ? 'Enregistrer' : 'Save Changes'}</span>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
 
               {/* Add User Modal Dialog */}
               {showAddUserModal && (
@@ -1844,6 +2154,436 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* TAB 4: SYSTEM, PROXMOX & NETWORK SETTINGS */}
+          {activeTab === 'settings' && (
+            <div className="space-y-6 text-xs text-[#2A4D48]">
+              {/* Proxmox VE Architecture & Status Header */}
+              <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-teal-800 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                      <Globe className="w-5 h-5 text-teal-200" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-sm text-[#0D3B37]">
+                          {lang === 'FR' ? 'Paramètres Système & Proxmox VE' : 'System & Proxmox VE Settings'}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 text-teal-800 border border-teal-200">
+                          {lang === 'FR' ? 'Installateur Proxmox Actif' : 'Proxmox Installer Active'}
+                        </span>
+                      </div>
+                      <p className="text-[#527470] text-xs mt-0.5">
+                        {lang === 'FR'
+                          ? 'Ces valeurs sont demandées lors de l’installation sur Proxmox et modifiables ici à tout moment.'
+                          : 'These values are requested during Proxmox installation and can be modified here at any time.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap text-[11px]">
+                    <div className="px-2.5 py-1 rounded-lg bg-[#FAF7EE] border border-[#E0D9C8] flex items-center gap-1.5 font-medium text-[#0D3B37]">
+                      <Radio className="w-3.5 h-3.5 text-teal-700" />
+                      <span>Port {settings.port || 3000}</span>
+                    </div>
+                    <div
+                      className={`px-2.5 py-1 rounded-lg border flex items-center gap-1.5 font-medium ${
+                        settings.hasGeminiKey
+                          ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                          : 'bg-amber-50 border-amber-200 text-amber-800'
+                      }`}
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>{settings.hasGeminiKey ? 'Gemini IA OK' : 'Gemini Non Défini'}</span>
+                    </div>
+                    <div
+                      className={`px-2.5 py-1 rounded-lg border flex items-center gap-1.5 font-medium ${
+                        settings.hasTunnelToken
+                          ? 'bg-blue-50 border-blue-200 text-blue-800'
+                          : 'bg-slate-100 border-slate-200 text-slate-700'
+                      }`}
+                    >
+                      <Terminal className="w-3.5 h-3.5" />
+                      <span>{settings.hasTunnelToken ? 'Cloudflare Tunnel' : 'Réseau Local'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-teal-50/70 border border-teal-200/60 text-[#124E48] flex items-start gap-2.5">
+                  <Info className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-relaxed">
+                    {lang === 'FR'
+                      ? 'Toute modification enregistrée met à jour à la fois la mémoire active du serveur, la base chiffrée SQLCipher et le fichier .env sur disque dans votre conteneur LXC sans interruption.'
+                      : 'Any saved modification updates server runtime memory, the encrypted SQLCipher database, and the on-disk .env file in your LXC container with zero downtime.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Status Banner */}
+              {settingsStatus && (
+                <div
+                  className={`p-4 rounded-xl flex items-center gap-3 ${
+                    settingsStatus.type === 'success'
+                      ? 'bg-emerald-50 border border-emerald-200 text-emerald-900'
+                      : 'bg-rose-50 border border-rose-200 text-rose-900'
+                  }`}
+                >
+                  {settingsStatus.type === 'success' ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+                  )}
+                  <span className="font-semibold text-xs flex-1">{settingsStatus.message}</span>
+                  <button
+                    onClick={() => setSettingsStatus(null)}
+                    className="text-slate-400 hover:text-slate-700"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              {/* Settings Form */}
+              <form onSubmit={handleSaveSettings} className="space-y-6">
+                {/* 1. Public App URL & Port */}
+                <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b border-[#F0EBE1]">
+                    <Globe className="w-4 h-4 text-teal-800" />
+                    <h3 className="font-bold text-[#0D3B37] text-xs uppercase tracking-wider">
+                      {lang === 'FR' ? '1. Domaine Public & Réseau' : '1. Public Domain & Network'}
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="sm:col-span-2 space-y-1.5">
+                      <label className="font-bold text-[#0D3B37] block text-[11px]">
+                        {lang === 'FR' ? 'URL Publique de l’Application (APP_URL)' : 'Public Application URL (APP_URL)'}
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="url"
+                          value={settings.appUrl}
+                          onChange={(e) => setSettings({ ...settings, appUrl: e.target.value })}
+                          placeholder="https://pantryo.yknet.org ou http://192.168.1.50:3000"
+                          className="flex-1 px-3.5 py-2.5 rounded-xl border border-[#D5CEBD] bg-[#FAF7EE] focus:bg-white focus:outline-teal-800 text-xs text-[#0D3B37]"
+                        />
+                        {settings.appUrl && (
+                          <a
+                            href={settings.appUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-2.5 rounded-xl bg-[#FAF7EE] hover:bg-[#EFEAE0] border border-[#D5CEBD] text-[#0D3B37] flex items-center justify-center shrink-0"
+                            title={lang === 'FR' ? 'Ouvrir le lien' : 'Open link'}
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-[#527470]">
+                        {lang === 'FR'
+                          ? 'Domaine principal utilisé pour le partage de listes, les liens d’invitation et les manifests PWA.'
+                          : 'Primary domain used for sharing lists, invitation links, and PWA manifests.'}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="font-bold text-[#0D3B37] block text-[11px]">
+                        {lang === 'FR' ? 'Port HTTP Local (PORT)' : 'Local HTTP Port (PORT)'}
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="65535"
+                        value={settings.port}
+                        onChange={(e) => setSettings({ ...settings, port: parseInt(e.target.value, 10) || 3000 })}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#D5CEBD] bg-[#FAF7EE] focus:bg-white focus:outline-teal-800 text-xs text-[#0D3B37]"
+                      />
+                      <p className="text-[10px] text-[#527470]">
+                        {lang === 'FR' ? 'Port d’écoute interne Node.js (défaut: 3000).' : 'Internal Node.js listening port (default: 3000).'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Google Gemini AI Engine */}
+                <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-[#F0EBE1]">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-teal-800" />
+                      <h3 className="font-bold text-[#0D3B37] text-xs uppercase tracking-wider">
+                        {lang === 'FR' ? '2. Intelligence Artificielle Google Gemini' : '2. Google Gemini AI Engine'}
+                      </h3>
+                    </div>
+                    <a
+                      href="https://aistudio.google.com/app/apikey"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] font-bold text-teal-800 hover:underline flex items-center gap-1"
+                    >
+                      <span>{lang === 'FR' ? 'Obtenir une clé API gratuite' : 'Get free API key'}</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="font-bold text-[#0D3B37] block text-[11px]">
+                      {lang === 'FR' ? 'Clé API Google Gemini (GEMINI_API_KEY)' : 'Google Gemini API Key (GEMINI_API_KEY)'}
+                    </label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          type={showGeminiKey ? 'text' : 'password'}
+                          value={settings.geminiApiKey}
+                          onChange={(e) => setSettings({ ...settings, geminiApiKey: e.target.value })}
+                          placeholder="AIzaSy..."
+                          className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-[#D5CEBD] bg-[#FAF7EE] focus:bg-white focus:outline-teal-800 text-xs font-mono text-[#0D3B37]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowGeminiKey(!showGeminiKey)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                        >
+                          {showGeminiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleTestGeminiKey}
+                        disabled={isTestingGemini || !settings.geminiApiKey}
+                        className="px-4 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer shrink-0"
+                      >
+                        {isTestingGemini ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Check className="w-3.5 h-3.5" />
+                        )}
+                        <span>{lang === 'FR' ? 'Tester la Clé' : 'Test Key'}</span>
+                      </button>
+                    </div>
+
+                    {geminiTestResult && (
+                      <div
+                        className={`p-3 rounded-xl text-xs flex items-center gap-2 mt-2 ${
+                          geminiTestResult.success
+                            ? 'bg-emerald-50 border border-emerald-200 text-emerald-900'
+                            : 'bg-rose-50 border border-rose-200 text-rose-900'
+                        }`}
+                      >
+                        {geminiTestResult.success ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        ) : (
+                          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                        )}
+                        <span className="flex-1 font-medium">{geminiTestResult.message}</span>
+                      </div>
+                    )}
+
+                    <p className="text-[10px] text-[#527470]">
+                      {lang === 'FR'
+                        ? 'Alimente la reconnaissance de reçus (OCR), le scan photo du garde-manger et les suggestions culinaires intelligentes.'
+                        : 'Powers grocery receipt OCR, camera pantry scanning, and smart chef meal suggestions.'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* 3. Cloudflare Zero Trust Tunnel */}
+                <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-[#F0EBE1]">
+                    <div className="flex items-center gap-2">
+                      <Terminal className="w-4 h-4 text-teal-800" />
+                      <h3 className="font-bold text-[#0D3B37] text-xs uppercase tracking-wider">
+                        {lang === 'FR' ? '3. Tunnel Cloudflare Zero Trust' : '3. Cloudflare Zero Trust Tunnel'}
+                      </h3>
+                    </div>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        settings.cloudflareTunnelToken
+                          ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                          : 'bg-slate-100 text-slate-600 border border-slate-200'
+                      }`}
+                    >
+                      {settings.cloudflareTunnelToken ? 'Configuré' : 'Optionnel / Inactif'}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-[#0D3B37] block text-[11px]">
+                      {lang === 'FR'
+                        ? 'Jeton de Tunnel Cloudflare (CLOUDFLARE_TUNNEL_TOKEN)'
+                        : 'Cloudflare Tunnel Token (CLOUDFLARE_TUNNEL_TOKEN)'}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showTunnelToken ? 'text' : 'password'}
+                        value={settings.cloudflareTunnelToken}
+                        onChange={(e) => setSettings({ ...settings, cloudflareTunnelToken: e.target.value })}
+                        placeholder="eyJhIjoi..."
+                        className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-[#D5CEBD] bg-[#FAF7EE] focus:bg-white focus:outline-teal-800 text-xs font-mono text-[#0D3B37]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowTunnelToken(!showTunnelToken)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                      >
+                        {showTunnelToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-[#527470]">
+                      {lang === 'FR'
+                        ? 'Permet d’accéder à Pantryo depuis n’importe où via votre domaine sécurisé Cloudflare sans ouverture de ports sur votre box ou pare-feu Proxmox.'
+                        : 'Enables secure remote access to Pantryo through Cloudflare Zero Trust without port forwarding on your router or Proxmox firewall.'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* 4. Expo Mobile Client API Endpoint */}
+                <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b border-[#F0EBE1]">
+                    <Smartphone className="w-4 h-4 text-teal-800" />
+                    <h3 className="font-bold text-[#0D3B37] text-xs uppercase tracking-wider">
+                      {lang === 'FR' ? '4. Application Mobile Expo (React Native)' : '4. Expo Mobile App (React Native)'}
+                    </h3>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-[#0D3B37] block text-[11px]">
+                      {lang === 'FR' ? 'URL API Client Mobile (EXPO_PUBLIC_API_URL)' : 'Expo Mobile API URL (EXPO_PUBLIC_API_URL)'}
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={settings.expoPublicApiUrl}
+                        onChange={(e) => setSettings({ ...settings, expoPublicApiUrl: e.target.value })}
+                        placeholder="https://pantryo.yknet.org/api/v1/inventory"
+                        className="flex-1 px-3.5 py-2.5 rounded-xl border border-[#D5CEBD] bg-[#FAF7EE] focus:bg-white focus:outline-teal-800 text-xs text-[#0D3B37]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const base = (settings.appUrl || 'http://localhost:3000').replace(/\/+$/, '');
+                          setSettings({ ...settings, expoPublicApiUrl: `${base}/api/v1/inventory` });
+                        }}
+                        className="px-3.5 py-2.5 rounded-xl bg-[#FAF7EE] hover:bg-[#EFEAE0] border border-[#D5CEBD] text-[#0D3B37] font-bold text-xs shrink-0 cursor-pointer"
+                        title={lang === 'FR' ? 'Générer depuis APP_URL' : 'Derive from APP_URL'}
+                      >
+                        {lang === 'FR' ? 'Dériver d’APP_URL' : 'Derive from APP_URL'}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-[#527470]">
+                      {lang === 'FR'
+                        ? 'Point d’accès utilisé par les applications iOS et Android développées avec Expo React Native pour synchroniser l’inventaire.'
+                        : 'Endpoint accessed by iOS and Android clients built with Expo React Native to synchronize real-time kitchen inventory.'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* 5. Database & SQLCipher 256-bit Encryption */}
+                <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b border-[#F0EBE1]">
+                    <Database className="w-4 h-4 text-teal-800" />
+                    <h3 className="font-bold text-[#0D3B37] text-xs uppercase tracking-wider">
+                      {lang === 'FR' ? '5. Base de Données & Chiffrement SQLCipher' : '5. Database & SQLCipher Encryption'}
+                    </h3>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="font-bold text-[#0D3B37] block text-[11px]">
+                        {lang === 'FR'
+                          ? 'Chaîne de Connexion PostgreSQL (DATABASE_URL) [Optionnel pour Prisma]'
+                          : 'PostgreSQL Connection URL (DATABASE_URL) [Optional for Prisma]'}
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.databaseUrl}
+                        onChange={(e) => setSettings({ ...settings, databaseUrl: e.target.value })}
+                        placeholder="postgresql://pantryo_admin:pass@localhost:5432/pantryo?schema=public"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#D5CEBD] bg-[#FAF7EE] focus:bg-white focus:outline-teal-800 text-xs font-mono text-[#0D3B37]"
+                      />
+                      <p className="text-[10px] text-[#527470]">
+                        {lang === 'FR'
+                          ? 'Laissez vide pour continuer à utiliser le moteur local chiffré SQLCipher SQLite intégré (rapide et résilient).'
+                          : 'Leave blank to use the embedded encrypted SQLCipher SQLite engine (fast, resilient, and fully local).'}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="font-bold text-[#0D3B37] block text-[11px]">
+                        {lang === 'FR'
+                          ? 'Clé de Chiffrement SQLCipher 256-bit AES-GCM (DB_ENCRYPTION_KEY)'
+                          : 'At-Rest SQLCipher 256-bit AES-GCM Key (DB_ENCRYPTION_KEY)'}
+                      </label>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <input
+                            type={showDbSettingsKey ? 'text' : 'password'}
+                            value={settings.dbEncryptionKey}
+                            onChange={(e) => setSettings({ ...settings, dbEncryptionKey: e.target.value })}
+                            placeholder="Clé hexadécimale de 64 caractères..."
+                            className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-[#D5CEBD] bg-[#FAF7EE] focus:bg-white focus:outline-teal-800 text-xs font-mono text-[#0D3B37]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowDbSettingsKey(!showDbSettingsKey)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                          >
+                            {showDbSettingsKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleGenerateSettingsDbKey}
+                          className="px-3.5 py-2.5 rounded-xl bg-[#FAF7EE] hover:bg-[#EFEAE0] border border-[#D5CEBD] text-[#0D3B37] font-bold text-xs shrink-0 cursor-pointer flex items-center gap-1.5"
+                        >
+                          <Key className="w-3.5 h-3.5 text-teal-800" />
+                          <span>{lang === 'FR' ? 'Générer 256-bit' : 'Generate 256-bit'}</span>
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-amber-700 font-medium">
+                        {lang === 'FR'
+                          ? 'Attention : la modification de cette clé chiffre instantanément la base de données SQLCipher avec la nouvelle clé.'
+                          : 'Notice: changing this key immediately re-encrypts the SQLCipher database storage on disk.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Save Button Bar */}
+                <div className="p-4 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="text-[11px] text-[#527470]">
+                    {settings.updatedAt ? (
+                      <span>
+                        {lang === 'FR' ? 'Dernière mise à jour :' : 'Last updated:'}{' '}
+                        <strong className="text-[#0D3B37]">
+                          {new Date(settings.updatedAt).toLocaleString(lang === 'FR' ? 'fr-FR' : 'en-US')}
+                        </strong>
+                      </span>
+                    ) : (
+                      <span>{lang === 'FR' ? 'Modifications prêtes à être appliquées' : 'Ready to apply changes'}</span>
+                    )}
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSavingSettings}
+                    className="w-full sm:w-auto px-6 py-3 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                  >
+                    {isSavingSettings ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Save className="w-4 h-4" />
+                    )}
+                    <span>
+                      {lang === 'FR' ? 'Enregistrer tous les paramètres' : 'Save System & Network Settings'}
+                    </span>
+                  </button>
+                </div>
+              </form>
             </div>
           )}
         </div>

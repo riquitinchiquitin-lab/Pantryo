@@ -71,6 +71,47 @@ export function setActiveServerKey(newKey) {
   return customActiveKey;
 }
 
+/**
+ * Syncs updated configuration keys to the .env file on disk if available
+ */
+export function syncEnvFile(updates = {}) {
+  try {
+    const envPath = path.join(process.cwd(), ".env");
+    let content = "";
+    if (fs.existsSync(envPath)) {
+      try {
+        content = fs.readFileSync(envPath, "utf8");
+      } catch (_) {}
+    }
+
+    const lines = content ? content.split("\n") : [];
+    const updatedKeys = new Set();
+
+    const newLines = lines.map((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) return line;
+      const eqIdx = trimmed.indexOf("=");
+      if (eqIdx === -1) return line;
+      const key = trimmed.slice(0, eqIdx).trim();
+      if (updates[key] !== undefined) {
+        updatedKeys.add(key);
+        return `${key}="${updates[key]}"`;
+      }
+      return line;
+    });
+
+    for (const [key, val] of Object.entries(updates)) {
+      if (!updatedKeys.has(key) && val !== undefined) {
+        newLines.push(`${key}="${val}"`);
+      }
+    }
+
+    fs.writeFileSync(envPath, newLines.join("\n") + "\n", { encoding: "utf8", mode: 0o600 });
+  } catch (err) {
+    console.warn("[Pantryo DB] Could not sync .env file on disk:", err.message);
+  }
+}
+
 const SERVER_MASTER_KEY = getActiveServerKey();
 
 const SEED_HOUSEHOLD_ID = "hh_pantryo_main";
@@ -439,6 +480,7 @@ class EncryptedDatabaseStore {
       enforced: true,
       updatedAt: new Date().toISOString(),
     };
+    this.systemSettings = null;
 
     this.init();
   }
@@ -478,11 +520,15 @@ class EncryptedDatabaseStore {
         this.lastBackupAt = sqliteSnapshot.lastBackupAt || null;
         this.lastRestoreAt = sqliteSnapshot.lastRestoreAt || null;
         this.fido2Policy = sqliteSnapshot.fido2Policy || { allUsersRequired: true, enforced: true };
+        this.systemSettings = sqliteSnapshot.systemSettings || null;
 
         this.users = this.users.filter((u) => !u.isDefaultAdmin && u.id !== "usr_admin");
         this.users.forEach((u) => {
           u.fido2Enforced = true;
         });
+        if (this.users.length === 0) {
+          this.seedAdminFromEnvOrInstall();
+        }
 
         this.persistToEncryptedDisk();
         console.log(
@@ -523,12 +569,16 @@ class EncryptedDatabaseStore {
             enforced: true,
             updatedAt: new Date().toISOString(),
           };
+          this.systemSettings = decrypted.systemSettings || null;
 
           // Policy enforcement: all users must use FIDO2
           this.users = this.users.filter((u) => !u.isDefaultAdmin && u.id !== "usr_admin");
           this.users.forEach((u) => {
             u.fido2Enforced = true;
           });
+          if (this.users.length === 0) {
+            this.seedAdminFromEnvOrInstall();
+          }
 
           this.persistToEncryptedDisk();
 
@@ -542,17 +592,58 @@ class EncryptedDatabaseStore {
       console.warn("[Pantryo DB] Could not load existing encrypted database, starting with clean install:", err.message);
     }
 
-    // Clean install initial state: no default recipes, grocery lists, or inventory
+    // Clean install initial state
     this.items = [];
     this.plannedMeals = [];
     this.customRecipes = [];
     this.groceryItems = [];
     this.savedLists = [];
     this.users = [...DEFAULT_USERS];
-    this.users.forEach((u) => {
-      u.fido2Enforced = true;
-    });
+    if (!this.systemSettings) {
+      this.systemSettings = {
+        appUrl: process.env.APP_URL || "http://localhost:3000",
+        geminiApiKey: process.env.GEMINI_API_KEY || "",
+        cloudflareTunnelToken: process.env.CLOUDFLARE_TUNNEL_TOKEN || "",
+        expoPublicApiUrl: process.env.EXPO_PUBLIC_API_URL || "",
+        databaseUrl: process.env.DATABASE_URL || "",
+        port: parseInt(process.env.PORT || "3000", 10),
+        updatedAt: new Date().toISOString(),
+      };
+    }
+    this.seedAdminFromEnvOrInstall();
     this.persistToEncryptedDisk();
+  }
+
+  seedAdminFromEnvOrInstall() {
+    if (!this.users || this.users.length === 0) {
+      const adminName = (process.env.PANTRYO_ADMIN_NAME || "Alex Johnson").trim();
+      const adminUsername = (process.env.PANTRYO_ADMIN_USERNAME || process.env.PANTRYO_ADMIN_EMAIL || "alex").trim().toLowerCase();
+      const adminPassword = (process.env.PANTRYO_ADMIN_PASSWORD || "PantryoSecure2026!").trim();
+      const adminAvatar = (process.env.PANTRYO_ADMIN_AVATAR || "/avatars/chef-cat.svg").trim();
+
+      const newAdmin = this.createUser(
+        adminName,
+        adminUsername,
+        "ADMIN",
+        adminPassword,
+        adminAvatar
+      );
+      newAdmin.mustChangePassword = false;
+      newAdmin.mustSetupProfile = false;
+      newAdmin.isDefaultAdmin = false;
+      newAdmin.fido2Enforced = false; // Allow standard login first, FIDO2 enrollment optional in Admin
+      console.log(`[Pantryo DB] Initialized administrator '${adminUsername}' (${adminName}) from install/environment settings.`);
+    }
+  }
+
+  updateUserProfile(userId, name, email) {
+    const user = this.users.find((u) => u.id === userId);
+    if (!user) throw new Error("User not found");
+    if (name !== undefined && name.trim()) user.name = name.trim();
+    if (email !== undefined && email.trim()) user.email = email.trim().toLowerCase();
+    user.updatedAt = new Date().toISOString();
+    this.persistToEncryptedDisk();
+    return user;
   }
 
   async generateEncryptionKey() {
@@ -612,6 +703,7 @@ class EncryptedDatabaseStore {
         lastBackupAt: this.lastBackupAt,
         lastRestoreAt: this.lastRestoreAt,
         fido2Policy: this.fido2Policy || { allUsersRequired: true, enforced: true },
+        systemSettings: this.systemSettings || null,
       };
 
       // 1. Save to local-first SQLite SQLCipher tables
@@ -626,6 +718,94 @@ class EncryptedDatabaseStore {
       console.error("[Pantryo DB] Error persisting encrypted database to disk:", err);
       return false;
     }
+  }
+
+  /**
+   * Retrieves operational system and network configuration settings
+   */
+  getSystemSettings() {
+    return {
+      appUrl: this.systemSettings?.appUrl || process.env.APP_URL || "http://localhost:3000",
+      geminiApiKey: this.systemSettings?.geminiApiKey || process.env.GEMINI_API_KEY || "",
+      hasGeminiKey: Boolean(this.systemSettings?.geminiApiKey || process.env.GEMINI_API_KEY),
+      cloudflareTunnelToken: this.systemSettings?.cloudflareTunnelToken || process.env.CLOUDFLARE_TUNNEL_TOKEN || "",
+      hasTunnelToken: Boolean(this.systemSettings?.cloudflareTunnelToken || process.env.CLOUDFLARE_TUNNEL_TOKEN),
+      expoPublicApiUrl: this.systemSettings?.expoPublicApiUrl || process.env.EXPO_PUBLIC_API_URL || "",
+      databaseUrl: this.systemSettings?.databaseUrl || process.env.DATABASE_URL || "",
+      port: parseInt(this.systemSettings?.port || process.env.PORT || "3000", 10),
+      dbEncryptionKey: this.getActiveKey(),
+      nodeEnv: process.env.NODE_ENV || "production",
+      updatedAt: this.systemSettings?.updatedAt || null,
+    };
+  }
+
+  /**
+   * Updates system and network configuration settings, persists to encrypted DB, and syncs .env
+   */
+  updateSystemSettings(updates = {}) {
+    if (!this.systemSettings) {
+      this.systemSettings = {};
+    }
+
+    const envSyncObj = {};
+
+    if (updates.appUrl !== undefined) {
+      const val = updates.appUrl.trim();
+      this.systemSettings.appUrl = val;
+      process.env.APP_URL = val;
+      envSyncObj.APP_URL = val;
+    }
+
+    if (updates.geminiApiKey !== undefined) {
+      const val = updates.geminiApiKey.trim();
+      this.systemSettings.geminiApiKey = val;
+      process.env.GEMINI_API_KEY = val;
+      envSyncObj.GEMINI_API_KEY = val;
+    }
+
+    if (updates.cloudflareTunnelToken !== undefined) {
+      const val = updates.cloudflareTunnelToken.trim();
+      this.systemSettings.cloudflareTunnelToken = val;
+      process.env.CLOUDFLARE_TUNNEL_TOKEN = val;
+      envSyncObj.CLOUDFLARE_TUNNEL_TOKEN = val;
+    }
+
+    if (updates.expoPublicApiUrl !== undefined) {
+      const val = updates.expoPublicApiUrl.trim();
+      this.systemSettings.expoPublicApiUrl = val;
+      process.env.EXPO_PUBLIC_API_URL = val;
+      envSyncObj.EXPO_PUBLIC_API_URL = val;
+    }
+
+    if (updates.databaseUrl !== undefined) {
+      const val = updates.databaseUrl.trim();
+      this.systemSettings.databaseUrl = val;
+      process.env.DATABASE_URL = val;
+      envSyncObj.DATABASE_URL = val;
+    }
+
+    if (updates.port !== undefined && Number(updates.port) > 0) {
+      const p = parseInt(updates.port, 10);
+      this.systemSettings.port = p;
+      process.env.PORT = String(p);
+      envSyncObj.PORT = String(p);
+    }
+
+    if (updates.dbEncryptionKey !== undefined && updates.dbEncryptionKey.trim().length >= 16) {
+      const newKey = updates.dbEncryptionKey.trim();
+      if (newKey !== this.getActiveKey()) {
+        this.setEncryptionKey(newKey);
+      }
+      envSyncObj.DB_ENCRYPTION_KEY = newKey;
+    }
+
+    this.systemSettings.updatedAt = new Date().toISOString();
+    this.persistToEncryptedDisk();
+
+    // Sync changes to .env file on disk
+    syncEnvFile(envSyncObj);
+
+    return this.getSystemSettings();
   }
 
   /**

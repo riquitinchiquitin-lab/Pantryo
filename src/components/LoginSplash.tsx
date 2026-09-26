@@ -58,56 +58,56 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
   const [loading, setLoading] = useState(false);
   const [webAuthnSupported, setWebAuthnSupported] = useState(false);
 
-  // Clean-Install Initial Setup Form States (when zero saved users exist)
-  const [initName, setInitName] = useState('');
-  const [initUsername, setInitUsername] = useState('');
-  const [initPassword, setInitPassword] = useState('');
-  const [initConfirmPassword, setInitConfirmPassword] = useState('');
-  const [showInitPassword, setShowInitPassword] = useState(false);
-  const [initAvatarUrl, setInitAvatarUrl] = useState('/avatars/chef-cat.svg');
-  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+  const [directUsername, setDirectUsername] = useState('');
 
-  // Database Encryption Key Generator state (256-bit AES-GCM via SubtleCrypto API)
-  const [initDbKey, setInitDbKey] = useState('');
-  const [dbKeyDetails, setDbKeyDetails] = useState<DatabaseKeyDetails | null>(null);
-  const [isGeneratingDbKey, setIsGeneratingDbKey] = useState(false);
-  const [keyVerifiedWithSubtle, setKeyVerifiedWithSubtle] = useState(false);
-  const [showDbKey, setShowDbKey] = useState(false);
-  const [copiedDbKey, setCopiedDbKey] = useState(false);
-
-  // Generate initial 256-bit key using SubtleCrypto API on mount if clean install
+  // Auto-fetch users from server on mount if clean or empty
   useEffect(() => {
     if (!householdMembers || householdMembers.length === 0) {
-      setIsGeneratingDbKey(true);
-      generateDatabaseKeyDetails()
-        .then(async (details) => {
-          setInitDbKey(details.hexKey);
-          setDbKeyDetails(details);
-          const test = await testKeyWithSubtleCrypto(details.hexKey);
-          if (test.valid) setKeyVerifiedWithSubtle(true);
+      fetch('/api/v1/admin/users')
+        .then((r) => r.json())
+        .then((users) => {
+          if (Array.isArray(users) && users.length > 0) {
+            if (onMembersUpdated) onMembersUpdated(users);
+            setSelectedUser(users[0]);
+          }
         })
-        .catch((err) => {
-          console.warn('[Pantryo Setup] SubtleCrypto initial key generation warning:', err);
-        })
-        .finally(() => {
-          setIsGeneratingDbKey(false);
-        });
+        .catch((err) => console.warn('[Pantryo Login] Could not auto-fetch users:', err));
     }
-  }, [householdMembers]);
+  }, [householdMembers, onMembersUpdated]);
 
-  const handleGenerateNewDbKey = async () => {
+  const handleDirectLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!directUsername.trim()) {
+      setError(lang === 'FR' ? 'Veuillez saisir votre identifiant ou courriel' : 'Please enter your username or email');
+      return;
+    }
+    if (!password.trim()) {
+      setError(lang === 'FR' ? 'Veuillez saisir votre mot de passe' : 'Please enter your password');
+      return;
+    }
+
     try {
-      setIsGeneratingDbKey(true);
-      setKeyVerifiedWithSubtle(false);
-      const details = await generateDatabaseKeyDetails();
-      setInitDbKey(details.hexKey);
-      setDbKeyDetails(details);
-      const test = await testKeyWithSubtleCrypto(details.hexKey);
-      if (test.valid) setKeyVerifiedWithSubtle(true);
-    } catch (e) {
-      console.warn('[Pantryo Setup] Key regeneration error:', e);
+      setLoading(true);
+      setError('');
+      const res = await fetch('/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: directUsername.trim(),
+          password: password.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Authentication failed');
+      }
+
+      onLoginSuccess(data.user);
+    } catch (err: any) {
+      setError(err.message || 'Login error');
     } finally {
-      setIsGeneratingDbKey(false);
+      setLoading(false);
     }
   };
 
@@ -142,119 +142,6 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
       }
     }
   }, [householdMembers]);
-
-  // Clean-Install Initial Administrator Registration Submission
-  const handleSetupAdminSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    if (!initName.trim()) {
-      setError(
-        lang === 'FR'
-          ? 'Veuillez saisir votre nom ou prénom'
-          : 'Please enter your display name'
-      );
-      return;
-    }
-
-    const cleanUsername = initUsername.trim().toLowerCase();
-    if (!cleanUsername) {
-      setError(
-        lang === 'FR'
-          ? 'Veuillez choisir un identifiant personnalisé'
-          : 'Please enter a personalized username'
-      );
-      return;
-    }
-
-    if (cleanUsername === 'admin') {
-      setError(
-        lang === 'FR'
-          ? "L'identifiant ne peut pas être 'admin'. Choisissez un nom d'utilisateur ou pseudo personnel."
-          : "Username cannot remain generic 'admin'. Please choose your personal username."
-      );
-      return;
-    }
-
-    if (!initPassword.trim()) {
-      setError(
-        lang === 'FR'
-          ? 'Veuillez saisir votre mot de passe'
-          : 'Please enter your password'
-      );
-      return;
-    }
-
-    if (initPassword.length < 8) {
-      setError(
-        lang === 'FR'
-          ? 'Le mot de passe doit contenir au moins 8 caractères (NIST SP 800-63B)'
-          : 'Password must be at least 8 characters (NIST SP 800-63B)'
-      );
-      return;
-    }
-
-    if (initPassword !== initConfirmPassword) {
-      setError(
-        lang === 'FR'
-          ? 'Les deux mots de passe ne correspondent pas'
-          : 'Passwords do not match'
-      );
-      return;
-    }
-
-    if (!initDbKey || !isValid256BitKey(initDbKey)) {
-      setError(
-        lang === 'FR'
-          ? 'Veuillez générer ou saisir une clé de chiffrement valide pour la base de données (clé 256 bits / 64 caractères hexadécimaux recommandée, min. 16 caractères).'
-          : 'Please generate or enter a valid database encryption key (256-bit / 64 hex characters recommended, min. 16 characters).'
-      );
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const res = await fetch('/api/v1/auth/setup-admin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: initName.trim(),
-          username: cleanUsername,
-          password: initPassword.trim(),
-          avatarUrl: initAvatarUrl,
-          dbEncryptionKey: initDbKey.trim(),
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to initialize administrator account');
-      }
-
-      try {
-        localStorage.setItem('pantryo_active_db_key', initDbKey.trim());
-      } catch (e) {}
-
-      const createdAdmin: User = data.user;
-      setSelectedUser(createdAdmin);
-      if (onMembersUpdated) {
-        onMembersUpdated([createdAdmin]);
-      }
-
-      // Mandatory 2FA registration for the new administrator
-      setFidoModal({
-        isOpen: true,
-        targetUser: createdAdmin,
-        mode: 'ENROLL_MANDATORY',
-        preferredMethod: webAuthnSupported ? 'fido' : 'totp',
-        loginType: 'password',
-      });
-    } catch (err: any) {
-      setError(err.message || 'Setup error');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Quick Passkey / Biometrics trigger
   const handlePasskeyLogin = async (userToAuth: User) => {
@@ -412,229 +299,65 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
       <div className="w-full max-w-md bg-white/95 backdrop-blur-md border border-[#E5DFD0] rounded-3xl p-6 sm:p-7 shadow-xl space-y-6">
         {householdMembers.length === 0 ? (
           /* ======================================================== */
-          /* CLEAN INSTALL / ZERO SAVED USERS INITIAL SETUP VIEW      */
+          /* DIRECT CREDENTIALS LOGIN VIEW                            */
           /* ======================================================== */
           <div className="space-y-4 animate-fade-in">
             <div className="text-center space-y-1.5">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold mb-1">
-                <Sparkles className="w-3.5 h-3.5 text-emerald-700" />
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-50 border border-teal-200 text-teal-900 text-xs font-bold mb-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-teal-700" />
                 <span>
-                  {lang === 'FR' ? 'Configuration Initiale • Installation Propre' : 'Initial Setup • Clean Installation'}
+                  {lang === 'FR' ? 'Pantryo • Connexion' : 'Pantryo • Sign In'}
                 </span>
               </div>
               <h2 className="text-xl sm:text-2xl font-black text-[#0D3B37] tracking-tight">
-                {lang === 'FR' ? 'Créer le Compte Administrateur' : 'Create Administrator Account'}
+                {lang === 'FR' ? 'Connexion Sécurisée' : 'Secure Login'}
               </h2>
               <p className="text-xs text-[#527470]">
                 {lang === 'FR'
-                  ? 'Aucun profil enregistré. Créez votre compte administrateur pour initialiser votre foyer et sécuriser vos données.'
-                  : 'No saved users. Create your primary administrator account to initialize your kitchen and secure your data.'}
+                  ? 'Connectez-vous avec vos identifiants configurés lors de l’installation.'
+                  : 'Log in with the credentials configured during Proxmox installation.'}
               </p>
             </div>
 
-            <form onSubmit={handleSetupAdminSubmit} className="space-y-3.5 pt-1">
-              {/* Avatar Picker Preview */}
-              <div className="flex flex-col items-center justify-center gap-1 pb-1">
-                <div
-                  className="relative group cursor-pointer"
-                  onClick={() => setIsAvatarModalOpen(true)}
-                  title={lang === 'FR' ? 'Changer la photo' : 'Change picture'}
-                >
-                  <img
-                    src={initAvatarUrl}
-                    alt="Avatar"
-                    referrerPolicy="no-referrer"
-                    className="w-16 h-16 rounded-full object-cover border-2 border-teal-600 shadow-sm group-hover:opacity-85 transition-opacity"
-                  />
-                  <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span className="text-[10px] text-white font-bold">{lang === 'FR' ? 'Modifier' : 'Edit'}</span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsAvatarModalOpen(true)}
-                  className="text-[11px] font-bold text-teal-800 hover:underline cursor-pointer"
-                >
-                  {lang === 'FR' ? 'Choisir ou prendre une photo' : 'Choose or take a photo'}
-                </button>
-              </div>
-
-              {/* Full Name */}
+            <form onSubmit={handleDirectLoginSubmit} className="space-y-3.5 pt-1">
               <div className="space-y-1">
                 <label className="text-xs font-bold text-[#0D3B37] block">
-                  {lang === 'FR' ? 'Nom ou Prénom' : 'Full Name or Display Name'}
+                  {lang === 'FR' ? 'Identifiant ou Courriel' : 'Username or Email'}
                 </label>
                 <input
                   type="text"
                   required
-                  value={initName}
-                  onChange={(e) => setInitName(e.target.value)}
-                  placeholder={lang === 'FR' ? 'Ex: Sophie Martin' : 'e.g., Alex Johnson'}
-                  className="w-full px-3.5 py-2.5 bg-[#FAF7EE] border border-[#E0D9C8] rounded-xl text-xs sm:text-sm text-[#0D3B37] focus:ring-2 focus:ring-teal-600 focus:bg-white focus:outline-hidden"
-                />
-              </div>
-
-              {/* Username */}
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-[#0D3B37]">
-                    {lang === 'FR' ? 'Identifiant personnel' : 'Personal Username or Email'}
-                  </label>
-                  <span className="text-[10px] text-[#7A9A96]">
-                    {lang === 'FR' ? 'Différent de "admin"' : 'Cannot be generic "admin"'}
-                  </span>
-                </div>
-                <input
-                  type="text"
-                  required
-                  value={initUsername}
-                  onChange={(e) => setInitUsername(e.target.value)}
-                  placeholder={lang === 'FR' ? 'Ex: sophie ou sophie@foyer.local' : 'e.g., alex or alex@home.local'}
+                  value={directUsername}
+                  onChange={(e) => setDirectUsername(e.target.value)}
+                  placeholder={lang === 'FR' ? 'Ex: alex ou alex@home.local' : 'e.g., alex or alex@home.local'}
                   className="w-full px-3.5 py-2.5 bg-[#FAF7EE] border border-[#E0D9C8] rounded-xl text-xs sm:text-sm text-[#0D3B37] focus:ring-2 focus:ring-teal-600 focus:bg-white focus:outline-hidden font-mono"
                 />
               </div>
 
-              {/* Password */}
               <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-[#0D3B37]">
-                    {lang === 'FR' ? 'Mot de passe sécurisé' : 'Secure Password'}
-                  </label>
-                  <span className="text-[10px] text-teal-800 font-bold">
-                    NIST SP 800-63B (min 8 chars)
-                  </span>
-                </div>
+                <label className="text-xs font-bold text-[#0D3B37] block">
+                  {lang === 'FR' ? 'Mot de passe' : 'Password'}
+                </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                     <Lock className="w-4 h-4" />
                   </div>
                   <input
-                    type={showInitPassword ? 'text' : 'password'}
+                    type={showPassword ? 'text' : 'password'}
                     required
-                    value={initPassword}
-                    onChange={(e) => setInitPassword(e.target.value)}
-                    placeholder={lang === 'FR' ? 'Au moins 8 caractères...' : 'At least 8 characters...'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
                     className="w-full pl-9 pr-10 py-2.5 bg-[#FAF7EE] border border-[#E0D9C8] rounded-xl text-xs sm:text-sm text-[#0D3B37] focus:ring-2 focus:ring-teal-600 focus:bg-white focus:outline-hidden font-mono"
                   />
                   <button
                     type="button"
-                    onClick={() => setShowInitPassword(!showInitPassword)}
+                    onClick={() => setShowPassword(!showPassword)}
                     className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
                   >
-                    {showInitPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-              </div>
-
-              {/* Confirm Password */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-[#0D3B37] block">
-                  {lang === 'FR' ? 'Confirmer le mot de passe' : 'Confirm Password'}
-                </label>
-                <input
-                  type={showInitPassword ? 'text' : 'password'}
-                  required
-                  value={initConfirmPassword}
-                  onChange={(e) => setInitConfirmPassword(e.target.value)}
-                  placeholder={lang === 'FR' ? 'Retapez votre mot de passe...' : 'Re-type your password...'}
-                  className="w-full px-3.5 py-2.5 bg-[#FAF7EE] border border-[#E0D9C8] rounded-xl text-xs sm:text-sm text-[#0D3B37] focus:ring-2 focus:ring-teal-600 focus:bg-white focus:outline-hidden font-mono"
-                />
-              </div>
-
-              {/* Database Encryption Key Generator (SubtleCrypto API - 256-bit SQLite SQLCipher) */}
-              <div className="p-3.5 rounded-2xl bg-teal-50/70 border border-teal-200/80 space-y-2.5 animate-fade-in">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-[#0D3B37] flex items-center gap-1.5">
-                    <Database className="w-3.5 h-3.5 text-teal-700" />
-                    <span>{lang === 'FR' ? 'Clé SQLite SQLCipher au repos (SubtleCrypto 256-bit)' : 'At-Rest SQLite SQLCipher Key (SubtleCrypto 256-bit)'}</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleGenerateNewDbKey}
-                    disabled={isGeneratingDbKey}
-                    className="text-[10px] font-bold text-teal-800 hover:text-teal-950 flex items-center gap-1 cursor-pointer bg-teal-100/70 hover:bg-teal-200/70 px-2 py-0.5 rounded-lg transition-colors disabled:opacity-50"
-                  >
-                    <RefreshCw className={`w-2.5 h-2.5 ${isGeneratingDbKey ? 'animate-spin' : ''}`} />
-                    <span>{lang === 'FR' ? 'Régénérer via SubtleCrypto' : 'Regenerate via SubtleCrypto'}</span>
-                  </button>
-                </div>
-
-                <div className="relative">
-                  <input
-                    type={showDbKey ? 'text' : 'password'}
-                    required
-                    value={initDbKey}
-                    onChange={(e) => {
-                      setInitDbKey(e.target.value);
-                      setKeyVerifiedWithSubtle(false);
-                    }}
-                    placeholder="256-bit hexadecimal encryption key..."
-                    className="w-full pl-3 pr-24 py-2 bg-white border border-[#D5CEBD] rounded-xl text-xs text-[#0D3B37] focus:ring-2 focus:ring-teal-600 focus:outline-hidden font-mono tracking-wider"
-                  />
-                  <div className="absolute inset-y-0 right-0 pr-1.5 flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setShowDbKey(!showDbKey)}
-                      className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
-                      title={showDbKey ? 'Masquer' : 'Afficher'}
-                    >
-                      {showDbKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (initDbKey) {
-                          navigator.clipboard.writeText(initDbKey);
-                          setCopiedDbKey(true);
-                          setTimeout(() => setCopiedDbKey(false), 2000);
-                        }
-                      }}
-                      className="p-1 text-teal-700 hover:text-teal-900 cursor-pointer"
-                      title={lang === 'FR' ? 'Copier la clé' : 'Copy key'}
-                    >
-                      {copiedDbKey ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                    </button>
-                    {dbKeyDetails && (
-                      <button
-                        type="button"
-                        onClick={() => downloadKeyRecoveryCard(dbKeyDetails, initName || 'Household Admin')}
-                        className="p-1 text-teal-700 hover:text-teal-900 cursor-pointer"
-                        title={lang === 'FR' ? 'Télécharger la fiche de récupération' : 'Download Key Backup Card'}
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* SubtleCrypto Badges & Security Verification Indicators */}
-                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-teal-100/90 text-teal-900 text-[10px] font-bold font-mono">
-                    <Cpu className="w-2.5 h-2.5 text-teal-700" />
-                    <span>SubtleCrypto API</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100/90 text-emerald-900 text-[10px] font-bold">
-                    <Lock className="w-2.5 h-2.5 text-emerald-700" />
-                    <span>256-bit AES-GCM / SQLCipher</span>
-                  </span>
-                  {dbKeyDetails?.fingerprint && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-mono">
-                      <span>ID: #{dbKeyDetails.fingerprint}</span>
-                    </span>
-                  )}
-                  {keyVerifiedWithSubtle && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold">
-                      <ShieldCheck className="w-2.5 h-2.5 text-emerald-600" />
-                      <span>{lang === 'FR' ? 'Vérifié au repos' : 'Verified at-rest'}</span>
-                    </span>
-                  )}
-                </div>
-
-                <p className="text-[10px] text-[#527470] leading-snug">
-                  {lang === 'FR'
-                    ? '🔒 Générée via l’API SubtleCrypto native, cette clé chiffre intégralement votre base SQLite locale au repos (tables utilisateurs, inventaire, restes et recettes chiffrées par page SQLCipher).'
-                    : '🔒 Generated via the native SubtleCrypto API, this 256-bit key encrypts your local SQLite database at-rest (users, inventory, leftovers, and recipe tables encrypted via SQLCipher page-level ciphers).'}
-                </p>
               </div>
 
               {error && (
@@ -652,15 +375,11 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
                 {loading ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>{lang === 'FR' ? 'Initialisation en cours...' : 'Creating Account...'}</span>
+                    <span>{lang === 'FR' ? 'Connexion en cours...' : 'Signing In...'}</span>
                   </>
                 ) : (
                   <>
-                    <span>
-                      {lang === 'FR'
-                        ? 'Créer le Compte Administrateur & Continuer'
-                        : 'Create Administrator Account & Continue'}
-                    </span>
+                    <span>{lang === 'FR' ? 'Se Connecter' : 'Log In'}</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
@@ -857,26 +576,6 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
           </>
         )}
       </div>
-
-      {/* Change Avatar Modal for Setup */}
-      {isAvatarModalOpen && (
-        <ChangeAvatarModal
-          isOpen={isAvatarModalOpen}
-          user={{
-            id: 'temp_admin',
-            name: initName || 'Administrator',
-            email: initUsername || 'admin',
-            role: 'ADMIN',
-            avatarUrl: initAvatarUrl,
-            fido2Enabled: false,
-          }}
-          onClose={() => setIsAvatarModalOpen(false)}
-          onSaveAvatar={(newUrl) => {
-            setInitAvatarUrl(newUrl);
-            setIsAvatarModalOpen(false);
-          }}
-        />
-      )}
 
       {/* Footer */}
       <footer className="text-center text-[11px] text-[#7A9A96] py-3 space-y-1">

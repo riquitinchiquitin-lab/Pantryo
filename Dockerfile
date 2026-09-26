@@ -24,6 +24,9 @@ COPY . .
 # Build Vite frontend and bundle Express backend
 RUN npm run build
 
+# Prune dev dependencies so node_modules contains only compiled production packages
+RUN npm prune --omit=dev
+
 # Production runtime stage
 FROM node:20-bookworm-slim AS runner
 
@@ -37,9 +40,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Install production dependencies only
-COPY package*.json ./
-RUN npm install --omit=dev
+# Copy production dependencies and package.json from builder
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
 
 # Copy compiled backend bundle and frontend dist from builder
 COPY --from=builder /app/dist ./dist

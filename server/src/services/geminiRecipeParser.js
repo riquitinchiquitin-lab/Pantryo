@@ -31,6 +31,10 @@ function getGeminiClient() {
   return aiClient;
 }
 
+export function resetGeminiClient() {
+  aiClient = null;
+}
+
 /**
  * Extracts YouTube video ID from various URL formats
  */

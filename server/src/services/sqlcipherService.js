@@ -501,6 +501,7 @@ export class SqlcipherService {
         if (snapshot.lastBackupAt) this.setMetadata("last_backup_at", snapshot.lastBackupAt);
         if (snapshot.lastRestoreAt) this.setMetadata("last_restore_at", snapshot.lastRestoreAt);
         if (snapshot.fido2Policy) this.setMetadata("fido2_policy", JSON.stringify(snapshot.fido2Policy));
+        if (snapshot.systemSettings) this.setMetadata("system_settings", JSON.stringify(snapshot.systemSettings));
       });
 
       tx();
@@ -573,9 +574,12 @@ export class SqlcipherService {
         .all()
         .map((row) => (row.raw_json ? JSON.parse(row.raw_json) : row));
 
-      // 10. Policy & timestamps
+      // 10. Policy & timestamps & system settings
       const rawPolicy = this.getMetadata("fido2_policy");
       const fido2Policy = rawPolicy ? JSON.parse(rawPolicy) : { allUsersRequired: true, enforced: true };
+
+      const rawSettings = this.getMetadata("system_settings");
+      const systemSettings = rawSettings ? JSON.parse(rawSettings) : null;
 
       return {
         household,
@@ -588,6 +592,7 @@ export class SqlcipherService {
         groceryItems,
         savedLists,
         fido2Policy,
+        systemSettings,
         lastBackupAt: this.getMetadata("last_backup_at"),
         lastRestoreAt: this.getMetadata("last_restore_at"),
       };
