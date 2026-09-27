@@ -80,18 +80,7 @@ export function usePWAInstall() {
   }, []);
 
   const install = async (): Promise<boolean> => {
-    // 1. Try official PWABuilder web component if present
-    const pwaInstallEl = document.querySelector('pwa-install') as (HTMLElement & { openPrompt?: () => void; isInstallAvailable?: boolean }) | null;
-    if (pwaInstallEl && typeof pwaInstallEl.openPrompt === 'function') {
-      try {
-        pwaInstallEl.openPrompt();
-        return true;
-      } catch (err) {
-        console.warn('[Pantryo PWA] pwa-install openPrompt note:', err);
-      }
-    }
-
-    // 2. Try captured beforeinstallprompt event
+    // 1. Prioritize native beforeinstallprompt for instant 1-tap browser install dialog
     const promptEvent = deferredPrompt || globalDeferredPrompt;
     if (promptEvent && typeof promptEvent.prompt === 'function') {
       try {
@@ -103,10 +92,23 @@ export function usePWAInstall() {
           setDeferredPrompt(null);
           return true;
         }
+        return false;
       } catch (e) {
-        console.warn('[Pantryo PWA] Install prompt execution note:', e);
+        console.warn('[Pantryo PWA] Native install prompt error:', e);
       }
     }
+
+    // 2. Fallback to PWABuilder web component if present
+    const pwaInstallEl = document.querySelector('pwa-install') as (HTMLElement & { openPrompt?: () => void; isInstallAvailable?: boolean }) | null;
+    if (pwaInstallEl && typeof pwaInstallEl.openPrompt === 'function') {
+      try {
+        pwaInstallEl.openPrompt();
+        return true;
+      } catch (err) {
+        console.warn('[Pantryo PWA] pwa-install openPrompt note:', err);
+      }
+    }
+
     return false;
   };
 
