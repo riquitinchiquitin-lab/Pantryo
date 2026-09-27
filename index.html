@@ -69,6 +69,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Pantryo</title>
+    <!-- Web App Manifest for Android Chrome, iOS Safari & Desktop PWA -->
+    <link rel="manifest" href="/manifest.json" />
     <link rel="icon" type="image/svg+xml" href="/pantryo-logo.svg" />
     <link rel="alternate icon" type="image/png" href="/pantryo-logo.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -84,6 +86,20 @@
     <meta name="apple-mobile-web-app-title" content="Pantryo" />
     <meta name="application-name" content="Pantryo" />
     <meta name="theme-color" content="#0E766E" />
+    <script>
+      // Immediate Service Worker registration for PWA installability
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/sw.js', { scope: '/' })
+            .then(function(reg) {
+              console.log('[Pantryo PWA] Service Worker registered on scope:', reg.scope);
+            })
+            .catch(function(err) {
+              console.warn('[Pantryo PWA] Service Worker registration note:', err);
+            });
+        });
+      }
+    </script>
     <meta name="description" content="Smart food inventory tracking with grocery receipt parsing, photo/paste OCR scanning, meal planning calendar with date-to-date shopping list generation cross-checked against kitchen stock, visual food cuts, and multilingual French and English support." />
     <meta property="og:title" content="Pantryo" />
     <meta property="og:description" content="Smart food inventory tracking with grocery receipt parsing, photo/paste OCR scanning, meal planning calendar with date-to-date shopping list generation cross-checked against kitchen stock, visual food cuts, and multilingual French and English support." />
