@@ -36,6 +36,7 @@ import {
   Layers,
   Thermometer,
   ShieldCheck,
+  Pencil,
 } from 'lucide-react';
 import { InventoryItem, PlannedMeal, MealType } from '../types';
 import { RICARDO_RECIPES, RicardoRecipe } from '../data/ricardoRecipes';
@@ -88,13 +89,29 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
 
   // Add Recipe Modal state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [recipeToEdit, setRecipeToEdit] = useState<RicardoRecipe | null>(null);
   const [addModalInitialTab, setAddModalInitialTab] = useState<'url' | 'youtube' | 'text' | 'photo'>('url');
   const [addModalAutoCam, setAddModalAutoCam] = useState(false);
   const [capturedRecipePhoto, setCapturedRecipePhoto] = useState<string | null>(null);
   const directRecipeCamRef = useRef<HTMLInputElement | null>(null);
 
+  const handleEditRecipe = (recipe: RicardoRecipe, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    // If it's a built-in recipe or saved recipe, prepare it with a persistent id
+    const editableRecipe: RicardoRecipe = {
+      ...recipe,
+      id: recipe.isCustom ? recipe.id : `custom_${recipe.id}`,
+      isCustom: true,
+      source: recipe.isRicardoOfficial ? 'Ricardo Cuisine' : (recipe.source || 'Personal'),
+    };
+    setRecipeToEdit(editableRecipe);
+    setCapturedRecipePhoto(null);
+    setIsAddModalOpen(true);
+  };
+
   const openRecipeScan = () => {
     // Instantly launch camera shutter in direct user click gesture
+    setRecipeToEdit(null);
     if (directRecipeCamRef.current) {
       directRecipeCamRef.current.click();
     } else {
@@ -152,6 +169,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
   };
 
   const openRecipeAdd = () => {
+    setRecipeToEdit(null);
     setCapturedRecipePhoto(null);
     setAddModalInitialTab('url');
     setAddModalAutoCam(false);
@@ -1147,6 +1165,16 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
 
                   {/* Right: Actions */}
                   <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    {/* Edit Recipe Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => handleEditRecipe(recipe, e)}
+                      className="p-2 rounded-xl border border-[#D5E1D2] bg-white text-slate-500 hover:text-emerald-700 hover:border-emerald-400 hover:bg-emerald-50 transition-all cursor-pointer shadow-2xs active:scale-95"
+                      title={lang === 'FR' ? 'Modifier la recette' : 'Edit recipe'}
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+
                     {/* Save to My Recipes Button */}
                     <button
                       type="button"
@@ -1260,6 +1288,15 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                           </span>
                         )}
 
+                        {/* Edit Recipe Button */}
+                        <button
+                          onClick={(e) => handleEditRecipe(recipe, e)}
+                          className="p-1 rounded-full bg-black/50 hover:bg-emerald-600 text-white transition-colors cursor-pointer"
+                          title={lang === 'FR' ? 'Modifier cette recette' : 'Edit recipe'}
+                        >
+                          <Pencil className="w-2.5 h-2.5" />
+                        </button>
+
                         {isUserCustom && (
                           <button
                             onClick={() => handleDeleteCustomRecipe(recipe.id, title)}
@@ -1326,9 +1363,20 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                   </div>
                 )}
 
-                {/* Primary Action Bar: Save to My Recipes & Meal Plan */}
+                {/* Primary Action Bar: Save to My Recipes, Edit Recipe, & Meal Plan */}
                 <div className="p-3 bg-[#F4F8F3] border-b border-[#D5E1D2] flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-1.5 flex-wrap">
+                    {/* Edit Recipe button */}
+                    <button
+                      type="button"
+                      onClick={(e) => handleEditRecipe(recipe, e)}
+                      className="px-3 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 text-xs font-black flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-95"
+                      title={lang === 'FR' ? 'Modifier cette recette' : 'Edit this recipe'}
+                    >
+                      <Pencil className="w-3.5 h-3.5 text-emerald-700" />
+                      <span>{lang === 'FR' ? 'Modifier la recette' : 'Edit Recipe'}</span>
+                    </button>
+
                     {/* Save to My Recipes button */}
                     <button
                       type="button"
@@ -1861,18 +1909,23 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
         className="hidden"
       />
 
-      {/* Add Recipe Modal */}
+      {/* Add / Edit Recipe Modal */}
       <AddRecipeModal
         isOpen={isAddModalOpen}
         onClose={() => {
           setIsAddModalOpen(false);
+          setRecipeToEdit(null);
           setCapturedRecipePhoto(null);
         }}
-        onRecipeSaved={handleSaveRecipe}
+        onRecipeSaved={(savedRecipe) => {
+          handleSaveRecipe(savedRecipe);
+          setRecipeToEdit(null);
+        }}
         lang={lang}
         initialTab={addModalInitialTab}
         autoOpenCam={addModalAutoCam}
         initialPhotoBase64={capturedRecipePhoto}
+        recipeToEdit={recipeToEdit}
       />
     </div>
   );

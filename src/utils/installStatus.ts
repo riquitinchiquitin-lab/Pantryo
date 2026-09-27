@@ -7,20 +7,29 @@
 export function isAppInstalledOrStandalone(): boolean {
   if (typeof window === 'undefined') return false;
 
-  const isStandaloneMedia = window.matchMedia?.('(display-mode: standalone)').matches;
-  const isMinimalUi = window.matchMedia?.('(display-mode: minimal-ui)').matches;
-  const isFullscreen = window.matchMedia?.('(display-mode: fullscreen)').matches;
-  const isIosStandalone = (window.navigator as any)?.standalone === true;
-  const isAndroidReferrer = typeof document !== 'undefined' && document.referrer?.includes('android-app://');
-  const isInstalledUrlParam = typeof window !== 'undefined' && (
-    window.location.search.includes('installed=true') ||
-    window.location.search.includes('mode=standalone')
+  // Real standalone check (W3C standard)
+  const isStandaloneMedia = Boolean(window.matchMedia?.('(display-mode: standalone)').matches);
+
+  // iOS Safari Home Screen standalone mode
+  const isIosStandalone = Boolean((window.navigator as any)?.standalone === true);
+
+  // Android WebAPK or TWA launcher referrer
+  const isAndroidReferrer = Boolean(
+    typeof document !== 'undefined' &&
+    typeof document.referrer === 'string' &&
+    document.referrer.includes('android-app://')
+  );
+
+  // Explicit installed / standalone URL parameter
+  const isInstalledUrlParam = Boolean(
+    typeof window !== 'undefined' && (
+      window.location.search.includes('installed=true') ||
+      window.location.search.includes('mode=standalone')
+    )
   );
 
   return Boolean(
     isStandaloneMedia ||
-    isMinimalUi ||
-    isFullscreen ||
     isIosStandalone ||
     isAndroidReferrer ||
     isInstalledUrlParam

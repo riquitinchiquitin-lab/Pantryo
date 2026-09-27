@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Copy, Check, Shield, Clock, Plus, UserCheck, ArrowRightLeft, Key, ShieldAlert, ShieldCheck, Camera, LogOut } from 'lucide-react';
+import { Users, Copy, Check, Shield, Clock, Plus, UserCheck, ArrowRightLeft, Key, ShieldAlert, ShieldCheck, Camera, LogOut, Download, Smartphone, CheckCircle2 } from 'lucide-react';
 import { User, ActivityLogItem } from '../types';
 import { useLanguage, getLocationLocalizedName } from '../utils/i18n';
 import { Fido2AuthModal } from './Fido2AuthModal';
@@ -12,6 +12,8 @@ interface FamilySyncViewProps {
   onOpenAdmin?: () => void;
   onUpdateMember?: (user: User) => void;
   onLogout?: () => void;
+  onInstall?: () => void;
+  isInstalled?: boolean;
 }
 
 export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
@@ -21,6 +23,8 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
   onOpenAdmin,
   onUpdateMember,
   onLogout,
+  onInstall,
+  isInstalled = false,
 }) => {
   const { t, lang } = useLanguage();
   const [copied, setCopied] = useState(false);
@@ -324,6 +328,57 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
           }}
         />
       )}
+
+      {/* PWA Application & Install Status Card */}
+      <div className="p-4 rounded-3xl bg-gradient-to-br from-white via-white to-teal-50/40 border border-[#D5E1D2] space-y-3 shadow-xs">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-teal-800 text-white flex items-center justify-center shadow-xs">
+              <Smartphone className="w-4 h-4 text-teal-300" />
+            </div>
+            <div>
+              <h4 className="text-xs sm:text-sm font-black text-[#0D3B37]">
+                {lang === 'FR' ? 'Application & Installation PWA' : 'App & PWA Installation'}
+              </h4>
+              <p className="text-[11px] text-[#527470]">
+                {lang === 'FR' ? 'Application Web Progressive plein écran' : 'Fullscreen Progressive Web App'}
+              </p>
+            </div>
+          </div>
+          {isInstalled ? (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-teal-100 text-teal-900 font-extrabold text-[10px] border border-teal-200">
+              <CheckCircle2 className="w-3 h-3 text-teal-700" />
+              <span>{lang === 'FR' ? 'Appli Installée' : 'App Installed'}</span>
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 font-extrabold text-[10px] border border-amber-200">
+              <Smartphone className="w-3 h-3 text-amber-700" />
+              <span>{lang === 'FR' ? 'Mode Navigateur' : 'Browser Mode'}</span>
+            </span>
+          )}
+        </div>
+
+        <p className="text-xs text-[#2A4D48] leading-relaxed">
+          {isInstalled
+            ? lang === 'FR'
+              ? 'Pantryo est installée sur cet appareil en mode autonome avec prise en charge du cache hors-ligne et lancement plein écran.'
+              : 'Pantryo is installed on this device in standalone mode with offline cache and instant launch.'
+            : lang === 'FR'
+            ? 'Installez Pantryo sur votre écran d\'accueil pour profiter du mode plein écran, d\'un accès rapide sans barre d\'adresse et de la numérisation caméra instantanée.'
+            : 'Install Pantryo on your home screen for a fullscreen experience, fast camera barcode scanning, and offline access.'}
+        </p>
+
+        {!isInstalled && onInstall && (
+          <button
+            type="button"
+            onClick={onInstall}
+            className="w-full py-2.5 px-4 rounded-2xl bg-teal-800 hover:bg-teal-900 text-white font-black text-xs flex items-center justify-center gap-2 shadow-xs transition-all active:scale-98 cursor-pointer"
+          >
+            <Download className="w-4 h-4 text-teal-300" />
+            <span>{lang === 'FR' ? 'Installer Pantryo sur cet appareil' : 'Install Pantryo on this device'}</span>
+          </button>
+        )}
+      </div>
 
       {/* Household Audit Activity Feed */}
       <div className="space-y-3 pt-2">

@@ -849,24 +849,27 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             <LanguageSwitcher />
 
             {/* Install Button */}
-            {!isInstalled && onInstall && (
+            {!isInstalledEffective && onInstall && (
               <button
+                type="button"
                 onClick={onInstall}
-                className="p-1.5 lg:px-2.5 lg:py-1.5 rounded-xl bg-[#0E766E] hover:bg-[#0B5C56] text-white text-xs font-bold shadow-2xs transition-all active:scale-95 flex items-center gap-1 shrink-0 cursor-pointer"
+                className="px-2.5 py-1.5 rounded-xl bg-[#0E766E] hover:bg-[#0B5C56] text-white text-xs font-bold shadow-2xs transition-all active:scale-95 flex items-center gap-1.5 shrink-0 cursor-pointer"
                 title={t('install_tooltip')}
               >
-                <Download className="w-3.5 h-3.5" />
-                <span className="hidden lg:inline">{t('install_btn')}</span>
+                <Download className="w-3.5 h-3.5 text-teal-200" />
+                <span className="font-bold text-[11px] sm:text-xs">{t('install_btn')}</span>
               </button>
             )}
 
-            {/* User Pill with Avatar Change Trigger */}
-            <div className="flex items-center gap-1 bg-white/95 border border-[#E0D9C8] rounded-xl p-1 lg:px-2 lg:py-1 shadow-2xs shrink-0">
+            {/* User Pill: Clicking opens Family & Profile */}
+            <div className={`flex items-center gap-1 border rounded-xl p-1 lg:px-2 lg:py-1 shadow-2xs shrink-0 transition-colors ${
+              activeNav === 'sync' ? 'bg-teal-700 border-teal-800 text-white' : 'bg-white/95 border-[#E0D9C8] text-[#0D3B37]'
+            }`}>
               <button
                 type="button"
-                onClick={() => setIsAvatarModalOpen(true)}
+                onClick={() => setActiveNav(activeNav === 'sync' ? 'home' : 'sync')}
                 className="relative group/avatar cursor-pointer shrink-0"
-                title={lang === 'FR' ? 'Changer votre photo de profil' : 'Change your profile picture'}
+                title={lang === 'FR' ? 'Famille & Profil' : 'Family & Profile'}
               >
                 <img
                   src={currentUser.avatarUrl || '/avatars/chef-cat.svg'}
@@ -874,17 +877,17 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                   referrerPolicy="no-referrer"
                   className="w-6 h-6 rounded-full object-cover shrink-0 border border-teal-600/30 group-hover/avatar:opacity-80 transition-opacity"
                 />
-                <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
-                  <Camera className="w-3 h-3 text-white" />
-                </div>
               </button>
               <button
                 type="button"
-                onClick={() => setActiveNav('sync')}
-                className="text-xs font-bold text-[#0D3B37] hover:text-teal-800 transition-colors hidden lg:inline cursor-pointer px-1"
+                onClick={() => setActiveNav(activeNav === 'sync' ? 'home' : 'sync')}
+                className={`text-xs font-bold transition-colors cursor-pointer px-1 flex items-center gap-1 ${
+                  activeNav === 'sync' ? 'text-white' : 'text-[#0D3B37] hover:text-teal-800'
+                }`}
                 title={currentUser.name}
               >
-                {currentUser.name}
+                <span className="truncate max-w-[70px] sm:max-w-[110px]">{currentUser.name}</span>
+                <Users className="w-3 h-3 opacity-70 hidden sm:inline" />
               </button>
             </div>
 
@@ -1773,6 +1776,8 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             members={householdMembers}
             onUpdateMember={handleUpdateMember}
             onLogout={handleLogout}
+            onInstall={onInstall}
+            isInstalled={isInstalledEffective}
             onOpenAdmin={() => {
               if (currentUser.role === 'ADMIN') {
                 setIsAdminModalOpen(true);
@@ -1935,17 +1940,39 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 </p>
               </div>
             </button>
+
+            {/* Option 5: Family & Profile Settings */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsAddMenuOpen(false);
+                setActiveNav('sync');
+              }}
+              className="w-full p-4 rounded-3xl bg-white hover:bg-[#F2ECE0] border-2 border-[#E5DFD0] hover:border-teal-500 flex items-center gap-4 text-left transition-all active:scale-[0.98] shadow-xs group cursor-pointer"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-teal-800 group-hover:bg-teal-900 text-white flex items-center justify-center shadow-xs shrink-0 transition-colors">
+                <Users className="w-6 h-6 text-teal-200" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-extrabold text-[#0D3B37]">
+                  {lang === 'FR' ? 'Famille, Profil & Rôles' : 'Family, Profile & Roles'}
+                </p>
+                <p className="text-xs text-[#527470]">
+                  {lang === 'FR' ? 'Changer d\'utilisateur, journal d\'audit et sécurité' : 'Switch household members, audit log & security'}
+                </p>
+              </div>
+            </button>
           </div>
         </div>
       )}
 
-      {/* Bottom Navigation Bar with Integrated Center + Add Button (Mobile screens, guaranteed Safe Area & touch clearance) */}
+      {/* Bottom Navigation Bar with Perfectly Centered Raised Add Button (2 tabs left, 2 tabs right) */}
       <nav
         aria-label="Bottom Navigation"
         className="md:hidden fixed bottom-0 inset-x-0 bg-[#FAF7EE]/95 backdrop-blur-md border-t border-[#E5DFD0] pt-1.5 pb-[max(0.75rem,env(safe-area-inset-bottom,0.75rem))] px-2 z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]"
       >
-        <div className="w-full max-w-lg mx-auto flex items-end justify-between gap-0.5">
-          {/* Tab 1: Inventory */}
+        <div className="w-full max-w-lg mx-auto flex items-end justify-between">
+          {/* Tab 1: Inventory (Left 1) */}
           <button
             type="button"
             onClick={() => {
@@ -1966,7 +1993,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             </span>
           </button>
 
-          {/* Tab 2: Meals */}
+          {/* Tab 2: Meals (Left 2) */}
           <button
             type="button"
             onClick={() => {
@@ -1994,8 +2021,8 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             </span>
           </button>
 
-          {/* CENTER: Integrated Raised Add Button with + icon */}
-          <div className="flex flex-col items-center justify-center px-1.5 shrink-0 relative">
+          {/* EXACT CENTER: Integrated Raised Add Button with + icon */}
+          <div className="flex flex-col items-center justify-center px-2 shrink-0 relative">
             <button
               id="bottom-center-add-btn"
               type="button"
@@ -2013,7 +2040,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             </span>
           </div>
 
-          {/* Tab 3: Grocery */}
+          {/* Tab 3: Grocery (Right 1) */}
           <button
             type="button"
             onClick={() => {
@@ -2041,7 +2068,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             </span>
           </button>
 
-          {/* Tab 4: Cooking Ideas */}
+          {/* Tab 4: Cooking Ideas (Right 2) */}
           <button
             type="button"
             onClick={() => {
@@ -2059,27 +2086,6 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               activeNav === 'cooking' ? 'font-black text-[#0D3B37]' : 'font-semibold text-slate-400'
             }`}>
               {t('bottom_cooking')}
-            </span>
-          </button>
-
-          {/* Tab 5: Family & Profile */}
-          <button
-            type="button"
-            onClick={() => {
-              setIsAddMenuOpen(false);
-              setActiveNav('sync');
-            }}
-            className={`min-w-0 flex-1 flex flex-col items-center justify-center py-1 rounded-xl transition-all cursor-pointer active:scale-95 ${
-              activeNav === 'sync' ? 'text-[#0D3B37]' : 'text-slate-400 hover:text-slate-600'
-            }`}
-          >
-            <div className={`p-1 rounded-xl transition-colors ${activeNav === 'sync' ? 'bg-teal-100/80 text-[#0D3B37]' : ''}`}>
-              <Users className="w-5 h-5 shrink-0" />
-            </div>
-            <span className={`text-[10px] tracking-tight leading-tight mt-0.5 truncate max-w-full text-center ${
-              activeNav === 'sync' ? 'font-black text-[#0D3B37]' : 'font-semibold text-slate-400'
-            }`}>
-              {t('bottom_family')}
             </span>
           </button>
         </div>

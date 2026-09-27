@@ -99,33 +99,82 @@ router.get("/custom", (req, res) => {
 
 /**
  * POST /api/v1/recipes/custom
- * Saves a new custom recipe to the backend store
+ * Saves or updates a custom recipe in the backend store
  */
 router.post("/custom", (req, res) => {
   try {
     const recipe = req.body;
-    if (!recipe || !recipe.title) {
+    if (!recipe || (!recipe.title && !recipe.titleFr)) {
       return res.status(400).json({ success: false, error: "Invalid recipe data" });
     }
 
+    const recipeId = recipe.id || `rec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const existingIndex = dbStore.customRecipes.findIndex((r) => r.id === recipeId);
+
     const recipeWithMeta = {
       ...recipe,
-      id: recipe.id || `rec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      id: recipeId,
       isCustom: true,
-      createdAt: recipe.createdAt || new Date().toISOString(),
+      createdAt: recipe.createdAt || (existingIndex >= 0 ? dbStore.customRecipes[existingIndex].createdAt : new Date().toISOString()),
+      updatedAt: new Date().toISOString(),
     };
 
-    // Prepend to top of dbStore and persist
-    dbStore.customRecipes.unshift(recipeWithMeta);
+    if (existingIndex >= 0) {
+      dbStore.customRecipes[existingIndex] = recipeWithMeta;
+    } else {
+      dbStore.customRecipes.unshift(recipeWithMeta);
+    }
     dbStore.persistToEncryptedDisk();
 
-    return res.status(201).json({
+    return res.status(200).json({
       success: true,
-      message: `Recipe "${recipeWithMeta.title}" saved successfully!`,
+      message: `Recipe "${recipeWithMeta.title || recipeWithMeta.titleFr}" saved successfully!`,
       recipe: recipeWithMeta,
     });
   } catch (error) {
     console.error("[Recipes Route] POST /custom error:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * PUT /api/v1/recipes/custom/:id
+ * Updates an existing recipe by ID
+ */
+router.put("/custom/:id", (req, res) => {
+  try {
+    const { id } = req.params;
+    const recipeUpdates = req.body;
+    if (!recipeUpdates) {
+      return res.status(400).json({ success: false, error: "Missing update payload" });
+    }
+
+    const existingIndex = dbStore.customRecipes.findIndex((r) => r.id === id);
+    const existingRecipe = existingIndex >= 0 ? dbStore.customRecipes[existingIndex] : null;
+
+    const updatedRecipe = {
+      ...(existingRecipe || {}),
+      ...recipeUpdates,
+      id,
+      isCustom: true,
+      updatedAt: new Date().toISOString(),
+      createdAt: existingRecipe?.createdAt || recipeUpdates.createdAt || new Date().toISOString(),
+    };
+
+    if (existingIndex >= 0) {
+      dbStore.customRecipes[existingIndex] = updatedRecipe;
+    } else {
+      dbStore.customRecipes.unshift(updatedRecipe);
+    }
+    dbStore.persistToEncryptedDisk();
+
+    return res.status(200).json({
+      success: true,
+      message: `Recipe "${updatedRecipe.title || updatedRecipe.titleFr}" updated successfully!`,
+      recipe: updatedRecipe,
+    });
+  } catch (error) {
+    console.error("[Recipes Route] PUT /custom/:id error:", error);
     return res.status(500).json({ success: false, error: error.message });
   }
 });

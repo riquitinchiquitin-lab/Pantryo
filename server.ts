@@ -58,6 +58,37 @@ app.use("/api", (req, res) => {
   });
 });
 
+// Universal PWA manifest and service worker headers for installability (dev & prod)
+app.get("/sw.js", (req, res, next) => {
+  res.setHeader("Content-Type", "text/javascript; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  res.setHeader("Service-Worker-Allowed", "/");
+  const targetDir = process.env.NODE_ENV === "production" ? "dist" : "public";
+  const swPath = path.join(process.cwd(), targetDir, "sw.js");
+  res.sendFile(swPath, (err) => {
+    if (err) {
+      res.sendFile(path.join(process.cwd(), "public", "sw.js"), (err2) => {
+        if (err2) next();
+      });
+    }
+  });
+});
+
+app.get(["/manifest.webmanifest", "/manifest.json"], (req, res, next) => {
+  res.setHeader("Content-Type", "application/manifest+json; charset=utf-8");
+  res.setHeader("Cache-Control", "public, max-age=3600");
+  const targetDir = process.env.NODE_ENV === "production" ? "dist" : "public";
+  const filename = req.path.endsWith("webmanifest") ? "manifest.webmanifest" : "manifest.json";
+  const filePath = path.join(process.cwd(), targetDir, filename);
+  res.sendFile(filePath, (err) => {
+    if (err) {
+      res.sendFile(path.join(process.cwd(), "public", "manifest.json"), (err2) => {
+        if (err2) next();
+      });
+    }
+  });
+});
+
 async function startServer() {
   // Vite middleware setup (development only)
   if (process.env.NODE_ENV !== "production") {
@@ -73,28 +104,6 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-
-    // Proper MIME and caching headers for PWA installability
-    app.get("/sw.js", (req, res, next) => {
-      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-      res.setHeader("Service-Worker-Allowed", "/");
-      res.sendFile(path.join(distPath, "sw.js"), (err) => {
-        if (err) next();
-      });
-    });
-
-    app.get(["/manifest.webmanifest", "/manifest.json"], (req, res, next) => {
-      res.setHeader("Content-Type", "application/manifest+json");
-      res.setHeader("Cache-Control", "public, max-age=3600");
-      const filename = req.path.endsWith("webmanifest") ? "manifest.webmanifest" : "manifest.json";
-      res.sendFile(path.join(distPath, filename), (err) => {
-        if (err) {
-          res.sendFile(path.join(distPath, "manifest.json"), (err2) => {
-            if (err2) next();
-          });
-        }
-      });
-    });
 
     app.use(express.static(distPath));
     app.use((req, res) => {

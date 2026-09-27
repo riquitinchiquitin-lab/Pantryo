@@ -26,6 +26,10 @@ import {
   Eye,
   Video,
   RefreshCw,
+  Pencil,
+  ChevronUp,
+  ChevronDown,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { RicardoRecipe, RecipeIngredient } from '../data/ricardoRecipes';
 import { useLanguage } from '../utils/i18n';
@@ -43,6 +47,7 @@ interface AddRecipeModalProps {
   initialTab?: 'url' | 'youtube' | 'text' | 'photo';
   autoOpenCam?: boolean;
   initialPhotoBase64?: string | null;
+  recipeToEdit?: RicardoRecipe | null;
 }
 
 export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
@@ -53,6 +58,7 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
   initialTab = 'url',
   autoOpenCam = false,
   initialPhotoBase64 = null,
+  recipeToEdit = null,
 }) => {
   const { lang: globalLang } = useLanguage();
   const lang = propLang || globalLang;
@@ -100,6 +106,112 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
 
   // Review & Edit state after AI has parsed
   const [parsedRecipe, setParsedRecipe] = useState<RicardoRecipe | null>(null);
+
+  // Synchronize when editing an existing recipe
+  useEffect(() => {
+    if (recipeToEdit && isOpen) {
+      setParsedRecipe(JSON.parse(JSON.stringify(recipeToEdit)));
+    } else if (!isOpen && !recipeToEdit) {
+      setParsedRecipe(null);
+    }
+  }, [recipeToEdit, isOpen]);
+
+  // Helper methods for editing ingredients
+  const handleAddIngredient = () => {
+    setParsedRecipe((prev) => {
+      if (!prev) return null;
+      const newIng: RecipeIngredient = {
+        name: '',
+        nameFr: '',
+        amount: '1',
+        locationType: 'FRIDGE',
+        category: 'Pantry Staples',
+      };
+      return {
+        ...prev,
+        ingredients: [...(prev.ingredients || []), newIng],
+      };
+    });
+  };
+
+  const handleUpdateIngredient = (index: number, updates: Partial<RecipeIngredient>) => {
+    setParsedRecipe((prev) => {
+      if (!prev) return null;
+      const copy = [...(prev.ingredients || [])];
+      if (!copy[index]) return prev;
+      copy[index] = { ...copy[index], ...updates };
+      return { ...prev, ingredients: copy };
+    });
+  };
+
+  const handleRemoveIngredient = (index: number) => {
+    setParsedRecipe((prev) => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        ingredients: (prev.ingredients || []).filter((_, i) => i !== index),
+      };
+    });
+  };
+
+  // Helper methods for editing instruction steps
+  const handleAddInstructionStep = () => {
+    setParsedRecipe((prev) => {
+      if (!prev) return null;
+      const isFr = lang === 'FR';
+      if (isFr) {
+        const cur = prev.instructionsFr && prev.instructionsFr.length > 0 ? prev.instructionsFr : (prev.instructionsEn || []);
+        return { ...prev, instructionsFr: [...cur, ''] };
+      } else {
+        const cur = prev.instructionsEn && prev.instructionsEn.length > 0 ? prev.instructionsEn : (prev.instructionsFr || []);
+        return { ...prev, instructionsEn: [...cur, ''] };
+      }
+    });
+  };
+
+  const handleUpdateInstructionStep = (index: number, value: string) => {
+    setParsedRecipe((prev) => {
+      if (!prev) return null;
+      const isFr = lang === 'FR';
+      if (isFr) {
+        const copy = [...(prev.instructionsFr && prev.instructionsFr.length > 0 ? prev.instructionsFr : prev.instructionsEn || [])];
+        copy[index] = value;
+        return { ...prev, instructionsFr: copy };
+      } else {
+        const copy = [...(prev.instructionsEn && prev.instructionsEn.length > 0 ? prev.instructionsEn : prev.instructionsFr || [])];
+        copy[index] = value;
+        return { ...prev, instructionsEn: copy };
+      }
+    });
+  };
+
+  const handleRemoveInstructionStep = (index: number) => {
+    setParsedRecipe((prev) => {
+      if (!prev) return null;
+      const isFr = lang === 'FR';
+      if (isFr) {
+        const copy = (prev.instructionsFr && prev.instructionsFr.length > 0 ? prev.instructionsFr : prev.instructionsEn || []).filter((_, i) => i !== index);
+        return { ...prev, instructionsFr: copy };
+      } else {
+        const copy = (prev.instructionsEn && prev.instructionsEn.length > 0 ? prev.instructionsEn : prev.instructionsFr || []).filter((_, i) => i !== index);
+        return { ...prev, instructionsEn: copy };
+      }
+    });
+  };
+
+  const handleMoveInstructionStep = (index: number, direction: 'up' | 'down') => {
+    setParsedRecipe((prev) => {
+      if (!prev) return null;
+      const isFr = lang === 'FR';
+      const steps = [...(isFr ? (prev.instructionsFr && prev.instructionsFr.length > 0 ? prev.instructionsFr : prev.instructionsEn || []) : (prev.instructionsEn && prev.instructionsEn.length > 0 ? prev.instructionsEn : prev.instructionsFr || []))];
+      const targetIdx = direction === 'up' ? index - 1 : index + 1;
+      if (targetIdx < 0 || targetIdx >= steps.length) return prev;
+      const temp = steps[index];
+      steps[index] = steps[targetIdx];
+      steps[targetIdx] = temp;
+      return isFr ? { ...prev, instructionsFr: steps } : { ...prev, instructionsEn: steps };
+    });
+  };
 
   // Stop live camera stream cleanly
   const stopLiveCamera = () => {
@@ -668,21 +780,36 @@ Instructions:
   const handleConfirmSave = async () => {
     if (!parsedRecipe) return;
 
+    const recipeId = parsedRecipe.id || `rec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const recipeToPersist: RicardoRecipe = {
+      ...parsedRecipe,
+      id: recipeId,
+      isCustom: true,
+      updatedAt: new Date().toISOString(),
+      createdAt: parsedRecipe.createdAt || new Date().toISOString(),
+    };
+
     try {
-      const res = await fetch('/api/v1/recipes/custom', {
-        method: 'POST',
+      const isExisting = Boolean(recipeToEdit || (parsedRecipe.id && !parsedRecipe.id.startsWith('temp_')));
+      const endpoint = isExisting
+        ? `/api/v1/recipes/custom/${recipeId}`
+        : '/api/v1/recipes/custom';
+      const method = isExisting ? 'PUT' : 'POST';
+
+      const res = await fetch(endpoint, {
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(parsedRecipe),
+        body: JSON.stringify(recipeToPersist),
       });
       const data = await res.json();
-      const saved = data.success ? data.recipe : parsedRecipe;
+      const saved = data.success && data.recipe ? data.recipe : recipeToPersist;
       setParsedRecipe(null);
       setPhotoBase64(null);
       onRecipeSaved(saved);
       onClose();
     } catch (err) {
       console.error('Failed to save recipe to backend:', err);
-      const fallback = parsedRecipe;
+      const fallback = recipeToPersist;
       setParsedRecipe(null);
       setPhotoBase64(null);
       onRecipeSaved(fallback);
@@ -699,14 +826,24 @@ Instructions:
       <header className="px-4 sm:px-6 py-3.5 bg-white border-b border-[#E1EDE0] flex items-center justify-between shrink-0 shadow-2xs">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shadow-xs">
-            <Sparkles className="w-5 h-5" />
+            {recipeToEdit ? <Pencil className="w-5 h-5" /> : <Sparkles className="w-5 h-5" />}
           </div>
           <div>
             <h2 className="text-sm sm:text-base font-black text-[#1E3022]">
-              {lang === 'FR' ? 'Importer ou Ajouter une Recette' : 'Import or Add a Recipe'}
+              {recipeToEdit
+                ? lang === 'FR'
+                  ? 'Modifier la Recette'
+                  : 'Edit Recipe'
+                : lang === 'FR'
+                ? 'Importer ou Ajouter une Recette'
+                : 'Import or Add a Recipe'}
             </h2>
             <p className="text-[11px] text-[#556D58]">
-              {lang === 'FR'
+              {recipeToEdit
+                ? lang === 'FR'
+                  ? 'Personnalisez le titre, les portions, les ingrédients et les étapes'
+                  : 'Customize title, servings, ingredients, and instructions'
+                : lang === 'FR'
                 ? 'Sites web de recettes, YouTube, texte ou photo avec traduction automatique'
                 : 'Web recipe sites, YouTube, text notes, or photo OCR with auto-translation'}
             </p>
@@ -1507,68 +1644,121 @@ Instructions:
             )}
           </div>
         ) : (
-          /* REVIEW & EDIT STEP ONCE PARSED BY AI */
+          /* REVIEW & FULL EDIT STEP ONCE PARSED OR WHEN EDITING SAVED RECIPE */
           <div className="space-y-4 animate-fade-in">
-            <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between shadow-2xs">
-              <div className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-600 shrink-0 stroke-[3]" />
-                <span className="font-extrabold">
-                  {lang === 'FR'
-                    ? 'Recette importée avec succès ! Vérifiez les détails :'
-                    : 'Recipe imported successfully! Review details:'}
-                </span>
+            {/* Status & Mode Banner */}
+            {recipeToEdit ? (
+              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center justify-between shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <Pencil className="w-4 h-4 text-amber-600 shrink-0 stroke-[2.5]" />
+                  <span className="font-extrabold">
+                    {lang === 'FR'
+                      ? 'Mode modification : personnalisez les détails, ingrédients et étapes de votre recette :'
+                      : 'Edit mode: customize title, ingredients, and step-by-step instructions:'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="text-[11px] font-bold text-amber-800 hover:underline shrink-0"
+                >
+                  {lang === 'FR' ? 'Annuler' : 'Cancel'}
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setParsedRecipe(null)}
-                className="text-[11px] font-bold text-emerald-800 hover:underline flex items-center gap-1"
-              >
-                <RotateCcw className="w-3 h-3" />
-                <span>{lang === 'FR' ? 'Modifier la source' : 'Edit Input'}</span>
-              </button>
-            </div>
+            ) : (
+              <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-600 shrink-0 stroke-[3]" />
+                  <span className="font-extrabold">
+                    {lang === 'FR'
+                      ? 'Recette numérisée ! Vous pouvez modifier tous les champs, ingrédients et étapes ci-dessous :'
+                      : 'Recipe parsed! You can customize any field, ingredients, or instructions below:'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setParsedRecipe(null)}
+                  className="text-[11px] font-bold text-emerald-800 hover:underline flex items-center gap-1 shrink-0"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>{lang === 'FR' ? 'Recommencer' : 'Edit Input'}</span>
+                </button>
+              </div>
+            )}
 
-            {/* Recipe Image & Title Card */}
-            <div className="rounded-2xl border border-[#D5E1D2] bg-white overflow-hidden shadow-2xs space-y-3">
-              {parsedRecipe.imageUrl && (
-                <div className="h-36 w-full relative bg-slate-100">
+            {/* General Recipe Information Card */}
+            <div className="rounded-2xl border border-[#D5E1D2] bg-white overflow-hidden shadow-2xs space-y-4">
+              {/* Recipe Image Banner Preview & Image URL Field */}
+              {parsedRecipe.imageUrl ? (
+                <div className="h-44 w-full relative bg-slate-100 group">
                   <img
                     src={parsedRecipe.imageUrl}
                     alt={parsedRecipe.title}
                     className="w-full h-full object-cover"
                   />
-                  <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/70 text-white text-[9px] font-black tracking-wider uppercase backdrop-blur-xs">
-                    {parsedRecipe.source}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                  <span className="absolute top-2.5 left-2.5 px-2.5 py-0.5 rounded-full bg-black/70 text-white text-[10px] font-black tracking-wider uppercase backdrop-blur-xs">
+                    {parsedRecipe.source || (lang === 'FR' ? 'Recette Personnelle' : 'Personal Recipe')}
                   </span>
                   {parsedRecipe.ricardoUrlEn && (
                     <a
-                      href={parsedRecipe.ricardoUrlEn}
+                      href={lang === 'FR' && parsedRecipe.ricardoUrlFr ? parsedRecipe.ricardoUrlFr : parsedRecipe.ricardoUrlEn}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="absolute top-2 right-2 px-2.5 py-0.5 rounded-full bg-white/90 text-slate-800 text-[10px] font-bold flex items-center gap-1 hover:bg-white"
+                      className="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-full bg-white/90 text-slate-800 text-[10px] font-bold flex items-center gap-1 hover:bg-white shadow-xs"
                     >
-                      <span>{lang === 'FR' ? 'Source web' : 'Web page'}</span>
+                      <span>{lang === 'FR' ? 'Lien source' : 'Source link'}</span>
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   )}
+                  <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between text-white text-xs">
+                    <span className="text-[11px] opacity-90 drop-shadow-xs truncate">
+                      {lang === 'FR' && parsedRecipe.titleFr ? parsedRecipe.titleFr : parsedRecipe.title}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setParsedRecipe((prev) => (prev ? { ...prev, imageUrl: '' } : null))}
+                      className="px-2 py-0.5 rounded bg-black/60 hover:bg-red-600 text-white text-[10px] font-bold transition-colors cursor-pointer"
+                    >
+                      {lang === 'FR' ? 'Changer l’image' : 'Change Image'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 bg-[#F8FAF6] border-b border-[#E1EDE0] flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-slate-100 border border-[#D5E1D2] flex items-center justify-center text-slate-400 shrink-0">
+                    <ImageIcon className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
+                      {lang === 'FR' ? 'URL de l’image de la recette (optionnel)' : 'Recipe Image URL (optional)'}
+                    </label>
+                    <input
+                      type="url"
+                      value={parsedRecipe.imageUrl || ''}
+                      onChange={(e) => setParsedRecipe((prev) => (prev ? { ...prev, imageUrl: e.target.value } : null))}
+                      placeholder="https://images.unsplash.com/photo-..."
+                      className="w-full text-xs text-[#1E3022] font-mono bg-white border border-[#D5E1D2] rounded-lg px-2.5 py-1.5 mt-1 focus:outline-none focus:border-emerald-600"
+                    />
+                  </div>
                 </div>
               )}
 
-              <div className="p-4 space-y-3">
+              <div className="p-4 sm:p-5 space-y-4">
                 {/* On-Demand Translation Control Bar */}
-                <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-[#E1EDE0]">
+                <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-[#E1EDE0]">
                   <div className="flex items-center gap-1.5 text-xs text-[#556D58]">
                     <Languages className="w-4 h-4 text-teal-700" />
                     <span className="font-bold">
-                      {lang === 'FR' ? 'Langue de la recette :' : 'Recipe Language:'}
+                      {lang === 'FR' ? 'Traduction automatique :' : 'Auto-translate:'}
                     </span>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
                       disabled={isTranslating}
                       onClick={() => handleTranslateRecipe('FR')}
-                      className="px-2.5 py-1 rounded-lg text-[10px] font-black border border-[#D5E1D2] bg-white hover:bg-teal-50 text-teal-900 transition-colors disabled:opacity-50"
+                      className="px-3 py-1 rounded-xl text-xs font-black border border-[#D5E1D2] bg-white hover:bg-teal-50 text-teal-900 transition-colors disabled:opacity-50 cursor-pointer shadow-2xs"
                     >
                       {isTranslating ? '...' : '🇫🇷 Traduire en Français'}
                     </button>
@@ -1576,17 +1766,23 @@ Instructions:
                       type="button"
                       disabled={isTranslating}
                       onClick={() => handleTranslateRecipe('EN')}
-                      className="px-2.5 py-1 rounded-lg text-[10px] font-black border border-[#D5E1D2] bg-white hover:bg-teal-50 text-teal-900 transition-colors disabled:opacity-50"
+                      className="px-3 py-1 rounded-xl text-xs font-black border border-[#D5E1D2] bg-white hover:bg-teal-50 text-teal-900 transition-colors disabled:opacity-50 cursor-pointer shadow-2xs"
                     >
                       {isTranslating ? '...' : '🇬🇧 Translate to English'}
                     </button>
                   </div>
                 </div>
 
+                {/* Recipe Title Input */}
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    {lang === 'FR' ? 'Titre de la recette' : 'Recipe Title'}
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-black text-[#1E3022] uppercase tracking-wider">
+                      {lang === 'FR' ? 'Titre de la recette' : 'Recipe Title'} *
+                    </label>
+                    <span className="text-[10px] text-slate-400">
+                      {lang === 'FR' ? 'Visible dans votre cuisine' : 'Displayed in your kitchen'}
+                    </span>
+                  </div>
                   <input
                     type="text"
                     value={lang === 'FR' && parsedRecipe.titleFr ? parsedRecipe.titleFr : parsedRecipe.title}
@@ -1595,33 +1791,109 @@ Instructions:
                       setParsedRecipe((prev) =>
                         prev
                           ? lang === 'FR'
-                            ? { ...prev, titleFr: val }
-                            : { ...prev, title: val }
+                            ? { ...prev, titleFr: val, title: prev.title || val }
+                            : { ...prev, title: val, titleFr: prev.titleFr || val }
                           : null
                       );
                     }}
-                    className="w-full font-black text-base text-[#1E3022] border-b border-[#D5E1D2] pb-1 focus:outline-none focus:border-emerald-600 bg-transparent"
+                    placeholder={lang === 'FR' ? 'Ex: Poulet au beurre maison' : 'e.g. Homemade Butter Chicken'}
+                    className="w-full font-black text-base sm:text-lg text-[#1E3022] border border-[#CADBC7] rounded-xl px-3.5 py-2 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 bg-[#FAFBF9]"
                   />
                 </div>
 
-                <p className="text-xs text-[#556D58] leading-relaxed italic">
-                  "{lang === 'FR' && parsedRecipe.descriptionFr ? parsedRecipe.descriptionFr : parsedRecipe.descriptionEn}"
-                </p>
-
-                <div className="flex items-center gap-3 text-xs text-[#556D58] pt-1">
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5 text-emerald-600" /> {parsedRecipe.time}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Flame className="w-3.5 h-3.5 text-amber-500" /> {parsedRecipe.calories}
-                  </span>
-                  <span className="font-bold text-[#233527]">
-                    {parsedRecipe.servings}
-                  </span>
+                {/* Recipe Description & Notes Textarea */}
+                <div className="space-y-1">
+                  <label className="text-[11px] font-black text-[#1E3022] uppercase tracking-wider">
+                    {lang === 'FR' ? 'Description & Notes de cuisine' : 'Description & Chef Notes'}
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={lang === 'FR' && parsedRecipe.descriptionFr ? parsedRecipe.descriptionFr : parsedRecipe.descriptionEn || ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setParsedRecipe((prev) =>
+                        prev
+                          ? lang === 'FR'
+                            ? { ...prev, descriptionFr: val }
+                            : { ...prev, descriptionEn: val }
+                          : null
+                      );
+                    }}
+                    placeholder={lang === 'FR' ? 'Ajoutez vos astuces ou notes pour réussir cette recette...' : 'Add preparation tips or chef notes for this recipe...'}
+                    className="w-full text-xs text-[#334D37] leading-relaxed border border-[#CADBC7] rounded-xl p-3 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 bg-[#FAFBF9] resize-y"
+                  />
                 </div>
 
+                {/* Key Recipe Metrics Grid: Time, Servings, Calories, Difficulty */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                  {/* Servings */}
+                  <div className="p-2.5 rounded-xl border border-[#D5E1D2] bg-[#FAFBF9] space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block">
+                      {lang === 'FR' ? 'Portions' : 'Servings'}
+                    </label>
+                    <input
+                      type="text"
+                      value={parsedRecipe.servings || ''}
+                      onChange={(e) => setParsedRecipe((prev) => (prev ? { ...prev, servings: e.target.value } : null))}
+                      placeholder="4 portions"
+                      className="w-full text-xs font-black text-[#1E3022] bg-white border border-slate-200 rounded-lg px-2 py-1 focus:border-emerald-600 focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Total Time */}
+                  <div className="p-2.5 rounded-xl border border-[#D5E1D2] bg-[#FAFBF9] space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-emerald-600" />
+                      <span>{lang === 'FR' ? 'Temps total' : 'Total Time'}</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={parsedRecipe.time || ''}
+                      onChange={(e) => setParsedRecipe((prev) => (prev ? { ...prev, time: e.target.value } : null))}
+                      placeholder="35 min"
+                      className="w-full text-xs font-black text-[#1E3022] bg-white border border-slate-200 rounded-lg px-2 py-1 focus:border-emerald-600 focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Calories */}
+                  <div className="p-2.5 rounded-xl border border-[#D5E1D2] bg-[#FAFBF9] space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                      <Flame className="w-3 h-3 text-amber-500" />
+                      <span>{lang === 'FR' ? 'Calories' : 'Calories'}</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={parsedRecipe.calories || ''}
+                      onChange={(e) => setParsedRecipe((prev) => (prev ? { ...prev, calories: e.target.value } : null))}
+                      placeholder="450 kcal"
+                      className="w-full text-xs font-black text-[#1E3022] bg-white border border-slate-200 rounded-lg px-2 py-1 focus:border-emerald-600 focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Difficulty */}
+                  <div className="p-2.5 rounded-xl border border-[#D5E1D2] bg-[#FAFBF9] space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block">
+                      {lang === 'FR' ? 'Difficulté' : 'Difficulty'}
+                    </label>
+                    <select
+                      value={parsedRecipe.difficulty || 'Easy'}
+                      onChange={(e) => {
+                        const val = e.target.value as 'Easy' | 'Medium' | 'Advanced';
+                        const frMap = { Easy: 'Facile', Medium: 'Moyen', Advanced: 'Avancé' } as const;
+                        setParsedRecipe((prev) => (prev ? { ...prev, difficulty: val, difficultyFr: frMap[val] } : null));
+                      }}
+                      className="w-full text-xs font-black text-[#1E3022] bg-white border border-slate-200 rounded-lg px-2 py-1 focus:border-emerald-600 focus:outline-none cursor-pointer"
+                    >
+                      <option value="Easy">{lang === 'FR' ? 'Facile' : 'Easy'}</option>
+                      <option value="Medium">{lang === 'FR' ? 'Moyen' : 'Medium'}</option>
+                      <option value="Advanced">{lang === 'FR' ? 'Avancé' : 'Advanced'}</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* OCR extracted raw text preview (if scanned from photo) */}
                 {parsedRecipe.rawOcrText && (
-                  <div className="mt-3 p-3 rounded-xl bg-[#F8FAF6] border border-[#CADBC7] text-xs space-y-1.5 text-left">
+                  <div className="p-3 rounded-xl bg-[#F8FAF6] border border-[#CADBC7] text-xs space-y-1.5 text-left">
                     <div className="flex items-center justify-between">
                       <p className="font-extrabold text-[#1E3022] flex items-center gap-1.5 text-[11px]">
                         <FileText className="w-3.5 h-3.5 text-emerald-700" />
@@ -1631,7 +1903,7 @@ Instructions:
                         OCR / Vision
                       </span>
                     </div>
-                    <p className="text-[11px] text-[#475C4B] line-clamp-4 whitespace-pre-wrap font-mono bg-white p-2 rounded-lg border border-[#D5E1D2]">
+                    <p className="text-[11px] text-[#475C4B] line-clamp-3 whitespace-pre-wrap font-mono bg-white p-2 rounded-lg border border-[#D5E1D2]">
                       {parsedRecipe.rawOcrText}
                     </p>
                   </div>
@@ -1639,75 +1911,209 @@ Instructions:
               </div>
             </div>
 
-            {/* Structured Ingredients Table */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black text-[#1E3022] uppercase tracking-wider">
-                  {lang === 'FR' ? 'Ingrédients Détectés' : 'Parsed Ingredients'} ({parsedRecipe.ingredients.length})
-                </span>
-                <span className="text-[10px] text-slate-500">
-                  {lang === 'FR' ? 'Zones de rangement attribuées' : 'Auto-zoned for your kitchen'}
-                </span>
-              </div>
-
-              <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
-                {parsedRecipe.ingredients.map((ing, idx) => (
-                  <div
-                    key={idx}
-                    className="p-2.5 rounded-xl bg-white border border-[#D5E1D2] text-xs flex items-center justify-between shadow-2xs"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center justify-center shrink-0">
-                        {idx + 1}
-                      </span>
-                      <span className="font-bold text-[#1E3022] truncate">
-                        {lang === 'FR' && ing.nameFr ? ing.nameFr : ing.name}
-                      </span>
-                      <span className="text-[11px] text-slate-400 shrink-0">
-                        ({ing.amount})
-                      </span>
-                    </div>
-
-                    <span
-                      className={`text-[9px] font-black px-2 py-0.5 rounded-md border shrink-0 ${
-                        ing.locationType === 'FREEZER'
-                          ? 'bg-blue-50 text-blue-800 border-blue-200'
-                          : ing.locationType === 'PANTRY'
-                          ? 'bg-amber-50 text-amber-800 border-amber-200'
-                          : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                      }`}
-                    >
-                      {ing.locationType || 'FRIDGE'}
+            {/* INGREDIENTS EDITOR CARD */}
+            <div className="rounded-2xl border border-[#D5E1D2] bg-white p-4 sm:p-5 space-y-3 shadow-2xs">
+              <div className="flex items-center justify-between gap-2 flex-wrap pb-2 border-b border-[#E1EDE0]">
+                <div>
+                  <h3 className="text-xs sm:text-sm font-black text-[#1E3022] uppercase tracking-wider flex items-center gap-1.5">
+                    <span>{lang === 'FR' ? 'Ingrédients de la recette' : 'Recipe Ingredients'}</span>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 text-[10px] font-black">
+                      {parsedRecipe.ingredients.length}
                     </span>
-                  </div>
-                ))}
+                  </h3>
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    {lang === 'FR' ? 'Modifiez les noms, quantités et zones de rangement' : 'Adjust ingredient names, amounts, and storage zones'}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleAddIngredient}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                  <span>{lang === 'FR' ? '+ Ajouter un ingrédient' : '+ Add Ingredient'}</span>
+                </button>
               </div>
+
+              {parsedRecipe.ingredients.length === 0 ? (
+                <div className="p-6 text-center border-2 border-dashed border-[#D5E1D2] rounded-xl space-y-2 bg-[#F8FAF6]">
+                  <p className="text-xs text-slate-500 font-bold">
+                    {lang === 'FR' ? 'Aucun ingrédient pour le moment.' : 'No ingredients added yet.'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleAddIngredient}
+                    className="px-3.5 py-1.5 rounded-xl bg-emerald-700 text-white text-xs font-black inline-flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{lang === 'FR' ? 'Ajouter le premier ingrédient' : 'Add First Ingredient'}</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                  {parsedRecipe.ingredients.map((ing, idx) => (
+                    <div
+                      key={idx}
+                      className="p-2.5 rounded-xl bg-[#FAFBF9] border border-[#D5E1D2] flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs hover:border-emerald-400 transition-all group"
+                    >
+                      {/* Name input */}
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <input
+                          type="text"
+                          value={lang === 'FR' && ing.nameFr ? ing.nameFr : ing.name}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            handleUpdateIngredient(
+                              idx,
+                              lang === 'FR' ? { nameFr: val, name: ing.name || val } : { name: val, nameFr: ing.nameFr || val }
+                            );
+                          }}
+                          placeholder={lang === 'FR' ? "Nom de l'ingrédient (ex: Poulet)..." : "Ingredient name (e.g. Chicken)..."}
+                          className="flex-1 font-bold text-xs text-[#1E3022] border-b border-transparent hover:border-slate-300 focus:border-emerald-600 focus:outline-none bg-transparent px-1.5 py-1"
+                        />
+                      </div>
+
+                      {/* Amount, Location selector, Delete */}
+                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                        <input
+                          type="text"
+                          value={ing.amount || ''}
+                          onChange={(e) => handleUpdateIngredient(idx, { amount: e.target.value })}
+                          placeholder={lang === 'FR' ? "Quantité (ex: 2 tasses)" : "Amount (e.g. 2 cups)"}
+                          className="w-28 text-xs font-semibold text-slate-700 border border-slate-200 rounded-lg px-2 py-1 focus:border-emerald-600 focus:outline-none bg-white"
+                        />
+
+                        <select
+                          value={ing.locationType || 'FRIDGE'}
+                          onChange={(e) => handleUpdateIngredient(idx, { locationType: e.target.value as any })}
+                          className={`text-[10px] font-black px-2 py-1 rounded-lg border focus:outline-none focus:border-emerald-600 cursor-pointer ${
+                            ing.locationType === 'FREEZER'
+                              ? 'bg-blue-50 text-blue-800 border-blue-200'
+                              : ing.locationType === 'PANTRY'
+                              ? 'bg-amber-50 text-amber-800 border-amber-200'
+                              : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                          }`}
+                        >
+                          <option value="FRIDGE">❄️ {lang === 'FR' ? 'Frigo' : 'Fridge'}</option>
+                          <option value="PANTRY">🥫 {lang === 'FR' ? 'Garde-manger' : 'Pantry'}</option>
+                          <option value="FREEZER">🧊 {lang === 'FR' ? 'Congélateur' : 'Freezer'}</option>
+                        </select>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveIngredient(idx)}
+                          className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          title={lang === 'FR' ? 'Supprimer cet ingrédient' : 'Remove ingredient'}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Instructions Preview */}
-            <div className="space-y-2">
-              <span className="text-xs font-black text-[#1E3022] uppercase tracking-wider">
-                {lang === 'FR' ? 'Étapes de préparation' : 'Cooking Instructions'} (
-                {lang === 'FR' && parsedRecipe.instructionsFr?.length
-                  ? parsedRecipe.instructionsFr.length
-                  : parsedRecipe.instructionsEn?.length || 0}
-                )
-              </span>
+            {/* INSTRUCTIONS & STEPS EDITOR CARD */}
+            <div className="rounded-2xl border border-[#D5E1D2] bg-white p-4 sm:p-5 space-y-3 shadow-2xs">
+              <div className="flex items-center justify-between gap-2 flex-wrap pb-2 border-b border-[#E1EDE0]">
+                <div>
+                  <h3 className="text-xs sm:text-sm font-black text-[#1E3022] uppercase tracking-wider flex items-center gap-1.5">
+                    <span>{lang === 'FR' ? 'Étapes de préparation' : 'Cooking Instructions'}</span>
+                    <span className="px-2 py-0.5 rounded-full bg-teal-100 text-teal-900 text-[10px] font-black">
+                      {(lang === 'FR' && parsedRecipe.instructionsFr?.length ? parsedRecipe.instructionsFr.length : parsedRecipe.instructionsEn?.length) || 0}
+                    </span>
+                  </h3>
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    {lang === 'FR' ? 'Réorganisez, ajoutez ou peaufinez chaque étape de la recette' : 'Reorder, add, or refine each step of the recipe'}
+                  </p>
+                </div>
 
-              <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
-                {(lang === 'FR' && parsedRecipe.instructionsFr?.length
-                  ? parsedRecipe.instructionsFr
-                  : parsedRecipe.instructionsEn || []
-                ).map((step, idx) => (
-                  <div
-                    key={idx}
-                    className="p-2.5 rounded-xl bg-white border border-[#D5E1D2] text-xs text-[#334D37] flex items-start gap-2 shadow-2xs"
-                  >
-                    <span className="font-black text-emerald-700 shrink-0">{idx + 1}.</span>
-                    <p className="leading-snug flex-1">{step}</p>
-                  </div>
-                ))}
+                <button
+                  type="button"
+                  onClick={handleAddInstructionStep}
+                  className="px-3 py-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-black flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                  <span>{lang === 'FR' ? '+ Ajouter une étape' : '+ Add Step'}</span>
+                </button>
               </div>
+
+              {((lang === 'FR' && parsedRecipe.instructionsFr && parsedRecipe.instructionsFr.length > 0
+                ? parsedRecipe.instructionsFr
+                : parsedRecipe.instructionsEn || []
+              ).length === 0) ? (
+                <div className="p-6 text-center border-2 border-dashed border-[#D5E1D2] rounded-xl space-y-2 bg-[#F8FAF6]">
+                  <p className="text-xs text-slate-500 font-bold">
+                    {lang === 'FR' ? 'Aucune étape de préparation enregistrée.' : 'No cooking steps recorded yet.'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleAddInstructionStep}
+                    className="px-3.5 py-1.5 rounded-xl bg-teal-700 text-white text-xs font-black inline-flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{lang === 'FR' ? 'Ajouter la première étape' : 'Add First Step'}</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+                  {(lang === 'FR' && parsedRecipe.instructionsFr && parsedRecipe.instructionsFr.length > 0
+                    ? parsedRecipe.instructionsFr
+                    : parsedRecipe.instructionsEn || []
+                  ).map((step, idx, arr) => (
+                    <div
+                      key={idx}
+                      className="p-3 rounded-xl bg-[#FAFBF9] border border-[#D5E1D2] flex items-start gap-2.5 shadow-2xs hover:border-teal-400 transition-all group"
+                    >
+                      <div className="flex flex-col items-center gap-1 shrink-0 pt-0.5">
+                        <span className="w-5 h-5 rounded-full bg-teal-100 text-teal-900 font-black text-[10px] flex items-center justify-center">
+                          {idx + 1}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={idx === 0}
+                          onClick={() => handleMoveInstructionStep(idx, 'up')}
+                          className="p-0.5 text-slate-400 hover:text-teal-700 disabled:opacity-20 cursor-pointer"
+                          title={lang === 'FR' ? 'Déplacer vers le haut' : 'Move up'}
+                        >
+                          <ChevronUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={idx === arr.length - 1}
+                          onClick={() => handleMoveInstructionStep(idx, 'down')}
+                          className="p-0.5 text-slate-400 hover:text-teal-700 disabled:opacity-20 cursor-pointer"
+                          title={lang === 'FR' ? 'Déplacer vers le bas' : 'Move down'}
+                        >
+                          <ChevronDown className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <textarea
+                        rows={2}
+                        value={step}
+                        onChange={(e) => handleUpdateInstructionStep(idx, e.target.value)}
+                        placeholder={lang === 'FR' ? `Instructions pour l'étape ${idx + 1}...` : `Instructions for step ${idx + 1}...`}
+                        className="flex-1 text-xs text-[#223825] leading-relaxed border border-slate-200 rounded-xl p-2.5 focus:border-teal-600 focus:outline-none bg-white resize-y shadow-2xs"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveInstructionStep(idx)}
+                        className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0 mt-1 cursor-pointer"
+                        title={lang === 'FR' ? 'Supprimer cette étape' : 'Remove step'}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1718,7 +2124,7 @@ Instructions:
         <button
           type="button"
           onClick={onClose}
-          className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+          className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
         >
           {lang === 'FR' ? 'Annuler' : 'Cancel'}
         </button>
@@ -1728,7 +2134,7 @@ Instructions:
             type="button"
             onClick={handleAIParse}
             disabled={isParsing}
-            className="px-5 py-2.5 rounded-xl bg-[#1E3022] hover:bg-black text-white text-xs font-black flex items-center gap-2 shadow-md active:scale-95 transition-all disabled:opacity-50"
+            className="px-5 py-2.5 rounded-xl bg-[#1E3022] hover:bg-black text-white text-xs font-black flex items-center gap-2 shadow-md active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
           >
             <Sparkles className="w-4 h-4 text-emerald-400" />
             <span>
@@ -1749,11 +2155,15 @@ Instructions:
           <button
             type="button"
             onClick={handleConfirmSave}
-            className="px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black flex items-center gap-2 shadow-md active:scale-95 transition-all"
+            className="px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black flex items-center gap-2 shadow-md active:scale-95 transition-all cursor-pointer"
           >
             <Check className="w-4 h-4 stroke-[3]" />
             <span>
-              {lang === 'FR'
+              {recipeToEdit
+                ? lang === 'FR'
+                  ? 'Enregistrer les modifications'
+                  : 'Save Changes'
+                : lang === 'FR'
                 ? 'Enregistrer dans ma cuisine'
                 : 'Save Recipe to My Kitchen'}
             </span>

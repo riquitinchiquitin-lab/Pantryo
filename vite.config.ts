@@ -64,6 +64,30 @@ export default defineConfig(() => {
               purpose: 'any',
             },
           ],
+          categories: ['food', 'lifestyle', 'productivity', 'utilities'],
+          shortcuts: [
+            {
+              name: 'Scan Receipt',
+              short_name: 'Scan',
+              description: 'Scan grocery receipts or barcodes into inventory',
+              url: '/?action=scan',
+              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }],
+            },
+            {
+              name: 'Meal Planner',
+              short_name: 'Meals',
+              description: "View this week's planned meals and shopping needs",
+              url: '/?tab=meals',
+              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }],
+            },
+            {
+              name: 'Shopping List',
+              short_name: 'Shopping',
+              description: 'Access grocery shopping list',
+              url: '/?tab=grocery',
+              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }],
+            },
+          ],
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff,woff2}'],

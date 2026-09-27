@@ -1,6 +1,7 @@
 // Pantryo Progressive Web App Service Worker
-const CACHE_NAME = 'pantryo-v2';
+const CACHE_NAME = 'pantryo-v4';
 const STATIC_ASSETS = [
+  '/manifest.webmanifest',
   '/manifest.json',
   '/pantryo-logo.svg',
   '/pantryo-logo.png',
@@ -67,4 +68,3 @@ self.addEventListener('fetch', (event) => {
     );
   }
 });
-

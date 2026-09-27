@@ -31,6 +31,7 @@ export interface RicardoRecipe {
   youtubeUrl?: string;
   youtubeVideoId?: string;
   createdAt?: string;
+  updatedAt?: string;
   descriptionEn: string;
   descriptionFr: string;
   ingredients: RecipeIngredient[];
