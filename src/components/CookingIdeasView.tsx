@@ -591,7 +591,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
   const getRicardoSearchUrl = (query: string) => getSearchUrl(query, 'ricardo');
 
   return (
-    <div className="space-y-4 pb-24 animate-fade-in text-slate-800">
+    <div className="space-y-4 pb-32 animate-fade-in text-slate-800">
       {/* Top Header with Title, Language Switch & Action Button */}
       <div className="flex items-start justify-between gap-2">
         <div>

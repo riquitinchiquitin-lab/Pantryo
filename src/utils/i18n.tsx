@@ -18,10 +18,10 @@ export const translations = {
     install_tooltip: 'Install Pantryo App on your phone',
 
     // Mobile Bottom Nav
-    bottom_home: 'Home',
+    bottom_home: 'Inventory',
     bottom_meals: 'Meals',
     bottom_grocery: 'Grocery',
-    bottom_cooking: 'Cooking',
+    bottom_cooking: 'Recipes',
     bottom_family: 'Family',
 
     // Pulse & Bento Stats
@@ -272,7 +272,7 @@ export const translations = {
     install_tooltip: "Installer l'application Pantryo sur votre téléphone",
 
     // Mobile Bottom Nav
-    bottom_home: 'Accueil',
+    bottom_home: 'Inventaire',
     bottom_meals: 'Repas',
     bottom_grocery: 'Épicerie',
     bottom_cooking: 'Recettes',

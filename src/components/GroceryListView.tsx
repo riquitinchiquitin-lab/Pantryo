@@ -271,7 +271,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
       : 0;
 
   return (
-    <div className="space-y-3.5 pb-28 animate-fade-in">
+    <div className="space-y-3.5 pb-32 animate-fade-in">
       {/* Top Banner / Success Notice */}
       {stockSuccessMessage && (
         <div className="p-3.5 rounded-2xl bg-teal-700 text-white text-xs shadow-md flex items-center justify-between animate-fade-in">

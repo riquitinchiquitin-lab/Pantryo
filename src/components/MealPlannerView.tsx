@@ -365,7 +365,7 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
   };
 
   return (
-    <div className="space-y-4 pb-28 animate-fade-in">
+    <div className="space-y-4 pb-32 animate-fade-in">
       {/* Toast Notification */}
       {successToast && (
         <div className="p-3.5 rounded-2xl bg-teal-800 text-white text-xs shadow-lg flex items-center justify-between animate-fade-in sticky top-2 z-30">

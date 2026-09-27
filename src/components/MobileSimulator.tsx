@@ -909,7 +909,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
       </div>
 
       {/* Main Scrollable View */}
-      <div className="flex-1 overflow-y-auto px-3 sm:px-5 pt-1.5 pb-24 md:pb-12 space-y-2.5 sm:space-y-3.5">
+      <div className="flex-1 overflow-y-auto px-3 sm:px-5 pt-1.5 pb-32 md:pb-12 space-y-2.5 sm:space-y-3.5">
         {/* VIEW: HOME INVENTORY */}
         {activeNav === 'home' && (
           <>
@@ -1939,110 +1939,148 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         </div>
       )}
 
-      {/* Bottom Navigation Bar with Integrated Center + Add Button (Mobile screens, with Safe Area support) */}
-      <nav aria-label="Bottom Navigation" className="md:hidden fixed bottom-0 inset-x-0 pb-[env(safe-area-inset-bottom,0px)] bg-[#FAF7EE]/95 backdrop-blur-md border-t border-[#E5DFD0] px-4 flex items-center justify-center z-30 shadow-lg">
-        <div className="w-full max-w-lg mx-auto h-16 flex items-center justify-between">
+      {/* Bottom Navigation Bar with Integrated Center + Add Button (Mobile screens, guaranteed Safe Area & touch clearance) */}
+      <nav
+        aria-label="Bottom Navigation"
+        className="md:hidden fixed bottom-0 inset-x-0 bg-[#FAF7EE]/95 backdrop-blur-md border-t border-[#E5DFD0] pt-1.5 pb-[max(0.75rem,env(safe-area-inset-bottom,0.75rem))] px-2 z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]"
+      >
+        <div className="w-full max-w-lg mx-auto flex items-end justify-between gap-0.5">
           {/* Tab 1: Inventory */}
           <button
+            type="button"
             onClick={() => {
               setIsAddMenuOpen(false);
               setActiveNav('home');
             }}
-            className={`flex flex-col items-center justify-center flex-1 py-1 gap-0.5 text-[10px] font-bold transition-colors ${
-              activeNav === 'home' ? 'text-teal-700' : 'text-slate-400 hover:text-slate-600'
+            className={`min-w-0 flex-1 flex flex-col items-center justify-center py-1 rounded-xl transition-all cursor-pointer active:scale-95 ${
+              activeNav === 'home' ? 'text-[#0D3B37]' : 'text-slate-400 hover:text-slate-600'
             }`}
           >
-            <Home className="w-4 h-4" />
-            <span>{t('nav_inventory')}</span>
+            <div className={`p-1 rounded-xl transition-colors ${activeNav === 'home' ? 'bg-teal-100/80 text-[#0D3B37]' : ''}`}>
+              <Home className="w-5 h-5 shrink-0" />
+            </div>
+            <span className={`text-[10px] tracking-tight leading-tight mt-0.5 truncate max-w-full text-center ${
+              activeNav === 'home' ? 'font-black text-[#0D3B37]' : 'font-semibold text-slate-400'
+            }`}>
+              {t('bottom_home')}
+            </span>
           </button>
 
           {/* Tab 2: Meals */}
           <button
+            type="button"
             onClick={() => {
               setIsAddMenuOpen(false);
               setActiveNav('meals');
             }}
-            className={`flex flex-col items-center justify-center flex-1 py-1 gap-0.5 text-[10px] font-bold transition-colors relative ${
-              activeNav === 'meals' ? 'text-teal-700' : 'text-slate-400 hover:text-slate-600'
+            className={`min-w-0 flex-1 flex flex-col items-center justify-center py-1 rounded-xl transition-all cursor-pointer active:scale-95 ${
+              activeNav === 'meals' ? 'text-[#0D3B37]' : 'text-slate-400 hover:text-slate-600'
             }`}
           >
             <div className="relative">
-              <CalendarDays className="w-4 h-4" />
+              <div className={`p-1 rounded-xl transition-colors ${activeNav === 'meals' ? 'bg-teal-100/80 text-[#0D3B37]' : ''}`}>
+                <CalendarDays className="w-5 h-5 shrink-0" />
+              </div>
               {plannedMeals.length > 0 && (
-                <span className="absolute -top-1.5 -right-2 w-3.5 h-3.5 bg-indigo-600 text-white rounded-full text-[9px] font-black flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-indigo-600 text-white rounded-full text-[9px] font-black flex items-center justify-center shadow-xs">
                   {plannedMeals.length}
                 </span>
               )}
             </div>
-            <span>{t('nav_meals')}</span>
+            <span className={`text-[10px] tracking-tight leading-tight mt-0.5 truncate max-w-full text-center ${
+              activeNav === 'meals' ? 'font-black text-[#0D3B37]' : 'font-semibold text-slate-400'
+            }`}>
+              {t('bottom_meals')}
+            </span>
           </button>
 
           {/* CENTER: Integrated Raised Add Button with + icon */}
-          <div className="flex flex-col items-center justify-center px-2 shrink-0 relative">
+          <div className="flex flex-col items-center justify-center px-1.5 shrink-0 relative">
             <button
               id="bottom-center-add-btn"
               type="button"
               onClick={() => setIsAddMenuOpen((prev) => !prev)}
-              className={`w-13 h-13 -mt-6 rounded-full bg-gradient-to-tr from-[#0D3B37] via-[#0E766E] to-teal-500 text-white flex items-center justify-center shadow-xl border-4 border-[#FAF7EE] active:scale-90 transition-all duration-300 hover:scale-105 ${
+              className={`w-12 h-12 -mt-5 rounded-full bg-gradient-to-tr from-[#0D3B37] via-[#0E766E] to-teal-500 text-white flex items-center justify-center shadow-lg border-[3.5px] border-[#FAF7EE] active:scale-90 transition-all duration-300 hover:scale-105 cursor-pointer ${
                 isAddMenuOpen ? 'rotate-45 scale-105 ring-4 ring-teal-500/40' : ''
               }`}
               aria-label={lang === 'FR' ? 'Ajouter un aliment' : 'Add Item'}
               title={lang === 'FR' ? 'Ajouter un aliment' : 'Add Item'}
             >
-              <Plus className="w-7 h-7 stroke-[3]" />
+              <Plus className="w-6 h-6 stroke-[3]" />
             </button>
-            <span className="text-[10px] font-black text-[#0D3B37] mt-0.5 tracking-tight">
+            <span className="text-[10px] font-black text-[#0D3B37] mt-0.5 tracking-tight leading-tight">
               {lang === 'FR' ? 'Ajout' : 'Add'}
             </span>
           </div>
 
           {/* Tab 3: Grocery */}
           <button
+            type="button"
             onClick={() => {
               setIsAddMenuOpen(false);
               setActiveNav('grocery');
             }}
-            className={`flex flex-col items-center justify-center flex-1 py-1 gap-0.5 text-[10px] font-bold transition-colors relative ${
-              activeNav === 'grocery' ? 'text-teal-700' : 'text-slate-400 hover:text-slate-600'
+            className={`min-w-0 flex-1 flex flex-col items-center justify-center py-1 rounded-xl transition-all cursor-pointer active:scale-95 ${
+              activeNav === 'grocery' ? 'text-[#0D3B37]' : 'text-slate-400 hover:text-slate-600'
             }`}
           >
             <div className="relative">
-              <ShoppingCart className="w-4 h-4" />
+              <div className={`p-1 rounded-xl transition-colors ${activeNav === 'grocery' ? 'bg-teal-100/80 text-[#0D3B37]' : ''}`}>
+                <ShoppingCart className="w-5 h-5 shrink-0" />
+              </div>
               {groceryItems.filter((i) => i.inCart).length > 0 && (
-                <span className="absolute -top-1.5 -right-2 w-3.5 h-3.5 bg-teal-700 text-white rounded-full text-[9px] font-black flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-teal-700 text-white rounded-full text-[9px] font-black flex items-center justify-center shadow-xs">
                   {groceryItems.filter((i) => i.inCart).length}
                 </span>
               )}
             </div>
-            <span>{t('nav_grocery')}</span>
+            <span className={`text-[10px] tracking-tight leading-tight mt-0.5 truncate max-w-full text-center ${
+              activeNav === 'grocery' ? 'font-black text-[#0D3B37]' : 'font-semibold text-slate-400'
+            }`}>
+              {t('bottom_grocery')}
+            </span>
           </button>
 
           {/* Tab 4: Cooking Ideas */}
           <button
+            type="button"
             onClick={() => {
               setIsAddMenuOpen(false);
               setActiveNav('cooking');
             }}
-            className={`flex flex-col items-center justify-center flex-1 py-1 gap-0.5 text-[10px] font-bold transition-colors ${
-              activeNav === 'cooking' ? 'text-teal-700' : 'text-slate-400 hover:text-slate-600'
+            className={`min-w-0 flex-1 flex flex-col items-center justify-center py-1 rounded-xl transition-all cursor-pointer active:scale-95 ${
+              activeNav === 'cooking' ? 'text-[#0D3B37]' : 'text-slate-400 hover:text-slate-600'
             }`}
           >
-            <ChefHat className="w-4 h-4" />
-            <span>{t('nav_cooking')}</span>
+            <div className={`p-1 rounded-xl transition-colors ${activeNav === 'cooking' ? 'bg-teal-100/80 text-[#0D3B37]' : ''}`}>
+              <ChefHat className="w-5 h-5 shrink-0" />
+            </div>
+            <span className={`text-[10px] tracking-tight leading-tight mt-0.5 truncate max-w-full text-center ${
+              activeNav === 'cooking' ? 'font-black text-[#0D3B37]' : 'font-semibold text-slate-400'
+            }`}>
+              {t('bottom_cooking')}
+            </span>
           </button>
 
           {/* Tab 5: Family & Profile */}
           <button
+            type="button"
             onClick={() => {
               setIsAddMenuOpen(false);
               setActiveNav('sync');
             }}
-            className={`flex flex-col items-center justify-center flex-1 py-1 gap-0.5 text-[10px] font-bold transition-colors ${
-              activeNav === 'sync' ? 'text-teal-700' : 'text-slate-400 hover:text-slate-600'
+            className={`min-w-0 flex-1 flex flex-col items-center justify-center py-1 rounded-xl transition-all cursor-pointer active:scale-95 ${
+              activeNav === 'sync' ? 'text-[#0D3B37]' : 'text-slate-400 hover:text-slate-600'
             }`}
           >
-            <Users className="w-4 h-4" />
-            <span>{t('nav_family')}</span>
+            <div className={`p-1 rounded-xl transition-colors ${activeNav === 'sync' ? 'bg-teal-100/80 text-[#0D3B37]' : ''}`}>
+              <Users className="w-5 h-5 shrink-0" />
+            </div>
+            <span className={`text-[10px] tracking-tight leading-tight mt-0.5 truncate max-w-full text-center ${
+              activeNav === 'sync' ? 'font-black text-[#0D3B37]' : 'font-semibold text-slate-400'
+            }`}>
+              {t('bottom_family')}
+            </span>
           </button>
         </div>
       </nav>

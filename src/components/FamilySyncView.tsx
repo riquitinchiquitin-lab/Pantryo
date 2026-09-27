@@ -89,7 +89,7 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
   ];
 
   return (
-    <div className="space-y-5 pb-20 animate-fade-in">
+    <div className="space-y-5 pb-32 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div>

@@ -73,6 +73,29 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
+
+    // Proper MIME and caching headers for PWA installability
+    app.get("/sw.js", (req, res, next) => {
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.setHeader("Service-Worker-Allowed", "/");
+      res.sendFile(path.join(distPath, "sw.js"), (err) => {
+        if (err) next();
+      });
+    });
+
+    app.get(["/manifest.webmanifest", "/manifest.json"], (req, res, next) => {
+      res.setHeader("Content-Type", "application/manifest+json");
+      res.setHeader("Cache-Control", "public, max-age=3600");
+      const filename = req.path.endsWith("webmanifest") ? "manifest.webmanifest" : "manifest.json";
+      res.sendFile(path.join(distPath, filename), (err) => {
+        if (err) {
+          res.sendFile(path.join(distPath, "manifest.json"), (err2) => {
+            if (err2) next();
+          });
+        }
+      });
+    });
+
     app.use(express.static(distPath));
     app.use((req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
