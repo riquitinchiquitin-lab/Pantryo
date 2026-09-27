@@ -1,15 +1,20 @@
 {
   "id": "/",
+  "scope": "/",
   "name": "Pantryo",
   "short_name": "Pantryo",
   "description": "Smart Kitchen Food Inventory, Receipts & Meal Planning",
   "start_url": "/",
-  "scope": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
-  "background_color": "#FAF7EE",
+  "display_override": ["window-controls-overlay", "standalone"],
   "theme_color": "#0E766E",
-  "categories": ["food", "lifestyle", "productivity", "utilities"],
+  "background_color": "#FAF7EE",
+  "orientation": "portrait-primary",
+  "related_applications": [],
+  "prefer_related_applications": false,
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  },
   "icons": [
     {
       "src": "/pwa-192x192.png",
@@ -42,6 +47,23 @@
       "purpose": "any"
     }
   ],
+  "screenshots": [
+    {
+      "src": "/screenshot-desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Pantryo Smart Kitchen Dashboard"
+    },
+    {
+      "src": "/screenshot-mobile.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Pantryo Mobile Food Inventory & Scanner"
+    }
+  ],
+  "categories": ["food", "lifestyle", "productivity", "utilities"],
   "shortcuts": [
     {
       "name": "Scan Receipt",

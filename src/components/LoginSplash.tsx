@@ -577,13 +577,6 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
         )}
       </div>
 
-      {/* Mobile-Friendly PWA Install Notice on Splash Screen */}
-      {!isInstalled && (
-        <div className="w-full max-w-md my-2">
-          <PWAInstallButton variant="banner" />
-        </div>
-      )}
-
       {/* Footer */}
       <footer className="text-center text-[11px] text-[#7A9A96] py-3 space-y-1">
         <p>Pantryo • Zero-Waste Kitchen & Smart Pantry Management</p>

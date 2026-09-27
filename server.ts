@@ -89,6 +89,20 @@ app.get(["/manifest.webmanifest", "/manifest.json"], (req, res, next) => {
   });
 });
 
+// Explicitly serve public static assets (icons, screenshots, logo, avatars)
+app.use(express.static(path.join(process.cwd(), "public"), {
+  maxAge: "1d",
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith(".webmanifest") || filePath.endsWith("manifest.json")) {
+      res.setHeader("Content-Type", "application/manifest+json; charset=utf-8");
+    } else if (filePath.endsWith(".png")) {
+      res.setHeader("Content-Type", "image/png");
+    } else if (filePath.endsWith(".svg")) {
+      res.setHeader("Content-Type", "image/svg+xml");
+    }
+  }
+}));
+
 async function startServer() {
   // Vite middleware setup (development only)
   if (process.env.NODE_ENV !== "production") {

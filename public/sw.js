@@ -1,5 +1,5 @@
 // Pantryo Progressive Web App Service Worker
-const CACHE_NAME = 'pantryo-v6';
+const CACHE_NAME = 'pantryo-v7';
 
 const PRECACHE_ASSETS = [
   '/',
@@ -13,6 +13,8 @@ const PRECACHE_ASSETS = [
   '/pwa-512x512.png',
   '/pwa-maskable-192x192.png',
   '/pwa-maskable-512x512.png',
+  '/screenshot-desktop.png',
+  '/screenshot-mobile.png',
   '/favicon.ico'
 ];
 
@@ -23,7 +25,7 @@ self.addEventListener('install', (event) => {
       return Promise.all(
         PRECACHE_ASSETS.map((url) => {
           return cache.add(url).catch((err) => {
-            console.warn('[Pantryo PWA] Non-fatal precache skip:', url, err);
+            console.warn('[Pantryo PWA] Precache note for', url, err);
           });
         })
       );

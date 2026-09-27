@@ -67,7 +67,8 @@
       })();
     </script>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <base href="/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
     <title>Pantryo</title>
     <!-- Web App Manifest for Android Chrome, iOS Safari & Desktop PWA -->
     <link rel="manifest" href="/manifest.json" />
@@ -108,6 +109,8 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- PWABuilder Official Web Component -->
+    <pwa-install manifestpath="/manifest.json" name="Pantryo" icon="/pwa-192x192.png" description="Smart Kitchen Food Inventory, Receipts & Meal Planning"></pwa-install>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
