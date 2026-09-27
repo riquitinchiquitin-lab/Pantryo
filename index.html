@@ -64,6 +64,44 @@
         window.WebSocket.OPEN = 1;
         window.WebSocket.CLOSING = 2;
         window.WebSocket.CLOSED = 3;
+
+        // Safeguard navigator.getInstalledRelatedApps against iframe DOMException
+        try {
+          var isTopFrame = function() {
+            try { return window.self === window.top; } catch(_) { return false; }
+          };
+          var navProto = Object.getPrototypeOf(navigator) || (typeof Navigator !== 'undefined' ? Navigator.prototype : null);
+          if (navProto && 'getInstalledRelatedApps' in navProto) {
+            var origProtoMethod = navProto.getInstalledRelatedApps;
+            Object.defineProperty(navProto, 'getInstalledRelatedApps', {
+              value: function() {
+                if (!isTopFrame()) return Promise.resolve([]);
+                try {
+                  return origProtoMethod.apply(this, arguments).catch(function() { return []; });
+                } catch(_) {
+                  return Promise.resolve([]);
+                }
+              },
+              configurable: true,
+              writable: true
+            });
+          }
+          if ('getInstalledRelatedApps' in navigator) {
+            var origNavMethod = navigator.getInstalledRelatedApps;
+            Object.defineProperty(navigator, 'getInstalledRelatedApps', {
+              value: function() {
+                if (!isTopFrame()) return Promise.resolve([]);
+                try {
+                  return origNavMethod.apply(navigator, arguments).catch(function() { return []; });
+                } catch(_) {
+                  return Promise.resolve([]);
+                }
+              },
+              configurable: true,
+              writable: true
+            });
+          }
+        } catch(_) {}
       })();
     </script>
     <meta charset="UTF-8" />
