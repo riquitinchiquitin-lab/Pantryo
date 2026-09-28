@@ -11,11 +11,11 @@ const promptListeners = new Set<(prompt: BeforeInstallPromptEvent | null) => voi
 
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeinstallprompt', (e: Event) => {
-    // IMPORTANT: Do NOT call e.preventDefault() so the browser's native "Add to home screen"
-    // or "Install App" omnibox prompt / banner is NEVER suppressed by the browser!
+    // Prevent the default browser mini-infobar so our custom install UI can control the prompt
+    e.preventDefault();
     globalDeferredPrompt = e as BeforeInstallPromptEvent;
     promptListeners.forEach((listener) => listener(globalDeferredPrompt));
-    console.log('[Pantryo PWA] beforeinstallprompt event captured and enabled for native & custom install');
+    console.log('[Pantryo PWA] beforeinstallprompt event captured and deferred');
   });
 
   window.addEventListener('appinstalled', () => {
@@ -59,6 +59,7 @@ export function usePWAInstall() {
     promptListeners.add(promptListener);
 
     const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
       globalDeferredPrompt = e as BeforeInstallPromptEvent;
       setDeferredPrompt(globalDeferredPrompt);
     };
@@ -80,7 +81,6 @@ export function usePWAInstall() {
   }, []);
 
   const install = async (): Promise<boolean> => {
-    // 1. Prioritize native beforeinstallprompt for instant 1-tap browser install dialog
     const promptEvent = deferredPrompt || globalDeferredPrompt;
     if (promptEvent && typeof promptEvent.prompt === 'function') {
       try {
@@ -95,17 +95,6 @@ export function usePWAInstall() {
         return false;
       } catch (e) {
         console.warn('[Pantryo PWA] Native install prompt error:', e);
-      }
-    }
-
-    // 2. Fallback to PWABuilder web component if present
-    const pwaInstallEl = document.querySelector('pwa-install') as (HTMLElement & { openPrompt?: () => void; isInstallAvailable?: boolean }) | null;
-    if (pwaInstallEl && typeof pwaInstallEl.openPrompt === 'function') {
-      try {
-        pwaInstallEl.openPrompt();
-        return true;
-      } catch (err) {
-        console.warn('[Pantryo PWA] pwa-install openPrompt note:', err);
       }
     }
 
