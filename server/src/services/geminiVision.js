@@ -58,14 +58,17 @@ export async function analyzeFoodImage(base64Data, mimeType = "image/jpeg", lang
 Your job is to visually inspect photographs of groceries, ingredients, prepared meals, food packaging, store receipts, or refrigerator/pantry contents.
 
 CRITICAL OCR & TEXT EXTRACTION INSTRUCTIONS:
-1. READ ALL VISIBLE TEXT: Actively examine and read printed text on packaging, labels, bottles, cans, carton lids, price tags, and grocery store receipts (Costco, Walmart, Trader Joe's, Kroger, etc.).
-2. BARCODE & UPC READING: Look for any UPC-A, UPC-E, or EAN barcode symbol on food packaging. Read the 12-digit or 13-digit numeric code printed directly below the barcode lines (e.g., "011110816850", "073420000115") and output it in the 'barcode' field.
-3. BRAND & PRODUCT NAME: Read exact brand names (e.g., "Oatly", "Chobani", "Kirkland Signature", "Barilla", "Tyson") and combine with product title (e.g., "Oatly Barista Edition Oatmilk", "Kirkland Organic Eggs Grade A Large").
-4. PRINTED EXPIRATION DATES: Specifically scan for printed date stamps: "EXP", "BEST BY", "BEST BEFORE", "USE BY", "SELL BY", "BB", or dot-matrix expiration dates printed on container necks, carton tops, or bag clips.
+1. MULTILINGUAL OCR RECOGNITION (FRENCH, ENGLISH, SPANISH, TAGALOG):
+   Actively recognize, read, and interpret food packaging labels and receipts in French (Français), English, Spanish (Español), and Tagalog (Filipino).
+   Accurately transcribe Hispanic, Latin American, Quebecois, and Filipino ingredients and specialty brands (e.g. Datu Puti, Mama Sita's, Lucky Me, San Miguel, Goya, La Costeña, Herdez, El Mexicano, etc.).
+2. READ ALL VISIBLE TEXT: Actively examine and read printed text on packaging, labels, bottles, cans, carton lids, price tags, and grocery store receipts (Costco, Walmart, Trader Joe's, Kroger, Maxi, IGA, Super C, Metro, Carrefour, Mercadona, Seafood City, etc.).
+3. BARCODE & UPC READING: Look for any UPC-A, UPC-E, or EAN barcode symbol on food packaging. Read the 12-digit or 13-digit numeric code printed directly below the barcode lines (e.g., "011110816850", "073420000115") and output it in the 'barcode' field.
+4. BRAND & PRODUCT NAME: Read exact brand names (e.g., "Oatly", "Chobani", "Kirkland Signature", "Barilla", "Tyson", "Goya", "Datu Puti") and combine with product title.
+5. PRINTED EXPIRATION DATES: Specifically scan for printed date stamps: "EXP", "BEST BY", "BEST BEFORE", "USE BY", "SELL BY", "BB", "CADUCIDAD", "VENCIMIENTO", or dot-matrix expiration dates printed on container necks, carton tops, or bag clips.
    - If a date is visible (e.g. "OCT 25 2026", "2026-10-25", "10/25/26"), output it in 'printedExpirationDate' (in YYYY-MM-DD format whenever possible) and calculate 'estimatedShelfLifeDays' based on the remaining days until that date.
-5. QUANTITIES & WEIGHTS: Read printed net contents, weights, or volumes (e.g. "32 FL OZ (1 QT) 946mL", "16 OZ (1 LB) 454g", "1 Gallon", "Pack of 6") to extract precise quantity and unit.
-6. RECEIPT SCANNING: If the image is a paper grocery receipt, parse the itemized lines into individual food inventory entries, omitting tax/tender lines.
-7. DETECTED TEXT: In 'detectedText', include the key words or label text read from the item (e.g., "OATLY BARISTA EDITION 32 FL OZ - BEST BY 12/15/2026").
+6. QUANTITIES & WEIGHTS: Read printed net contents, weights, or volumes (e.g. "32 FL OZ (1 QT) 946mL", "16 OZ (1 LB) 454g", "1 Gallon", "Pack of 6", "1 kg", "500g") to extract precise quantity and unit.
+7. RECEIPT SCANNING: If the image is a paper grocery receipt, parse the itemized lines into individual food inventory entries, omitting tax/tender lines.
+8. DETECTED TEXT: In 'detectedText', include the key words or label text read from the item (e.g., "OATLY BARISTA EDITION 32 FL OZ - BEST BY 12/15/2026").
 
 MANDATORY TRANSLATION ON IMPORT:
 Target Language: ${language === "FR" ? "French (Français)" : "English"}.
@@ -397,87 +400,87 @@ function parseReceiptTextFallback(receiptText) {
     let shelfLifeDays = 21;
     let brand = undefined;
 
-    if (lower.includes("spinach") || lower.includes("lettuce") || lower.includes("kale") || lower.includes("salad")) {
+    if (lower.includes("spinach") || lower.includes("lettuce") || lower.includes("kale") || lower.includes("salad") || lower.includes("espinaca") || lower.includes("lechuga") || lower.includes("ensalada") || lower.includes("kangkong") || lower.includes("gulay")) {
       category = "Produce";
       location = "Fridge";
       shelfLifeDays = 5;
       unit = "clamshell";
-    } else if (lower.includes("berry") || lower.includes("strawberr") || lower.includes("blueberr") || lower.includes("raspberr")) {
+    } else if (lower.includes("berry") || lower.includes("strawberr") || lower.includes("blueberr") || lower.includes("raspberr") || lower.includes("fresa") || lower.includes("arándano")) {
       category = "Produce";
       location = "Fridge";
       shelfLifeDays = 4;
       unit = "pack";
-    } else if (lower.includes("apple") || lower.includes("banana") || lower.includes("orange") || lower.includes("avocado") || lower.includes("lemon") || lower.includes("lime")) {
+    } else if (lower.includes("apple") || lower.includes("banana") || lower.includes("orange") || lower.includes("avocado") || lower.includes("lemon") || lower.includes("lime") || lower.includes("manzana") || lower.includes("platano") || lower.includes("plátano") || lower.includes("limon") || lower.includes("limón") || lower.includes("aguacate") || lower.includes("saging") || lower.includes("mansanas") || lower.includes("kamatis")) {
       category = "Produce";
-      location = lower.includes("avocado") ? "Pantry" : "Fridge";
+      location = (lower.includes("avocado") || lower.includes("aguacate") || lower.includes("banana") || lower.includes("platano") || lower.includes("saging")) ? "Pantry" : "Fridge";
       shelfLifeDays = 7;
       unit = "pcs";
-    } else if (lower.includes("milk") || lower.includes("oatmilk") || lower.includes("almond milk") || lower.includes("cream")) {
+    } else if (lower.includes("milk") || lower.includes("oatmilk") || lower.includes("almond milk") || lower.includes("cream") || lower.includes("lait") || lower.includes("leche") || lower.includes("gatas")) {
       category = "Dairy & Eggs";
       location = "Fridge";
       shelfLifeDays = 7;
       unit = "carton";
-    } else if (lower.includes("cheese") || lower.includes("cheddar") || lower.includes("parmesan") || lower.includes("feta") || lower.includes("mozzarella")) {
+    } else if (lower.includes("cheese") || lower.includes("cheddar") || lower.includes("parmesan") || lower.includes("feta") || lower.includes("mozzarella") || lower.includes("fromage") || lower.includes("queso") || lower.includes("keso")) {
       category = "Dairy & Eggs";
       location = "Fridge";
       shelfLifeDays = 14;
       unit = "block";
-    } else if (lower.includes("egg") || lower.includes("eggs")) {
+    } else if (lower.includes("egg") || lower.includes("eggs") || lower.includes("oeuf") || lower.includes("œuf") || lower.includes("huevo") || lower.includes("huevos") || lower.includes("itlog")) {
       category = "Dairy & Eggs";
       location = "Fridge";
       shelfLifeDays = 21;
       unit = "dozen";
-    } else if (lower.includes("yogurt") || lower.includes("kefir")) {
+    } else if (lower.includes("yogurt") || lower.includes("kefir") || lower.includes("yogourt") || lower.includes("yogur")) {
       category = "Dairy & Eggs";
       location = "Fridge";
       shelfLifeDays = 10;
       unit = "tub";
-    } else if (lower.includes("beef") || lower.includes("steak") || lower.includes("ground beef") || lower.includes("ribeye")) {
+    } else if (lower.includes("beef") || lower.includes("steak") || lower.includes("ground beef") || lower.includes("ribeye") || lower.includes("boeuf") || lower.includes("bœuf") || lower.includes("res") || lower.includes("carne") || lower.includes("baka")) {
       category = "Meat & Seafood";
       location = "Fridge";
       shelfLifeDays = 3;
       unit = "pack";
-    } else if (lower.includes("chicken") || lower.includes("poultry") || lower.includes("turkey") || lower.includes("breast") || lower.includes("thigh")) {
+    } else if (lower.includes("chicken") || lower.includes("poultry") || lower.includes("turkey") || lower.includes("breast") || lower.includes("thigh") || lower.includes("poulet") || lower.includes("pollo") || lower.includes("pavo") || lower.includes("manok")) {
       category = "Meat & Seafood";
       location = "Fridge";
       shelfLifeDays = 2;
       unit = "pack";
-    } else if (lower.includes("salmon") || lower.includes("fish") || lower.includes("shrimp") || lower.includes("cod") || lower.includes("tuna")) {
+    } else if (lower.includes("salmon") || lower.includes("fish") || lower.includes("shrimp") || lower.includes("cod") || lower.includes("tuna") || lower.includes("saumon") || lower.includes("poisson") || lower.includes("pescado") || lower.includes("camaron") || lower.includes("camarón") || lower.includes("isda") || lower.includes("bangus") || lower.includes("hipon") || lower.includes("tilapia")) {
       category = "Meat & Seafood";
       location = "Fridge";
       shelfLifeDays = 2;
       unit = "fillet";
-    } else if (lower.includes("pork") || lower.includes("bacon") || lower.includes("sausage")) {
+    } else if (lower.includes("pork") || lower.includes("bacon") || lower.includes("sausage") || lower.includes("porc") || lower.includes("cerdo") || lower.includes("tocino") || lower.includes("salchicha") || lower.includes("baboy") || lower.includes("longganisa")) {
       category = "Meat & Seafood";
       location = "Fridge";
       shelfLifeDays = 4;
       unit = "pack";
-    } else if (lower.includes("bread") || lower.includes("sourdough") || lower.includes("bagel") || lower.includes("croissant") || lower.includes("brioche") || lower.includes("toast")) {
+    } else if (lower.includes("bread") || lower.includes("sourdough") || lower.includes("bagel") || lower.includes("croissant") || lower.includes("brioche") || lower.includes("toast") || lower.includes("pain") || lower.includes("pan") || lower.includes("tinapay") || lower.includes("pandesal")) {
       category = "Bakery";
       location = "Pantry";
       shelfLifeDays = 6;
       unit = "loaf";
-    } else if (lower.includes("frozen") || lower.includes("pizza") || lower.includes("ice cream") || lower.includes("dumpling") || lower.includes("waffle")) {
+    } else if (lower.includes("frozen") || lower.includes("pizza") || lower.includes("ice cream") || lower.includes("dumpling") || lower.includes("waffle") || lower.includes("surgelé") || lower.includes("congelado") || lower.includes("helado") || lower.includes("pinalamig") || lower.includes("sorbetes")) {
       category = "Frozen Meals";
       location = "Freezer";
       shelfLifeDays = 180;
       unit = "box";
-    } else if (lower.includes("coffee") || lower.includes("tea") || lower.includes("juice") || lower.includes("sparkling") || lower.includes("soda")) {
+    } else if (lower.includes("coffee") || lower.includes("tea") || lower.includes("juice") || lower.includes("sparkling") || lower.includes("soda") || lower.includes("café") || lower.includes("té") || lower.includes("jugo") || lower.includes("kape") || lower.includes("tsaa")) {
       category = "Beverages";
-      location = lower.includes("juice") ? "Fridge" : "Pantry";
+      location = lower.includes("juice") || lower.includes("jugo") ? "Fridge" : "Pantry";
       shelfLifeDays = 30;
       unit = "bottle";
-    } else if (lower.includes("sauce") || lower.includes("mayo") || lower.includes("ketchup") || lower.includes("mustard") || lower.includes("dressing") || lower.includes("oil")) {
+    } else if (lower.includes("sauce") || lower.includes("mayo") || lower.includes("ketchup") || lower.includes("mustard") || lower.includes("dressing") || lower.includes("oil") || lower.includes("huile") || lower.includes("salsa") || lower.includes("aceite") || lower.includes("toyo") || lower.includes("suka") || lower.includes("patis") || lower.includes("mantika")) {
       category = "Condiments";
-      location = lower.includes("oil") ? "Pantry" : "Fridge";
+      location = (lower.includes("oil") || lower.includes("huile") || lower.includes("aceite") || lower.includes("mantika") || lower.includes("suka")) ? "Pantry" : "Fridge";
       shelfLifeDays = 60;
       unit = "bottle";
-    } else if (lower.includes("chip") || lower.includes("cracker") || lower.includes("nut") || lower.includes("snack") || lower.includes("pretzel") || lower.includes("cookie")) {
+    } else if (lower.includes("chip") || lower.includes("cracker") || lower.includes("nut") || lower.includes("snack") || lower.includes("pretzel") || lower.includes("cookie") || lower.includes("galleta") || lower.includes("chicharon")) {
       category = "Snacks";
       location = "Pantry";
       shelfLifeDays = 45;
       unit = "bag";
-    } else if (lower.includes("pasta") || lower.includes("rice") || lower.includes("flour") || lower.includes("bean") || lower.includes("grain") || lower.includes("cereal")) {
+    } else if (lower.includes("pasta") || lower.includes("rice") || lower.includes("flour") || lower.includes("bean") || lower.includes("grain") || lower.includes("cereal") || lower.includes("riz") || lower.includes("farine") || lower.includes("arroz") || lower.includes("harina") || lower.includes("frijol") || lower.includes("frijoles") || lower.includes("bigas") || lower.includes("kanin")) {
       category = "Pantry Staples";
       location = "Pantry";
       shelfLifeDays = 90;
@@ -566,7 +569,14 @@ export async function analyzeReceiptText(receiptText, language = "EN") {
   const ai = getGeminiClient();
 
   const systemInstruction = `You are Pantryo's expert grocery receipt parsing and food inventory extraction engine.
-Your task is to parse raw text from store receipts (Costco, Walmart, Trader Joe's, Kroger, Aldi, Carrefour, Loblaws, Metro, IGA, Whole Foods, Super C, Maxi, Provigo, etc.) or online order confirmations (Instacart, UberEats, Amazon Fresh).
+Your task is to parse raw text from store receipts (Costco, Walmart, Trader Joe's, Kroger, Aldi, Carrefour, Loblaws, Metro, IGA, Whole Foods, Super C, Maxi, Provigo, Mercadona, Soriana, Seafood City, Puregold, etc.) or online order confirmations.
+
+MULTILINGUAL OCR RECEIPT READING:
+You MUST accurately parse receipts printed in:
+- French (Français - e.g. Maxi, Provigo, Metro, IGA, Super C, Carrefour)
+- English (e.g. Costco, Walmart, Trader Joe's, Kroger, Loblaws)
+- Spanish (Español - e.g. Supermercado, Bodega, Tienda, Soriana, Mercadona, Chedraui)
+- Tagalog / Filipino (e.g. Sari-sari receipts, Seafood City, Pinoy Supermarket, Puregold, Robinson's)
 
 RULES:
 1. Extract all FOOD & BEVERAGE items. Ignore non-food household items (paper towels, soap, shampoo, trash bags) unless explicitly culinary.
@@ -899,8 +909,15 @@ export async function analyzeReceiptImage(base64Data, mimeType = "image/jpeg", l
   const receiptPhotoSystemInstruction = `You are Pantryo's expert optical character recognition (OCR) and grocery store receipt parsing specialist.
 You will inspect a photograph of a physical paper receipt from a grocery store, supermarket, warehouse club, or food market.
 
+MULTILINGUAL OCR RECEIPT READING:
+You MUST accurately transcribe and parse receipts in:
+- French (Français - e.g. Maxi, Provigo, Metro, IGA, Super C, Carrefour)
+- English (e.g. Costco, Walmart, Trader Joe's, Kroger, Loblaws, Whole Foods)
+- Spanish (Español - e.g. Supermercado, Tienda, Bodega, Soriana, Mercadona, Chedraui)
+- Tagalog / Filipino (e.g. Sari-sari receipts, Seafood City, Pinoy Supermarket, Puregold, Robinson's)
+
 INSTRUCTIONS:
-1. Thoroughly transcribe and read all itemized food and ingredient rows on the receipt.
+1. Thoroughly transcribe and read all itemized food and ingredient rows on the receipt in any of the supported languages.
 2. Filter out store logos, address lines, phone numbers, register/terminal identifiers, tax calculations (GST/HST/PST/Sales Tax), payment lines (VISA, MASTERCARD, DEBIT, CASH), bottle deposits, discounts, and cashier messages.
 3. Clean abbreviated product names into standard human-readable grocery names (e.g., expand "ORG BBY CARROT 2LB" to "Organic Baby Carrots").
 4. Extract quantity, units, price, food category, and recommended storage location ('Fridge', 'Pantry', or 'Freezer').

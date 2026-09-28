@@ -181,12 +181,12 @@ router.post("/scan", async (req, res) => {
       }
     }
 
-    // High-precision OCR fallback on food packaging labels
+    // High-precision OCR fallback on food packaging labels (French, English, Spanish, Tagalog)
     const cleanBase64 = imageBase64.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, "").trim();
     const imageBuffer = Buffer.from(cleanBase64, "base64");
     let ocrText = "";
     try {
-      const ocrResult = await Tesseract.recognize(imageBuffer, "eng+fra");
+      const ocrResult = await Tesseract.recognize(imageBuffer, "eng+fra+spa+tgl");
       ocrText = ocrResult?.data?.text?.trim() || "";
     } catch (e) {
       console.warn("[Inventory Route] Tesseract food OCR error:", e.message);
@@ -195,30 +195,39 @@ router.post("/scan", async (req, res) => {
     if (ocrText && ocrText.length > 3) {
       const lines = ocrText.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 2);
       const firstLine = lines[0] || (language === "FR" ? "Aliment scanné" : "Scanned Item");
-      const cleanName = firstLine.replace(/[^a-zA-Z0-9\sÀ-ÿ'-]/g, "").trim().slice(0, 45) || (language === "FR" ? "Aliment scanné" : "Scanned Item");
+      const cleanName = firstLine.replace(/[^a-zA-Z0-9\sÀ-ÿñÑ'-]/g, "").trim().slice(0, 45) || (language === "FR" ? "Aliment scanné" : "Scanned Item");
 
-      // Infer category & storage location from OCR text
+      // Infer category & storage location from OCR text across FR, EN, ES, and TGL
       const lower = ocrText.toLowerCase();
       let category = language === "FR" ? "Garde-manger" : "Pantry Staples";
       let recommendedLocation = "Pantry";
       let shelfLife = 30;
 
-      if (/(lait|milk|beurre|butter|cream|crème|cheese|fromage|yogourt|yogurt|egg|oeuf|œuf)/.test(lower)) {
+      // Dairy & Eggs: English, French, Spanish (leche/queso/huevo), Tagalog (gatas/keso/itlog)
+      if (/(lait|milk|beurre|butter|cream|crème|cheese|fromage|yogourt|yogurt|egg|oeuf|œuf|leche|mantequilla|crema|queso|yogur|huevo|huevos|gatas|mantikilya|keso|itlog)/.test(lower)) {
         category = language === "FR" ? "Produits laitiers & œufs" : "Dairy & Eggs";
         recommendedLocation = "Fridge";
         shelfLife = 10;
-      } else if (/(poulet|chicken|boeuf|beef|porc|pork|saumon|salmon|poisson|fish|viande|meat)/.test(lower)) {
+      // Meat & Seafood: English, French, Spanish (pollo/res/cerdo/pescado/camaron), Tagalog (manok/baka/baboy/isda/karne/bangus/hipon)
+      } else if (/(poulet|chicken|boeuf|bœuf|beef|porc|pork|saumon|salmon|poisson|fish|viande|meat|seafood|shrimp|pollo|res|carne|cerdo|pescado|mariscos|camaron|camarón|manok|baka|baboy|isda|karne|hipon|bangus|tilapia|longganisa|tocino)/.test(lower)) {
         category = language === "FR" ? "Viandes & Poissons" : "Meat & Seafood";
         recommendedLocation = "Fridge";
         shelfLife = 4;
-      } else if (/(pomme|apple|salade|lettuce|tomate|tomato|carotte|carrot|légume|vegetable|fruit|épinard|spinach)/.test(lower)) {
+      // Fresh Produce: English, French, Spanish (manzana/lechuga/tomate/zanahoria), Tagalog (gulay/kamatis/sibuyas/bawang/saging)
+      } else if (/(pomme|apple|salade|lettuce|tomate|tomato|carotte|carrot|légume|vegetable|fruit|épinard|spinach|manzana|ensalada|lechuga|zanahoria|verdura|fruta|espinaca|cebolla|ajo|papa|platano|plátano|gulay|kamatis|sibuyas|bawang|patatas|saging|kangkong|talong|luya|sili)/.test(lower)) {
         category = language === "FR" ? "Produits frais" : "Produce";
         recommendedLocation = "Fridge";
         shelfLife = 7;
-      } else if (/(surgelé|frozen|glace|ice cream)/.test(lower)) {
+      // Frozen Foods: English, French, Spanish (congelado/helado), Tagalog (pinalamig/sorbetes)
+      } else if (/(surgelé|surgele|frozen|glace|ice cream|congelado|helado|pinalamig|sorbetes)/.test(lower)) {
         category = language === "FR" ? "Surgelés" : "Frozen Foods";
         recommendedLocation = "Freezer";
         shelfLife = 180;
+      // Bakery: English, French, Spanish (pan/panaderia), Tagalog (tinapay/pandesal)
+      } else if (/(pain|bread|boulangerie|bakery|croissant|bagel|pan|panaderia|panadería|bollo|tinapay|pandesal|ensaymada)/.test(lower)) {
+        category = language === "FR" ? "Boulangerie" : "Bakery";
+        recommendedLocation = "Pantry";
+        shelfLife = 5;
       }
 
       return res.status(200).json({

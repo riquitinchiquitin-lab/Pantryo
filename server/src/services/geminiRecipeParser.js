@@ -340,7 +340,7 @@ Respond strictly in JSON following the schema.`;
   console.info("[Gemini Recipe Parser] Running Tesseract OCR on recipe image...");
   try {
     const imageBuffer = Buffer.from(cleanBase64, "base64");
-    const ocrResult = await Tesseract.recognize(imageBuffer, "eng+fra");
+    const ocrResult = await Tesseract.recognize(imageBuffer, "eng+fra+spa+tgl");
     const ocrText = ocrResult?.data?.text?.trim() || "";
     console.info(`[Gemini Recipe Parser] Tesseract extracted ${ocrText.length} characters.`);
 
