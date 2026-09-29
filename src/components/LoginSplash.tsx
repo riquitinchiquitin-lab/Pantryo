@@ -63,7 +63,7 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
   // Auto-fetch users from server on mount if clean or empty
   useEffect(() => {
     if (!householdMembers || householdMembers.length === 0) {
-      fetch('/api/v1/admin/users')
+      fetch('/api/v1/auth/public-members')
         .then((r) => r.json())
         .then((users) => {
           if (Array.isArray(users) && users.length > 0) {
@@ -101,6 +101,12 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || 'Authentication failed');
+      }
+
+      if (data.token) {
+        try {
+          localStorage.setItem('pantryo_auth_token', data.token);
+        } catch (_) {}
       }
 
       onLoginSuccess(data.user);
@@ -265,7 +271,7 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
     setSelectedUser(updatedUser);
 
     if (onMembersUpdated) {
-      fetch('/api/v1/admin/users')
+      fetch('/api/v1/auth/public-members')
         .then((r) => r.json())
         .then((users) => onMembersUpdated(users))
         .catch(() => {});

@@ -90,6 +90,11 @@ export const AdminRestrictedModal: React.FC<AdminRestrictedModalProps> = ({
       }
 
       if (result.success && result.verified) {
+        if (result.token) {
+          try {
+            localStorage.setItem('pantryo_auth_token', result.token);
+          } catch (_) {}
+        }
         setSuccessMessage(
           lang === 'FR'
             ? 'Clé FIDO2 vérifiée avec succès !'
@@ -127,6 +132,11 @@ export const AdminRestrictedModal: React.FC<AdminRestrictedModalProps> = ({
       );
 
       if (result.success && result.verified) {
+        if (result.token) {
+          try {
+            localStorage.setItem('pantryo_auth_token', result.token);
+          } catch (_) {}
+        }
         setSuccessMessage(
           lang === 'FR'
             ? 'Code de secours validé !'
@@ -187,6 +197,12 @@ export const AdminRestrictedModal: React.FC<AdminRestrictedModalProps> = ({
             : 'This account is protected by FIDO2 2FA. Please verify with your security key below.'
         );
         return;
+      }
+
+      if (data.token) {
+        try {
+          localStorage.setItem('pantryo_auth_token', data.token);
+        } catch (_) {}
       }
 
       onSwitchToAdmin();

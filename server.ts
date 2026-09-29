@@ -29,9 +29,63 @@ const PORT = 3000;
 // Trust reverse proxy headers from Cloudflare Tunnel
 app.set("trust proxy", true);
 
-// Middleware for parsing JSON with generous limits for high-resolution base64 camera photos
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+// Baseline HTTP Protective Security Headers (SEC-05)
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader("X-Permitted-Cross-Domain-Policies", "none");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(self), microphone=(), geolocation=()");
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+  res.setHeader(
+    "Content-Security-Policy",
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https: ws: wss:; object-src 'none'; base-uri 'self'; form-action 'self';"
+  );
+  if (req.secure || req.headers["x-forwarded-proto"] === "https") {
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
+  next();
+});
+
+// Standard API parser (2MB max) to protect from memory-exhaustion Denial of Service (SEC-04)
+const standardJsonParser = express.json({ limit: "2mb" });
+const standardUrlParser = express.urlencoded({ extended: true, limit: "2mb" });
+
+// High-capacity parser for image scans and database backup operations (50MB)
+const highCapacityJsonParser = express.json({ limit: "50mb" });
+const highCapacityUrlParser = express.urlencoded({ extended: true, limit: "50mb" });
+
+// Apply high-capacity parser specifically to image/backup upload routes
+const HIGH_CAPACITY_PREFIXES = [
+  "/api/v1/inventory/ai-scan",
+  "/api/inventory/ai-scan",
+  "/api/v1/inventory/barcode/packaging",
+  "/api/inventory/barcode/packaging",
+  "/api/v1/recipes/parse-photo",
+  "/api/recipes/parse-photo",
+  "/api/v1/recipes/parse-recipe-card",
+  "/api/recipes/parse-recipe-card",
+  "/api/v1/admin/backup/import",
+  "/api/admin/backup/import",
+  "/api/v1/admin/restore",
+  "/api/admin/restore",
+];
+
+app.use((req, res, next) => {
+  const isHighCap = HIGH_CAPACITY_PREFIXES.some((prefix) => req.path.startsWith(prefix));
+  if (isHighCap) {
+    highCapacityJsonParser(req, res, (err) => {
+      if (err) return next(err);
+      highCapacityUrlParser(req, res, next);
+    });
+  } else {
+    standardJsonParser(req, res, (err) => {
+      if (err) return next(err);
+      standardUrlParser(req, res, next);
+    });
+  }
+});
 
 // Mount the Kitchen Komrade Backend APIs (supports both /api/v1/* and /api/*)
 app.use(["/api/v1/inventory", "/api/inventory"], inventoryRouter);

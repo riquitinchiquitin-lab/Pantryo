@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import Tesseract from "tesseract.js";
+import { validateSafeExternalUrl, safeFetch } from "./ssrfGuard.js";
 
 /**
  * Pantryo - Gemini Recipe Parser Service
@@ -716,6 +717,7 @@ export async function fetchLiveWebsiteRecipes(urlOrDomain, query = "") {
   if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
     cleanUrl = `https://${cleanUrl}`;
   }
+  cleanUrl = await validateSafeExternalUrl(cleanUrl);
   let domain = "recipe website";
   let origin = cleanUrl;
   try {
@@ -734,7 +736,7 @@ export async function fetchLiveWebsiteRecipes(urlOrDomain, query = "") {
   try {
     const feedController = new AbortController();
     const feedTimeout = setTimeout(() => feedController.abort(), 4500);
-    const feedRes = await fetch(`${origin}/feed/`, {
+    const feedRes = await safeFetch(`${origin}/feed/`, {
       signal: feedController.signal,
       headers: {
         "User-Agent":
@@ -776,7 +778,7 @@ export async function fetchLiveWebsiteRecipes(urlOrDomain, query = "") {
   try {
     const pageController = new AbortController();
     const pageTimeout = setTimeout(() => pageController.abort(), 6000);
-    const pageRes = await fetch(cleanUrl, {
+    const pageRes = await safeFetch(cleanUrl, {
       signal: pageController.signal,
       headers: {
         "User-Agent":
@@ -1089,7 +1091,7 @@ export async function parseRecipeFromUrl({
     throw new Error("A valid recipe URL is required.");
   }
 
-  const cleanUrl = url.trim();
+  const cleanUrl = await validateSafeExternalUrl(url);
   let domain = "Web Recipe";
   try {
     const parsedUrl = new URL(cleanUrl);
@@ -1118,7 +1120,7 @@ export async function parseRecipeFromUrl({
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(cleanUrl, {
+    const res = await safeFetch(cleanUrl, {
       signal: controller.signal,
       headers: {
         "User-Agent":

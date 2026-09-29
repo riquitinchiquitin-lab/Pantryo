@@ -1,6 +1,9 @@
 import express from "express";
 import { dbStore } from "../services/dbStore.js";
 import { fido2Service } from "../services/fido2Service.js";
+import { issueSessionToken, requireAuth } from "../services/sessionTokenService.js";
+import { requireAdmin } from "./admin.js";
+import { rateLimiter } from "../services/rateLimiter.js";
 import {
   generateTotpSecret,
   verifyTotpCode,
@@ -203,7 +206,7 @@ router.post("/auth-verify", async (req, res) => {
     }
 
     const { passwordHash: _, recoveryCodes: __, ...safeUser } = user;
-    const token = `fido2_tok_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+    const token = issueSessionToken(user);
 
     res.json({
       success: true,
@@ -219,13 +222,25 @@ router.post("/auth-verify", async (req, res) => {
 
 /**
  * POST /api/v1/auth/fido2/verify-recovery-code
- * Fallback: verifies single-use recovery code
+ * Fallback: verifies single-use recovery code with progressive rate limiting
  */
-router.post("/verify-recovery-code", (req, res) => {
+router.post("/verify-recovery-code", async (req, res) => {
   try {
     const { userId, username, code } = req.body;
+    const clientIp = req.ip || req.headers["x-forwarded-for"] || "127.0.0.1";
+    const targetIdentifier = username || userId || "anonymous";
+
+    const throttleCheck = rateLimiter.check(clientIp, targetIdentifier);
+    if (throttleCheck.throttled) {
+      return res.status(429).json({
+        error: throttleCheck.message,
+        retryAfterMs: throttleCheck.delayMs,
+      });
+    }
+
     const user = findUser(userId || username);
     if (!user) {
+      rateLimiter.recordFailure(clientIp, targetIdentifier);
       return res.status(404).json({ error: "User not found" });
     }
     if (!code) {
@@ -234,11 +249,14 @@ router.post("/verify-recovery-code", (req, res) => {
 
     const result = fido2Service.verifyRecoveryCode(user, code);
     if (!result.success) {
+      rateLimiter.recordFailure(clientIp, targetIdentifier);
       return res.status(400).json({ error: result.error || "Invalid recovery code" });
     }
 
+    rateLimiter.recordSuccess(clientIp, targetIdentifier);
+
     const { passwordHash: _, recoveryCodes: __, ...safeUser } = user;
-    const token = `rec_tok_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+    const token = issueSessionToken(user);
 
     res.json({
       success: true,
@@ -314,7 +332,7 @@ router.post("/simulate-auth", (req, res) => {
     }
 
     const { passwordHash: _, recoveryCodes: __, ...safeUser } = user;
-    const token = `fido2_tok_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+    const token = issueSessionToken(user);
 
     res.json({
       success: true,
@@ -332,10 +350,16 @@ router.post("/simulate-auth", (req, res) => {
  * POST /api/v1/auth/fido2/recovery-codes/regenerate
  * Generates a new fresh set of 8 emergency recovery codes
  */
-router.post("/recovery-codes/regenerate", (req, res) => {
+router.post("/recovery-codes/regenerate", requireAuth, (req, res) => {
   try {
     const { userId } = req.body;
-    const user = findUser(userId);
+    const targetUserId = userId || req.user.id;
+
+    if (req.user.role !== "ADMIN" && req.user.id !== targetUserId) {
+      return res.status(403).json({ error: "Access denied. You can only regenerate your own recovery codes." });
+    }
+
+    const user = findUser(targetUserId);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -355,10 +379,11 @@ router.post("/recovery-codes/regenerate", (req, res) => {
  * DELETE /api/v1/auth/fido2/credentials/:credentialId
  * Removes an enrolled key or 'all' keys
  */
-router.delete("/credentials/:credentialId", (req, res) => {
+router.delete("/credentials/:credentialId", requireAuth, (req, res) => {
   try {
-    const userId = req.query.userId || req.headers["x-user-id"] || req.body?.userId || "usr_yan";
-    const user = findUser(userId);
+    const requestedUserId = req.query.userId || req.body?.userId;
+    const targetUserId = (req.user.role === "ADMIN" && requestedUserId) ? requestedUserId : req.user.id;
+    const user = findUser(targetUserId);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -377,7 +402,6 @@ router.delete("/credentials/:credentialId", (req, res) => {
 
     const ok = fido2Service.removeCredential(user, credentialId);
     if (!ok) {
-      // If it wasn't found by raw id, try decoded
       return res.status(404).json({ error: "Credential not found or already deleted" });
     }
 
@@ -397,11 +421,11 @@ router.delete("/credentials/:credentialId", (req, res) => {
  * POST /api/v1/auth/fido2/delete-credential
  * POST fallback alternative for deleting a key
  */
-router.post("/delete-credential", (req, res) => {
+router.post("/delete-credential", requireAuth, (req, res) => {
   try {
     const { userId, credentialId } = req.body || {};
-    const effectiveUserId = userId || req.headers["x-user-id"] || "usr_yan";
-    const user = findUser(effectiveUserId);
+    const targetUserId = (req.user.role === "ADMIN" && userId) ? userId : req.user.id;
+    const user = findUser(targetUserId);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -436,9 +460,9 @@ router.post("/delete-credential", (req, res) => {
 
 /**
  * POST /api/v1/auth/fido2/toggle-enforcement
- * Toggles or reinforces FIDO2 requirement for all users or a specific user
+ * Toggles or reinforces FIDO2 requirement for all users or a specific user (Admin only)
  */
-router.post("/toggle-enforcement", (req, res) => {
+router.post("/toggle-enforcement", requireAdmin, (req, res) => {
   try {
     const { userId, enforced, allUsers } = req.body || {};
     const willEnforce = enforced !== undefined ? Boolean(enforced) : true;
@@ -490,12 +514,12 @@ router.post("/toggle-enforcement", (req, res) => {
 /**
  * POST /api/v1/auth/fido2/totp/setup
  * Generates a new 6-digit TOTP secret and QR code URI for authenticator apps
- * (Google Authenticator, Microsoft Authenticator, 1Password, Bitwarden, etc.)
  */
-router.post("/totp/setup", (req, res) => {
+router.post("/totp/setup", requireAuth, (req, res) => {
   try {
     const { userId } = req.body;
-    const user = findUser(userId);
+    const targetUserId = (req.user.role === "ADMIN" && userId) ? userId : req.user.id;
+    const user = findUser(targetUserId);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -518,10 +542,11 @@ router.post("/totp/setup", (req, res) => {
  * POST /api/v1/auth/fido2/totp/confirm
  * Confirms and activates TOTP 6-digit 2FA by verifying the first 6-digit code
  */
-router.post("/totp/confirm", (req, res) => {
+router.post("/totp/confirm", requireAuth, (req, res) => {
   try {
     const { userId, secret, code } = req.body;
-    const user = findUser(userId);
+    const targetUserId = (req.user.role === "ADMIN" && userId) ? userId : req.user.id;
+    const user = findUser(targetUserId);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -563,13 +588,25 @@ router.post("/totp/confirm", (req, res) => {
 
 /**
  * POST /api/v1/auth/fido2/totp/verify
- * Verifies a 6-digit 2FA code during login
+ * Verifies a 6-digit 2FA code during login with progressive rate limiting
  */
-router.post("/totp/verify", (req, res) => {
+router.post("/totp/verify", async (req, res) => {
   try {
     const { userId, username, code } = req.body;
+    const clientIp = req.ip || req.headers["x-forwarded-for"] || "127.0.0.1";
+    const targetIdentifier = username || userId || "anonymous";
+
+    const throttleCheck = rateLimiter.check(clientIp, targetIdentifier);
+    if (throttleCheck.throttled) {
+      return res.status(429).json({
+        error: throttleCheck.message,
+        retryAfterMs: throttleCheck.delayMs,
+      });
+    }
+
     const user = findUser(userId || username);
     if (!user) {
+      rateLimiter.recordFailure(clientIp, targetIdentifier);
       return res.status(404).json({ error: "User not found" });
     }
 
@@ -579,14 +616,17 @@ router.post("/totp/verify", (req, res) => {
 
     const isValid = verifyTotpCode(user.totpSecret, code);
     if (!isValid) {
+      rateLimiter.recordFailure(clientIp, targetIdentifier);
       return res.status(400).json({
         error: "Code à 6 chiffres incorrect ou expiré. Vérifiez votre application d'authentification.",
       });
     }
 
+    rateLimiter.recordSuccess(clientIp, targetIdentifier);
+
     const { passwordHash: _, recoveryCodes: __, totpSecret: ___, ...safeUser } = user;
     safeUser.totpEnabled = true;
-    const token = `totp_tok_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+    const token = issueSessionToken(user);
 
     res.json({
       success: true,

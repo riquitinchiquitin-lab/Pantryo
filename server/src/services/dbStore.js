@@ -789,18 +789,28 @@ class EncryptedDatabaseStore {
   /**
    * Retrieves operational system and network configuration settings
    */
-  getSystemSettings() {
+  getSystemSettings(includeSensitiveKeys = false) {
+    const rawKey = this.getActiveKey();
+    const maskedKey = rawKey && rawKey.length >= 8
+      ? `${rawKey.substring(0, 4)}••••••••••••••••${rawKey.substring(rawKey.length - 4)}`
+      : "";
+
     return {
       kitchenName: this.household?.name || process.env.KITCHEN_NAME || "The Yan & Kriz Kitchen",
       appUrl: this.systemSettings?.appUrl || process.env.APP_URL || "http://localhost:3000",
-      geminiApiKey: this.systemSettings?.geminiApiKey || process.env.GEMINI_API_KEY || "",
+      geminiApiKey: includeSensitiveKeys
+        ? (this.systemSettings?.geminiApiKey || process.env.GEMINI_API_KEY || "")
+        : (this.systemSettings?.geminiApiKey || process.env.GEMINI_API_KEY ? "••••••••••••••••" : ""),
       hasGeminiKey: Boolean(this.systemSettings?.geminiApiKey || process.env.GEMINI_API_KEY),
-      cloudflareTunnelToken: this.systemSettings?.cloudflareTunnelToken || process.env.CLOUDFLARE_TUNNEL_TOKEN || "",
+      cloudflareTunnelToken: includeSensitiveKeys
+        ? (this.systemSettings?.cloudflareTunnelToken || process.env.CLOUDFLARE_TUNNEL_TOKEN || "")
+        : (this.systemSettings?.cloudflareTunnelToken || process.env.CLOUDFLARE_TUNNEL_TOKEN ? "••••••••••••••••" : ""),
       hasTunnelToken: Boolean(this.systemSettings?.cloudflareTunnelToken || process.env.CLOUDFLARE_TUNNEL_TOKEN),
       expoPublicApiUrl: this.systemSettings?.expoPublicApiUrl || process.env.EXPO_PUBLIC_API_URL || "",
       databaseUrl: this.systemSettings?.databaseUrl || process.env.DATABASE_URL || "",
       port: parseInt(this.systemSettings?.port || process.env.PORT || "3000", 10),
-      dbEncryptionKey: this.getActiveKey(),
+      dbEncryptionKey: includeSensitiveKeys ? rawKey : maskedKey,
+      hasCustomKey: Boolean(rawKey && rawKey.length >= 16),
       nodeEnv: process.env.NODE_ENV || "production",
       updatedAt: this.systemSettings?.updatedAt || null,
     };

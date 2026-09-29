@@ -258,6 +258,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
     setCurrentUser(null);
     try {
       localStorage.removeItem(LOCAL_STORAGE_ACTIVE_USER_ID);
+      localStorage.removeItem('pantryo_auth_token');
     } catch (e) {
       console.error('Failed clearing active user:', e);
     }

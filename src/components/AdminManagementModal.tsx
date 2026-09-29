@@ -201,6 +201,17 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
   const [editProfileUsername, setEditProfileUsername] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
+  // Authenticated fetch helper for administrative operations (SEC-01 & SEC-06)
+  const getAdminHeaders = async (customHeaders: Record<string, string> = {}) => {
+    let token = typeof localStorage !== 'undefined' ? localStorage.getItem('pantryo_auth_token') : null;
+    return {
+      Accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}`, 'x-auth-token': token } : {}),
+      'x-user-id': currentUser?.id || 'usr_yan',
+      ...customHeaders,
+    };
+  };
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUserForProfile || !editProfileName.trim() || !editProfileUsername.trim()) return;
@@ -209,11 +220,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
       setIsSavingProfile(true);
       const res = await fetch(`/api/v1/admin/users/${encodeURIComponent(selectedUserForProfile.id)}/profile`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-role': currentUser.role,
-          'x-user-id': currentUser.id,
-        },
+        headers: await getAdminHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           name: editProfileName.trim(),
           username: editProfileUsername.trim(),
@@ -250,11 +257,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     try {
       const res = await fetch(`/api/v1/admin/users/${encodeURIComponent(userToUpdate.id)}/avatar`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-role': currentUser?.role || 'ADMIN',
-          'x-user-id': currentUser?.id || 'usr_yan',
-        },
+        headers: await getAdminHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ avatarUrl: newAvatarUrl }),
       });
       if (res.ok) {
@@ -287,20 +290,13 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
   const fetchStatsAndUsers = async (retryCount = 0) => {
     try {
       setLoading(true);
+      const adminHeaders = await getAdminHeaders();
       const [statsRes, usersRes] = await Promise.all([
         fetch('/api/v1/admin/stats', {
-          headers: {
-            Accept: 'application/json',
-            'x-user-role': currentUser?.role || 'ADMIN',
-            'x-user-id': currentUser?.id || 'usr_yan',
-          },
+          headers: adminHeaders,
         }),
         fetch('/api/v1/admin/users', {
-          headers: {
-            Accept: 'application/json',
-            'x-user-role': currentUser?.role || 'ADMIN',
-            'x-user-id': currentUser?.id || 'usr_yan',
-          },
+          headers: adminHeaders,
         }),
       ]);
 
@@ -332,11 +328,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
   const fetchSettings = async () => {
     try {
       const res = await fetch('/api/v1/admin/settings', {
-        headers: {
-          Accept: 'application/json',
-          'x-user-role': currentUser?.role || 'ADMIN',
-          'x-user-id': currentUser?.id || 'usr_yan',
-        },
+        headers: await getAdminHeaders(),
       });
       if (res.ok) {
         const data = await res.json();
@@ -354,11 +346,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     try {
       const res = await fetch('/api/v1/admin/settings', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-role': currentUser?.role || 'ADMIN',
-          'x-user-id': currentUser?.id || 'usr_yan',
-        },
+        headers: await getAdminHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(settings),
       });
       const data = await res.json();
@@ -390,11 +378,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     try {
       const res = await fetch('/api/v1/admin/test-gemini', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-role': currentUser?.role || 'ADMIN',
-          'x-user-id': currentUser?.id || 'usr_yan',
-        },
+        headers: await getAdminHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ apiKey: settings.geminiApiKey }),
       });
       const data = await res.json();
@@ -497,11 +481,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
 
       const res = await fetch('/api/v1/admin/set-encryption-key', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-role': currentUser.role,
-          'x-user-id': currentUser.id,
-        },
+        headers: await getAdminHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ encryptionKey: dbKeyInput.trim() }),
       });
 
@@ -552,10 +532,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
       params.append('passphrase', backupPassphrase.trim());
 
       const res = await fetch(`/api/v1/admin/backup?${params.toString()}`, {
-        headers: {
-          'x-user-role': currentUser.role,
-          'x-user-id': currentUser.id,
-        },
+        headers: await getAdminHeaders(),
       });
 
       if (!res.ok) {
@@ -641,11 +618,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
 
       const res = await fetch('/api/v1/admin/restore', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-role': currentUser.role,
-          'x-user-id': currentUser.id,
-        },
+        headers: await getAdminHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           backupPackage: restorePackage,
           passphrase: restorePassphrase.trim(),
@@ -690,11 +663,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
       setLoading(true);
       const res = await fetch('/api/v1/admin/reset', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-role': currentUser.role,
-          'x-user-id': currentUser.id,
-        },
+        headers: await getAdminHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ action: resetAction }),
       });
 
@@ -734,11 +703,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
       setLoading(true);
       const res = await fetch('/api/v1/admin/users', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-role': currentUser.role,
-          'x-user-id': currentUser.id,
-        },
+        headers: await getAdminHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           name: newUserName.trim(),
           email: newUserEmail.trim(),
@@ -774,11 +739,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     try {
       const res = await fetch(`/api/v1/admin/users/${userId}/role`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-role': currentUser.role,
-          'x-user-id': currentUser.id,
-        },
+        headers: await getAdminHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ role: newRole }),
       });
 
@@ -805,11 +766,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     try {
       const res = await fetch(`/api/v1/admin/users/${selectedUserForPassword.id}/password`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-role': currentUser.role,
-          'x-user-id': currentUser.id,
-        },
+        headers: await getAdminHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ password: newPasswordValue }),
       });
 
@@ -833,10 +790,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     try {
       const res = await fetch(`/api/v1/admin/users/${encodeURIComponent(targetUser.id)}`, {
         method: 'DELETE',
-        headers: {
-          'x-user-role': currentUser.role,
-          'x-user-id': currentUser.id,
-        },
+        headers: await getAdminHeaders(),
       });
 
       if (!res.ok) {
@@ -1567,9 +1521,9 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                       if (!adminKitchenNameInput.trim()) return;
                       setIsSavingAdminKitchenName(true);
                       try {
-                        const res = await fetch('/api/v1/inventory/household-name', {
+                        const res = await fetch('/api/v1/admin/household/name', {
                           method: 'PUT',
-                          headers: { 'Content-Type': 'application/json' },
+                          headers: await getAdminHeaders({ 'Content-Type': 'application/json' }),
                           body: JSON.stringify({ name: adminKitchenNameInput.trim() }),
                         });
                         if (res.ok) {

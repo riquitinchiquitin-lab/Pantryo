@@ -4,65 +4,102 @@ import { validatePasswordNist } from "../services/nistPasswordValidator.js";
 import { rateLimiter } from "../services/rateLimiter.js";
 import { resetGeminiClient as resetVisionGemini } from "../services/geminiVision.js";
 import { resetGeminiClient as resetRecipeGemini } from "../services/geminiRecipeParser.js";
+import {
+  getAuthenticatedUserFromRequest,
+  issueSessionToken,
+} from "../services/sessionTokenService.js";
 
 const router = express.Router();
 
 /**
- * Middleware: Admin check
- * Validates admin role via header or session
+ * Middleware: Cryptographic Admin Authorization Check
+ * Strictly validates session token.
+ * Untrusted client assertions (x-user-role, ?role=, unverified proxy headers) are completely disallowed.
  */
 export function requireAdmin(req, res, next) {
-  const role = req.headers["x-user-role"] || req.query.role;
-  const userId = req.headers["x-user-id"];
-
-  // If user role header indicates ADMIN, allow
-  if (role === "ADMIN") {
-    return next();
-  }
-
-  // If userId provided, check against database
-  if (userId) {
-    const user = dbStore.users.find((u) => u.id === userId);
-    if (user && user.role === "ADMIN") {
+  const authUser = getAuthenticatedUserFromRequest(req);
+  if (authUser) {
+    if (authUser.role === "ADMIN") {
+      req.user = authUser;
       return next();
     }
+    return res.status(403).json({
+      error: "Administrator authorization required. Current account role is insufficient.",
+    });
   }
 
-  // Also check Authelia / Forward-Auth header
-  const remoteUser = req.headers["remote-user"] || req.headers["x-forwarded-user"];
-  if (remoteUser) {
-    const matched = dbStore.users.find(
-      (u) => u.email === remoteUser || u.name.toLowerCase() === remoteUser.toLowerCase()
-    );
-    if (matched && matched.role === "ADMIN") {
-      return next();
-    }
-  }
-
-  // Reject unauthorized access - no bypass allowed in production or installed mode
-  return res.status(403).json({
-    error: "Administrator authorization required. Access denied.",
+  return res.status(401).json({
+    error: "Administrator authorization required. Access denied. Please provide a valid session token.",
   });
 }
 
 /**
+ * Middleware: Requires any valid authenticated household member
+ */
+export function requireAuth(req, res, next) {
+  const authUser = getAuthenticatedUserFromRequest(req);
+  if (!authUser) {
+    return res.status(401).json({
+      error: "Authentication required. Please provide a valid session token.",
+    });
+  }
+  req.user = authUser;
+  return next();
+}
+
+/**
  * GET /api/v1/auth/status or /api/v1/admin/status
- * Returns system initialization status and sanitized user list
+ * Returns system initialization status without leaking user identities or emails (SEC-03 fix)
  */
 router.get("/status", (req, res) => {
   const initialized = dbStore.users.length > 0;
-  const safeUsers = dbStore.users.map(({ passwordHash, recoveryCodes, totpSecret, ...u }) => ({
-    ...u,
-    fido2Enabled: Boolean(u.fido2Enabled && u.fido2Credentials?.length > 0),
-    fido2Enforced: Boolean(u.fido2Enforced),
-    totpEnabled: Boolean(u.totpEnabled && u.totpSecret),
-  }));
-
   res.json({
     initialized,
     userCount: dbStore.users.length,
-    users: safeUsers,
+    fido2Policy: dbStore.fido2Policy,
+    hasAdmin: dbStore.users.some((u) => u.role === "ADMIN"),
   });
+});
+
+/**
+ * GET /api/v1/auth/public-members
+ * Public minimal representation for login screen avatar picker (no emails, no hashes, no recovery codes)
+ */
+router.get("/public-members", (req, res) => {
+  const publicUsers = dbStore.users.map((u) => ({
+    id: u.id,
+    name: u.name,
+    avatarUrl: u.avatarUrl || "/avatars/chef-cat.svg",
+    role: u.role,
+    fido2Enabled: Boolean(u.fido2Enabled && u.fido2Credentials?.length > 0),
+    totpEnabled: Boolean(u.totpEnabled && u.totpSecret),
+  }));
+  res.json(publicUsers);
+});
+
+/**
+ * POST /api/v1/auth/session or /api/v1/auth/refresh-session
+ * Refreshes/generates a signed session token for the authenticated user
+ */
+router.post(["/session", "/refresh-session"], (req, res) => {
+  try {
+    const authUser = getAuthenticatedUserFromRequest(req);
+    if (!authUser) {
+      return res.status(401).json({
+        error: "Active authenticated session token is required to refresh session.",
+      });
+    }
+
+    const token = issueSessionToken(authUser);
+    res.json({
+      success: true,
+      token,
+      userId: authUser.id,
+      role: authUser.role,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 /**
@@ -137,7 +174,7 @@ router.post("/setup-admin", async (req, res) => {
  * GET /api/v1/admin/generate-key
  * Generates a 256-bit cryptographically secure AES key for database and backup encryption
  */
-router.get("/generate-key", async (req, res) => {
+router.get("/generate-key", requireAdmin, async (req, res) => {
   try {
     const key = await dbStore.generateEncryptionKey();
     res.json({
@@ -156,7 +193,7 @@ router.get("/generate-key", async (req, res) => {
  * POST /api/v1/admin/set-encryption-key
  * Re-encrypts the database disk storage with a new user-supplied or generated encryption key
  */
-router.post("/set-encryption-key", (req, res) => {
+router.post("/set-encryption-key", requireAdmin, (req, res) => {
   try {
     const { encryptionKey } = req.body;
     if (!encryptionKey || typeof encryptionKey !== "string" || encryptionKey.trim().length < 16) {
@@ -180,7 +217,7 @@ router.post("/set-encryption-key", (req, res) => {
  * GET /api/v1/admin/settings
  * Retrieves operational system, network, and integration settings
  */
-router.get("/settings", (req, res) => {
+router.get("/settings", requireAdmin, (req, res) => {
   try {
     const settings = dbStore.getSystemSettings();
     res.json(settings);
@@ -193,7 +230,7 @@ router.get("/settings", (req, res) => {
  * POST /api/v1/admin/settings
  * Updates operational system, network, and integration settings
  */
-router.post("/settings", (req, res) => {
+router.post("/settings", requireAdmin, (req, res) => {
   try {
     const updates = req.body || {};
     const updatedSettings = dbStore.updateSystemSettings(updates);
@@ -216,7 +253,7 @@ router.post("/settings", (req, res) => {
  * POST /api/v1/admin/test-gemini
  * Verifies connectivity of the configured Google Gemini API Key
  */
-router.post("/test-gemini", async (req, res) => {
+router.post("/test-gemini", requireAdmin, async (req, res) => {
   try {
     const { apiKey } = req.body;
     const keyToTest = (apiKey || process.env.GEMINI_API_KEY || "").trim();
@@ -268,7 +305,7 @@ router.post("/test-gemini", async (req, res) => {
  * GET /api/v1/admin/stats
  * Returns database health, encryption status, and entity counts
  */
-router.get("/stats", (req, res) => {
+router.get("/stats", requireAdmin, (req, res) => {
   try {
     const stats = dbStore.getHealthStats();
     res.json(stats);
@@ -282,7 +319,7 @@ router.get("/stats", (req, res) => {
  * Downloads full encrypted database snapshot.
  * Requires an encryption key to download.
  */
-router.get("/backup", (req, res) => {
+router.get("/backup", requireAdmin, (req, res) => {
   try {
     const key = (req.query.passphrase || req.query.key || "").trim();
 
@@ -310,7 +347,7 @@ router.get("/backup", (req, res) => {
  * Restores database from an uploaded encrypted package.
  * Requires the encryption key to decrypt and restore.
  */
-router.post("/restore", (req, res) => {
+router.post("/restore", requireAdmin, (req, res) => {
   try {
     const { backupPackage, passphrase, key, mode = "replace" } = req.body;
     const decryptionKey = (passphrase || key || "").trim();
@@ -336,7 +373,7 @@ router.post("/restore", (req, res) => {
  * POST /api/v1/admin/reset
  * Resets database to factory seed data or wipes it
  */
-router.post("/reset", (req, res) => {
+router.post("/reset", requireAdmin, (req, res) => {
   try {
     const { action = "seed" } = req.body;
     if (action === "wipe") {
@@ -352,9 +389,9 @@ router.post("/reset", (req, res) => {
 
 /**
  * GET /api/v1/admin/users
- * Returns list of household users with sanitized FIDO2 2FA status
+ * Returns list of household users with sanitized FIDO2 2FA status (Admin Protected)
  */
-router.get("/users", (req, res) => {
+router.get("/users", requireAdmin, (req, res) => {
   try {
     const isGlobalEnforced = dbStore.fido2Policy?.allUsersRequired ?? true;
     const safeUsers = dbStore.users.map(({ passwordHash, recoveryCodes, totpSecret, ...u }) => {
@@ -468,9 +505,9 @@ router.get("/nist-policy", (req, res) => {
 
 /**
  * POST /api/v1/admin/users
- * Creates a new user in the household with NIST SP 800-63B validation
+ * Creates a new user in the household with NIST SP 800-63B validation (Admin only)
  */
-router.post("/users", async (req, res) => {
+router.post("/users", requireAdmin, async (req, res) => {
   try {
     const { name, email, role, password, avatarUrl } = req.body;
     if (!name || !email) {
@@ -509,9 +546,9 @@ router.post("/users", async (req, res) => {
 
 /**
  * PUT /api/v1/admin/users/:id/role
- * Updates a user's role (ADMIN vs MEMBER)
+ * Updates a user's role (ADMIN vs MEMBER) - Admin only
  */
-router.put("/users/:id/role", (req, res) => {
+router.put("/users/:id/role", requireAdmin, (req, res) => {
   try {
     const { role } = req.body;
     if (!role) return res.status(400).json({ error: "Role is required" });
@@ -526,8 +563,12 @@ router.put("/users/:id/role", (req, res) => {
  * PUT /api/v1/admin/users/:id/avatar
  * Updates a user's profile avatar picture (URL or Base64 data URL)
  */
-router.put("/users/:id/avatar", (req, res) => {
+router.put("/users/:id/avatar", requireAuth, (req, res) => {
   try {
+    if (req.user.role !== "ADMIN" && req.user.id !== req.params.id) {
+      return res.status(403).json({ error: "You can only update your own avatar." });
+    }
+
     const { avatarUrl } = req.body;
     if (!avatarUrl) return res.status(400).json({ error: "Avatar URL is required" });
     const updated = dbStore.updateUserAvatar(req.params.id, avatarUrl);
@@ -541,8 +582,12 @@ router.put("/users/:id/avatar", (req, res) => {
  * PUT /api/v1/admin/users/:id/profile
  * Updates a user's display name and/or personal username/email
  */
-router.put("/users/:id/profile", (req, res) => {
+router.put("/users/:id/profile", requireAuth, (req, res) => {
   try {
+    if (req.user.role !== "ADMIN" && req.user.id !== req.params.id) {
+      return res.status(403).json({ error: "You can only update your own profile." });
+    }
+
     const { name, email, username } = req.body;
     const user = dbStore.users.find((u) => u.id === req.params.id);
     if (!user) return res.status(404).json({ error: "User not found" });
@@ -571,9 +616,9 @@ router.put("/users/:id/profile", (req, res) => {
 
 /**
  * DELETE /api/v1/admin/users/:id
- * Deletes a user/member from the household database
+ * Deletes a user/member from the household database (Admin only)
  */
-router.delete("/users/:id", (req, res) => {
+router.delete("/users/:id", requireAdmin, (req, res) => {
   try {
     const { id } = req.params;
     const result = dbStore.deleteUser(id);
@@ -614,9 +659,9 @@ router.delete("/users/:id", (req, res) => {
 
 /**
  * PUT /api/v1/admin/household/name
- * Renames the active kitchen/household
+ * Renames the active kitchen/household (Admin only - exclusive to Admin pane)
  */
-router.put("/household/name", (req, res) => {
+router.put("/household/name", requireAdmin, (req, res) => {
   try {
     const { name } = req.body;
     if (!name || !name.trim()) {
@@ -635,9 +680,9 @@ router.put("/household/name", (req, res) => {
 
 /**
  * POST /api/v1/admin/users/:id/password
- * Resets or updates a user's password with NIST SP 800-63B verification
+ * Resets or updates a user's password with NIST SP 800-63B verification (Admin only)
  */
-router.post("/users/:id/password", async (req, res) => {
+router.post("/users/:id/password", requireAdmin, async (req, res) => {
   try {
     const { password } = req.body;
     if (!password) return res.status(400).json({ error: "Password is required" });
@@ -851,7 +896,7 @@ router.post("/login", async (req, res) => {
     res.json({
       success: true,
       user,
-      token: `ptk_${Date.now()}_${Math.random().toString(36).substring(2)}`,
+      token: issueSessionToken(user),
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

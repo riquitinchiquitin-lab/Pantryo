@@ -3,6 +3,8 @@ import Tesseract from "tesseract.js";
 import { analyzeFoodImage, analyzeReceiptText, analyzeReceiptImage } from "../services/geminiVision.js";
 import { dbStore } from "../services/dbStore.js";
 import { analyzePackagingText } from "../services/packagingAnalyzer.js";
+import { requireAdmin } from "./admin.js";
+import { requireAuth } from "../services/sessionTokenService.js";
 
 const router = express.Router();
 
@@ -578,7 +580,15 @@ router.get("/household/:id", (req, res) => {
       household: {
         id: householdId,
         name: dbStore.household?.name || "The Yan & Kriz Kitchen",
-        members: USERS,
+        members: (dbStore.users || []).map((u) => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          avatarUrl: u.avatarUrl || "/avatars/chef-cat.svg",
+          fido2Enabled: Boolean(u.fido2Enabled && u.fido2Credentials?.length > 0),
+          totpEnabled: Boolean(u.totpEnabled && u.totpSecret),
+        })),
       },
       stats,
       grouped: {
@@ -1044,9 +1054,9 @@ router.post("/bulk-consume", (req, res) => {
 
 /**
  * PUT /api/v1/inventory/household-name
- * Updates household/kitchen name
+ * Updates household/kitchen name (Administrator Only - Exclusive to Admin Pane)
  */
-router.put("/household-name", (req, res) => {
+router.put("/household-name", requireAdmin, (req, res) => {
   try {
     const { name } = req.body;
     if (!name || !name.trim()) {

@@ -164,6 +164,11 @@ export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
       }
 
       if (result.success && result.verified) {
+        if (result.token) {
+          try {
+            localStorage.setItem('pantryo_auth_token', result.token);
+          } catch (_) {}
+        }
         setSuccessMessage(
           lang === 'FR'
             ? 'Authentification FIDO2 réussie !'
@@ -334,6 +339,11 @@ export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
       );
 
       if (result.success && result.verified) {
+        if (result.token) {
+          try {
+            localStorage.setItem('pantryo_auth_token', result.token);
+          } catch (_) {}
+        }
         setSuccessMessage(
           lang === 'FR'
             ? 'Code à 6 chiffres validé avec succès !'
@@ -374,6 +384,11 @@ export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
       );
 
       if (result.success && result.verified) {
+        if (result.token) {
+          try {
+            localStorage.setItem('pantryo_auth_token', result.token);
+          } catch (_) {}
+        }
         setSuccessMessage(
           lang === 'FR'
             ? 'Code de secours validé avec succès !'
