@@ -245,9 +245,21 @@ router.post("/test-gemini", async (req, res) => {
       reply,
     });
   } catch (err) {
+    const isQuotaExceeded =
+      err.message &&
+      (err.message.includes("resource_exhausted") ||
+        err.message.includes("quota") ||
+        err.message.includes("rate-limits") ||
+        err.message.includes("429"));
+
+    const friendlyError = isQuotaExceeded
+      ? "Quota ou limite d'appels de l'API Gemini atteinte (Resource Exhausted). Les moteurs hors-ligne et OCR restent 100% actifs. Veuillez vérifier vos quotas sur ai.google.dev."
+      : `Échec du test de clé Gemini: ${err.message || "Clé invalide."}`;
+
     res.status(400).json({
       success: false,
-      error: `Échec du test de clé Gemini: ${err.message || "Clé invalide ou quota dépassé."}`,
+      isQuotaExceeded: Boolean(isQuotaExceeded),
+      error: friendlyError,
     });
   }
 });
@@ -552,6 +564,70 @@ router.put("/users/:id/profile", (req, res) => {
     const updated = dbStore.updateUserProfile(req.params.id, newName, newUsername);
     const { passwordHash, recoveryCodes, totpSecret, ...safeUser } = updated;
     res.json(safeUser);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * DELETE /api/v1/admin/users/:id
+ * Deletes a user/member from the household database
+ */
+router.delete("/users/:id", (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = dbStore.deleteUser(id);
+
+    const isGlobalEnforced = dbStore.fido2Policy?.allUsersRequired ?? true;
+    const safeUsers = dbStore.users.map(({ passwordHash, recoveryCodes, totpSecret, ...u }) => {
+      const hasCreds = Boolean(u.fido2Enabled && u.fido2Credentials?.length > 0);
+      return {
+        ...u,
+        fido2Enabled: hasCreds,
+        fido2Enforced: isGlobalEnforced || Boolean(u.fido2Enforced),
+        totpEnabled: Boolean(u.totpEnabled && u.totpSecret),
+        isCompliant: hasCreds || Boolean(u.totpEnabled && u.totpSecret),
+        requiresEnrollment: !hasCreds && !u.totpEnabled,
+        mustChangePassword: Boolean(u.mustChangePassword),
+        mustSetupProfile: Boolean(u.mustSetupProfile),
+        isDefaultAdmin: Boolean(u.isDefaultAdmin),
+        fido2Credentials: (u.fido2Credentials || []).map((c) => ({
+          id: c.id,
+          friendlyName: c.friendlyName,
+          counter: c.counter,
+          deviceType: c.deviceType,
+          createdAt: c.createdAt,
+        })),
+        recoveryCodesRemaining: (u.recoveryCodes || []).length,
+      };
+    });
+
+    res.json({
+      success: true,
+      message: result.message,
+      users: safeUsers,
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * PUT /api/v1/admin/household/name
+ * Renames the active kitchen/household
+ */
+router.put("/household/name", (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: "Kitchen name is required." });
+    }
+    const result = dbStore.updateHouseholdName(name.trim());
+    res.json({
+      success: true,
+      message: `Kitchen name updated to "${result.household.name}"`,
+      household: result.household,
+    });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

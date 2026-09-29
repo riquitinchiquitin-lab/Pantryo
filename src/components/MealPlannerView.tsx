@@ -41,6 +41,7 @@ interface MealPlannerViewProps {
   onAddIngredientsToGrocery?: (ingredients: Array<{ name: string; quantity: number; unit: string; category?: string }>) => void;
   onOpenRecipes?: () => void;
   onNavigateToGrocery?: () => void;
+  onCookMeal?: (meal: PlannedMeal) => Promise<void> | void;
 }
 
 export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
@@ -53,6 +54,7 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
   onAddIngredientsToGrocery,
   onOpenRecipes,
   onNavigateToGrocery,
+  onCookMeal,
 }) => {
   const { t, lang } = useLanguage();
 
@@ -326,13 +328,17 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
   };
 
   const handleToggleCooked = async (meal: PlannedMeal) => {
-    await onUpdateMeal(meal.id, { isCooked: !meal.isCooked });
-    setSuccessToast(
-      meal.isCooked
-        ? (lang === 'FR' ? 'Marqué comme prévu' : 'Marked as planned')
-        : (lang === 'FR' ? '🎉 Repas marqué cuisiné !' : '🎉 Meal marked cooked!')
-    );
-    setTimeout(() => setSuccessToast(null), 3000);
+    if (onCookMeal) {
+      await onCookMeal(meal);
+    } else {
+      await onUpdateMeal(meal.id, { isCooked: !meal.isCooked });
+      setSuccessToast(
+        meal.isCooked
+          ? (lang === 'FR' ? 'Marqué comme prévu' : 'Marked as planned')
+          : (lang === 'FR' ? '🎉 Repas marqué cuisiné !' : '🎉 Meal marked cooked!')
+      );
+      setTimeout(() => setSuccessToast(null), 3000);
+    }
   };
 
   const handlePushMissingToGrocery = (meal: PlannedMeal) => {

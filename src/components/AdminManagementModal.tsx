@@ -39,6 +39,7 @@ import {
   Sparkles,
   Radio,
   Terminal,
+  ChefHat,
 } from 'lucide-react';
 import { User, DatabaseStats, DatabaseBackupPackage } from '../types';
 import { useLanguage } from '../utils/i18n';
@@ -113,6 +114,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
 
   // Proxmox & System Integration Settings State
   const [settings, setSettings] = useState<{
+    kitchenName: string;
     appUrl: string;
     geminiApiKey: string;
     hasGeminiKey: boolean;
@@ -125,6 +127,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     nodeEnv: string;
     updatedAt?: string | null;
   }>({
+    kitchenName: 'The Yan & Kriz Kitchen',
     appUrl: '',
     geminiApiKey: '',
     hasGeminiKey: false,
@@ -136,6 +139,8 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     dbEncryptionKey: '',
     nodeEnv: 'production',
   });
+  const [adminKitchenNameInput, setAdminKitchenNameInput] = useState('The Yan & Kriz Kitchen');
+  const [isSavingAdminKitchenName, setIsSavingAdminKitchenName] = useState(false);
   const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [showTunnelToken, setShowTunnelToken] = useState(false);
   const [showDbSettingsKey, setShowDbSettingsKey] = useState(false);
@@ -303,6 +308,10 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
       if (statsRes.ok && statsType.includes('application/json')) {
         const statsData = await statsRes.json();
         setStats(statsData);
+        if (statsData.household?.name) {
+          setAdminKitchenNameInput(statsData.household.name);
+          setSettings((prev) => ({ ...prev, kitchenName: statsData.household.name }));
+        }
       } else if (retryCount < 2) {
         setTimeout(() => fetchStatsAndUsers(retryCount + 1), 600);
         return;
@@ -401,9 +410,20 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
             : 'Successfully connected to Google Gemini!'),
       });
     } catch (err: any) {
+      const rawMsg = err.message || '';
+      const isQuota =
+        rawMsg.includes('resource_exhausted') ||
+        rawMsg.includes('quota') ||
+        rawMsg.includes('rate-limits');
+      const cleanMsg = isQuota
+        ? (lang === 'FR'
+            ? "Quota de l'API Gemini dépassé (Resource Exhausted). Les moteurs hors-ligne et OCR restent actifs."
+            : 'Gemini API quota exceeded. Offline and local OCR engines remain fully active.')
+        : (rawMsg || (lang === 'FR' ? 'Échec du test de connexion' : 'Connection test failed'));
+
       setGeminiTestResult({
         success: false,
-        message: err.message || (lang === 'FR' ? 'Échec du test de connexion' : 'Connection test failed'),
+        message: cleanMsg,
       });
     } finally {
       setIsTestingGemini(false);
@@ -802,6 +822,36 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
       setNewPasswordValue('');
       setStatusMessage({
         text: lang === 'FR' ? 'Mot de passe mis à jour avec succès' : 'Password updated successfully',
+        type: 'success',
+      });
+    } catch (err: any) {
+      setStatusMessage({ text: err.message, type: 'error' });
+    }
+  };
+
+  const handleDeleteUserFromAdmin = async (targetUser: User) => {
+    try {
+      const res = await fetch(`/api/v1/admin/users/${encodeURIComponent(targetUser.id)}`, {
+        method: 'DELETE',
+        headers: {
+          'x-user-role': currentUser.role,
+          'x-user-id': currentUser.id,
+        },
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to delete user');
+      }
+
+      const data = await res.json();
+      if (data.users) {
+        setUsersList(data.users);
+      } else {
+        setUsersList((prev) => prev.filter((u) => u.id !== targetUser.id));
+      }
+      setStatusMessage({
+        text: lang === 'FR' ? `Membre "${targetUser.name}" supprimé` : `Member "${targetUser.name}" deleted`,
         type: 'success',
       });
     } catch (err: any) {
@@ -1477,6 +1527,81 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                 </div>
               </div>
 
+              {/* Household & Kitchen Name Customization Banner */}
+              <div className="p-4 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-teal-800 text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <ChefHat className="w-5 h-5 text-teal-200" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-sm text-[#0D3B37]">
+                          {lang === 'FR' ? 'Personnalisation du Nom de la Cuisine' : 'Kitchen Name Customization'}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-teal-100 text-teal-800 border border-teal-200">
+                          KITCHEN_NAME
+                        </span>
+                      </div>
+                      <p className="text-[#527470] text-xs mt-0.5">
+                        {lang === 'FR'
+                          ? 'Personnalisez le nom affiché de votre cuisine dans toute l’application et sur les terminaux synchronisés.'
+                          : 'Customize the display name of your kitchen across all app views and synchronized clients.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1 border-t border-[#F0EBE1]">
+                  <input
+                    type="text"
+                    value={adminKitchenNameInput}
+                    onChange={(e) => setAdminKitchenNameInput(e.target.value)}
+                    placeholder="e.g. The Yan & Kriz Kitchen"
+                    className="flex-1 px-3.5 py-2 rounded-xl border border-[#D5CEBD] bg-[#FAF7EE] focus:bg-white focus:outline-teal-800 text-xs font-bold text-[#0D3B37]"
+                  />
+                  <button
+                    type="button"
+                    disabled={isSavingAdminKitchenName || !adminKitchenNameInput.trim()}
+                    onClick={async () => {
+                      if (!adminKitchenNameInput.trim()) return;
+                      setIsSavingAdminKitchenName(true);
+                      try {
+                        const res = await fetch('/api/v1/inventory/household-name', {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ name: adminKitchenNameInput.trim() }),
+                        });
+                        if (res.ok) {
+                          const data = await res.json();
+                          const saved = data.household?.name || adminKitchenNameInput.trim();
+                          setStats((prev) => ({
+                            ...prev,
+                            household: { ...prev.household, name: saved },
+                          }));
+                          setSettings((prev) => ({ ...prev, kitchenName: saved }));
+                          try {
+                            localStorage.setItem('kitchen_komrade_kitchen_name', saved);
+                          } catch (_) {}
+                          setStatusMessage({
+                            text: lang === 'FR' ? `Nom de cuisine mis à jour : "${saved}"` : `Kitchen name updated: "${saved}"`,
+                            type: 'success',
+                          });
+                        }
+                      } catch (err: any) {
+                        setStatusMessage({ text: err.message, type: 'error' });
+                      } finally {
+                        setIsSavingAdminKitchenName(false);
+                      }
+                    }}
+                    className="px-4 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>{isSavingAdminKitchenName ? '...' : (lang === 'FR' ? 'Enregistrer le nom' : 'Save Name')}</span>
+                  </button>
+                </div>
+              </div>
+
               {/* Global FIDO2 Policy Status Banner */}
               <div className="p-3.5 rounded-2xl bg-teal-50 border border-teal-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-teal-900">
                 <div className="flex items-center gap-2.5">
@@ -1629,6 +1754,18 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                             <Key className="w-3.5 h-3.5 text-teal-700" />
                             <span>{lang === 'FR' ? 'Changer mot de passe' : 'Change Password'}</span>
                           </button>
+
+                          {/* Delete User */}
+                          {usersList.length > 1 && !isCurrentUser && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteUserFromAdmin(u)}
+                              className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors cursor-pointer"
+                              title={lang === 'FR' ? `Supprimer ${u.name}` : `Delete ${u.name}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     );
@@ -2248,6 +2385,39 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
 
               {/* Settings Form */}
               <form onSubmit={handleSaveSettings} className="space-y-6">
+                {/* 0. Kitchen Display Name */}
+                <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-[#F0EBE1]">
+                    <div className="flex items-center gap-2">
+                      <ChefHat className="w-4 h-4 text-teal-800" />
+                      <h3 className="font-bold text-[#0D3B37] text-xs uppercase tracking-wider">
+                        {lang === 'FR' ? '0. Personnalisation du Nom de la Cuisine (KITCHEN_NAME)' : '0. Kitchen Name Customization (KITCHEN_NAME)'}
+                      </h3>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 text-teal-800 border border-teal-200">
+                      {lang === 'FR' ? 'Personnalisable' : 'Customizable'}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-[#0D3B37] block text-[11px]">
+                      {lang === 'FR' ? 'Nom Affiché de la Cuisine (KITCHEN_NAME)' : 'Kitchen Display Name (KITCHEN_NAME)'}
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.kitchenName || ''}
+                      onChange={(e) => setSettings({ ...settings, kitchenName: e.target.value })}
+                      placeholder="The Yan & Kriz Kitchen"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-[#D5CEBD] bg-[#FAF7EE] focus:bg-white focus:outline-teal-800 text-xs font-bold text-[#0D3B37]"
+                    />
+                    <p className="text-[10px] text-[#527470]">
+                      {lang === 'FR'
+                        ? 'Ce nom s’affiche dans toute l’application, sur mobile et dans le fichier .env (KITCHEN_NAME).'
+                        : 'This name appears across the entire app, on mobile clients, and is synced to your .env file (KITCHEN_NAME).'}
+                    </p>
+                  </div>
+                </div>
+
                 {/* 1. Public App URL & Port */}
                 <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-4">
                   <div className="flex items-center gap-2 pb-2 border-b border-[#F0EBE1]">

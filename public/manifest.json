@@ -47,22 +47,6 @@
       "purpose": "any"
     }
   ],
-  "screenshots": [
-    {
-      "src": "/screenshot-desktop.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Pantryo Smart Kitchen Dashboard"
-    },
-    {
-      "src": "/screenshot-mobile.png",
-      "sizes": "750x1334",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Pantryo Mobile Food Inventory & Scanner"
-    }
-  ],
   "categories": ["food", "lifestyle", "productivity", "utilities"],
   "shortcuts": [
     {

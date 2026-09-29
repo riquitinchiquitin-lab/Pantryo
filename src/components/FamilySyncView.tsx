@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Copy, Check, Shield, Clock, Plus, UserCheck, ArrowRightLeft, Key, ShieldAlert, ShieldCheck, Camera, LogOut, Download, Smartphone, CheckCircle2 } from 'lucide-react';
+import { Users, Copy, Check, Shield, Clock, Plus, UserCheck, ArrowRightLeft, Key, ShieldAlert, ShieldCheck, Camera, LogOut, Download, Smartphone, CheckCircle2, Edit3, Trash2, X, AlertTriangle, ChefHat } from 'lucide-react';
 import { User, ActivityLogItem } from '../types';
 import { useLanguage, getLocationLocalizedName } from '../utils/i18n';
 import { Fido2AuthModal } from './Fido2AuthModal';
@@ -14,6 +14,8 @@ interface FamilySyncViewProps {
   onLogout?: () => void;
   onInstall?: () => void;
   isInstalled?: boolean;
+  kitchenName?: string;
+  onDeleteMember?: (user: User) => Promise<void> | void;
 }
 
 export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
@@ -25,9 +27,13 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
   onLogout,
   onInstall,
   isInstalled = false,
+  kitchenName = 'The Yan & Kriz Kitchen',
+  onDeleteMember,
 }) => {
   const { t, lang } = useLanguage();
   const [copied, setCopied] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [isDeletingUser, setIsDeletingUser] = useState(false);
   const [authModal, setAuthModal] = useState<{
     isOpen: boolean;
     targetUser: User | null;
@@ -122,12 +128,12 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
 
       {/* Household Invite Box */}
       <div className="p-4 rounded-3xl bg-gradient-to-br from-[#EBF3E8] to-[#DEF0DC] border border-[#BFDEBA] shadow-sm space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-emerald-950 font-bold text-sm">
-            <Users className="w-4 h-4 text-emerald-700" />
-            <span>The Yan & Kriz Kitchen</span>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-emerald-950 font-bold text-sm min-w-0">
+            <Users className="w-4 h-4 text-emerald-700 shrink-0" />
+            <span className="truncate">{kitchenName || 'The Yan & Kriz Kitchen'}</span>
           </div>
-          <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-600 text-white font-semibold">
+          <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-600 text-white font-semibold shrink-0">
             {lang === 'FR' ? 'Foyer Actif' : 'Active Household'}
           </span>
         </div>
@@ -250,7 +256,22 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-sm text-[#233527] truncate">{member.name}</span>
-                      {isActive && <UserCheck className="w-4 h-4 text-emerald-600 shrink-0" />}
+                      <div className="flex items-center gap-1 shrink-0">
+                        {isActive && <UserCheck className="w-4 h-4 text-emerald-600 shrink-0" />}
+                        {onDeleteMember && members.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setUserToDelete(member);
+                            }}
+                            className="p-1 rounded-lg text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title={lang === 'FR' ? `Supprimer ${member.name}` : `Delete ${member.name}`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <span className="text-[11px] text-[#6C8470]">
                       {member.role === 'ADMIN'
@@ -418,6 +439,67 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
           ))}
         </div>
       </div>
+
+      {/* Delete User Confirmation Modal */}
+      {userToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl border border-[#D5E1D2] max-w-sm w-full p-5 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-sm text-slate-900">
+                  {lang === 'FR' ? `Supprimer "${userToDelete.name}" ?` : `Delete "${userToDelete.name}"?`}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {lang === 'FR'
+                    ? 'Ce membre sera définitivement retiré du foyer.'
+                    : 'This member will be permanently removed from this household.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-[11px] leading-tight">
+                {lang === 'FR'
+                  ? 'Les articles ajoutés par cet utilisateur resteront dans la cuisine. Cette action ne peut pas être annulée.'
+                  : 'Items previously added by this member will remain in the kitchen. This action cannot be undone.'}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setUserToDelete(null)}
+                disabled={isDeletingUser}
+                className="flex-1 py-2.5 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs cursor-pointer transition-colors"
+              >
+                {lang === 'FR' ? 'Annuler' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingUser}
+                onClick={async () => {
+                  if (!onDeleteMember || !userToDelete) return;
+                  setIsDeletingUser(true);
+                  try {
+                    await onDeleteMember(userToDelete);
+                    setUserToDelete(null);
+                  } finally {
+                    setIsDeletingUser(false);
+                  }
+                }}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs shadow-xs cursor-pointer transition-colors active:scale-95 flex items-center justify-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{isDeletingUser ? '...' : (lang === 'FR' ? 'Supprimer' : 'Delete')}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

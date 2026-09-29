@@ -577,7 +577,7 @@ router.get("/household/:id", (req, res) => {
       success: true,
       household: {
         id: householdId,
-        name: "The Yan & Kriz Kitchen",
+        name: dbStore.household?.name || "The Yan & Kriz Kitchen",
         members: USERS,
       },
       stats,
@@ -957,6 +957,110 @@ router.delete("/item/:id", (req, res) => {
   itemsStore = itemsStore.filter((i) => i.id !== id);
   syncItemsToEncryptedDisk();
   return res.status(200).json({ success: true, message: `Removed "${item.name}" from inventory.` });
+});
+
+/**
+ * POST /api/v1/inventory/bulk-delete
+ * Deletes multiple inventory items in a single atomic transaction
+ */
+router.post("/bulk-delete", (req, res) => {
+  try {
+    const { itemIds = [], userId = "usr_yan" } = req.body;
+    if (!Array.isArray(itemIds) || itemIds.length === 0) {
+      return res.status(400).json({ success: false, error: "No item IDs provided for deletion" });
+    }
+
+    const idSet = new Set(itemIds);
+    const beforeCount = itemsStore.length;
+    const deletedItems = itemsStore.filter((i) => idSet.has(i.id));
+    itemsStore = itemsStore.filter((i) => !idSet.has(i.id));
+    syncItemsToEncryptedDisk();
+
+    activityLogs.unshift({
+      id: `log_${Date.now()}`,
+      action: "ITEMS_BULK_DELETED",
+      details: {
+        count: deletedItems.length,
+        names: deletedItems.map((i) => i.name).slice(0, 3).join(", "),
+        deletedBy: userId,
+      },
+      userId,
+      householdId: SEED_HOUSEHOLD_ID,
+      createdAt: new Date().toISOString(),
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully removed ${deletedItems.length} item(s) from inventory.`,
+      deletedCount: deletedItems.length,
+      remainingCount: itemsStore.length,
+    });
+  } catch (err) {
+    console.error("[Inventory Route] /bulk-delete error:", err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/v1/inventory/bulk-consume
+ * Marks multiple items as used/consumed
+ */
+router.post("/bulk-consume", (req, res) => {
+  try {
+    const { itemIds = [], userId = "usr_yan" } = req.body;
+    if (!Array.isArray(itemIds) || itemIds.length === 0) {
+      return res.status(400).json({ success: false, error: "No item IDs provided for consumption" });
+    }
+
+    const idSet = new Set(itemIds);
+    const consumedItems = itemsStore.filter((i) => idSet.has(i.id));
+    itemsStore = itemsStore.filter((i) => !idSet.has(i.id));
+    syncItemsToEncryptedDisk();
+
+    activityLogs.unshift({
+      id: `log_${Date.now()}`,
+      action: "ITEMS_BULK_CONSUMED",
+      details: {
+        count: consumedItems.length,
+        names: consumedItems.map((i) => i.name).slice(0, 3).join(", "),
+        consumedBy: userId,
+      },
+      userId,
+      householdId: SEED_HOUSEHOLD_ID,
+      createdAt: new Date().toISOString(),
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Marked ${consumedItems.length} item(s) as used/consumed.`,
+      consumedCount: consumedItems.length,
+      remainingCount: itemsStore.length,
+    });
+  } catch (err) {
+    console.error("[Inventory Route] /bulk-consume error:", err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * PUT /api/v1/inventory/household-name
+ * Updates household/kitchen name
+ */
+router.put("/household-name", (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, error: "Kitchen name is required." });
+    }
+    const result = dbStore.updateHouseholdName(name.trim());
+    return res.status(200).json({
+      success: true,
+      message: `Kitchen name updated to "${result.household.name}"`,
+      household: result.household,
+    });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
 });
 
 /**

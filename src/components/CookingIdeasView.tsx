@@ -59,6 +59,10 @@ interface CookingIdeasViewProps {
   }) => void;
   onPlanMeal?: (meal: Omit<PlannedMeal, 'id' | 'createdAt' | 'updatedAt'>) => Promise<boolean>;
   onNavigateToMealPlanner?: () => void;
+  onCookRecipe?: (recipe: {
+    title: string;
+    ingredients: Array<{ name: string; amount?: string; nameFr?: string; quantity?: number; unit?: string }>;
+  }) => Promise<void> | void;
 }
 
 export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
@@ -66,6 +70,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
   onAddMissingToGrocery,
   onPlanMeal,
   onNavigateToMealPlanner,
+  onCookRecipe,
 }) => {
   const { lang, setLang } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
@@ -1404,6 +1409,26 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                       <Calendar className="w-3.5 h-3.5 text-teal-200" />
                       <span>{lang === 'FR' ? '📅 Planifier ce repas' : '📅 Plan this Meal'}</span>
                     </button>
+
+                    {/* Cook Recipe button */}
+                    {onCookRecipe && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const recipeTitle = (lang === 'FR' && recipe.titleFr ? recipe.titleFr : recipe.title);
+                          onCookRecipe({
+                            title: recipeTitle,
+                            ingredients: recipe.ingredients,
+                          });
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white border border-emerald-800 text-xs font-black flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                        title={lang === 'FR' ? 'Cuisiner et déduire les ingrédients de la cuisine' : 'Cook and deduct ingredients from inventory'}
+                      >
+                        <Utensils className="w-3.5 h-3.5 text-emerald-200" />
+                        <span>{lang === 'FR' ? '🍳 Cuisiner' : '🍳 Cook Recipe'}</span>
+                      </button>
+                    )}
                   </div>
 
                   {/* Minimise button */}

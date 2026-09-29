@@ -497,9 +497,10 @@ const DEFAULT_RECIPES = [
 
 class EncryptedDatabaseStore {
   constructor() {
+    const defaultKitchenName = (process.env.KITCHEN_NAME || process.env.PANTRYO_KITCHEN_NAME || "The Yan & Kriz Kitchen").trim();
     this.household = {
       id: SEED_HOUSEHOLD_ID,
-      name: "My Kitchen",
+      name: defaultKitchenName,
       inviteCode: "PANTRY-KITCHEN",
     };
     this.users = [...DEFAULT_USERS];
@@ -546,6 +547,9 @@ class EncryptedDatabaseStore {
       const sqliteSnapshot = sqlcipherService.loadSnapshot();
       if (sqliteSnapshot && Array.isArray(sqliteSnapshot.users) && sqliteSnapshot.users.length > 0) {
         this.household = sqliteSnapshot.household || this.household;
+        if (process.env.KITCHEN_NAME && process.env.KITCHEN_NAME.trim()) {
+          this.household.name = process.env.KITCHEN_NAME.trim();
+        }
         this.users = sqliteSnapshot.users;
         this.locations = sqliteSnapshot.locations || this.locations;
         this.categories = sqliteSnapshot.categories || this.categories;
@@ -787,6 +791,7 @@ class EncryptedDatabaseStore {
    */
   getSystemSettings() {
     return {
+      kitchenName: this.household?.name || process.env.KITCHEN_NAME || "The Yan & Kriz Kitchen",
       appUrl: this.systemSettings?.appUrl || process.env.APP_URL || "http://localhost:3000",
       geminiApiKey: this.systemSettings?.geminiApiKey || process.env.GEMINI_API_KEY || "",
       hasGeminiKey: Boolean(this.systemSettings?.geminiApiKey || process.env.GEMINI_API_KEY),
@@ -810,6 +815,12 @@ class EncryptedDatabaseStore {
     }
 
     const envSyncObj = {};
+
+    if (updates.kitchenName !== undefined && updates.kitchenName.trim()) {
+      const val = updates.kitchenName.trim();
+      this.updateHouseholdName(val);
+      envSyncObj.KITCHEN_NAME = val;
+    }
 
     if (updates.appUrl !== undefined) {
       const val = updates.appUrl.trim();
@@ -1204,6 +1215,41 @@ class EncryptedDatabaseStore {
     user.passwordHash = hashPassword(newPassword);
     this.persistToEncryptedDisk();
     return true;
+  }
+
+  updateHouseholdName(newName) {
+    if (!newName || !newName.trim()) {
+      throw new Error("Kitchen name cannot be empty");
+    }
+    const cleanName = newName.trim();
+    this.household.name = cleanName;
+    this.persistToEncryptedDisk();
+    // Sync KITCHEN_NAME to .env file for persistence across installs/restarts
+    syncEnvFile({ KITCHEN_NAME: cleanName });
+    return { success: true, household: this.household };
+  }
+
+  deleteUser(userId) {
+    const userIndex = this.users.findIndex((u) => u.id === userId);
+    if (userIndex === -1) {
+      throw new Error("User not found");
+    }
+    const userToDelete = this.users[userIndex];
+
+    if (this.users.length <= 1) {
+      throw new Error("Cannot delete the only remaining user in the household");
+    }
+
+    if (userToDelete.role === "ADMIN") {
+      const adminCount = this.users.filter((u) => u.role === "ADMIN").length;
+      if (adminCount <= 1) {
+        throw new Error("Cannot delete the only administrator. Promote another member to Admin first.");
+      }
+    }
+
+    this.users.splice(userIndex, 1);
+    this.persistToEncryptedDisk();
+    return { success: true, message: `User "${userToDelete.name}" deleted successfully` };
   }
 
   getHealthStats() {

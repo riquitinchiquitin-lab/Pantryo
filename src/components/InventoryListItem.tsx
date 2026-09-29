@@ -27,6 +27,8 @@ interface InventoryListItemProps {
   onDefrost: (item: InventoryItem) => void;
   isDefrosting: boolean;
   lang: 'EN' | 'FR';
+  isSelected?: boolean;
+  onToggleSelect?: () => void;
 }
 
 export const InventoryListItem: React.FC<InventoryListItemProps> = ({
@@ -40,6 +42,8 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
   onDefrost,
   isDefrosting,
   lang,
+  isSelected = false,
+  onToggleSelect,
 }) => {
   const isFreezer = item.locationType === 'FREEZER';
   const daysLeft = item.daysUntilExpiration;
@@ -55,8 +59,27 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
         onClick={onToggleExpand}
         className="p-2 sm:p-2.5 rounded-2xl bg-white border border-[#D5E1D2] hover:border-emerald-300 shadow-2xs hover:shadow-xs transition-all flex items-center justify-between gap-2.5 cursor-pointer group select-none"
       >
-        {/* Left: Circle Quick-Consume + Food Badge + Title & Qty */}
-        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+        {/* Left: Select Checkbox + Circle Quick-Consume + Food Badge + Title & Qty */}
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          {/* Multi-selection Checkbox */}
+          {onToggleSelect && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleSelect();
+              }}
+              className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-all cursor-pointer ${
+                isSelected
+                  ? 'bg-teal-700 border-teal-700 text-white shadow-2xs'
+                  : 'border-slate-300 hover:border-teal-500 bg-slate-50/80 hover:bg-teal-50'
+              }`}
+              title={lang === 'FR' ? (isSelected ? 'Désélectionner' : 'Sélectionner') : (isSelected ? 'Deselect' : 'Select')}
+            >
+              {isSelected ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : null}
+            </button>
+          )}
+
           {/* Empty circle check button */}
           <button
             id={`consume-btn-${item.id}`}
@@ -125,7 +148,25 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
       className="p-3.5 rounded-3xl bg-white border border-[#D5E1D2] shadow-xs space-y-3 cursor-pointer transition-all animate-fade-in"
     >
       {/* Top Row: Food Image/Icon + Title + Quantity & Category Pill + Location Badge */}
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-2.5">
+        {onToggleSelect && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleSelect();
+            }}
+            className={`w-6 h-6 mt-1 rounded-lg border flex items-center justify-center shrink-0 transition-all cursor-pointer ${
+              isSelected
+                ? 'bg-teal-700 border-teal-700 text-white shadow-2xs'
+                : 'border-slate-300 hover:border-teal-500 bg-slate-50/80 hover:bg-teal-50'
+            }`}
+            title={lang === 'FR' ? (isSelected ? 'Désélectionner' : 'Sélectionner') : (isSelected ? 'Deselect' : 'Select')}
+          >
+            {isSelected ? <Check className="w-4 h-4 stroke-[3]" /> : null}
+          </button>
+        )}
+
         {/* Food Type Image & Icon Badge */}
         <div className="shrink-0">
           <FoodVisualBadge

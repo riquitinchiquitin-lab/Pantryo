@@ -46,11 +46,13 @@ import {
   FileText,
   X,
   LogOut,
+  Info,
 } from 'lucide-react';
 import { InventoryItem, User, PlannedMeal, StorageType } from '../types';
 import { FoodVisualBadge } from './FoodVisualBadge';
 import { InventoryListItem } from './InventoryListItem';
 import { getFoodVisual, ALL_FOOD_CATEGORIES, ALL_SUB_CATEGORIES, ALL_MEAT_SEAFOOD_SUBCATEGORIES } from '../utils/foodVisuals';
+import { deductRecipeFromInventory } from '../utils/recipeCooker';
 import { CameraScannerModal } from './CameraScannerModal';
 import { AddEditItemModal } from './AddEditItemModal';
 import { ImportLeftoverModal } from './ImportLeftoverModal';
@@ -307,6 +309,272 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   const [isBentoCompact, setIsBentoCompact] = useState<boolean>(true);
   const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(new Set());
 
+  // Kitchen Name State (customizable in app or .env)
+  const [kitchenName, setKitchenName] = useState<string>(() => {
+    try {
+      const stored = localStorage.getItem('kitchen_komrade_kitchen_name');
+      if (stored) return stored;
+    } catch (_) {}
+    return (typeof import.meta !== 'undefined' && import.meta.env?.VITE_KITCHEN_NAME) || 'The Yan & Kriz Kitchen';
+  });
+  // Multi-Selection State & Actions
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [isBulkConsuming, setIsBulkConsuming] = useState(false);
+
+  const toggleSelectItem = (id: string) => {
+    setSelectedItemIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    const visibleIds = filteredItems.map((i) => i.id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedItemIds.has(id));
+    if (allSelected) {
+      setSelectedItemIds(new Set());
+    } else {
+      setSelectedItemIds(new Set(visibleIds));
+    }
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedItemIds(new Set());
+  };
+
+  const handleBulkConsume = async () => {
+    if (selectedItemIds.size === 0) return;
+    setIsBulkConsuming(true);
+    const idsArray = Array.from(selectedItemIds);
+    try {
+      const res = await fetch('/api/v1/inventory/bulk-consume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          itemIds: idsArray,
+          userId: currentUser?.id || 'usr_yan',
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setItems((prev) => prev.filter((i) => !selectedItemIds.has(i.id)));
+        setBannerNotice(
+          lang === 'FR'
+            ? `✨ ${idsArray.length} article(s) marqué(s) comme utilisé(s) / consommé(s) !`
+            : `✨ Marked ${idsArray.length} item(s) as used/consumed!`
+        );
+        setTimeout(() => setBannerNotice(null), 3500);
+        setSelectedItemIds(new Set());
+      }
+    } catch (err) {
+      console.error('Bulk consume failed:', err);
+    } finally {
+      setIsBulkConsuming(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedItemIds.size === 0) return;
+    setIsBulkDeleting(true);
+    const idsArray = Array.from(selectedItemIds);
+    try {
+      const res = await fetch('/api/v1/inventory/bulk-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          itemIds: idsArray,
+          userId: currentUser?.id || 'usr_yan',
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setItems((prev) => prev.filter((i) => !selectedItemIds.has(i.id)));
+        setBannerNotice(
+          lang === 'FR'
+            ? `🗑️ ${idsArray.length} article(s) retiré(s) de l'inventaire.`
+            : `🗑️ Removed ${idsArray.length} item(s) from inventory.`
+        );
+        setTimeout(() => setBannerNotice(null), 3500);
+        setSelectedItemIds(new Set());
+        setShowBulkDeleteConfirm(false);
+      }
+    } catch (err) {
+      console.error('Bulk delete failed:', err);
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
+  const handleDeleteUser = async (userToDelete: User) => {
+    try {
+      const res = await fetch(`/api/v1/admin/users/${encodeURIComponent(userToDelete.id)}`, {
+        method: 'DELETE',
+        headers: {
+          'x-user-role': currentUser?.role || 'ADMIN',
+          'x-user-id': currentUser?.id || 'usr_yan',
+        },
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to delete user');
+      }
+
+      const data = await res.json();
+      const updatedMembers = data.users || householdMembers.filter((m) => m.id !== userToDelete.id);
+      setHouseholdMembers(updatedMembers);
+      try {
+        localStorage.setItem(LOCAL_STORAGE_MEMBERS_KEY, JSON.stringify(updatedMembers));
+      } catch (_) {}
+
+      // If active user was deleted, switch to next admin/member
+      if (currentUser?.id === userToDelete.id) {
+        const nextUser = updatedMembers.find((m: User) => m.role === 'ADMIN') || updatedMembers[0] || DEFAULT_MEMBERS[0];
+        setCurrentUser(nextUser);
+        try {
+          localStorage.setItem(LOCAL_STORAGE_ACTIVE_USER_ID, nextUser.id);
+        } catch (_) {}
+      }
+
+      setBannerNotice(
+        lang === 'FR'
+          ? `Membre "${userToDelete.name}" supprimé avec succès.`
+          : `Member "${userToDelete.name}" successfully deleted.`
+      );
+      setTimeout(() => setBannerNotice(null), 3500);
+    } catch (e: any) {
+      console.error('Error deleting user:', e);
+      setBannerNotice(`❌ ${e.message}`);
+      setTimeout(() => setBannerNotice(null), 4000);
+    }
+  };
+
+  const handleCookMealAndDeduct = async (meal: PlannedMeal) => {
+    const willBeCooked = !meal.isCooked;
+    await handleUpdateMeal(meal.id, { isCooked: willBeCooked });
+
+    if (willBeCooked && meal.ingredients && meal.ingredients.length > 0) {
+      const outcome = deductRecipeFromInventory(
+        meal.ingredients,
+        items,
+        meal.title
+      );
+
+      for (const update of outcome.itemsToUpdate) {
+        fetch(`/api/v1/inventory/item/${encodeURIComponent(update.id)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            quantity: update.quantity,
+            unit: update.unit,
+            notes: update.notes,
+            userId: currentUser?.id || 'usr_yan',
+          }),
+        }).catch((e) => console.warn('Item partial update failed:', e));
+      }
+
+      for (const deleteId of outcome.itemsToDelete) {
+        fetch(`/api/v1/inventory/item/${encodeURIComponent(deleteId)}`, {
+          method: 'DELETE',
+        }).catch((e) => console.warn('Item deletion failed:', e));
+      }
+
+      setItems(outcome.updatedInventory);
+
+      if (outcome.deductions.length > 0) {
+        const deductionSummary = outcome.deductions
+          .map((d) =>
+            d.wasFullyDepleted
+              ? `${d.inventoryItemName} (${lang === 'FR' ? 'épuisé' : 'depleted'})`
+              : `${d.inventoryItemName} (${d.remainingQuantity} ${d.remainingUnit} ${lang === 'FR' ? 'restant' : 'left'})`
+          )
+          .join(', ');
+
+        setBannerNotice(
+          lang === 'FR'
+            ? `🍳 Recette cuisinée ! Ingrédients déduits : ${deductionSummary}`
+            : `🍳 Recipe cooked! Ingredients deducted: ${deductionSummary}`
+        );
+      } else {
+        setBannerNotice(
+          lang === 'FR'
+            ? `🎉 Repas "${meal.title}" marqué cuisiné !`
+            : `🎉 Meal "${meal.title}" marked cooked!`
+        );
+      }
+      setTimeout(() => setBannerNotice(null), 5000);
+    } else {
+      setBannerNotice(
+        willBeCooked
+          ? (lang === 'FR' ? '🎉 Repas marqué cuisiné !' : '🎉 Meal marked cooked!')
+          : (lang === 'FR' ? 'Marqué comme prévu' : 'Marked as planned')
+      );
+      setTimeout(() => setBannerNotice(null), 3000);
+    }
+  };
+
+  const handleCookRecipeDirectly = async (recipe: {
+    title: string;
+    ingredients: Array<{ name: string; amount?: string; nameFr?: string; quantity?: number; unit?: string }>;
+  }) => {
+    const outcome = deductRecipeFromInventory(
+      recipe.ingredients,
+      items,
+      recipe.title
+    );
+
+    for (const update of outcome.itemsToUpdate) {
+      fetch(`/api/v1/inventory/item/${encodeURIComponent(update.id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quantity: update.quantity,
+          unit: update.unit,
+          notes: update.notes,
+          userId: currentUser?.id || 'usr_yan',
+        }),
+      }).catch((e) => console.warn('Item partial update failed:', e));
+    }
+
+    for (const deleteId of outcome.itemsToDelete) {
+      fetch(`/api/v1/inventory/item/${encodeURIComponent(deleteId)}`, {
+        method: 'DELETE',
+      }).catch((e) => console.warn('Item deletion failed:', e));
+    }
+
+    setItems(outcome.updatedInventory);
+
+    if (outcome.deductions.length > 0) {
+      const deductionSummary = outcome.deductions
+        .map((d) =>
+          d.wasFullyDepleted
+            ? `${d.inventoryItemName} (${lang === 'FR' ? 'épuisé' : 'depleted'})`
+            : `${d.inventoryItemName} (${d.remainingQuantity} ${d.remainingUnit} ${lang === 'FR' ? 'restant' : 'left'})`
+        )
+        .join(', ');
+
+      setBannerNotice(
+        lang === 'FR'
+          ? `🍳 Cuisiné avec succès ! Ingrédients déduits : ${deductionSummary}`
+          : `🍳 Successfully cooked! Ingredients deducted: ${deductionSummary}`
+      );
+    } else {
+      setBannerNotice(
+        lang === 'FR'
+          ? `🍳 Cuisiné ! Aucun ingrédient de votre cuisine n'a été déduit.`
+          : `🍳 Cooked! No matching kitchen ingredients to deduct.`
+      );
+    }
+    setTimeout(() => setBannerNotice(null), 5000);
+  };
+
   const toggleExpandItem = (id: string) => {
     setExpandedItemIds((prev) => {
       const next = new Set(prev);
@@ -401,8 +669,16 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
       });
       if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
         const data = await res.json();
-        if (data.success && data.allItems) {
-          setItems(data.allItems);
+        if (data.success) {
+          if (data.allItems) {
+            setItems(data.allItems);
+          }
+          if (data.household?.name) {
+            setKitchenName(data.household.name);
+            try {
+              localStorage.setItem('kitchen_komrade_kitchen_name', data.household.name);
+            } catch (_) {}
+          }
         }
       }
     } catch (err) {
@@ -706,49 +982,48 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
       {/* App Top Bar - Ultra-compact, spacious on tablet and desktop, zero overlapping or text-wrapping */}
       <div className="px-3 sm:px-5 py-1.5 sm:py-2.5 pt-[max(0.5rem,env(safe-area-inset-top,0px))] bg-[#FAF7EE] border-b border-[#E8E2D5] shrink-0">
         <div className="flex items-center justify-between gap-2 lg:gap-4 max-w-7xl mx-auto w-full">
-          {/* 1. Left: Logo & Kitchen Name (Clickable Admin Console Trigger) */}
-          <button
-            id="btn-pantryo-admin-management"
-            onClick={() => {
-              if (currentUser.role === 'ADMIN') {
-                setIsAdminModalOpen(true);
-              } else {
-                setIsAdminRestrictedOpen(true);
+          {/* 1. Left: Logo (Admin Console Trigger) & Kitchen Name Customizer */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <button
+              id="btn-pantryo-admin-management"
+              onClick={() => {
+                if (currentUser.role === 'ADMIN') {
+                  setIsAdminModalOpen(true);
+                } else {
+                  setIsAdminRestrictedOpen(true);
+                }
+              }}
+              className="flex items-center gap-1.5 sm:gap-2 shrink-0 hover:opacity-90 active:scale-98 transition-all cursor-pointer p-1 -m-1 rounded-2xl hover:bg-[#F2ECE0]/60 group text-left"
+              title={
+                currentUser.role === 'ADMIN'
+                  ? lang === 'FR'
+                    ? 'Ouvrir la Console d’Administration & Sauvegarde (Admin)'
+                    : 'Open App & Database Administration (Admin)'
+                  : lang === 'FR'
+                  ? 'Console Pantryo (Accès Administrateur requis)'
+                  : 'Pantryo Console (Admin Access Required)'
               }
-            }}
-            className="flex items-center gap-2 sm:gap-2.5 shrink-0 hover:opacity-90 active:scale-98 transition-all cursor-pointer p-1 -m-1 rounded-2xl hover:bg-[#F2ECE0]/60 group text-left"
-            title={
-              currentUser.role === 'ADMIN'
-                ? lang === 'FR'
-                  ? 'Ouvrir la Console d’Administration & Sauvegarde (Admin)'
-                  : 'Open App & Database Administration (Admin)'
-                : lang === 'FR'
-                ? 'Console Pantryo (Accès Administrateur requis)'
-                : 'Pantryo Console (Admin Access Required)'
-            }
-          >
-            <div className="shrink-0 flex items-center justify-center transition-transform group-hover:scale-105">
-              <PantryoLogo size={28} />
-            </div>
-            <div className="shrink-0">
-              <div className="flex items-center gap-1.5">
-                <h1 className="text-sm sm:text-base font-black tracking-tight text-[#0D3B37] leading-none whitespace-nowrap">
-                  Pantryo
-                </h1>
-                {currentUser.role === 'ADMIN' ? (
-                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-teal-100 text-teal-800 border border-teal-200">
-                    <ShieldCheck className="w-2.5 h-2.5" />
-                    <span>Admin</span>
-                  </span>
-                ) : (
-                  <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse shrink-0" />
-                )}
+            >
+              <div className="shrink-0 flex items-center justify-center transition-transform group-hover:scale-105">
+                <PantryoLogo size={28} />
               </div>
-              <p className="text-[10px] sm:text-[11px] text-[#527470] font-medium leading-tight mt-0.5 whitespace-nowrap hidden sm:block md:hidden xl:block">
-                {lang === 'FR' ? 'La Cuisine de Yan & Kriz' : 'The Yan & Kriz Kitchen'}
-              </p>
-            </div>
-          </button>
+              <div className="shrink-0">
+                <div className="flex items-center gap-1">
+                  <h1 className="text-sm sm:text-base font-black tracking-tight text-[#0D3B37] leading-none whitespace-nowrap">
+                    Pantryo
+                  </h1>
+                  {currentUser.role === 'ADMIN' ? (
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-teal-100 text-teal-800 border border-teal-200">
+                      <ShieldCheck className="w-2.5 h-2.5" />
+                      <span className="hidden xs:inline">Admin</span>
+                    </span>
+                  ) : (
+                    <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse shrink-0" />
+                  )}
+                </div>
+              </div>
+            </button>
+          </div>
 
           {/* 2. Center: Navigation Bar (shown on md+ screens, centered, zero wrapping, responsive labels) */}
           <nav aria-label="Main Navigation" className="hidden md:flex items-center gap-0.5 lg:gap-1 p-1 bg-white/95 rounded-2xl border border-[#E0D9C8] shadow-2xs shrink-0">
@@ -1436,30 +1711,56 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 </button>
               </ScrollableRow>
 
-              {/* Bento Layout Switcher (Grid vs List) */}
-              <div className="flex items-center gap-0.5 p-1 bg-white border border-[#D5E1D2] rounded-xl shrink-0 shadow-2xs">
+              {/* Multi-selection toggle & Bento Layout Switcher */}
+              <div className="flex items-center gap-1.5 shrink-0">
                 <button
-                  onClick={() => setBentoViewMode('grid')}
-                  title={lang === 'FR' ? 'Mode Grille Bento' : 'Bento Grid Mode'}
-                  className={`p-1.5 rounded-lg transition-all ${
-                    bentoViewMode === 'grid'
-                      ? 'bg-[#233527] text-white shadow-xs'
-                      : 'text-[#5C715F] hover:text-[#233527]'
+                  type="button"
+                  onClick={handleSelectAll}
+                  className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs ${
+                    selectedItemIds.size > 0
+                      ? 'bg-teal-700 text-white border-teal-700'
+                      : 'bg-white border-[#D5E1D2] text-[#4F6553] hover:bg-[#EAF1E8]'
                   }`}
+                  title={
+                    filteredItems.length > 0 && filteredItems.every((i) => selectedItemIds.has(i.id))
+                      ? (lang === 'FR' ? 'Tout désélectionner' : 'Deselect All')
+                      : (lang === 'FR' ? 'Tout sélectionner' : 'Select All')
+                  }
                 >
-                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <CheckCheck className="w-3.5 h-3.5" />
+                  <span className="hidden xs:inline">
+                    {selectedItemIds.size > 0
+                      ? `(${selectedItemIds.size})`
+                      : lang === 'FR'
+                      ? 'Sélectionner'
+                      : 'Select'}
+                  </span>
                 </button>
-                <button
-                  onClick={() => setBentoViewMode('list')}
-                  title={lang === 'FR' ? 'Mode Liste Bento' : 'Bento List Mode'}
-                  className={`p-1.5 rounded-lg transition-all ${
-                    bentoViewMode === 'list'
-                      ? 'bg-[#233527] text-white shadow-xs'
-                      : 'text-[#5C715F] hover:text-[#233527]'
-                  }`}
-                >
-                  <List className="w-3.5 h-3.5" />
-                </button>
+
+                <div className="flex items-center gap-0.5 p-1 bg-white border border-[#D5E1D2] rounded-xl shadow-2xs">
+                  <button
+                    onClick={() => setBentoViewMode('grid')}
+                    title={lang === 'FR' ? 'Mode Grille Bento' : 'Bento Grid Mode'}
+                    className={`p-1.5 rounded-lg transition-all ${
+                      bentoViewMode === 'grid'
+                        ? 'bg-[#233527] text-white shadow-xs'
+                        : 'text-[#5C715F] hover:text-[#233527]'
+                    }`}
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setBentoViewMode('list')}
+                    title={lang === 'FR' ? 'Mode Liste Bento' : 'Bento List Mode'}
+                    className={`p-1.5 rounded-lg transition-all ${
+                      bentoViewMode === 'list'
+                        ? 'bg-[#233527] text-white shadow-xs'
+                        : 'text-[#5C715F] hover:text-[#233527]'
+                    }`}
+                  >
+                    <List className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1496,7 +1797,11 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                   return (
                     <div
                       key={item.id}
-                      className="p-2.5 rounded-3xl bg-white border border-[#D5E1D2] shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between group"
+                      className={`p-2.5 rounded-3xl bg-white transition-all flex flex-col justify-between group relative border ${
+                        selectedItemIds.has(item.id)
+                          ? 'border-teal-600 ring-2 ring-teal-600/40 shadow-sm bg-teal-50/10'
+                          : 'border-[#D5E1D2] shadow-2xs hover:shadow-xs'
+                      }`}
                     >
                       {/* Top Bento Image Frame with corner badges */}
                       <div
@@ -1504,18 +1809,48 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                         className="relative w-full h-24 rounded-2xl overflow-hidden bg-slate-100 mb-2 border border-[#E7EFE6] cursor-pointer"
                         title="Click to edit item"
                       >
+                        {/* Multi-selection Checkbox button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleSelectItem(item.id);
+                          }}
+                          className={`absolute top-1.5 left-1.5 z-10 w-6 h-6 rounded-lg border flex items-center justify-center transition-all cursor-pointer shadow-xs ${
+                            selectedItemIds.has(item.id)
+                              ? 'bg-teal-700 border-teal-700 text-white'
+                              : 'bg-white/90 backdrop-blur-xs border-slate-300 hover:border-teal-600 text-transparent hover:text-slate-400'
+                          }`}
+                          title={
+                            lang === 'FR'
+                              ? selectedItemIds.has(item.id)
+                                ? 'Désélectionner'
+                                : 'Sélectionner'
+                              : selectedItemIds.has(item.id)
+                              ? 'Deselect'
+                              : 'Select'
+                          }
+                        >
+                          <Check
+                            className={`w-3.5 h-3.5 stroke-[3] ${
+                              selectedItemIds.has(item.id)
+                                ? 'text-white'
+                                : 'opacity-0 hover:opacity-50 text-slate-600'
+                            }`}
+                          />
+                        </button>
                         <img
                           src={item.imageUrl || visual.defaultImage}
                           alt={item.name}
                           referrerPolicy="no-referrer"
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
-                        {/* Top-left Category Icon Pill */}
+                        {/* Top-left Category Icon Pill (offset right from checkbox) */}
                         <div
-                          className={`absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-lg text-[9px] font-extrabold flex items-center gap-1 backdrop-blur-md shadow-2xs border ${visual.bgColor} ${visual.textColor} ${visual.borderColor}`}
+                          className={`absolute top-1.5 left-9 px-1.5 py-0.5 rounded-lg text-[9px] font-extrabold flex items-center gap-1 backdrop-blur-md shadow-2xs border ${visual.bgColor} ${visual.textColor} ${visual.borderColor}`}
                         >
                           <CategoryIcon className="w-2.5 h-2.5" />
-                          <span className="truncate max-w-[60px]">
+                          <span className="truncate max-w-[55px]">
                             {getCategoryLocalizedName(item.categoryName, lang)}
                           </span>
                         </div>
@@ -1682,6 +2017,8 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                     item={item}
                     isExpanded={expandedItemIds.has(item.id)}
                     onToggleExpand={() => toggleExpandItem(item.id)}
+                    isSelected={selectedItemIds.has(item.id)}
+                    onToggleSelect={() => toggleSelectItem(item.id)}
                     onConsume={handleConsumeItem}
                     onDelete={handleDeleteItem}
                     onEdit={handleOpenEditModal}
@@ -1691,6 +2028,69 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                     lang={lang}
                   />
                 ))}
+              </div>
+            )}
+
+            {/* FLOATING BATCH ACTION BAR (When items are selected) */}
+            {selectedItemIds.size > 0 && (
+              <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-lg bg-teal-950/95 backdrop-blur-md text-white rounded-2xl px-4 py-3 shadow-2xl border border-teal-700 flex items-center justify-between gap-3 animate-fade-in">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-7 h-7 rounded-xl bg-teal-700 flex items-center justify-center font-bold text-xs shrink-0">
+                    {selectedItemIds.size}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-black truncate">
+                      {lang === 'FR'
+                        ? `${selectedItemIds.size} article(s) sélectionné(s)`
+                        : `${selectedItemIds.size} item(s) selected`}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleSelectAll}
+                      className="text-[10px] text-teal-300 hover:text-white underline cursor-pointer truncate block text-left"
+                    >
+                      {filteredItems.length > 0 && filteredItems.every((i) => selectedItemIds.has(i.id))
+                        ? (lang === 'FR' ? 'Tout désélectionner' : 'Deselect all')
+                        : (lang === 'FR' ? `Tout sélectionner (${filteredItems.length})` : `Select all (${filteredItems.length})`)}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* Bulk Use / Consume */}
+                  <button
+                    type="button"
+                    onClick={handleBulkConsume}
+                    disabled={isBulkConsuming}
+                    className="py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-xs cursor-pointer disabled:opacity-50"
+                    title={lang === 'FR' ? 'Marquer comme utilisé / consommé' : 'Mark as used / consumed'}
+                  >
+                    <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    <span>{isBulkConsuming ? '...' : (lang === 'FR' ? 'Utiliser' : 'Use')}</span>
+                  </button>
+
+                  {/* Bulk Delete */}
+                  <button
+                    type="button"
+                    onClick={() => setShowBulkDeleteConfirm(true)}
+                    disabled={isBulkDeleting}
+                    className="py-1.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-xs cursor-pointer disabled:opacity-50"
+                    title={lang === 'FR' ? 'Supprimer de l’inventaire' : 'Delete from inventory'}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>{isBulkDeleting ? '...' : (lang === 'FR' ? 'Supprimer' : 'Delete')}</span>
+                  </button>
+
+                  {/* Cancel / Deselect */}
+                  <button
+                    type="button"
+                    onClick={handleDeselectAll}
+                    className="p-1.5 rounded-xl bg-teal-900 hover:bg-teal-800 text-teal-200 hover:text-white transition-colors cursor-pointer"
+                    title={lang === 'FR' ? 'Annuler' : 'Cancel'}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             )}
           </>
@@ -1721,6 +2121,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             onAddMeal={handleAddMeal}
             onUpdateMeal={handleUpdateMeal}
             onDeleteMeal={handleDeleteMeal}
+            onCookMeal={handleCookMealAndDeduct}
             onAddIngredientsToGrocery={(ingredients) => {
               ingredients.forEach((ing) => {
                 setGroceryItems((prev) => [
@@ -1755,6 +2156,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             items={items}
             onPlanMeal={handleAddMeal}
             onNavigateToMealPlanner={() => setActiveNav('meals')}
+            onCookRecipe={handleCookRecipeDirectly}
             onAddMissingToGrocery={(missing) => {
               setGroceryItems((prev) => [
                 {
@@ -1793,6 +2195,8 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             onLogout={handleLogout}
             onInstall={onInstall}
             isInstalled={isInstalledEffective}
+            kitchenName={kitchenName}
+            onDeleteMember={handleDeleteUser}
             onOpenAdmin={() => {
               if (currentUser.role === 'ADMIN') {
                 setIsAdminModalOpen(true);
@@ -2164,7 +2568,10 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
       {/* Admin App & Database Management Modal */}
       <AdminManagementModal
         isOpen={isAdminModalOpen}
-        onClose={() => setIsAdminModalOpen(false)}
+        onClose={() => {
+          setIsAdminModalOpen(false);
+          fetchInventory();
+        }}
         currentUser={currentUser}
         onUserChange={(newUser) => {
           setCurrentUser(newUser);
@@ -2262,6 +2669,63 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         initialTab="photo"
         initialPhotoBase64={recipeScanPhoto}
       />
+
+      {/* Bulk Delete Confirmation Modal */}
+      {showBulkDeleteConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl border border-[#D5E1D2] max-w-sm w-full p-5 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-sm text-slate-900">
+                  {lang === 'FR'
+                    ? `Supprimer ${selectedItemIds.size} article(s) ?`
+                    : `Delete ${selectedItemIds.size} item(s)?`}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {lang === 'FR'
+                    ? 'Cette action retirera ces articles de votre inventaire.'
+                    : 'This action will permanently remove these items from your inventory.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="max-h-36 overflow-y-auto space-y-1 p-2 bg-slate-50 rounded-xl border border-slate-200/80 text-xs">
+              {items
+                .filter((item) => selectedItemIds.has(item.id))
+                .map((item) => (
+                  <div key={item.id} className="flex items-center justify-between text-slate-700 py-0.5">
+                    <span className="truncate font-semibold">{item.name}</span>
+                    <span className="text-[10px] text-slate-400 shrink-0 ml-2">
+                      {item.quantity} {item.unit}
+                    </span>
+                  </div>
+                ))}
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowBulkDeleteConfirm(false)}
+                className="flex-1 py-2.5 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs cursor-pointer transition-colors"
+              >
+                {lang === 'FR' ? 'Annuler' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkDelete}
+                disabled={isBulkDeleting}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs shadow-xs cursor-pointer transition-colors active:scale-95 flex items-center justify-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{isBulkDeleting ? '...' : (lang === 'FR' ? 'Confirmer' : 'Delete')}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
