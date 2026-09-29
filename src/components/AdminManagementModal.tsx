@@ -1620,7 +1620,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                             </button>
                           </div>
                           <div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="font-bold text-sm text-[#0D3B37]">{u.name}</span>
                               {isAdmin ? (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-200">
@@ -1659,12 +1659,12 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           {/* Switch Active User */}
                           {onUserChange && !isCurrentUser && (
                             <button
                               onClick={() => onUserChange(u)}
-                              className="px-2.5 py-1 rounded-lg bg-[#FAF7EE] hover:bg-[#EFEAE0] text-[#0D3B37] border border-[#D5CEBD] font-bold text-xs flex items-center gap-1 cursor-pointer"
+                              className="px-2.5 py-1 rounded-lg bg-[#FAF7EE] hover:bg-[#EFEAE0] text-[#0D3B37] border border-[#D5CEBD] font-bold text-xs flex items-center gap-1 cursor-pointer shrink-0"
                               title={lang === 'FR' ? 'Basculer sur cette session' : 'Switch active session'}
                             >
                               <UserCheck className="w-3.5 h-3.5" />
@@ -1679,7 +1679,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                               setEditProfileName(u.name);
                               setEditProfileUsername(u.email);
                             }}
-                            className="px-2.5 py-1 rounded-lg bg-[#FAF7EE] hover:bg-[#EFEAE0] text-[#0D3B37] border border-[#D5CEBD] font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                            className="px-2.5 py-1 rounded-lg bg-[#FAF7EE] hover:bg-[#EFEAE0] text-[#0D3B37] border border-[#D5CEBD] font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors shrink-0"
                             title={lang === 'FR' ? 'Modifier le nom complet et l’identifiant' : 'Edit display name and username/email'}
                           >
                             <Edit2 className="w-3.5 h-3.5 text-teal-700" />
@@ -1689,7 +1689,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                           {/* Role Toggle Button */}
                           <button
                             onClick={() => handleUpdateRole(u.id, u.role)}
-                            className="px-2.5 py-1 rounded-lg bg-[#FAF7EE] hover:bg-[#EFEAE0] text-[#0D3B37] border border-[#D5CEBD] font-bold text-xs flex items-center gap-1 cursor-pointer"
+                            className="px-2.5 py-1 rounded-lg bg-[#FAF7EE] hover:bg-[#EFEAE0] text-[#0D3B37] border border-[#D5CEBD] font-bold text-xs flex items-center gap-1 cursor-pointer shrink-0"
                             title={lang === 'FR' ? 'Changer de rôle' : 'Toggle role'}
                           >
                             <Shield className="w-3.5 h-3.5 text-teal-700" />
@@ -1702,7 +1702,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                               setSelectedUserForPassword(u);
                               setNewPasswordValue('');
                             }}
-                            className="px-3 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-900 border border-teal-200 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                            className="px-2.5 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-900 border border-teal-200 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-colors shrink-0"
                             title={lang === 'FR' ? 'Modifier le mot de passe de ce membre' : 'Change password for this member'}
                           >
                             <Key className="w-3.5 h-3.5 text-teal-700" />
@@ -1714,10 +1714,10 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                             <button
                               type="button"
                               onClick={() => handleDeleteUserFromAdmin(u)}
-                              className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors cursor-pointer"
+                              className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors cursor-pointer shrink-0 flex items-center justify-center min-w-[32px] min-h-[30px]"
                               title={lang === 'FR' ? `Supprimer ${u.name}` : `Delete ${u.name}`}
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Trash2 className="w-3.5 h-3.5 shrink-0" />
                             </button>
                           )}
                         </div>

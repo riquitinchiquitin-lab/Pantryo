@@ -6,3 +6,12 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Runtime database, keys, and session meta
+server/data/*
+!server/data/.gitkeep
+*.enc
+*.db
+*.db-shm
+*.db-wal
+*.meta
