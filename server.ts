@@ -33,12 +33,12 @@ app.set("trust proxy", true);
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
-// Mount the Kitchen Komrade Backend APIs
-app.use("/api/v1/inventory", inventoryRouter);
-app.use("/api/v1/recipes", recipesRouter);
-app.use("/api/v1/admin", adminRouter);
-app.use("/api/v1/auth/fido2", authFido2Router);
-app.use("/api/v1/auth", adminRouter);
+// Mount the Kitchen Komrade Backend APIs (supports both /api/v1/* and /api/*)
+app.use(["/api/v1/inventory", "/api/inventory"], inventoryRouter);
+app.use(["/api/v1/recipes", "/api/recipes"], recipesRouter);
+app.use(["/api/v1/admin", "/api/admin"], adminRouter);
+app.use(["/api/v1/auth/fido2", "/api/auth/fido2"], authFido2Router);
+app.use(["/api/v1/auth", "/api/auth"], adminRouter);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {

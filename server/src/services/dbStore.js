@@ -116,9 +116,46 @@ const SERVER_MASTER_KEY = getActiveServerKey();
 
 const SEED_HOUSEHOLD_ID = "hh_pantryo_main";
 
-// Clean-install configuration: Zero saved users upon installation.
-// The user creates their personalized primary administrator account during initial onboarding.
-const DEFAULT_USERS = [];
+const DEFAULT_USERS = [
+  {
+    id: "usr_yan",
+    name: "Yan",
+    email: "yjsboily@gmail.com",
+    role: "ADMIN",
+    avatarUrl: "/avatars/chef-cat.svg",
+    fido2Enforced: false,
+    fido2Enabled: false,
+    mustChangePassword: false,
+    mustSetupProfile: false,
+    isDefaultAdmin: false,
+    fido2Credentials: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    totpEnabled: false,
+    isCompliant: true,
+    requiresEnrollment: false,
+    recoveryCodesRemaining: 5,
+  },
+  {
+    id: "usr_kriz",
+    name: "Kriz",
+    email: "kriz@home.local",
+    role: "MEMBER",
+    avatarUrl: "/avatars/av-female-1.svg",
+    fido2Enforced: false,
+    fido2Enabled: false,
+    mustChangePassword: false,
+    mustSetupProfile: false,
+    isDefaultAdmin: false,
+    fido2Credentials: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    totpEnabled: false,
+    isCompliant: true,
+    requiresEnrollment: false,
+    recoveryCodesRemaining: 5,
+  },
+];
 
 const DEFAULT_LOCATIONS = [
   { id: "loc_fridge", name: "Fridge", type: "FRIDGE", householdId: SEED_HOUSEHOLD_ID },
@@ -523,10 +560,8 @@ class EncryptedDatabaseStore {
         this.systemSettings = sqliteSnapshot.systemSettings || null;
 
         this.users = this.users.filter((u) => !u.isDefaultAdmin && u.id !== "usr_admin");
-        this.users.forEach((u) => {
-          u.fido2Enforced = true;
-        });
-        if (this.users.length === 0) {
+        const hasYan = this.users.some((u) => u.id === "usr_yan" || u.email === "yjsboily@gmail.com");
+        if (!hasYan || this.users.length === 0) {
           this.seedAdminFromEnvOrInstall();
         }
 
@@ -573,10 +608,8 @@ class EncryptedDatabaseStore {
 
           // Policy enforcement: all users must use FIDO2
           this.users = this.users.filter((u) => !u.isDefaultAdmin && u.id !== "usr_admin");
-          this.users.forEach((u) => {
-            u.fido2Enforced = true;
-          });
-          if (this.users.length === 0) {
+          const hasYan = this.users.some((u) => u.id === "usr_yan" || u.email === "yjsboily@gmail.com");
+          if (!hasYan || this.users.length === 0) {
             this.seedAdminFromEnvOrInstall();
           }
 
@@ -615,24 +648,53 @@ class EncryptedDatabaseStore {
   }
 
   seedAdminFromEnvOrInstall() {
-    if (!this.users || this.users.length === 0) {
-      const adminName = (process.env.PANTRYO_ADMIN_NAME || "Alex Johnson").trim();
-      const adminUsername = (process.env.PANTRYO_ADMIN_USERNAME || process.env.PANTRYO_ADMIN_EMAIL || "alex").trim().toLowerCase();
-      const adminPassword = (process.env.PANTRYO_ADMIN_PASSWORD || "PantryoSecure2026!").trim();
-      const adminAvatar = (process.env.PANTRYO_ADMIN_AVATAR || "/avatars/chef-cat.svg").trim();
+    const hasYan = this.users && this.users.some((u) => u.id === "usr_yan" || u.email === "yjsboily@gmail.com");
+    if (!hasYan) {
+      const adminUser = {
+        id: "usr_yan",
+        name: (process.env.PANTRYO_ADMIN_NAME || "Yan").trim(),
+        email: (process.env.PANTRYO_ADMIN_EMAIL || "yjsboily@gmail.com").trim().toLowerCase(),
+        role: "ADMIN",
+        passwordHash: hashPassword(process.env.PANTRYO_ADMIN_PASSWORD || "PantryoSecure2026!"),
+        avatarUrl: "/avatars/chef-cat.svg",
+        fido2Enforced: false,
+        fido2Enabled: false,
+        mustChangePassword: false,
+        mustSetupProfile: false,
+        isDefaultAdmin: false,
+        fido2Credentials: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        totpEnabled: false,
+        isCompliant: true,
+        requiresEnrollment: false,
+        recoveryCodesRemaining: 5,
+      };
 
-      const newAdmin = this.createUser(
-        adminName,
-        adminUsername,
-        "ADMIN",
-        adminPassword,
-        adminAvatar
-      );
-      newAdmin.mustChangePassword = false;
-      newAdmin.mustSetupProfile = false;
-      newAdmin.isDefaultAdmin = false;
-      newAdmin.fido2Enforced = false; // Allow standard login first, FIDO2 enrollment optional in Admin
-      console.log(`[Pantryo DB] Initialized administrator '${adminUsername}' (${adminName}) from install/environment settings.`);
+      const memberKriz = {
+        id: "usr_kriz",
+        name: "Kriz",
+        email: "kriz@home.local",
+        role: "MEMBER",
+        passwordHash: hashPassword("PantryoSecure2026!"),
+        avatarUrl: "/avatars/av-female-1.svg",
+        fido2Enforced: false,
+        fido2Enabled: false,
+        mustChangePassword: false,
+        mustSetupProfile: false,
+        isDefaultAdmin: false,
+        fido2Credentials: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        totpEnabled: false,
+        isCompliant: true,
+        requiresEnrollment: false,
+        recoveryCodesRemaining: 5,
+      };
+
+      this.users = [adminUser, memberKriz, ...(this.users || [])];
+      this.persistToEncryptedDisk();
+      console.log(`[Pantryo DB] Initialized household users 'Yan' and 'Kriz'.`);
     }
   }
 

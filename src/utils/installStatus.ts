@@ -7,8 +7,13 @@
 export function isAppInstalledOrStandalone(): boolean {
   if (typeof window === 'undefined') return false;
 
-  // Real standalone check (W3C standard)
-  const isStandaloneMedia = Boolean(window.matchMedia?.('(display-mode: standalone)').matches);
+  // Real standalone check (W3C standard display modes)
+  const isStandaloneMedia = Boolean(
+    window.matchMedia?.('(display-mode: standalone)').matches ||
+    window.matchMedia?.('(display-mode: fullscreen)').matches ||
+    window.matchMedia?.('(display-mode: minimal-ui)').matches ||
+    window.matchMedia?.('(display-mode: window-controls-overlay)').matches
+  );
 
   // iOS Safari Home Screen standalone mode
   const isIosStandalone = Boolean((window.navigator as any)?.standalone === true);
@@ -17,23 +22,34 @@ export function isAppInstalledOrStandalone(): boolean {
   const isAndroidReferrer = Boolean(
     typeof document !== 'undefined' &&
     typeof document.referrer === 'string' &&
-    document.referrer.includes('android-app://')
+    (document.referrer.includes('android-app://') || document.referrer.includes('app-installed'))
   );
 
-  // Explicit installed / standalone URL parameter
+  // Explicit installed / standalone URL parameter or hash
   const isInstalledUrlParam = Boolean(
     typeof window !== 'undefined' && (
       window.location.search.includes('installed=true') ||
-      window.location.search.includes('mode=standalone')
+      window.location.search.includes('mode=standalone') ||
+      window.location.hash.includes('installed=true') ||
+      window.location.hash.includes('standalone')
     )
   );
 
-  return Boolean(
-    isStandaloneMedia ||
-    isIosStandalone ||
-    isAndroidReferrer ||
-    isInstalledUrlParam
-  );
+  // Cached PWA installed state
+  let isLocalStorageInstalled = false;
+  try {
+    isLocalStorageInstalled = localStorage.getItem('pantryo_pwa_installed') === 'true';
+  } catch (_) {}
+
+  // If detected via query param or standalone media, cache to localStorage
+  if (isStandaloneMedia || isIosStandalone || isAndroidReferrer || isInstalledUrlParam) {
+    try {
+      localStorage.setItem('pantryo_pwa_installed', 'true');
+    } catch (_) {}
+    return true;
+  }
+
+  return Boolean(isLocalStorageInstalled);
 }
 
 /**

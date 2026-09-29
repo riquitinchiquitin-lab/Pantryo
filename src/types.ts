@@ -77,6 +77,18 @@ export interface InventoryItem {
   notes?: string | null;
   barcode?: string | null;
   imageUrl?: string | null;
+  brand?: string | null;
+  gradeOrigin?: string | null;
+  packagingFormat?: string | null;
+  dietaryBadges?: string[] | null;
+  netContent?: string | null;
+  unopenedLocation?: string | null;
+  openedLocation?: string | null;
+  unopenedShelfLifeDays?: number | null;
+  openedShelfLifeDays?: number | null;
+  storageTip?: string | null;
+  freezerTip?: string | null;
+  storageReason?: string | null;
   isLeftover?: boolean;
   leftoverFoodType?: string;
   leftoverSourceMeal?: string;
@@ -101,9 +113,19 @@ export interface ScannedItemCandidate {
   monthsFrozenShelfLife: number;
   confidence?: number;
   storageTip?: string;
+  freezerTip?: string;
   suggestedExpirationDate?: string;
   detectedText?: string;
   printedExpirationDate?: string;
+  gradeOrigin?: string;
+  packagingFormat?: string;
+  dietaryBadges?: string[];
+  netContent?: string;
+  unopenedLocation?: string;
+  openedLocation?: string;
+  unopenedShelfLifeDays?: number;
+  openedShelfLifeDays?: number;
+  imageUrl?: string;
 }
 
 export interface ScanResponse {

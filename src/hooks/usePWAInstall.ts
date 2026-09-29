@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { isAppInstalledOrStandalone } from '../utils/installStatus';
 
 export interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -20,6 +21,9 @@ if (typeof window !== 'undefined') {
 
   window.addEventListener('appinstalled', () => {
     console.log('[Pantryo PWA] App was successfully installed!');
+    try {
+      localStorage.setItem('pantryo_pwa_installed', 'true');
+    } catch (_) {}
     globalDeferredPrompt = null;
     promptListeners.forEach((listener) => listener(null));
   });
@@ -27,14 +31,7 @@ if (typeof window !== 'undefined') {
 
 export function usePWAInstall() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(() => globalDeferredPrompt);
-  const [isInstalled, setIsInstalled] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return Boolean(
-      window.matchMedia('(display-mode: standalone)').matches ||
-      window.matchMedia('(display-mode: fullscreen)').matches ||
-      (window.navigator as unknown as { standalone?: boolean }).standalone === true
-    );
-  });
+  const [isInstalled, setIsInstalled] = useState<boolean>(() => isAppInstalledOrStandalone());
   const [isIOS, setIsIOS] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     const userAgent = window.navigator.userAgent.toLowerCase();
@@ -44,11 +41,7 @@ export function usePWAInstall() {
 
   useEffect(() => {
     const checkInstalled = () => {
-      const standalone =
-        window.matchMedia('(display-mode: standalone)').matches ||
-        window.matchMedia('(display-mode: fullscreen)').matches ||
-        (window.navigator as unknown as { standalone?: boolean }).standalone === true;
-      setIsInstalled(standalone);
+      setIsInstalled(isAppInstalledOrStandalone());
     };
 
     checkInstalled();
@@ -65,6 +58,9 @@ export function usePWAInstall() {
     };
 
     const handleAppInstalled = () => {
+      try {
+        localStorage.setItem('pantryo_pwa_installed', 'true');
+      } catch (_) {}
       setIsInstalled(true);
       globalDeferredPrompt = null;
       setDeferredPrompt(null);
@@ -87,6 +83,9 @@ export function usePWAInstall() {
         await promptEvent.prompt();
         const { outcome } = await promptEvent.userChoice;
         if (outcome === 'accepted') {
+          try {
+            localStorage.setItem('pantryo_pwa_installed', 'true');
+          } catch (_) {}
           setIsInstalled(true);
           globalDeferredPrompt = null;
           setDeferredPrompt(null);
@@ -102,7 +101,7 @@ export function usePWAInstall() {
   };
 
   return {
-    isInstallable: Boolean(deferredPrompt || globalDeferredPrompt),
+    isInstallable: Boolean((deferredPrompt || globalDeferredPrompt) && !isInstalled),
     isInstalled,
     isIOS,
     install,

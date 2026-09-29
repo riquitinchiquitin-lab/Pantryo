@@ -290,7 +290,7 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <PWAInstallButton variant="pill" />
+          {!isInstalled && <PWAInstallButton variant="pill" />}
           <LanguageSwitcher />
         </div>
       </header>
@@ -314,8 +314,8 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
               </h2>
               <p className="text-xs text-[#527470]">
                 {lang === 'FR'
-                  ? 'Connectez-vous avec vos identifiants configurés lors de l’installation.'
-                  : 'Log in with the credentials configured during Proxmox installation.'}
+                  ? 'Connectez-vous pour accéder à votre cuisine et inventaire Pantryo.'
+                  : 'Log in to access your Pantryo kitchen inventory.'}
               </p>
             </div>
 
@@ -329,7 +329,7 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
                   required
                   value={directUsername}
                   onChange={(e) => setDirectUsername(e.target.value)}
-                  placeholder={lang === 'FR' ? 'Ex: alex ou alex@home.local' : 'e.g., alex or alex@home.local'}
+                  placeholder={lang === 'FR' ? 'Ex: yan ou yan@home.local' : 'e.g., yan or yan@home.local'}
                   className="w-full px-3.5 py-2.5 bg-[#FAF7EE] border border-[#E0D9C8] rounded-xl text-xs sm:text-sm text-[#0D3B37] focus:ring-2 focus:ring-teal-600 focus:bg-white focus:outline-hidden font-mono"
                 />
               </div>

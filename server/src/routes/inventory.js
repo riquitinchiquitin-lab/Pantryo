@@ -2,6 +2,7 @@ import express from "express";
 import Tesseract from "tesseract.js";
 import { analyzeFoodImage, analyzeReceiptText, analyzeReceiptImage } from "../services/geminiVision.js";
 import { dbStore } from "../services/dbStore.js";
+import { analyzePackagingText } from "../services/packagingAnalyzer.js";
 
 const router = express.Router();
 
@@ -186,71 +187,52 @@ router.post("/scan", async (req, res) => {
     const imageBuffer = Buffer.from(cleanBase64, "base64");
     let ocrText = "";
     try {
-      const ocrResult = await Tesseract.recognize(imageBuffer, "eng+fra+spa+tgl");
+      const ocrResult = await Tesseract.recognize(imageBuffer, "eng+fra");
       ocrText = ocrResult?.data?.text?.trim() || "";
     } catch (e) {
       console.warn("[Inventory Route] Tesseract food OCR error:", e.message);
     }
 
     if (ocrText && ocrText.length > 3) {
-      const lines = ocrText.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 2);
-      const firstLine = lines[0] || (language === "FR" ? "Aliment scanné" : "Scanned Item");
-      const cleanName = firstLine.replace(/[^a-zA-Z0-9\sÀ-ÿñÑ'-]/g, "").trim().slice(0, 45) || (language === "FR" ? "Aliment scanné" : "Scanned Item");
+      const insight = analyzePackagingText(ocrText, language);
+      const isFr = (language || "EN").toUpperCase() === "FR";
 
-      // Infer category & storage location from OCR text across FR, EN, ES, and TGL
-      const lower = ocrText.toLowerCase();
-      let category = language === "FR" ? "Garde-manger" : "Pantry Staples";
-      let recommendedLocation = "Pantry";
-      let shelfLife = 30;
+      const candidate = {
+        name: isFr ? insight.nameFr : insight.nameEn,
+        nameFr: insight.nameFr,
+        nameEn: insight.nameEn,
+        brand: insight.brand || undefined,
+        gradeOrigin: insight.gradeOrigin || undefined,
+        packagingFormat: isFr ? insight.packagingFormat : insight.packagingFormatEn,
+        dietaryBadges: insight.dietaryBadges,
+        netContent: insight.netContent || undefined,
+        category: isFr ? insight.category : insight.categoryEn,
+        quantity: insight.quantity,
+        unit: insight.unit,
+        recommendedLocation: insight.recommendedLocation,
+        unopenedLocation: insight.unopenedLocation,
+        openedLocation: insight.openedLocation,
+        unopenedShelfLifeDays: insight.unopenedShelfLifeDays,
+        openedShelfLifeDays: insight.openedShelfLifeDays,
+        estimatedShelfLifeDays: insight.estimatedShelfLifeDays,
+        monthsFrozenShelfLife: insight.monthsFrozenShelfLife,
+        storageReason: insight.storageReason,
+        storageTip: insight.storageTip,
+        freezerTip: insight.freezerTip,
+        confidence: insight.confidence,
+        suggestedExpirationDate: getRelativeDate(insight.estimatedShelfLifeDays).split("T")[0],
+        detectedText: ocrText.slice(0, 150),
+      };
 
-      // Dairy & Eggs: English, French, Spanish (leche/queso/huevo), Tagalog (gatas/keso/itlog)
-      if (/(lait|milk|beurre|butter|cream|crème|cheese|fromage|yogourt|yogurt|egg|oeuf|œuf|leche|mantequilla|crema|queso|yogur|huevo|huevos|gatas|mantikilya|keso|itlog)/.test(lower)) {
-        category = language === "FR" ? "Produits laitiers & œufs" : "Dairy & Eggs";
-        recommendedLocation = "Fridge";
-        shelfLife = 10;
-      // Meat & Seafood: English, French, Spanish (pollo/res/cerdo/pescado/camaron), Tagalog (manok/baka/baboy/isda/karne/bangus/hipon)
-      } else if (/(poulet|chicken|boeuf|bœuf|beef|porc|pork|saumon|salmon|poisson|fish|viande|meat|seafood|shrimp|pollo|res|carne|cerdo|pescado|mariscos|camaron|camarón|manok|baka|baboy|isda|karne|hipon|bangus|tilapia|longganisa|tocino)/.test(lower)) {
-        category = language === "FR" ? "Viandes & Poissons" : "Meat & Seafood";
-        recommendedLocation = "Fridge";
-        shelfLife = 4;
-      // Fresh Produce: English, French, Spanish (manzana/lechuga/tomate/zanahoria), Tagalog (gulay/kamatis/sibuyas/bawang/saging)
-      } else if (/(pomme|apple|salade|lettuce|tomate|tomato|carotte|carrot|légume|vegetable|fruit|épinard|spinach|manzana|ensalada|lechuga|zanahoria|verdura|fruta|espinaca|cebolla|ajo|papa|platano|plátano|gulay|kamatis|sibuyas|bawang|patatas|saging|kangkong|talong|luya|sili)/.test(lower)) {
-        category = language === "FR" ? "Produits frais" : "Produce";
-        recommendedLocation = "Fridge";
-        shelfLife = 7;
-      // Frozen Foods: English, French, Spanish (congelado/helado), Tagalog (pinalamig/sorbetes)
-      } else if (/(surgelé|surgele|frozen|glace|ice cream|congelado|helado|pinalamig|sorbetes)/.test(lower)) {
-        category = language === "FR" ? "Surgelés" : "Frozen Foods";
-        recommendedLocation = "Freezer";
-        shelfLife = 180;
-      // Bakery: English, French, Spanish (pan/panaderia), Tagalog (tinapay/pandesal)
-      } else if (/(pain|bread|boulangerie|bakery|croissant|bagel|pan|panaderia|panadería|bollo|tinapay|pandesal|ensaymada)/.test(lower)) {
-        category = language === "FR" ? "Boulangerie" : "Bakery";
-        recommendedLocation = "Pantry";
-        shelfLife = 5;
-      }
+      const summaryText = isFr
+        ? `Reconnu : ${candidate.name}${candidate.brand ? ` (${candidate.brand})` : ''} • ${candidate.quantity} ${candidate.unit}`
+        : `Recognized: ${candidate.name}${candidate.brand ? ` (${candidate.brand})` : ''} • ${candidate.quantity} ${candidate.unit}`;
 
       return res.status(200).json({
         success: true,
-        summary: language === "FR" ? `Étiquette reconnue par OCR : ${cleanName}` : `Label recognized by OCR: ${cleanName}`,
+        summary: summaryText,
         itemsCount: 1,
-        items: [
-          {
-            name: cleanName,
-            nameFr: cleanName,
-            nameEn: cleanName,
-            category,
-            quantity: 1,
-            unit: language === "FR" ? "unité" : "unit",
-            recommendedLocation,
-            storageReason: language === "FR" ? "Détecté d'après l'emballage" : "Detected from packaging label",
-            estimatedShelfLifeDays: shelfLife,
-            monthsFrozenShelfLife: 6,
-            confidence: 0.88,
-            suggestedExpirationDate: getRelativeDate(shelfLife).split("T")[0],
-            detectedText: ocrText.slice(0, 100),
-          },
-        ],
+        items: [candidate],
         scannedAt: new Date().toISOString(),
       });
     }
@@ -642,6 +624,18 @@ router.post("/item", (req, res) => {
       leftoverFoodType = null,
       leftoverSourceMeal = null,
       prepDate = null,
+      brand = null,
+      gradeOrigin = null,
+      packagingFormat = null,
+      dietaryBadges = null,
+      netContent = null,
+      unopenedLocation = null,
+      openedLocation = null,
+      unopenedShelfLifeDays = null,
+      openedShelfLifeDays = null,
+      storageTip = null,
+      freezerTip = null,
+      storageReason = null,
     } = req.body;
 
     if (!name || name.trim().length === 0) {
@@ -693,6 +687,18 @@ router.post("/item", (req, res) => {
       notes: notes || null,
       barcode: barcode || null,
       imageUrl: imageUrl || null,
+      brand: brand ? String(brand).trim() : null,
+      gradeOrigin: gradeOrigin ? String(gradeOrigin).trim() : null,
+      packagingFormat: packagingFormat ? String(packagingFormat).trim() : null,
+      dietaryBadges: Array.isArray(dietaryBadges) ? dietaryBadges : null,
+      netContent: netContent ? String(netContent).trim() : null,
+      unopenedLocation: unopenedLocation || null,
+      openedLocation: openedLocation || null,
+      unopenedShelfLifeDays: typeof unopenedShelfLifeDays === "number" ? unopenedShelfLifeDays : null,
+      openedShelfLifeDays: typeof openedShelfLifeDays === "number" ? openedShelfLifeDays : null,
+      storageTip: storageTip || null,
+      freezerTip: freezerTip || null,
+      storageReason: storageReason || null,
       isLeftover: Boolean(isLeftover),
       leftoverFoodType: leftoverFoodType || null,
       leftoverSourceMeal: leftoverSourceMeal || null,
@@ -838,6 +844,18 @@ router.put("/item/:id", (req, res) => {
       leftoverFoodType,
       leftoverSourceMeal,
       prepDate,
+      brand,
+      gradeOrigin,
+      packagingFormat,
+      dietaryBadges,
+      netContent,
+      unopenedLocation,
+      openedLocation,
+      unopenedShelfLifeDays,
+      openedShelfLifeDays,
+      storageTip,
+      freezerTip,
+      storageReason,
       userId = "usr_yan",
     } = req.body;
 
@@ -871,6 +889,18 @@ router.put("/item/:id", (req, res) => {
       expirationDate: expirationDate ? new Date(expirationDate).toISOString() : currentItem.expirationDate,
       notes: notes !== undefined ? notes : currentItem.notes,
       imageUrl: imageUrl !== undefined ? imageUrl : currentItem.imageUrl,
+      brand: brand !== undefined ? brand : currentItem.brand,
+      gradeOrigin: gradeOrigin !== undefined ? gradeOrigin : currentItem.gradeOrigin,
+      packagingFormat: packagingFormat !== undefined ? packagingFormat : currentItem.packagingFormat,
+      dietaryBadges: dietaryBadges !== undefined ? dietaryBadges : currentItem.dietaryBadges,
+      netContent: netContent !== undefined ? netContent : currentItem.netContent,
+      unopenedLocation: unopenedLocation !== undefined ? unopenedLocation : currentItem.unopenedLocation,
+      openedLocation: openedLocation !== undefined ? openedLocation : currentItem.openedLocation,
+      unopenedShelfLifeDays: unopenedShelfLifeDays !== undefined ? unopenedShelfLifeDays : currentItem.unopenedShelfLifeDays,
+      openedShelfLifeDays: openedShelfLifeDays !== undefined ? openedShelfLifeDays : currentItem.openedShelfLifeDays,
+      storageTip: storageTip !== undefined ? storageTip : currentItem.storageTip,
+      freezerTip: freezerTip !== undefined ? freezerTip : currentItem.freezerTip,
+      storageReason: storageReason !== undefined ? storageReason : currentItem.storageReason,
       isLeftover: isLeftover !== undefined ? Boolean(isLeftover) : currentItem.isLeftover,
       leftoverFoodType: leftoverFoodType !== undefined ? leftoverFoodType : currentItem.leftoverFoodType,
       leftoverSourceMeal: leftoverSourceMeal !== undefined ? leftoverSourceMeal : currentItem.leftoverSourceMeal,

@@ -79,8 +79,37 @@ const INITIAL_GROCERY_ITEMS: GroceryCartItem[] = [];
 const LOCAL_STORAGE_MEMBERS_KEY = 'kitchen_komrade_household_members';
 const LOCAL_STORAGE_ACTIVE_USER_ID = 'pantryo_active_user_id';
 
-// Clean installation: zero saved users upon installation.
-const DEFAULT_MEMBERS: User[] = [];
+// Default household members for Pantryo
+const DEFAULT_MEMBERS: User[] = [
+  {
+    id: 'usr_yan',
+    name: 'Yan',
+    email: 'yjsboily@gmail.com',
+    role: 'ADMIN',
+    avatarUrl: '/avatars/chef-cat.svg',
+    fido2Enabled: false,
+    fido2Enforced: false,
+    isCompliant: true,
+    requiresEnrollment: false,
+    mustChangePassword: false,
+    mustSetupProfile: false,
+    isDefaultAdmin: false,
+  },
+  {
+    id: 'usr_kriz',
+    name: 'Kriz',
+    email: 'kriz@home.local',
+    role: 'MEMBER',
+    avatarUrl: '/avatars/av-female-1.svg',
+    fido2Enabled: false,
+    fido2Enforced: false,
+    isCompliant: true,
+    requiresEnrollment: false,
+    mustChangePassword: false,
+    mustSetupProfile: false,
+    isDefaultAdmin: false,
+  },
+];
 
 function getStoredMembers(): User[] {
   try {
@@ -88,30 +117,26 @@ function getStoredMembers(): User[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // Strip out any default mock accounts
-        const realMembers = parsed.filter((u: User) => !u.isDefaultAdmin && u.id !== 'usr_admin');
-        if (realMembers.length > 0) {
-          return realMembers;
-        }
+        return parsed;
       }
     }
   } catch (e) {
     console.error('Failed reading household members from localStorage:', e);
   }
-  return [];
+  return DEFAULT_MEMBERS;
 }
 
-function getInitialActiveUser(members: User[]): User | null {
+function getInitialActiveUser(members: User[]): User {
   try {
     const savedId = localStorage.getItem(LOCAL_STORAGE_ACTIVE_USER_ID);
     if (savedId) {
-      const found = members.find((m) => m.id === savedId && !m.isDefaultAdmin && m.id !== 'usr_admin');
+      const found = members.find((m) => m.id === savedId);
       if (found) return found;
     }
   } catch (e) {
     console.error('Failed reading active user from localStorage:', e);
   }
-  return null;
+  return members[0] || DEFAULT_MEMBERS[0];
 }
 
 interface MobileSimulatorProps {
@@ -194,33 +219,23 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
     return getInitialActiveUser(list);
   });
 
-  // Strict enforcement: When installed, purge any template mock users and ensure clean slate
+  // When installed, preserve household session and ensure seamless continuity
   useEffect(() => {
     if (isInstalledEffective) {
       try {
-        const raw = localStorage.getItem(LOCAL_STORAGE_MEMBERS_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) {
-            const purged = parsed.filter((u: User) => !u.isDefaultAdmin && u.id !== 'usr_admin');
-            if (purged.length !== parsed.length) {
-              if (purged.length === 0) {
-                localStorage.removeItem(LOCAL_STORAGE_MEMBERS_KEY);
-                localStorage.removeItem(LOCAL_STORAGE_ACTIVE_USER_ID);
-                setHouseholdMembers([]);
-                setCurrentUser(null);
-              } else {
-                localStorage.setItem(LOCAL_STORAGE_MEMBERS_KEY, JSON.stringify(purged));
-                setHouseholdMembers(purged);
-              }
-            }
+        localStorage.setItem('pantryo_pwa_installed', 'true');
+        const active = currentUser || householdMembers[0] || DEFAULT_MEMBERS[0];
+        if (active) {
+          localStorage.setItem(LOCAL_STORAGE_ACTIVE_USER_ID, active.id);
+          if (!currentUser) {
+            setCurrentUser(active);
           }
         }
       } catch (e) {
-        console.warn('Error purging mock users in installed mode:', e);
+        console.warn('Error saving installed state:', e);
       }
     }
-  }, [isInstalledEffective]);
+  }, [isInstalledEffective, currentUser, householdMembers]);
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);

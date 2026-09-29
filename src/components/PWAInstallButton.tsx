@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Download, Share, PlusSquare, CheckCircle2, X, Smartphone, Sparkles } from 'lucide-react';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 import { useLanguage } from '../utils/i18n';
+import { isAppInstalledOrStandalone } from '../utils/installStatus';
 
 interface PWAInstallButtonProps {
   className?: string;
@@ -17,14 +18,9 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
   const [showIOSModal, setShowIOSModal] = useState(false);
   const [showGeneralModal, setShowGeneralModal] = useState(false);
 
-  // If already running as installed standalone PWA, hide or return null
-  if (isInstalled) {
-    return (
-      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-900/10 text-teal-800 text-[11px] font-bold border border-teal-700/20 ${className}`}>
-        <CheckCircle2 className="w-3 h-3 text-teal-700" />
-        <span>{lang === 'FR' ? 'Appli installée' : 'App Installed'}</span>
-      </div>
-    );
+  // If already running as installed standalone PWA, completely hide button and badge
+  if (isInstalled || isAppInstalledOrStandalone()) {
+    return null;
   }
 
   const handleInstallClick = () => {

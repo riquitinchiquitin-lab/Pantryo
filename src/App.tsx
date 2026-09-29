@@ -12,6 +12,7 @@ function AppContent() {
   const { t, lang } = useLanguage();
 
   const handleInstallClick = async () => {
+    if (isInstalled) return;
     if (isInstallable) {
       const installed = await install();
       if (!installed) {
@@ -27,13 +28,13 @@ function AppContent() {
       <main className="flex-1 w-full flex justify-center sm:py-6">
         <MobileSimulator
           mode="webapp"
-          onInstall={handleInstallClick}
+          onInstall={isInstalled ? undefined : handleInstallClick}
           isInstalled={isInstalled}
         />
       </main>
 
       {/* PWA Install Guidance Modal (Phone & Desktop Instructions) */}
-      {showInstallModal && (
+      {!isInstalled && showInstallModal && (
         <div className="fixed inset-0 z-50 bg-[#FAF7EE] flex flex-col w-full h-full overflow-hidden text-[#133E3B] animate-fade-in">
           <div className="px-5 py-3.5 bg-white border-b border-[#E8E2D5] flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2.5">

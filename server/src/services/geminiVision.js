@@ -1,4 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
+import Tesseract from "tesseract.js";
+import { parseQuebecReceiptText } from "./quebecReceiptParser.js";
+import { analyzePackagingText } from "./packagingAnalyzer.js";
 
 /**
  * Pantryo - Gemini Flash Vision Service
@@ -188,6 +191,43 @@ Always respond with structured JSON following the specified schema. If multiple 
                 type: Type.STRING,
                 description: "Practical tip to preserve freshness and avoid waste",
               },
+              gradeOrigin: {
+                type: Type.STRING,
+                description: "Grade, origin, or certification (e.g. 'CANADA No. 1 • PRODUIT DU QUÉBEC', 'Aliments du Québec')",
+              },
+              packagingFormat: {
+                type: Type.STRING,
+                description: "Physical packaging type (e.g. 'Perforated plastic produce bag', 'Metal can / Tin', 'Tetra Pak carton with resealable cap')",
+              },
+              dietaryBadges: {
+                type: Type.ARRAY,
+                description: "List of nutrition, dietary or safety claims (e.g. ['60% Moins de sodium', 'Sans BPA', 'Aliments du Québec'])",
+                items: { type: Type.STRING },
+              },
+              netContent: {
+                type: Type.STRING,
+                description: "Printed net weight, volume, or count (e.g. '1.36 kg / 3 lb', '680 mL', '900 mL')",
+              },
+              unopenedLocation: {
+                type: Type.STRING,
+                description: "Recommended compartment before opening (e.g. 'Pantry' or 'Fridge')",
+              },
+              openedLocation: {
+                type: Type.STRING,
+                description: "Recommended compartment after opening (e.g. 'Fridge')",
+              },
+              unopenedShelfLifeDays: {
+                type: Type.INTEGER,
+                description: "Shelf life in days before opening",
+              },
+              openedShelfLifeDays: {
+                type: Type.INTEGER,
+                description: "Shelf life in days after opening",
+              },
+              freezerTip: {
+                type: Type.STRING,
+                description: "Practical tip for freezing this food item",
+              },
             },
             required: [
               "name",
@@ -317,21 +357,42 @@ Always respond with structured JSON following the specified schema. If multiple 
         barcodeStr = null;
       }
 
+      // Enrich with packagingAnalyzer intelligence for deep completeness
+      const packagingInsight = analyzePackagingText(
+        [item.name, item.brand, item.detectedText].filter(Boolean).join(" "),
+        language
+      );
+
       return {
         ...item,
-        name: item.name || "Grocery Item",
-        brand: item.brand ? String(item.brand).trim() : undefined,
+        name: item.name || packagingInsight.name,
+        nameFr: item.nameFr || packagingInsight.nameFr,
+        nameEn: item.nameEn || packagingInsight.nameEn,
+        brand: (item.brand ? String(item.brand).trim() : null) || packagingInsight.brand,
+        gradeOrigin: (item.gradeOrigin ? String(item.gradeOrigin).trim() : null) || packagingInsight.gradeOrigin,
+        packagingFormat: (item.packagingFormat ? String(item.packagingFormat).trim() : null) || (language === "FR" ? packagingInsight.packagingFormat : packagingInsight.packagingFormatEn),
+        dietaryBadges: Array.isArray(item.dietaryBadges) && item.dietaryBadges.length > 0 ? item.dietaryBadges : packagingInsight.dietaryBadges,
+        netContent: (item.netContent ? String(item.netContent).trim() : null) || packagingInsight.netContent,
         barcode: barcodeStr || undefined,
-        detectedText: item.detectedText ? String(item.detectedText).trim() : undefined,
+        detectedText: item.detectedText ? String(item.detectedText).trim() : packagingInsight.detectedText,
         printedExpirationDate: printedDateStr || undefined,
-        quantity: typeof item.quantity === "number" && item.quantity > 0 ? item.quantity : 1,
-        unit: item.unit || "pcs",
+        quantity: typeof item.quantity === "number" && item.quantity > 0 ? item.quantity : packagingInsight.quantity,
+        unit: item.unit || packagingInsight.unit,
+        category: item.category || (language === "FR" ? packagingInsight.category : packagingInsight.categoryEn),
         recommendedLocation: ["Fridge", "Pantry", "Freezer"].includes(item.recommendedLocation)
           ? item.recommendedLocation
-          : "Fridge",
-        estimatedShelfLifeDays: days,
+          : packagingInsight.recommendedLocation,
+        unopenedLocation: item.unopenedLocation || packagingInsight.unopenedLocation,
+        openedLocation: item.openedLocation || packagingInsight.openedLocation,
+        unopenedShelfLifeDays: typeof item.unopenedShelfLifeDays === "number" ? item.unopenedShelfLifeDays : packagingInsight.unopenedShelfLifeDays,
+        openedShelfLifeDays: typeof item.openedShelfLifeDays === "number" ? item.openedShelfLifeDays : packagingInsight.openedShelfLifeDays,
+        estimatedShelfLifeDays: days || packagingInsight.estimatedShelfLifeDays,
         suggestedExpirationDate: targetExp.toISOString().split("T")[0],
-        monthsFrozenShelfLife: typeof item.monthsFrozenShelfLife === "number" ? item.monthsFrozenShelfLife : 6,
+        monthsFrozenShelfLife: typeof item.monthsFrozenShelfLife === "number" ? item.monthsFrozenShelfLife : packagingInsight.monthsFrozenShelfLife,
+        storageTip: item.storageTip || packagingInsight.storageTip,
+        freezerTip: item.freezerTip || packagingInsight.freezerTip,
+        storageReason: item.storageReason || packagingInsight.storageReason,
+        confidence: typeof item.confidence === "number" ? item.confidence : packagingInsight.confidence,
       };
     });
 
@@ -352,7 +413,13 @@ Always respond with structured JSON following the specified schema. If multiple 
  * Intelligent rule-based offline fallback parser for receipt text
  * Used when GEMINI_API_KEY is not yet configured or if API is unreachable.
  */
-function parseReceiptTextFallback(receiptText) {
+function parseReceiptTextFallback(receiptText, language = "FR") {
+  // First, run high-precision Canadian / Quebec supermarket parser
+  const specializedItems = parseQuebecReceiptText(receiptText, language);
+  if (specializedItems && specializedItems.length > 0) {
+    return specializedItems;
+  }
+
   const lines = receiptText
     .split(/\r?\n/)
     .map((l) => l.trim())
@@ -808,7 +875,29 @@ export async function analyzeReceiptImage(base64Data, mimeType = "image/jpeg", l
   );
 
   if (!isApiKeyConfigured) {
-    console.info("[Pantryo Receipt Image] GEMINI_API_KEY is not configured. Returning demonstration receipt items.");
+    console.info("[Pantryo Receipt Image] GEMINI_API_KEY is not configured. Running high-accuracy local OCR on receipt photo.");
+    try {
+      const imageBuffer = Buffer.from(cleanBase64, "base64");
+      const ocrResult = await Tesseract.recognize(imageBuffer, "eng+fra+spa+tgl");
+      const ocrText = ocrResult?.data?.text?.trim() || "";
+      if (ocrText && ocrText.length > 5) {
+        const parsedItems = parseReceiptTextFallback(ocrText, language);
+        if (parsedItems && parsedItems.length > 0) {
+          return {
+            success: true,
+            summary: language === "FR"
+              ? `Numérisation du reçu réussie (${parsedItems.length} article(s) détecté(s)).`
+              : `Successfully scanned receipt (${parsedItems.length} item(s) recognized).`,
+            itemsCount: parsedItems.length,
+            items: parsedItems,
+            scannedAt: new Date().toISOString(),
+          };
+        }
+      }
+    } catch (ocrErr) {
+      console.warn("[Pantryo Receipt Image] Local OCR note:", ocrErr.message);
+    }
+
     const now = new Date();
     const demoItems = [
       {
@@ -1060,6 +1149,28 @@ INSTRUCTIONS:
   }
 
   if (!response || !response.text) {
+    console.warn("[Pantryo Receipt Image] Gemini Vision failed, attempting local OCR fallback:", lastError?.message);
+    try {
+      const imageBuffer = Buffer.from(cleanBase64, "base64");
+      const ocrResult = await Tesseract.recognize(imageBuffer, "eng+fra+spa+tgl");
+      const ocrText = ocrResult?.data?.text?.trim() || "";
+      if (ocrText && ocrText.length > 5) {
+        const parsedItems = parseReceiptTextFallback(ocrText, language);
+        if (parsedItems && parsedItems.length > 0) {
+          return {
+            success: true,
+            summary: language === "FR"
+              ? `Numérisation du reçu réussie (${parsedItems.length} article(s) détecté(s)).`
+              : `Extracted ${parsedItems.length} item(s) from receipt photograph via OCR.`,
+            itemsCount: parsedItems.length,
+            items: parsedItems,
+            scannedAt: new Date().toISOString(),
+          };
+        }
+      }
+    } catch (e) {
+      console.warn("[Pantryo Receipt Image] Local fallback OCR also failed:", e.message);
+    }
     throw lastError || new Error("Failed to extract receipt items from image.");
   }
 

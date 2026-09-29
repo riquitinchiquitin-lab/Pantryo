@@ -41,6 +41,19 @@ interface SessionItem {
   categoryName: string;
   notes?: string;
   addedAt: string;
+  brand?: string;
+  gradeOrigin?: string;
+  packagingFormat?: string;
+  dietaryBadges?: string[];
+  netContent?: string;
+  unopenedLocation?: string;
+  openedLocation?: string;
+  unopenedShelfLifeDays?: number;
+  openedShelfLifeDays?: number;
+  storageTip?: string;
+  freezerTip?: string;
+  imageUrl?: string;
+  confidence?: number;
 }
 
 const SAMPLE_PRESETS = [
@@ -160,6 +173,9 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
     });
   };
 
+  // State for inspecting extracted details
+  const [inspectingItem, setInspectingItem] = useState<SessionItem | null>(null);
+
   // Save single candidate to backend API and notify parent
   const saveCandidateToInventory = async (candidate: ScannedItemCandidate): Promise<InventoryItem> => {
     const days = candidate.estimatedShelfLifeDays || 7;
@@ -193,6 +209,19 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
       notes,
       barcode: candidate.barcode || null,
       addedById: currentUser.id,
+      brand: candidate.brand || null,
+      gradeOrigin: candidate.gradeOrigin || null,
+      packagingFormat: candidate.packagingFormat || null,
+      dietaryBadges: candidate.dietaryBadges || null,
+      netContent: candidate.netContent || null,
+      unopenedLocation: candidate.unopenedLocation || null,
+      openedLocation: candidate.openedLocation || null,
+      unopenedShelfLifeDays: candidate.unopenedShelfLifeDays || null,
+      openedShelfLifeDays: candidate.openedShelfLifeDays || null,
+      storageTip: candidate.storageTip || null,
+      freezerTip: candidate.freezerTip || null,
+      storageReason: candidate.storageReason || null,
+      imageUrl: candidate.imageUrl || null,
     };
 
     const res = await fetch('/api/v1/inventory/item', {
@@ -214,8 +243,8 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
     setActiveJobsCount((prev) => prev + 1);
     showToast(
       lang === 'FR'
-        ? '⚡ Photo en cours de lecture en arrière-plan...'
-        : '⚡ Reading photo in background...',
+        ? '⚡ Photo en cours d’analyse (IA & OCR)...'
+        : '⚡ Analyzing photo (AI & OCR)...',
       'info',
       8000
     );
@@ -252,9 +281,12 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
       const addedThisBatch: SessionItem[] = [];
       for (const itemCandidate of items) {
         try {
+          // Attach image thumbnail
+          itemCandidate.imageUrl = compressedDataUrl;
           const savedItem = await saveCandidateToInventory(itemCandidate);
           onItemAdded(savedItem);
-          addedThisBatch.push({
+
+          const sessionEntry: SessionItem = {
             id: savedItem.id,
             name: savedItem.name,
             quantity: savedItem.quantity,
@@ -263,7 +295,22 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
             categoryName: itemCandidate.category || 'Produce',
             notes: savedItem.notes ?? undefined,
             addedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          });
+            brand: itemCandidate.brand,
+            gradeOrigin: itemCandidate.gradeOrigin,
+            packagingFormat: itemCandidate.packagingFormat,
+            dietaryBadges: itemCandidate.dietaryBadges,
+            netContent: itemCandidate.netContent,
+            unopenedLocation: itemCandidate.unopenedLocation,
+            openedLocation: itemCandidate.openedLocation,
+            unopenedShelfLifeDays: itemCandidate.unopenedShelfLifeDays,
+            openedShelfLifeDays: itemCandidate.openedShelfLifeDays,
+            storageTip: itemCandidate.storageTip,
+            freezerTip: itemCandidate.freezerTip,
+            imageUrl: compressedDataUrl,
+            confidence: itemCandidate.confidence,
+          };
+
+          addedThisBatch.push(sessionEntry);
         } catch (err) {
           console.warn('Failed saving candidate:', itemCandidate.name, err);
         }
@@ -271,13 +318,15 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
 
       if (addedThisBatch.length > 0) {
         setSessionItems((prev) => [...addedThisBatch, ...prev]);
+        // Set the latest extracted item to highlight the rich attributes table!
+        setInspectingItem(addedThisBatch[0]);
         const namesSummary = addedThisBatch.map((i) => i.name).join(', ');
         showToast(
           lang === 'FR'
-            ? `✓ Ajouté en arrière-plan : ${namesSummary}`
-            : `✓ Added in background: ${namesSummary}`,
+            ? `✓ Extrait & ajouté au stock : ${namesSummary}`
+            : `✓ Extracted & added to kitchen stock: ${namesSummary}`,
           'success',
-          5000
+          6000
         );
       }
     } catch (err: any) {
@@ -763,6 +812,243 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                 </div>
               </div>
 
+              {/* EXTRACTED FOOD INTELLIGENCE CARD (Matches user table format) */}
+              {inspectingItem && (
+                <div className="w-full rounded-3xl border-2 border-teal-600/40 bg-white p-4 shadow-md space-y-3 animate-scale-in">
+                  <div className="flex items-center justify-between border-b border-[#E8E1D5] pb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">✨</span>
+                      <div>
+                        <h3 className="text-xs font-black text-[#0D3B37] leading-tight">
+                          {lang === 'FR' ? 'Attributs extraits de la photo' : 'Extracted Food Intelligence'}
+                        </h3>
+                        <p className="text-[10px] text-[#527470]">
+                          {lang === 'FR' ? 'Vision IA & Analyse d’emballage' : 'AI Vision & Packaging Extraction'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setInspectingItem(null)}
+                      className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                      title={lang === 'FR' ? 'Fermer l’aperçu' : 'Close review'}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Header preview with thumbnail & title */}
+                  <div className="flex items-center gap-3 bg-[#FAF7EE] p-2.5 rounded-2xl border border-[#E8E1D5]">
+                    {inspectingItem.imageUrl ? (
+                      <img
+                        src={inspectingItem.imageUrl}
+                        alt={inspectingItem.name}
+                        className="w-14 h-14 rounded-xl object-cover border border-[#D5E1D2] shrink-0 shadow-2xs"
+                      />
+                    ) : (
+                      <div className="shrink-0">
+                        <FoodVisualBadge
+                          itemName={inspectingItem.name}
+                          categoryName={inspectingItem.categoryName}
+                          size="md"
+                        />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h4 className="font-black text-sm text-[#0D3B37] truncate">
+                          {inspectingItem.name}
+                        </h4>
+                        {inspectingItem.brand && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-teal-800 text-white shadow-2xs">
+                            {inspectingItem.brand}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-[#527470] mt-0.5">
+                        {inspectingItem.netContent || `${inspectingItem.quantity} ${inspectingItem.unit}`} • {getLocationLocalizedName(inspectingItem.locationName, lang)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Detailed Attributes Table */}
+                  <div className="overflow-x-auto rounded-xl border border-[#E8E1D5]">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-[#F2ECE0] text-[#0D3B37] text-[10px] uppercase tracking-wider">
+                          <th className="py-1.5 px-3 font-extrabold w-1/3">
+                            {lang === 'FR' ? 'Attribut' : 'Attribute'}
+                          </th>
+                          <th className="py-1.5 px-3 font-extrabold">
+                            {lang === 'FR' ? 'Valeur extraite' : 'Extracted Value'}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#F0EBE0] text-[11px] bg-white">
+                        <tr>
+                          <td className="py-2 px-3 font-bold text-[#527470]">
+                            {lang === 'FR' ? 'Nom du produit' : 'Product Name'}
+                          </td>
+                          <td className="py-2 px-3 font-extrabold text-[#0D3B37]">
+                            {inspectingItem.name}
+                          </td>
+                        </tr>
+
+                        {inspectingItem.brand && (
+                          <tr>
+                            <td className="py-2 px-3 font-bold text-[#527470]">
+                              {lang === 'FR' ? 'Marque' : 'Brand'}
+                            </td>
+                            <td className="py-2 px-3 font-bold text-teal-900">
+                              {inspectingItem.brand}
+                            </td>
+                          </tr>
+                        )}
+
+                        {inspectingItem.gradeOrigin && (
+                          <tr>
+                            <td className="py-2 px-3 font-bold text-[#527470]">
+                              {lang === 'FR' ? 'Grade / Origine' : 'Grade / Origin'}
+                            </td>
+                            <td className="py-2 px-3 font-medium text-[#1F3323]">
+                              {inspectingItem.gradeOrigin}
+                            </td>
+                          </tr>
+                        )}
+
+                        <tr>
+                          <td className="py-2 px-3 font-bold text-[#527470]">
+                            {lang === 'FR' ? 'Quantité / Volume net' : 'Net Quantity / Weight'}
+                          </td>
+                          <td className="py-2 px-3 font-extrabold text-[#0D3B37]">
+                            {inspectingItem.netContent || `${inspectingItem.quantity} ${inspectingItem.unit}`}
+                          </td>
+                        </tr>
+
+                        {inspectingItem.packagingFormat && (
+                          <tr>
+                            <td className="py-2 px-3 font-bold text-[#527470]">
+                              {lang === 'FR' ? 'Format d’emballage' : 'Packaging Format'}
+                            </td>
+                            <td className="py-2 px-3 font-medium text-[#1F3323]">
+                              {inspectingItem.packagingFormat}
+                            </td>
+                          </tr>
+                        )}
+
+                        {inspectingItem.dietaryBadges && inspectingItem.dietaryBadges.length > 0 && (
+                          <tr>
+                            <td className="py-2 px-3 font-bold text-[#527470]">
+                              {lang === 'FR' ? 'Allégations / Badges' : 'Dietary / Features'}
+                            </td>
+                            <td className="py-2 px-3">
+                              <div className="flex items-center gap-1 flex-wrap">
+                                {inspectingItem.dietaryBadges.map((badge, bIdx) => (
+                                  <span
+                                    key={bIdx}
+                                    className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300"
+                                  >
+                                    ✓ {badge}
+                                  </span>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+
+                        <tr>
+                          <td className="py-2 px-3 font-bold text-[#527470]">
+                            {lang === 'FR' ? 'Catégorie' : 'Category'}
+                          </td>
+                          <td className="py-2 px-3 font-semibold text-[#1F3323]">
+                            {getCategoryLocalizedName(inspectingItem.categoryName, lang)}
+                          </td>
+                        </tr>
+
+                        {(inspectingItem.unopenedLocation || inspectingItem.openedLocation) && (
+                          <tr>
+                            <td className="py-2 px-3 font-bold text-[#527470]">
+                              {lang === 'FR' ? 'Emplacement conseillé' : 'Recommended Location'}
+                            </td>
+                            <td className="py-2 px-3 space-y-0.5">
+                              {inspectingItem.unopenedLocation && (
+                                <p className="text-[11px] text-[#1F3323]">
+                                  • <span className="font-bold">{lang === 'FR' ? 'Fermé :' : 'Unopened:'}</span> {inspectingItem.unopenedLocation}
+                                </p>
+                              )}
+                              {inspectingItem.openedLocation && (
+                                <p className="text-[11px] text-[#1F3323]">
+                                  • <span className="font-bold">{lang === 'FR' ? 'Après ouverture :' : 'After opening:'}</span> {inspectingItem.openedLocation}
+                                </p>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+
+                        {(inspectingItem.unopenedShelfLifeDays || inspectingItem.openedShelfLifeDays) && (
+                          <tr>
+                            <td className="py-2 px-3 font-bold text-[#527470]">
+                              {lang === 'FR' ? 'Durée de conservation' : 'Estimated Shelf Life'}
+                            </td>
+                            <td className="py-2 px-3 space-y-0.5">
+                              {inspectingItem.unopenedShelfLifeDays && (
+                                <p className="text-[11px] text-[#1F3323]">
+                                  • <span className="font-bold">{lang === 'FR' ? 'Fermé :' : 'Unopened:'}</span> {inspectingItem.unopenedShelfLifeDays} {lang === 'FR' ? 'jours' : 'days'}
+                                </p>
+                              )}
+                              {inspectingItem.openedShelfLifeDays && (
+                                <p className="text-[11px] text-[#1F3323]">
+                                  • <span className="font-bold">{lang === 'FR' ? 'Après ouverture :' : 'After opening:'}</span> {inspectingItem.openedShelfLifeDays} {lang === 'FR' ? 'jours' : 'days'}
+                                </p>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+
+                        {inspectingItem.freezerTip && (
+                          <tr>
+                            <td className="py-2 px-3 font-bold text-[#527470]">
+                              {lang === 'FR' ? 'Conservation congélateur' : 'Freezer Shelf Life'}
+                            </td>
+                            <td className="py-2 px-3 font-medium text-blue-900">
+                              {inspectingItem.freezerTip}
+                            </td>
+                          </tr>
+                        )}
+
+                        {inspectingItem.storageTip && (
+                          <tr>
+                            <td className="py-2 px-3 font-bold text-[#527470]">
+                              {lang === 'FR' ? 'Conseil fraîcheur' : 'Storage Tip'}
+                            </td>
+                            <td className="py-2 px-3 text-[#1F3323] leading-relaxed">
+                              {inspectingItem.storageTip}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Actions footer */}
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <span className="text-[11px] font-bold text-emerald-800 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>{lang === 'FR' ? 'Enregistré dans le stock' : 'Saved to kitchen inventory'}</span>
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => cameraInputRef.current?.click()}
+                      className="px-3.5 py-1.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>{lang === 'FR' ? 'Photo suivante' : 'Snap Next'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* LIVE FEED OF ADDED ITEMS (Always visible directly, no nested hidden drawer) */}
               <div className="w-full rounded-3xl border border-[#E0D9C8] bg-white overflow-hidden shadow-xs">
                 <div className="px-4 py-3 bg-[#FAF7EE] border-b border-[#E8E2D5] flex items-center justify-between">
@@ -801,19 +1087,39 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                     </div>
                   ) : (
                     sessionItems.map((item) => (
-                      <div key={item.id} className="py-2.5 flex items-center justify-between gap-3 animate-fade-in">
+                      <div
+                        key={item.id}
+                        onClick={() => setInspectingItem(item)}
+                        className="py-2.5 px-1.5 rounded-xl hover:bg-[#FAF7EE] flex items-center justify-between gap-3 animate-fade-in cursor-pointer transition-colors"
+                        title={lang === 'FR' ? 'Cliquer pour voir la fiche d’extraction' : 'Click to inspect extracted attributes'}
+                      >
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <FoodVisualBadge itemName={item.name} categoryName={item.categoryName} size="sm" />
+                          {item.imageUrl ? (
+                            <img
+                              src={item.imageUrl}
+                              alt={item.name}
+                              className="w-8 h-8 rounded-lg object-cover border border-[#D5E1D2] shrink-0"
+                            />
+                          ) : (
+                            <FoodVisualBadge itemName={item.name} categoryName={item.categoryName} size="sm" />
+                          )}
                           <div className="min-w-0">
                             <p className="text-xs font-bold text-[#0D3B37] truncate">{item.name}</p>
                             <p className="text-[10px] text-[#527470]">
-                              {item.quantity} {item.unit} • {getLocationLocalizedName(item.locationName, lang)} • {item.addedAt}
+                              {item.netContent || `${item.quantity} ${item.unit}`} • {getLocationLocalizedName(item.locationName, lang)} • {item.addedAt}
                             </p>
                           </div>
                         </div>
-                        <span className="text-[10px] font-extrabold text-emerald-800 bg-emerald-100/90 border border-emerald-200 px-2.5 py-0.5 rounded-full shrink-0">
-                          {lang === 'FR' ? '✓ Ajouté' : '✓ Added'}
-                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {item.brand && (
+                            <span className="hidden sm:inline-block text-[9px] font-bold text-teal-800 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded-md truncate max-w-[100px]">
+                              {item.brand}
+                            </span>
+                          )}
+                          <span className="text-[10px] font-extrabold text-emerald-800 bg-emerald-100/90 border border-emerald-200 px-2 py-0.5 rounded-full shrink-0">
+                            {lang === 'FR' ? 'Détails >' : 'Details >'}
+                          </span>
+                        </div>
                       </div>
                     ))
                   )}

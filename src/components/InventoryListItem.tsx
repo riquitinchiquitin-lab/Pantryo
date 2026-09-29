@@ -283,6 +283,99 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
         </div>
       )}
 
+      {/* Visual Packaging & Extraction Details Table (Extracted from photo OCR/Vision) */}
+      {(item.brand || item.gradeOrigin || item.packagingFormat || (item.dietaryBadges && item.dietaryBadges.length > 0) || item.storageTip || item.unopenedLocation) && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="rounded-2xl bg-[#FAF7EE] border border-[#E2DAD0] p-2.5 space-y-2 text-xs"
+        >
+          <div className="flex items-center justify-between border-b border-[#E8E1D5] pb-1.5">
+            <span className="font-extrabold text-[11px] text-[#0D3B37] flex items-center gap-1.5">
+              <span>🏷️</span>
+              <span>{lang === 'FR' ? 'Attributs extraits de l’emballage' : 'Extracted Packaging Attributes'}</span>
+            </span>
+            {item.brand && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-teal-100 text-teal-900 border border-teal-200">
+                {item.brand}
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px]">
+            {item.gradeOrigin && (
+              <div className="flex flex-col bg-white p-2 rounded-xl border border-[#EAE3D6]">
+                <span className="text-[9px] font-bold text-[#6D8371] uppercase tracking-wider">
+                  {lang === 'FR' ? 'Grade & Origine' : 'Grade & Origin'}
+                </span>
+                <span className="font-semibold text-[#1F3323]">{item.gradeOrigin}</span>
+              </div>
+            )}
+
+            {item.packagingFormat && (
+              <div className="flex flex-col bg-white p-2 rounded-xl border border-[#EAE3D6]">
+                <span className="text-[9px] font-bold text-[#6D8371] uppercase tracking-wider">
+                  {lang === 'FR' ? 'Format d’emballage' : 'Packaging Format'}
+                </span>
+                <span className="font-semibold text-[#1F3323]">{item.packagingFormat}</span>
+              </div>
+            )}
+
+            {item.unopenedLocation && (
+              <div className="flex flex-col bg-white p-2 rounded-xl border border-[#EAE3D6]">
+                <span className="text-[9px] font-bold text-[#6D8371] uppercase tracking-wider">
+                  {lang === 'FR' ? 'Stockage non ouvert' : 'Unopened Storage'}
+                </span>
+                <span className="font-semibold text-[#1F3323]">
+                  {item.unopenedLocation}
+                  {item.unopenedShelfLifeDays ? ` (${item.unopenedShelfLifeDays} ${lang === 'FR' ? 'j' : 'days'})` : ''}
+                </span>
+              </div>
+            )}
+
+            {item.openedLocation && (
+              <div className="flex flex-col bg-white p-2 rounded-xl border border-[#EAE3D6]">
+                <span className="text-[9px] font-bold text-[#6D8371] uppercase tracking-wider">
+                  {lang === 'FR' ? 'Après ouverture' : 'After Opening'}
+                </span>
+                <span className="font-semibold text-[#1F3323]">
+                  {item.openedLocation}
+                  {item.openedShelfLifeDays ? ` (${item.openedShelfLifeDays} ${lang === 'FR' ? 'j' : 'days'})` : ''}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Dietary / Feature Badges */}
+          {item.dietaryBadges && item.dietaryBadges.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+              {item.dietaryBadges.map((badge, idx) => (
+                <span
+                  key={idx}
+                  className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-100/90 text-emerald-900 border border-emerald-300"
+                >
+                  ✓ {badge}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Practical Storage & Freezing Tip */}
+          {item.storageTip && (
+            <div className="p-2 rounded-xl bg-teal-50/80 border border-teal-200/80 text-[11px] text-teal-950 flex items-start gap-1.5">
+              <span className="shrink-0 text-sm">💡</span>
+              <span className="font-medium leading-relaxed">{item.storageTip}</span>
+            </div>
+          )}
+
+          {item.freezerTip && (
+            <div className="p-2 rounded-xl bg-blue-50/80 border border-blue-200/80 text-[11px] text-blue-950 flex items-start gap-1.5">
+              <span className="shrink-0 text-sm">❄️</span>
+              <span className="font-medium leading-relaxed">{item.freezerTip}</span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Bottom Row: Household Attribution Badge ("by Yan") & Actions */}
       <div
         onClick={(e) => e.stopPropagation()}
