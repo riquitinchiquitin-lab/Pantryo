@@ -40,17 +40,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy production dependencies and package.json from builder
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
+# Pre-create data and application directories and set ownership to built-in 'node' user (UID 1000)
+RUN mkdir -p /app/server/data && chown -R node:node /app
 
-# Copy compiled backend bundle and frontend dist from builder
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/server ./server
-COPY --from=builder /app/public ./public
+# Copy production dependencies and package.json from builder with node ownership
+COPY --from=builder --chown=node:node /app/package*.json ./
+COPY --from=builder --chown=node:node /app/node_modules ./node_modules
 
-# Ensure database directory exists with read/write access
-RUN mkdir -p /app/server/data
+# Copy compiled backend bundle and frontend dist from builder with node ownership
+COPY --from=builder --chown=node:node /app/dist ./dist
+COPY --from=builder --chown=node:node /app/server ./server
+COPY --from=builder --chown=node:node /app/public ./public
+
+# Ensure write permissions for node user on server data directory
+RUN chown -R node:node /app/server/data
+
+# Switch to non-root user
+USER node
 
 EXPOSE 3000
 
