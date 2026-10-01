@@ -34,6 +34,7 @@ import {
   detectLeftoverCategory,
   calculateSmartExpiration,
 } from '../utils/leftovers';
+import { getBilingualNames, translateFoodItem } from '../utils/foodTranslator';
 
 interface ImportLeftoverModalProps {
   isOpen: boolean;
@@ -260,8 +261,15 @@ export const ImportLeftoverModal: React.FC<ImportLeftoverModalProps> = ({
       const smartExp = calculateSmartExpiration(categoryId, config.locationType, prepDateStr);
       const locationName = config.locationType === 'FREEZER' ? 'Freezer' : 'Fridge';
 
+      const bilingTmpl = getBilingualNames(tmpl?.nameEn || tmpl?.nameFr || 'Leftover', lang);
+      const leftoverNameFr = tmpl?.nameFr || bilingTmpl.nameFr;
+      const leftoverNameEn = tmpl?.nameEn || bilingTmpl.nameEn;
+      const chosenName = lang === 'FR' ? leftoverNameFr : leftoverNameEn;
+
       return {
-        name: lang === 'FR' ? (tmpl?.nameFr || tmpl?.nameEn || 'Reste') : (tmpl?.nameEn || tmpl?.nameFr || 'Leftover'),
+        name: chosenName,
+        nameFr: leftoverNameFr,
+        nameEn: leftoverNameEn,
         quantity: Number(config.quantity) || 1,
         unit: config.unit || 'portions',
         locationName,
@@ -349,8 +357,17 @@ export const ImportLeftoverModal: React.FC<ImportLeftoverModalProps> = ({
     const smartExp = calculateSmartExpiration(detected.id, tonightLocation, prepDateStr);
     const locationName = tonightLocation === 'FREEZER' ? 'Freezer' : 'Fridge';
 
+    const tonightBiling = getBilingualNames(meal.title, lang);
+    const mealTitleFr = (meal as any).titleFr || tonightBiling.nameFr || meal.title;
+    const mealTitleEn = meal.title || tonightBiling.nameEn;
+    const leftoverNameFr = mealTitleFr.startsWith('Restes') ? mealTitleFr : `Restes : ${mealTitleFr}`;
+    const leftoverNameEn = mealTitleEn.startsWith('Leftover') ? mealTitleEn : `Leftover: ${mealTitleEn}`;
+    const chosenName = lang === 'FR' ? leftoverNameFr : leftoverNameEn;
+
     const payload = {
-      name: lang === 'FR' ? `Restes : ${meal.title}` : `Leftover: ${meal.title}`,
+      name: chosenName,
+      nameFr: leftoverNameFr,
+      nameEn: leftoverNameEn,
       quantity: Number(tonightServings) || 1,
       unit: lang === 'FR' ? 'portions' : 'servings',
       locationName,
@@ -411,11 +428,16 @@ export const ImportLeftoverModal: React.FC<ImportLeftoverModalProps> = ({
     setIsSaving(true);
     setErrorMessage(null);
 
+    const manualBiling = getBilingualNames(manualName.trim(), lang);
+    const resolvedNameFr = manualBiling.nameFr || manualName.trim();
+    const resolvedNameEn = manualBiling.nameEn || manualName.trim();
+    const chosenName = lang === 'FR' ? resolvedNameFr : resolvedNameEn;
+
     // If checked, save into templates for future 1-tap selection
     if (saveAsTemplateChecked) {
       saveNewLeftoverTemplate({
-        nameEn: manualName.trim(),
-        nameFr: manualName.trim(),
+        nameEn: resolvedNameEn,
+        nameFr: resolvedNameFr,
         categoryId: manualCatId,
         defaultLocation: manualLocation,
         defaultQuantity: Number(manualQuantity) || 2,
@@ -426,7 +448,9 @@ export const ImportLeftoverModal: React.FC<ImportLeftoverModalProps> = ({
 
     const locationName = manualLocation === 'FREEZER' ? 'Freezer' : 'Fridge';
     const payload = {
-      name: manualName.trim(),
+      name: chosenName,
+      nameFr: resolvedNameFr,
+      nameEn: resolvedNameEn,
       quantity: Number(manualQuantity) || 1,
       unit: manualUnit.trim() || 'servings',
       locationName,

@@ -49,6 +49,8 @@ export interface Household {
 export interface InventoryItem {
   id: string;
   name: string;
+  nameFr?: string;
+  nameEn?: string;
   quantity: number;
   unit: string;
   householdId: string;

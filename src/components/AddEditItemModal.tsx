@@ -23,6 +23,7 @@ import { ALL_FOOD_CATEGORIES, ALL_SUB_CATEGORIES, ALL_MEAT_SEAFOOD_SUBCATEGORIES
 import { useLanguage, getCategoryLocalizedName, getSubcategoryLocalizedName } from '../utils/i18n';
 import { ScrollableRow } from './ScrollableRow';
 import { estimateSmartShelfLife } from '../utils/smartExpirationRules';
+import { getBilingualNames, translateFoodItem } from '../utils/foodTranslator';
 
 interface AddEditItemModalProps {
   isOpen: boolean;
@@ -242,8 +243,15 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
     const parsedQty = parseFloat(String(quantity));
     const safeQty = isNaN(parsedQty) || parsedQty <= 0 ? 1 : Number(parsedQty.toFixed(3));
     const locationName = locationType === 'FREEZER' ? 'Freezer' : locationType === 'PANTRY' ? 'Pantry' : 'Fridge';
+
+    const biling = getBilingualNames(name.trim(), lang);
+    const resolvedNameFr = (itemToEdit?.nameFr && itemToEdit.name === name.trim()) ? itemToEdit.nameFr : (biling.nameFr || name.trim());
+    const resolvedNameEn = (itemToEdit?.nameEn && itemToEdit.name === name.trim()) ? itemToEdit.nameEn : (biling.nameEn || name.trim());
+
     const payload = {
       name: name.trim(),
+      nameFr: resolvedNameFr,
+      nameEn: resolvedNameEn,
       imageUrl: imageUrl.trim() || undefined,
       quantity: safeQty,
       unit: unit.trim() || 'pcs',
@@ -272,6 +280,8 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
           ...itemToEdit,
           ...data.item,
           name: payload.name,
+          nameFr: payload.nameFr,
+          nameEn: payload.nameEn,
           imageUrl: payload.imageUrl || itemToEdit.imageUrl,
           quantity: payload.quantity,
           unit: payload.unit,
@@ -302,6 +312,8 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
         const newEnriched: InventoryItem = {
           ...data.item,
           name: payload.name,
+          nameFr: payload.nameFr,
+          nameEn: payload.nameEn,
           quantity: payload.quantity,
           unit: payload.unit,
           locationName,

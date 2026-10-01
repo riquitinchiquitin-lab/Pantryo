@@ -495,6 +495,24 @@ const DEFAULT_RECIPES = [
   },
 ];
 
+const isNoiseItemName = (name) => {
+  if (!name || typeof name !== "string") return true;
+  const trimmed = name.trim();
+  const letters = trimmed.replace(/[^a-zA-ZÀ-ÿ]/g, "");
+  if (letters.length < 3) return true;
+  if (/^(?:- - a|-  s a|Le  4  4 3|a ig  ès a|A es re ae EE  a 7200|d  BE AN Al a ee El  4 æ|ice y Fg  2x 8|REE LP|À 4 A 4 - ne té|oad poor|LM Na|War  - L A|aE pt)$/i.test(trimmed)) {
+    return true;
+  }
+  const words = trimmed.split(/[\s-]+/).filter(Boolean);
+  if (words.length >= 3) {
+    const tinyWords = words.filter((w) => w.length <= 2);
+    if (tinyWords.length / words.length > 0.55) {
+      return true;
+    }
+  }
+  return false;
+};
+
 class EncryptedDatabaseStore {
   constructor() {
     const defaultKitchenName = (process.env.KITCHEN_NAME || process.env.PANTRYO_KITCHEN_NAME || "The Yan & Kriz Kitchen").trim();
@@ -553,7 +571,9 @@ class EncryptedDatabaseStore {
         this.users = sqliteSnapshot.users;
         this.locations = sqliteSnapshot.locations || this.locations;
         this.categories = sqliteSnapshot.categories || this.categories;
-        this.items = Array.isArray(sqliteSnapshot.items) ? sqliteSnapshot.items : [];
+        this.items = (Array.isArray(sqliteSnapshot.items) ? sqliteSnapshot.items : []).filter(
+          (item) => item && item.name && !isNoiseItemName(item.name)
+        );
         this.plannedMeals = Array.isArray(sqliteSnapshot.plannedMeals) ? sqliteSnapshot.plannedMeals : [];
         this.customRecipes = Array.isArray(sqliteSnapshot.customRecipes) ? sqliteSnapshot.customRecipes : [];
         this.groceryItems = Array.isArray(sqliteSnapshot.groceryItems) ? sqliteSnapshot.groceryItems : [];
@@ -596,7 +616,9 @@ class EncryptedDatabaseStore {
           this.users = decrypted.users;
           this.locations = decrypted.locations || this.locations;
           this.categories = decrypted.categories || this.categories;
-          this.items = Array.isArray(decrypted.items) ? decrypted.items : [];
+          this.items = (Array.isArray(decrypted.items) ? decrypted.items : []).filter(
+            (item) => item && item.name && !isNoiseItemName(item.name)
+          );
           this.plannedMeals = Array.isArray(decrypted.plannedMeals) ? decrypted.plannedMeals : [];
           this.customRecipes = Array.isArray(decrypted.customRecipes) ? decrypted.customRecipes : [];
           this.groceryItems = Array.isArray(decrypted.groceryItems) ? decrypted.groceryItems : [];

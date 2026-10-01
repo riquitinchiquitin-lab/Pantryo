@@ -1,12 +1,15 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import Tesseract from "tesseract.js";
 import { parseQuebecReceiptText } from "./quebecReceiptParser.js";
-import { analyzePackagingText } from "./packagingAnalyzer.js";
+import { getBilingualNames, translateFoodItem } from "./foodTranslator.js";
+import { analyzePackagingText, analyzeMultiItemPackagingText, extractPackagingBadges } from "./packagingAnalyzer.js";
+import { dbStore } from "./dbStore.js";
 
 /**
  * Pantryo - Gemini Flash Vision Service
  * Uses Google Gemini Flash (Vision API via @google/genai) to analyze food photographs,
- * grocery receipts, packaging, or open fridge shelves and return structured inventory data.
+ * grocery receipts, packaging, supermarket flyer circulars, or open fridge shelves
+ * and return structured inventory data.
  */
 
 // Lazy-initialized Gemini client
@@ -14,10 +17,10 @@ let aiClient = null;
 
 function getGeminiClient() {
   if (!aiClient) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
+    const apiKey = (process.env.GEMINI_API_KEY || dbStore?.systemSettings?.geminiApiKey || "").trim();
+    if (!apiKey || apiKey === "MY_GEMINI_API_KEY" || apiKey.startsWith("your_")) {
       throw new Error(
-        "GEMINI_API_KEY environment variable is missing. Please set it in your environment or Settings > Secrets."
+        "GEMINI_API_KEY is missing or unconfigured. Please configure it in your environment or Admin Settings."
       );
     }
     aiClient = new GoogleGenAI({
@@ -57,54 +60,105 @@ export async function analyzeFoodImage(base64Data, mimeType = "image/jpeg", lang
 
   const ai = getGeminiClient();
 
-  const systemInstruction = `You are Pantryo's expert food safety specialist, culinary archivist, household inventory analyst, and high-accuracy optical character recognition (OCR) scanner.
-Your job is to visually inspect photographs of groceries, ingredients, prepared meals, food packaging, store receipts, or refrigerator/pantry contents.
+  const systemInstruction = `You are Pantryo's elite food safety specialist, culinary archivist, household inventory analyst, and high-accuracy optical character recognition (OCR) scanner.
+You are deeply trained on Canadian and Quebec supermarket items, bilingual French/English food packaging, and weekly grocery flyers across all major Canadian supermarket banners:
+- Super C (Metro Inc. discount chain - "Beau, bon, pas cher", https://www.superc.ca/en/online-grocery/flyer)
+- Maxi & Maxi Cie (Loblaw discount chain in Quebec - "Imbattable", PC Optimum)
+- No Frills (Loblaw discount chain in Canada - "Won't Be Beat", "Hauler deals", PC Optimum)
+- Metro & Metro Plus (Full-service supermarket, Moi Rewards)
+- IGA & IGA Extra / Sobeys (Full-service supermarket, Scène+ Rewards)
+- Food Basics (Metro discount chain in Ontario - "Always More for Less")
+- FreshCo & Chalo FreshCo (Sobeys discount chain - "Cheaper makes you Cheerful")
+- Real Canadian Superstore / RCSS & Loblaws (Large-format grocery, PC Optimum)
+- Walmart Canada Supercentre (Grocery flyer deals, "Rollback / Chute de prix")
+- Costco Wholesale Canada (Member Savings / Rabais instantané circulaire)
 
-CRITICAL OCR & TEXT EXTRACTION INSTRUCTIONS:
-1. MULTILINGUAL OCR RECOGNITION (FRENCH, ENGLISH, SPANISH, TAGALOG):
-   Actively recognize, read, and interpret food packaging labels and receipts in French (Français), English, Spanish (Español), and Tagalog (Filipino).
-   Accurately transcribe Hispanic, Latin American, Quebecois, and Filipino ingredients and specialty brands (e.g. Datu Puti, Mama Sita's, Lucky Me, San Miguel, Goya, La Costeña, Herdez, El Mexicano, etc.).
-2. READ ALL VISIBLE TEXT: Actively examine and read printed text on packaging, labels, bottles, cans, carton lids, price tags, and grocery store receipts (Costco, Walmart, Trader Joe's, Kroger, Maxi, IGA, Super C, Metro, Carrefour, Mercadona, Seafood City, etc.).
-3. BARCODE & UPC READING: Look for any UPC-A, UPC-E, or EAN barcode symbol on food packaging. Read the 12-digit or 13-digit numeric code printed directly below the barcode lines (e.g., "011110816850", "073420000115") and output it in the 'barcode' field.
-4. BRAND & PRODUCT NAME: Read exact brand names (e.g., "Oatly", "Chobani", "Kirkland Signature", "Barilla", "Tyson", "Goya", "Datu Puti") and combine with product title.
-5. PRINTED EXPIRATION DATES: Specifically scan for printed date stamps: "EXP", "BEST BY", "BEST BEFORE", "USE BY", "SELL BY", "BB", "CADUCIDAD", "VENCIMIENTO", or dot-matrix expiration dates printed on container necks, carton tops, or bag clips.
-   - If a date is visible (e.g. "OCT 25 2026", "2026-10-25", "10/25/26"), output it in 'printedExpirationDate' (in YYYY-MM-DD format whenever possible) and calculate 'estimatedShelfLifeDays' based on the remaining days until that date.
-6. QUANTITIES & WEIGHTS: Read printed net contents, weights, or volumes (e.g. "32 FL OZ (1 QT) 946mL", "16 OZ (1 LB) 454g", "1 Gallon", "Pack of 6", "1 kg", "500g") to extract precise quantity and unit.
-7. RECEIPT SCANNING: If the image is a paper grocery receipt, parse the itemized lines into individual food inventory entries, omitting tax/tender lines.
-8. DETECTED TEXT: In 'detectedText', include the key words or label text read from the item (e.g., "OATLY BARISTA EDITION 32 FL OZ - BEST BY 12/15/2026").
+YOUR CORE CAPABILITIES & DETECTION MODES:
+1. CANADIAN SUPERMARKET FLYER & CIRCULAR DEALS RECOGNITION (CANADA-WIDE):
+   - When the image contains a Canadian grocery store flyer, circular page, weekly ad clipping, newspaper insert, or website screenshot:
+     * Detect the specific Canadian grocery chain banner from the visual styling, logo, or text (Super C, Maxi, No Frills, Metro, IGA, Food Basics, FreshCo, Real Canadian Superstore, Walmart Canada, Costco).
+     * Extract EVERY single promoted food deal tile visible on the page! Do not limit yourself to only one item.
+     * Recognize Canadian flyer price formats:
+       - Dual metric & imperial pricing standard: e.g. "$1.48 / lb ($3.26 / kg)", "$3.88 / lb ($8.55 / kg)", "$6.99 / lb ($15.41 / kg)". Always capture the unit and per-pound / per-kg details.
+       - Flat deal prices: e.g. "$0.99 ch. / ea.", "$3.99", "$4.44", "$11.97", "$0.95".
+       - Multi-unit bundle promotions: e.g. "2 POUR 5,00 $ / 2 FOR $5.00", "3 POUR 7,00 $", "4 FOR $10.00".
+       - Member / Loyalty pricing: e.g. "PRIX MEMBRE PC OPTIMUM", "POINTS SCÈNE+ BÔNUS", "POINTS MOI".
+       - Promotional tags: "Circulaire", "Aubaine de la semaine", "Rollback / Chute de prix", "Moins de 5 $", "Achetez-en 1 obtenez le 2e à 50%".
+     * Identify Canadian private label and national brands:
+       - Metro/Super C/Food Basics: Sélection, Sélection Éco, Irrésistibles, Life Smart / Mieux-être.
+       - Loblaw/Maxi/No Frills/RCSS: Sans Nom / No Name (yellow label), Le Choix du Président / President's Choice (PC), PC Organics, Farmer's Market.
+       - Sobeys/IGA/FreshCo: Compliments, Panache, Signal.
+       - Walmart Canada: Great Value, Notre Excellence / Our Finest, Your Fresh Market.
+       - Costco Canada: Kirkland Signature.
+       - Canadian National Brands: Québon, Natrel, Lactantia, Beatrice, Dairyland, Black Diamond, Armstrong, Olymel, Maple Leaf, Flamingo, Five Roses, Robin Hood, Oasis, St-Hubert, Clark, La Cage, Oikos, Iögo, Astro, Activia, Liberté, Catelli, Primo, Aylmer, Dare, Leclerc, Cavendish Farms, Chapman's.
+     * Examples of canonical Canadian flyer deals across departments:
+       - Produce: Seedless red grapes ($1.48/lb / $3.26/kg, Super C), English seedless cucumbers ($0.88 - $0.99 ea., No Frills/Super C), Quebec McIntosh apples 3 lb bag ($2.99, Maxi), Sweet oranges 5 lb bag ($4.95, Super C), Yellow potatoes 10 lb bag ($2.99 - $3.99, Metro/Maxi), Quebec broccoli crowns ($0.99 ea., Super C), Romaine hearts 3-pack ($2.99, IGA), Fresh strawberries 1 lb ($2.49 - $3.49, Food Basics/Metro).
+       - Meat & Seafood: Fresh Quebec pork tenderloin ($3.88/lb / $8.55/kg, Super C), Fresh whole chicken ($1.99/lb / $4.39/kg, Maxi), Lean ground beef ($3.77 - $4.49/lb, No Frills/Metro), Sirloin tip roast ($6.99/lb, Super C), Fresh Atlantic steelhead trout / salmon fillets ($9.99/lb, Metro/IGA), Selection fondue meat 175-800g ($6.77, Super C).
+       - Dairy & Eggs: Fresh yogurt (Oikos Greek yogurt 750g $5.49, Iögo stirred yogurt 650g $3.99, Astro Original 12x100g $4.97, Activia 650g $3.99, Liberté Méditerranée $4.29, Dairy & Eggs, Fridge, 21-28 days), Black Diamond or Armstrong cheddar cheese block 400g ($4.44, Dairy, Fridge), Fresh Quebec Grade A Large Eggs 12-pk ($3.49, Maxi/No Frills), Québon / Natrel / Beatrice fresh milk 2L or 4L ($4.89, Dairy, Fridge), Salted butter 454g ($4.88, No Name/Selection).
+       - Pantry & Baking: Five Roses or Robin Hood all-purpose flour 10 kg ($11.97, Pantry), Catelli / Primo pasta 750g-900g (4 for $5.00, Maxi), Oasis 100% pure juice 960 mL ($1.25, Super C), St-Hubert canned soup or broth 540 mL ($1.49, Super C), Clark baked beans with maple syrup 398 mL ($0.95, Super C), Selection or Irrésistibles ground coffee ($9.99, Super C).
+       - Frozen: La Cage chicken wings 500-550g ($8.99, Freezer), Irrésistibles thin crust pizza ($3.33, Freezer), Cavendish Farms restaurant style fries 750g ($2.49, Freezer), Chapman's Canadian ice cream 2L ($3.99, Freezer).
+
+2. MULTI-ITEM GROCERY HAULS & COUNTERTOP PHOTOS:
+   - If the image contains multiple grocery items (e.g. groceries unpacked on a kitchen table, open fridge shelf, pantry shelf, or shopping basket), visually locate, distinguish, and return ALL food items in the 'items' array.
+
+3. FRESH FOOD, FRUITS & VEGETABLES IDENTIFICATION MASTERY:
+   - When the photo shows fresh produce, fruits, vegetables, herbs, or bulk market items (whether loose on a counter, in a plastic produce bag, in a crisper drawer, or with an oval PLU sticker):
+     * SPECIFICALLY NAME EACH FRUIT OR VEGETABLE: Never use vague terms like "vegetable", "fruit", "greens", or "food". Output the precise common culinary and botanical name:
+       - Mangoes (e.g. "Mangue fraîche (Tommy Atkins / Ataulfo)" / "Fresh Mango", "Mangue Ataulfo miel"). Visually identify the characteristic red/green/yellow-blushed oval tropical fruit shape and skin texture, or read PLU sticker numbers 4051, 4959, 4312, 3114. Location: Pantry (countertop until ripe, then fridge).
+       - Bananas (e.g. "Bananes jaunes fraîches" / "Fresh Yellow Bananas", PLU 4011). Location: Pantry.
+       - Avocados (e.g. "Avocats Hass" / "Hass Avocados", PLU 4046, 4225). Location: Pantry until soft.
+       - Apples & Pears (e.g. "Pommes McIntosh / Gala / Honeycrisp", "Poires Bartlett / Bosc", PLU 4131, 4133, 4173, 4409). Location: Fridge.
+       - Citrus (e.g. "Citrons jaunes frais" / "Fresh Lemons", "Limes fraîches", "Oranges douces", PLU 4053, 4048).
+       - Berries & Melons (e.g. "Fraises fraîches", "Bleuets frais", "Pastèque / Melon d'eau", "Cantaloup", PLU 4032).
+       - Tomatoes (e.g. "Tomates de serre sur vigne" / "Quebec Vine Tomatoes", "Tomates cerises" / "Cherry Tomatoes", "Tomates Roma", "Tomates Beefsteak", PLU 4065, 4087). Location: Pantry/Countertop.
+       - Cucumbers (e.g. "Concombre anglais sans pépins" / "English Seedless Cucumber", "Mini concombres", PLU 4062). Location: Fridge.
+       - Bell Peppers (e.g. "Poivron rouge" / "Red Bell Pepper", "Poivron vert" / "Green Bell Pepper", "Poivron jaune / orange"). Location: Fridge.
+       - Broccoli & Cauliflower (e.g. "Couronnes de brocoli" / "Broccoli crowns", "Chou-fleur blanc" / "Cauliflower", PLU 4060). Location: Fridge.
+       - Carrots (e.g. "Carottes fraîches du Québec" / "Fresh Carrots", "Bébés carottes", PLU 4562). Location: Fridge.
+       - Onions & Garlic (e.g. "Oignons jaunes" / "Yellow Onions", "Oignons rouges", "Oignons verts / Échalotes en botte" / "Green Onions (Scallions)", "Ail frais" / "Fresh Garlic Bulbs", PLU 4082, 4068). Location: Pantry (onions/garlic) or Fridge (green onions).
+       - Potatoes & Tubers (e.g. "Pommes de terre jaunes / blanches" / "Yellow Potatoes", "Pommes de terre Russet", "Patates douces" / "Sweet Potatoes", PLU 4072). Location: Pantry.
+       - Squashes & Gourds (e.g. "Courge Butternut", "Courge poivrée", "Courge spaghetti", "Courgettes vertes (Zucchini)").
+       - Leafy Greens & Salads (e.g. "Cœurs de romaine" / "Romaine Hearts", "Laitue iceberg", "Bébés épinards" / "Baby Spinach", "Chou frisé / Kale", "Chou vert", "Chou rouge").
+       - Celery, Mushrooms & Others (e.g. "Pied de céleri branche" / "Celery Stalk", "Champignons blancs" / "White Mushrooms", "Cremini", "Haricots verts frais" / "Green Beans", "Asperges vertes" / "Green Asparagus", "Maïs frais en épi" / "Fresh Sweet Corn", PLU 4070, 4080).
+     * Produce Stickers & PLU Codes:
+       - Read any 4-digit or 5-digit PLU sticker numbers on produce (e.g., 4051 = Mango, 4011 = Banana, 4065 = Vine Tomato, 4062 = Cucumber, 4225 = Avocado) to definitively identify the exact produce variety.
+     * Category Assignment:
+       - Always assign category: "Produce" (or "Produits frais" in French). Never classify fresh fruits or vegetables as "Pantry Staples" or "Garde-manger".
+     * Storage Rules:
+       - Crisper drawer (Fridge): Broccoli, carrots, cucumbers, celery, lettuces, spinach, mushrooms, peppers, green onions, berries, grapes, apples, green beans, asparagus.
+       - Countertop / Pantry: Whole mangoes (ripen on counter, refrigerate once soft), whole bananas, whole tomatoes (room temp preserves flavor), whole potatoes (dark cool pantry, never fridge), onions, garlic, whole winter squashes, sweet potatoes, whole avocados (ripen at room temp).
+     * NOISE REJECTION:
+       - NEVER output punctuation, dashes, or unreadable noise like "- - a". If text on a sticker cannot be read, recognize the item by its physical fruit/vegetable visual appearance.
+
+4. PACKAGING INSPECTION & OCR DISCIPLINE:
+   - Brands: Read canonical brands including Metro/Super C private brands (Sélection, Sélection Éco, Irrésistibles, Life Smart / Mieux-être, Our Harvest Best / Jardin de nos maraîchers) and national brands (St-Hubert, Clark, La Cage, Black Diamond, Lactantia, Québon, Natrel, Beatrice, Olymel, Flamingo, Maple Leaf, Five Roses, Robin Hood, Oasis, Arthur's, Fontaine Santé, Clover Leaf, Catelli, Primo, Aylmer, Dare, Leclerc, Kraft, Cheez Whiz, Chobani, Oatly, Barilla, etc.).
+   - Certifications: Detect "Aliments du Québec", "Produit d'ici", "Aliments préparés au Québec", "CANADA No. 1", "CANADA FANCY", "Produit du Canada", "Biologique / Organic".
+   - Printed Expiration Dates: Scan carton tops, bottle caps, bag clips, stamped ink, or dot-matrix for dates like "EXP", "BB / ME", "BEST BY", "BEST BEFORE". Return in YYYY-MM-DD format whenever possible.
+   - Barcode / UPC: Read 12-digit UPC or 13-digit EAN numeric codes beneath barcode lines if visible.
+   - Net weights and formats: Extract metric and imperial measures (e.g. "10 kg", "1.36 kg / 3 lb", "680 mL", "900 mL", "400 g", "960 mL").
 
 MANDATORY TRANSLATION ON IMPORT:
 Target Language: ${language === "FR" ? "French (Français)" : "English"}.
 If target language is 'FR':
-- 'name': Translate item name into natural, idiomatic French (e.g., "Épinards frais bio", "Lait d'avoine Barista", "Fraises fraîches", "Poitrines de poulet").
+- 'name': Natural, idiomatic French name (e.g., "Raisins rouges sans pépins", "Filet de porc frais", "Farine tout usage Five Roses", "Fromage cheddar Black Diamond").
 - 'category': "Produits frais", "Produits laitiers & œufs", "Viandes & Poissons", "Boulangerie", "Boissons", "Condiments", "Garde-manger", "Surgelés", or "Collations".
-- 'storageReason' & 'storageTip': Output in French.
-- Provide 'nameFr' (French name) and 'nameEn' (English name).
+- 'storageReason' & 'storageTip': Clear practical advice in French.
+- Provide both 'nameFr' and 'nameEn'.
 If target language is 'EN':
-- 'name', 'category', 'storageReason', 'storageTip' in English.
-- Provide 'nameEn' and 'nameFr'.
+- 'name': Clear English name.
+- 'category', 'storageReason', 'storageTip' in English.
+- Provide both 'nameEn' and 'nameFr'.
 
-For each distinct food item identified in the image:
-1. name: Precise item name translated to ${language === "FR" ? "French" : "English"}.
-2. nameFr: French translation of item name.
-3. nameEn: English translation of item name.
-4. brand: Brand name extracted from packaging/receipt, or null if unbranded fresh produce.
-5. barcode: 12-digit UPC or 13-digit EAN code read from packaging, or null if absent.
-6. category: Food category.
-7. quantity: Number extracted from packaging/receipt or visual estimation.
-8. unit: "pcs", "pack", "carton", "bottle", "can", "box", "bag", "lbs", "oz", "fl oz", "kg", "g", "L", "gal".
-9. recommendedLocation: "Fridge", "Pantry", or "Freezer".
-10. storageReason: Why this compartment is recommended.
-11. estimatedShelfLifeDays: Days before spoilage.
-12. monthsFrozenShelfLife: Recommended maximum frozen storage duration in months at 0°F.
-13. confidence: 0.0 to 1.0.
-14. storageTip: Practical tip to maximize freshness.
-15. detectedText: Key printed label or receipt text read via OCR.
-16. printedExpirationDate: Date string (preferably YYYY-MM-DD) if stamped on packaging, else null.
+Always respond with structured JSON following the specified schema. Return every identified item or flyer deal in the 'items' array.`;
 
-Always respond with structured JSON following the specified schema. If multiple items or receipt lines are detected, return all items in the "items" array.`;
-
-  const promptText = `Examine this photo thoroughly. Perform full optical character recognition (OCR) to read all text, product packaging labels, brand names, barcodes / UPC codes, grocery receipts, net weights, and any printed expiration or best-by dates. Return complete inventory attributes for each item with detectedText, brand, barcode, and printedExpirationDate when visible. Ensure item names, categories, and recommendations are translated according to user language preference.`;
+  const promptText = `Examine this image with expert vision intelligence.
+If this is a grocery flyer, circular ad, or weekly deals clipping (e.g., Super C or Quebec grocery deals):
+- Extract ALL promotional food deals shown on the circular page with deal prices (e.g., $1.48/lb, $3.88/lb, $11.97, $0.95), brand names, net contents, categories, and storage recommendations.
+If this is a grocery haul, open fridge, or pantry shelf:
+- Detect and extract ALL distinct food items visible.
+If this is a single packaged product or fresh produce:
+- Perform full optical character recognition (OCR) to read all text, product packaging labels, brand names, barcodes / UPC codes, net weights, and any printed expiration or best-by dates.
+Translate item names and categories to ${language === "FR" ? "French" : "English"} with bilingual name fields.`;
 
   try {
     console.log(`[Pantryo Vision] Starting image analysis. Base64 length: ${cleanBase64.length} chars, mimeType: ${mimeType}`);
@@ -166,6 +220,10 @@ Always respond with structured JSON following the specified schema. If multiple 
               monthsFrozenShelfLife: {
                 type: Type.INTEGER,
                 description: "Recommended maximum frozen storage duration in months",
+              },
+              price: {
+                type: Type.STRING,
+                description: "Deal or package price if visible on circular or label (e.g. '$1.48 / lb', '$3.88', '$11.97', '$0.95')",
               },
               brand: {
                 type: Type.STRING,
@@ -372,6 +430,7 @@ Always respond with structured JSON following the specified schema. If multiple 
         gradeOrigin: (item.gradeOrigin ? String(item.gradeOrigin).trim() : null) || packagingInsight.gradeOrigin,
         packagingFormat: (item.packagingFormat ? String(item.packagingFormat).trim() : null) || (language === "FR" ? packagingInsight.packagingFormat : packagingInsight.packagingFormatEn),
         dietaryBadges: Array.isArray(item.dietaryBadges) && item.dietaryBadges.length > 0 ? item.dietaryBadges : packagingInsight.dietaryBadges,
+        price: (item.price ? String(item.price).trim() : null) || packagingInsight.price || undefined,
         netContent: (item.netContent ? String(item.netContent).trim() : null) || packagingInsight.netContent,
         barcode: barcodeStr || undefined,
         detectedText: item.detectedText ? String(item.detectedText).trim() : packagingInsight.detectedText,
@@ -404,9 +463,247 @@ Always respond with structured JSON following the specified schema. If multiple 
       scannedAt: now.toISOString(),
     };
   } catch (error) {
-    console.error("[Pantryo - Gemini Vision Error]:", error);
+    console.warn("[Pantryo - Gemini Vision Note]:", error.message, "- Trying offline OCR & Quebec packaging analyzer fallback...");
+
+    try {
+      const imageBuffer = Buffer.from(cleanBase64, "base64");
+      const ocrResult = await Tesseract.recognize(imageBuffer, "fra+eng");
+      const ocrText = ocrResult?.data?.text?.trim() || "";
+
+      if (ocrText && ocrText.length > 3) {
+        const fallbackItems = analyzeMultiItemPackagingText(ocrText, language);
+        if (fallbackItems && fallbackItems.length > 0) {
+          const isFr = (language || "EN").toUpperCase() === "FR";
+          const now = new Date();
+          const itemsWithDates = fallbackItems.map((fi) => {
+            const days = fi.estimatedShelfLifeDays || 7;
+            const targetExp = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+            return {
+              ...fi,
+              suggestedExpirationDate: targetExp.toISOString().split("T")[0],
+            };
+          });
+
+          return {
+            success: true,
+            summary: isFr
+              ? `Reconnaissance locale réussie (${itemsWithDates.length} article(s) détecté(s)).`
+              : `Local vision recognition completed (${itemsWithDates.length} item(s) detected).`,
+            itemsCount: itemsWithDates.length,
+            items: itemsWithDates,
+            demoMode: true,
+            scannedAt: now.toISOString(),
+          };
+        }
+      }
+    } catch (fallbackErr) {
+      console.warn("[Pantryo Vision] Local fallback OCR also failed:", fallbackErr.message);
+    }
+
     throw new Error(`Failed to parse food image with Gemini Vision: ${error.message}`);
   }
+}
+
+/**
+ * Specialized Supermarket Flyer & Circular Scanner
+ * Highly trained on Super C, Metro, Maxi, IGA weekly circulars, deal pages,
+ * and circular screenshots (e.g. superc.ca/flyer).
+ * 
+ * @param {string} base64Data - Raw base64-encoded image string
+ * @param {string} mimeType - Standard image MIME type
+ * @param {string} language - "FR" or "EN"
+ */
+export async function analyzeFlyerImage(base64Data, mimeType = "image/jpeg", language = "FR") {
+  if (!base64Data || typeof base64Data !== "string") {
+    throw new Error("Invalid image payload: base64Data is required as a string.");
+  }
+
+  const cleanBase64 = base64Data.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, "").trim();
+  const isFr = (language || "FR").toUpperCase() === "FR";
+
+  const ai = getGeminiClient();
+
+  const flyerSystemInstruction = `You are Pantryo's elite supermarket flyer and promotional circular parser.
+You are specifically trained on Canadian grocery flyer pictures and circular clippings across all Canadian supermarket banners:
+- Super C (Metro Inc. discount chain - "Beau, bon, pas cher")
+- Maxi & Maxi Cie (Loblaw discount chain in Quebec - "Imbattable")
+- No Frills (Loblaw discount chain - "Won't Be Beat", "Hauler deals")
+- Metro & Metro Plus (Full-service supermarket, Moi Rewards)
+- IGA & IGA Extra / Sobeys (Full-service supermarket, Scène+ Rewards)
+- Food Basics (Metro discount chain in Ontario - "Always More for Less")
+- FreshCo & Chalo FreshCo (Sobeys discount chain - "Cheaper makes you Cheerful")
+- Real Canadian Superstore / RCSS & Loblaws (Large-format grocery, PC Optimum)
+- Walmart Canada Supercentre (Grocery flyer deals, "Rollback / Chute de prix")
+- Costco Wholesale Canada (Member Instant Savings / Épargnes membres)
+
+FLYER ANATOMY & CANADIAN PROMOTIONAL DEALS DETECTION:
+Inspect this circular / flyer page photograph, clipping, or screenshot and extract EVERY promoted grocery deal shown.
+Each promotional deal tile typically features:
+1. Product name (bilingual FR & EN): Provide specific canonical names (e.g. "Raisins rouges sans pépins" / "Seedless Red Grapes", "Filet de porc frais" / "Fresh Pork Tenderloin", "Yogourt grec Oikos" / "Oikos Greek Yogurt", "Poulet entier frais" / "Fresh Whole Chicken").
+2. Brand name: Canadian private labels (Sélection, Irrésistibles, Sans Nom / No Name, Le Choix du Président / PC, Compliments, Panache, Great Value, Kirkland Signature) or national brands (Olymel, Maple Leaf, Black Diamond, Québon, Natrel, Lactantia, Five Roses, Robin Hood, Oasis, St-Hubert, Clark, La Cage, Oikos, Iögo, Astro, Activia, Liberté).
+3. Deal promotional price: Parse Canadian price conventions:
+   - Dual lb/kg pricing: e.g. "$1.48 / lb ($3.26 / kg)", "$3.88 / lb ($8.55 / kg)", "$6.99 / lb ($15.41 / kg)".
+   - Flat promotional prices: e.g. "$0.99 ch.", "$3.99", "$4.44", "$11.97", "$0.95".
+   - Multi-unit promotions: e.g. "2 POUR 5,00 $ / 2 FOR $5.00", "3 POUR 7,00 $", "4 FOR $10.00".
+4. Net content or pack size: e.g. "10 kg", "750 g", "650 g", "375-400g", "960 mL", "5 lb", "10 lb", "2 L", "4 L", "540 mL", "398 mL".
+5. Promotional badge: e.g. "Prix membre PC Optimum", "Points Scène+", "Circulaire Super C", "Imbattable Maxi", "Rollback Walmart", "Aliments du Québec", "100% Lait canadien".
+6. Food category, optimal compartment ('Fridge', 'Pantry', or 'Freezer'), and estimated shelf life.
+
+Output ALL deals in the 'items' array with bilingual names (nameFr and nameEn).`;
+
+  const flyerPrompt = `Analyze this Canadian supermarket flyer / circular page photograph. Detect the store chain (Super C, Maxi, No Frills, Metro, IGA, Food Basics, FreshCo, Walmart, Costco), and extract all promotional deals with their product name, brand, deal price, unit, category, and storage recommendations. Translate to ${isFr ? "French" : "English"} with bilingual name fields.`;
+
+  const flyerSchema = {
+    type: Type.OBJECT,
+    properties: {
+      summary: {
+        type: Type.STRING,
+        description: "Summary of flyer deals parsed and store circular name if detected",
+      },
+      storeName: {
+        type: Type.STRING,
+        description: "Store name (e.g., 'Super C', 'Metro', 'Maxi', 'IGA')",
+      },
+      items: {
+        type: Type.ARRAY,
+        description: "List of promotional food deals extracted from the flyer",
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            name: { type: Type.STRING },
+            nameFr: { type: Type.STRING },
+            nameEn: { type: Type.STRING },
+            brand: { type: Type.STRING },
+            price: { type: Type.STRING, description: "Promotional deal price (e.g. '$1.48 / lb', '$3.88 / lb', '$4.44', '$11.97')" },
+            category: { type: Type.STRING },
+            quantity: { type: Type.NUMBER },
+            unit: { type: Type.STRING },
+            netContent: { type: Type.STRING },
+            recommendedLocation: { type: Type.STRING, description: "'Fridge', 'Pantry', or 'Freezer'" },
+            estimatedShelfLifeDays: { type: Type.INTEGER },
+            monthsFrozenShelfLife: { type: Type.INTEGER },
+            storageTip: { type: Type.STRING },
+            storageReason: { type: Type.STRING },
+            dietaryBadges: { type: Type.ARRAY, items: { type: Type.STRING } },
+            gradeOrigin: { type: Type.STRING },
+            confidence: { type: Type.NUMBER },
+          },
+          required: ["name", "category", "quantity", "unit", "recommendedLocation", "estimatedShelfLifeDays", "monthsFrozenShelfLife"],
+        },
+      },
+    },
+    required: ["summary", "items"],
+  };
+
+  const modelCandidates = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-flash-latest"];
+  let response = null;
+  let lastError = null;
+
+  for (const modelName of modelCandidates) {
+    try {
+      console.log(`[Pantryo Flyer Vision] Analyzing flyer with model: ${modelName}`);
+      response = await ai.models.generateContent({
+        model: modelName,
+        contents: {
+          parts: [
+            {
+              inlineData: {
+                mimeType: mimeType || "image/jpeg",
+                data: cleanBase64,
+              },
+            },
+            {
+              text: flyerPrompt,
+            },
+          ],
+        },
+        config: {
+          systemInstruction: flyerSystemInstruction,
+          temperature: 0.1,
+          responseMimeType: "application/json",
+          responseSchema: flyerSchema,
+        },
+      });
+
+      if (response && response.text) {
+        break;
+      }
+    } catch (err) {
+      lastError = err;
+      console.warn(`[Pantryo Flyer Vision] Model ${modelName} error:`, err.message);
+    }
+  }
+
+  if (response && response.text) {
+    let sanitizedJson = response.text.trim();
+    if (sanitizedJson.startsWith("```json")) {
+      sanitizedJson = sanitizedJson.replace(/^```json\s*/, "").replace(/\s*```$/, "");
+    } else if (sanitizedJson.startsWith("```")) {
+      sanitizedJson = sanitizedJson.replace(/^```\s*/, "").replace(/\s*```$/, "");
+    }
+
+    try {
+      const parsedData = JSON.parse(sanitizedJson);
+      const now = new Date();
+      const normalized = (parsedData.items || []).map((item) => {
+        const days = typeof item.estimatedShelfLifeDays === "number" ? item.estimatedShelfLifeDays : 7;
+        const targetExp = new Date(now.getTime() + days * 86400000);
+        return {
+          ...item,
+          suggestedExpirationDate: targetExp.toISOString().split("T")[0],
+          confidence: typeof item.confidence === "number" ? item.confidence : 0.96,
+        };
+      });
+
+      return {
+        success: true,
+        summary: parsedData.summary || `Extracted ${normalized.length} promotional flyer deal(s).`,
+        storeName: parsedData.storeName || "Super C",
+        itemsCount: normalized.length,
+        items: normalized,
+        scannedAt: now.toISOString(),
+      };
+    } catch (e) {
+      console.warn("[Pantryo Flyer Vision] JSON parse failed, falling back to local catalog parser:", e.message);
+    }
+  }
+
+  // Fallback to local OCR + Quebec grocery catalog
+  try {
+    const imageBuffer = Buffer.from(cleanBase64, "base64");
+    const ocrResult = await Tesseract.recognize(imageBuffer, "fra+eng");
+    const ocrText = ocrResult?.data?.text?.trim() || "";
+
+    if (ocrText && ocrText.length > 3) {
+      const items = analyzeMultiItemPackagingText(ocrText, language);
+      if (items.length > 0) {
+        const now = new Date();
+        const normalized = items.map((i) => {
+          const days = i.estimatedShelfLifeDays || 7;
+          return {
+            ...i,
+            suggestedExpirationDate: new Date(now.getTime() + days * 86400000).toISOString().split("T")[0],
+          };
+        });
+
+        return {
+          success: true,
+          summary: isFr
+            ? `Circulaire Super C numérisée (${normalized.length} rabais extraits).`
+            : `Super C circular analyzed (${normalized.length} flyer deals extracted).`,
+          storeName: "Super C",
+          itemsCount: normalized.length,
+          items: normalized,
+          demoMode: true,
+          scannedAt: now.toISOString(),
+        };
+      }
+    }
+  } catch (e) {
+    console.warn("[Pantryo Flyer Vision] Local OCR fallback note:", e.message);
+  }
+
+  throw lastError || new Error("Failed to extract flyer deals from image.");
 }
 
 /**
@@ -432,7 +729,8 @@ function parseReceiptTextFallback(receiptText, language = "FR") {
     "tel", "phone", "thank you", "welcome", "customer", "rewards", "points",
     "saving", "discount", "order #", "order id", "card #", "approved",
     "auth", "reference", "aid", "tvr", "tsi", "terminal", "lane", "station",
-    "deposit", "bottle deposit", "bag fee"
+    "deposit", "bottle deposit", "bag fee", "costco wholesale", "walmart supercenter",
+    "supermarché", "circulaire", "flyer", "weekly circular"
   ];
 
   const candidateLines = lines.filter((line) => {
@@ -497,10 +795,10 @@ function parseReceiptTextFallback(receiptText, language = "FR") {
       location = "Fridge";
       shelfLifeDays = 21;
       unit = "dozen";
-    } else if (lower.includes("yogurt") || lower.includes("kefir") || lower.includes("yogourt") || lower.includes("yogur")) {
+    } else if (lower.includes("yogurt") || lower.includes("kefir") || lower.includes("yogourt") || lower.includes("yogur") || lower.includes("yaourt") || lower.includes("oikos") || lower.includes("iogo") || lower.includes("iögo") || lower.includes("astro") || lower.includes("activia") || lower.includes("liberte") || lower.includes("liberté") || lower.includes("chobani") || lower.includes("skyr")) {
       category = "Dairy & Eggs";
       location = "Fridge";
-      shelfLifeDays = 10;
+      shelfLifeDays = 21;
       unit = "tub";
     } else if (lower.includes("beef") || lower.includes("steak") || lower.includes("ground beef") || lower.includes("ribeye") || lower.includes("boeuf") || lower.includes("bœuf") || lower.includes("res") || lower.includes("carne") || lower.includes("baka")) {
       category = "Meat & Seafood";
@@ -554,8 +852,19 @@ function parseReceiptTextFallback(receiptText, language = "FR") {
       unit = "box";
     }
 
+    let expandedCleaned = cleaned
+      .replace(/\bKS\s+ORG\b/i, "Kirkland Signature Organic")
+      .replace(/\bBONLESS\s+SKNLS\s+CHIK\s+BRST\b/i, "Boneless Skinless Chicken Breast")
+      .replace(/\bCHIK\s+BRST\b|\bCHKN\s+BRST\b/i, "Chicken Breast")
+      .replace(/\bGRND\s+BEEF\b|\bGND\s+BEEF\b/i, "Ground Beef")
+      .replace(/\bAPPLES\s+GALA\b/i, "Gala Apples")
+      .replace(/\bAPPLES\s+MCINTOSH\b/i, "McIntosh Apples")
+      .replace(/\bAPPLES\s+HONEYCRISP\b/i, "Honeycrisp Apples")
+      .replace(/\s+\d+PK\b/i, "")
+      .replace(/\s+\d+LB\b/i, "");
+
     // Capitalize properly
-    const friendlyName = cleaned
+    const friendlyName = expandedCleaned
       .toLowerCase()
       .split(" ")
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
@@ -572,20 +881,32 @@ function parseReceiptTextFallback(receiptText, language = "FR") {
     else if (lower.includes("oatly")) brand = "Oatly";
     else if (lower.includes("barilla")) brand = "Barilla";
 
+    const isFr = (language || "FR").toUpperCase().startsWith("FR");
+    const biling = getBilingualNames(friendlyName, isFr ? "FR" : "EN");
+
     const targetExp = new Date(now.getTime() + shelfLifeDays * 24 * 60 * 60 * 1000);
 
+    const locFr = location === "Fridge" ? "réfrigérateur" : location === "Freezer" ? "congélateur" : "garde-manger";
+    const locEn = location.toLowerCase();
+
     items.push({
-      name: friendlyName,
+      name: isFr ? (biling.nameFr || friendlyName) : (biling.nameEn || friendlyName),
+      nameFr: biling.nameFr || friendlyName,
+      nameEn: biling.nameEn || friendlyName,
       brand,
       category,
       quantity,
       unit,
       recommendedLocation: location,
-      storageReason: `Preserve peak flavor and texture in ${location.toLowerCase()}.`,
+      storageReason: isFr
+        ? `Conserver au ${locFr} pour préserver la fraîcheur et la qualité optimale.`
+        : `Preserve peak flavor and texture in ${locEn}.`,
       estimatedShelfLifeDays: shelfLifeDays,
       monthsFrozenShelfLife: location === "Freezer" ? 6 : 4,
       confidence: 0.88,
-      storageTip: `Keep sealed and stored in ${location.toLowerCase()}.`,
+      storageTip: isFr
+        ? `Garder scellé et ranger au ${locFr}.`
+        : `Keep sealed and stored in ${locEn}.`,
       suggestedExpirationDate: targetExp.toISOString().split("T")[0],
       detectedText: rawLine,
     });

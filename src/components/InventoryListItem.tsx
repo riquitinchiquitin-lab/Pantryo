@@ -48,7 +48,8 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
   const isFreezer = item.locationType === 'FREEZER';
   const daysLeft = item.daysUntilExpiration;
   const isSoon = item.isExpiringSoon || (daysLeft !== null && daysLeft <= 3);
-  const visual = getFoodVisual(item.name, item.categoryName);
+  const displayName = lang === 'FR' ? (item.nameFr || item.name) : (item.nameEn || item.name);
+  const visual = getFoodVisual(displayName, item.categoryName);
   const CategoryIcon = visual.icon;
 
   if (!isExpanded) {
@@ -97,7 +98,7 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
           {/* Food Type Image & Icon Badge */}
           <div className="shrink-0">
             <FoodVisualBadge
-              itemName={item.name}
+              itemName={displayName}
               categoryName={item.categoryName}
               imageUrl={item.imageUrl}
               size="sm"
@@ -107,7 +108,7 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
           {/* Title & Quantity */}
           <div className="min-w-0 flex-1">
             <h3 className="font-bold text-xs sm:text-sm text-[#1F3323] truncate leading-tight group-hover:text-emerald-900 transition-colors">
-              {item.name}
+              {displayName}
             </h3>
             <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#EDF3EC] text-[#344837] inline-block">
@@ -170,7 +171,7 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
         {/* Food Type Image & Icon Badge */}
         <div className="shrink-0">
           <FoodVisualBadge
-            itemName={item.name}
+            itemName={displayName}
             categoryName={item.categoryName}
             imageUrl={item.imageUrl}
             size="md"
@@ -181,7 +182,7 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-1.5">
             <h3 className="font-bold text-xs sm:text-sm text-[#1F3323] truncate leading-snug">
-              {item.name}
+              {displayName}
             </h3>
 
             {/* Storage Location Badge (Top Right) */}

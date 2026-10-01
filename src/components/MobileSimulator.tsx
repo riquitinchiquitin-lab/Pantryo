@@ -295,7 +295,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   const [plannedMeals, setPlannedMeals] = useState<PlannedMeal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const [scannerInitialMode, setScannerInitialMode] = useState<'snap' | 'receipt' | 'barcode' | 'upload' | 'presets'>('snap');
+  const [scannerInitialMode, setScannerInitialMode] = useState<'snap' | 'receipt' | 'barcode' | 'upload' | 'presets' | 'produce' | 'flyer'>('snap');
   const [isAddEditModalOpen, setIsAddEditModalOpen] = useState(false);
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
@@ -2263,48 +2263,33 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               </div>
             </button>
 
-            {/* Option 2: Camera Photo Scan */}
+            {/* Option 2: Smart Unified Camera Photo Scan (Produce, Grocery, Receipt) */}
             <button
               type="button"
+              id="add-smart-camera-scan-btn"
               onClick={() => {
                 setIsAddMenuOpen(false);
                 setScannerInitialMode('snap');
                 setIsScannerOpen(true);
               }}
-              className="w-full p-4 rounded-3xl bg-white hover:bg-[#F6F2E8] border-2 border-[#E5DFD0] hover:border-teal-400 flex items-center gap-4 text-left transition-all active:scale-[0.98] shadow-xs group"
+              className="w-full p-4 rounded-3xl bg-white hover:bg-teal-50/70 border-2 border-teal-600/30 hover:border-teal-500 flex items-center gap-4 text-left transition-all active:scale-[0.98] shadow-xs group"
             >
-              <div className="w-12 h-12 rounded-2xl bg-[#0E766E] group-hover:bg-[#0B5C56] text-white flex items-center justify-center shadow-xs shrink-0 transition-colors">
-                <Camera className="w-6 h-6 text-teal-200" />
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#0D3B37] via-[#0E766E] to-teal-500 text-white flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition-transform">
+                <Camera className="w-6 h-6 text-teal-100" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-extrabold text-[#0D3B37]">
-                  {lang === 'FR' ? 'Scanner un aliment par photo' : 'Scan Item (Camera)'}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-extrabold text-[#0D3B37]">
+                    {lang === 'FR' ? 'Photographier (Scanner Intelligent)' : 'Snap Photo (Smart Scanner)'}
+                  </p>
+                  <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-950 border border-emerald-300">
+                    Auto-IA
+                  </span>
+                </div>
                 <p className="text-xs text-[#527470]">
-                  {lang === 'FR' ? 'Prenez des photos en rafale, l’ajout continue en arrière-plan' : 'Continuous background scanning as you take pictures'}
-                </p>
-              </div>
-            </button>
-
-            {/* Option 3: Receipt Scan */}
-            <button
-              type="button"
-              onClick={() => {
-                setIsAddMenuOpen(false);
-                setScannerInitialMode('receipt');
-                setIsScannerOpen(true);
-              }}
-              className="w-full p-4 rounded-3xl bg-white hover:bg-[#F6F2E8] border-2 border-[#E5DFD0] hover:border-amber-400 flex items-center gap-4 text-left transition-all active:scale-[0.98] shadow-xs group"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-amber-600 group-hover:bg-amber-700 text-white flex items-center justify-center shadow-xs shrink-0 transition-colors">
-                <FileText className="w-6 h-6 text-amber-200" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-extrabold text-[#0D3B37]">
-                  {lang === 'FR' ? 'Scanner un reçu d’épicerie' : 'Scan Grocery Receipt'}
-                </p>
-                <p className="text-xs text-[#527470]">
-                  {lang === 'FR' ? 'Numérisez votre facture Maxi, IGA, Métro ou Costco' : 'OCR scan for Maxi, IGA, Metro, Costco receipt'}
+                  {lang === 'FR'
+                    ? 'Détecte automatiquement fruits, légumes, emballages, reçus et codes-barres'
+                    : 'Auto-detects fresh produce, packaged foods, receipts, and barcodes'}
                 </p>
               </div>
             </button>
@@ -2357,6 +2342,37 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                   {lang === 'FR'
                     ? 'Souper de ce soir, fête philippine (lechon, riz...), ou plats enregistrés'
                     : 'Tonight’s dinner, Filipino party (lechon, rice...), or saved items'}
+                </p>
+              </div>
+            </button>
+
+            {/* Option 5: Canadian Grocery Flyers (Maxi, Super C, No Frills, Metro, IGA, Walmart) */}
+            <button
+              type="button"
+              id="add-canadian-flyers-option"
+              onClick={() => {
+                setIsAddMenuOpen(false);
+                setScannerInitialMode('flyer');
+                setIsScannerOpen(true);
+              }}
+              className="w-full p-4 rounded-3xl bg-white hover:bg-rose-50/70 border-2 border-rose-600/30 hover:border-rose-500 flex items-center gap-4 text-left transition-all active:scale-[0.98] shadow-xs group cursor-pointer"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-rose-700 via-rose-600 to-amber-500 text-white flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition-transform">
+                <ShoppingBag className="w-6 h-6 text-rose-100" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-extrabold text-[#0D3B37]">
+                    {lang === 'FR' ? 'Circulaires d’épicerie canadiennes' : 'Canadian Grocery Flyers'}
+                  </p>
+                  <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-rose-100 text-rose-900 border border-rose-300">
+                    🇨🇦 Photos & IA
+                  </span>
+                </div>
+                <p className="text-xs text-[#527470]">
+                  {lang === 'FR'
+                    ? 'Maxi, Super C, No Frills, Metro, IGA, Walmart : photos de circulaires, yogourts et rabais $/lb'
+                    : 'Maxi, Super C, No Frills, Metro, IGA, Walmart: flyer pictures, yogurts & $/lb deals'}
                 </p>
               </div>
             </button>

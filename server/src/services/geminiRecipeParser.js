@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import Tesseract from "tesseract.js";
 import { validateSafeExternalUrl, safeFetch } from "./ssrfGuard.js";
+import { getBilingualNames, translateFoodItem } from "./foodTranslator.js";
 
 /**
  * Pantryo - Gemini Recipe Parser Service
@@ -564,9 +565,10 @@ export function parseRecipeTextDirectly(text, { language = "EN", source = "Perso
         locationType = "PANTRY";
       }
 
+      const biling = getBilingualNames(name, language);
       ingredients.push({
-        name,
-        nameFr: name,
+        name: biling.nameEn || name,
+        nameFr: biling.nameFr || name,
         amount,
         category,
         locationType,
@@ -579,10 +581,14 @@ export function parseRecipeTextDirectly(text, { language = "EN", source = "Perso
     }
   }
 
+  const titleBiling = getBilingualNames(titleCandidate, language);
+  const resolvedTitleEn = titleBiling.nameEn || titleCandidate;
+  const resolvedTitleFr = titleBiling.nameFr || titleCandidate;
+
   if (ingredients.length === 0 && instructions.length > 0) {
     ingredients.push({
-      name: titleCandidate,
-      nameFr: titleCandidate,
+      name: resolvedTitleEn,
+      nameFr: resolvedTitleFr,
       amount: "1 portion",
       category: "Pantry",
       locationType: "PANTRY",
@@ -599,8 +605,8 @@ export function parseRecipeTextDirectly(text, { language = "EN", source = "Perso
   const recipeId = `rec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   return {
     id: recipeId,
-    title: titleCandidate,
-    titleFr: titleCandidate,
+    title: resolvedTitleEn,
+    titleFr: resolvedTitleFr,
     ricardoUrlEn: youtubeUrl || "",
     ricardoUrlFr: youtubeUrl || "",
     youtubeUrl: youtubeUrl || null,

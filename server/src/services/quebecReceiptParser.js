@@ -4,6 +4,8 @@
  * and international receipts with department headers, discounts, weight scales, and brand decoding.
  */
 
+import { getBilingualNames, translateFoodItem } from "./foodTranslator.js";
+
 const DEPARTMENT_HEADERS = {
   // French headers
   "EPICERIE": { category: "Garde-manger", categoryEn: "Pantry Staples", location: "Pantry", shelfLife: 60, unit: "pcs" },
@@ -45,6 +47,7 @@ const DEPARTMENT_HEADERS = {
 };
 
 const IGNORE_PATTERNS = [
+  /^(?:costco|walmart|super\s*c|maxi|metro|iga|provigo|loblaws|no\s*frills)\b/i,
   /^(?:bienvenue\s+chez|welcome\s+to)/i,
   /^programme\s+moi/i,
   /^num[eé]ro\s+de\s+carte/i,
@@ -242,7 +245,14 @@ export function parseQuebecReceiptText(rawReceiptText, language = "FR") {
     // 7. General cleanup if not in dictionary
     if (!matchedNameFr) {
       // Remove punctuation and clean
-      let clean = itemText.replace(/[._]/g, " ").replace(/\s+/g, " ").trim();
+      let clean = itemText
+        .replace(/\bBONLESS\s+SKNLS\s+CHIK\s+BRST\b/i, "Boneless Skinless Chicken Breast")
+        .replace(/\bCHIK\s+BRST\b|\bCHKN\s+BRST\b/i, "Chicken Breast")
+        .replace(/\bGRND\s+BEEF\b|\bGND\s+BEEF\b/i, "Ground Beef")
+        .replace(/\bKS\s+ORG\b/i, "Kirkland Signature Organic")
+        .replace(/[._]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
 
       // Brand extractions
       if (/^SE\s+|\bSE\b/i.test(clean)) {
@@ -266,8 +276,9 @@ export function parseQuebecReceiptText(rawReceiptText, language = "FR") {
         .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
         .join(" ");
 
-      matchedNameFr = clean;
-      matchedNameEn = clean;
+      const biling = getBilingualNames(clean, language);
+      matchedNameFr = biling.nameFr || clean;
+      matchedNameEn = biling.nameEn || clean;
     }
 
     // Assign final localized name
