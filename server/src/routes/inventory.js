@@ -162,6 +162,7 @@ let activityLogs = [];
 router.post("/scan", async (req, res) => {
   try {
     const { imageBase64, mimeType = "image/jpeg", language = "EN" } = req.body;
+    console.log(`[Pantryo Scan] 📸 Picture scan received (mime: ${mimeType}, lang: ${language}, approx: ${Math.round((imageBase64?.length || 0) * 0.75 / 1024)} KB)`);
 
     if (!imageBase64) {
       return res.status(400).json({
@@ -181,6 +182,7 @@ router.post("/scan", async (req, res) => {
     if (isApiKeyConfigured) {
       try {
         const result = await analyzeFoodImage(imageBase64, mimeType, language);
+        console.log(`[Pantryo Scan] ✅ Detected item: "${result.item?.name}" (method: ${result.detectionMethod || 'Gemini Vision'}, confidence: ${result.confidence})`);
         return res.status(200).json(result);
       } catch (err) {
         console.warn("[Inventory Route] Gemini vision call failed, falling back to OCR & catalog:", err.message);
