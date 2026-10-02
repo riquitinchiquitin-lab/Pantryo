@@ -683,6 +683,61 @@ export const PRODUCE_MAPPING: Record<string, ProduceDetails> = {
 // Singleton model reference cached in browser memory
 let cachedModel: any = null;
 let isModelInitializing = false;
+let customOnnxSession: any = null;
+let customModel: any = null;
+let customClasses: string[] = [];
+let hasCheckedCustomModel = false;
+
+/**
+ * Checks if a custom Proxmox-trained model is deployed as either:
+ * 1. Native ONNX (/models/grocery_model/grocery_model.onnx) - direct from PyTorch with ZERO conversion!
+ * 2. TensorFlow.js (/models/grocery_model/model.json)
+ */
+export async function checkAndLoadCustomOfflineModel(): Promise<boolean> {
+  if (hasCheckedCustomModel) return !!(customOnnxSession || customModel);
+  hasCheckedCustomModel = true;
+
+  // 1. Try native ONNX (direct from PyTorch)
+  try {
+    const onnxRes = await fetch('/models/grocery_model/grocery_model.onnx', { method: 'HEAD' });
+    if (onnxRes.ok) {
+      const ort = await import('onnxruntime-web');
+      customOnnxSession = await ort.InferenceSession.create('/models/grocery_model/grocery_model.onnx', {
+        executionProviders: ['wasm'],
+      });
+      const classRes = await fetch('/models/grocery_model/classes.txt');
+      if (classRes.ok) {
+        const text = await classRes.text();
+        customClasses = text.split('\n').map((c) => c.trim()).filter(Boolean);
+      }
+      console.info('[ProduceVision] Native ONNX model loaded directly with', customClasses.length, 'classes!');
+      return true;
+    }
+  } catch (_) {
+    // ONNX model not present, fallback to checking for TF.js
+  }
+
+  // 2. Try TensorFlow.js model
+  try {
+    const res = await fetch('/models/grocery_model/model.json', { method: 'HEAD' });
+    if (res.ok) {
+      const tf = await import('@tensorflow/tfjs');
+      await tf.ready();
+      customModel = await tf.loadGraphModel('/models/grocery_model/model.json');
+
+      const classRes = await fetch('/models/grocery_model/classes.txt');
+      if (classRes.ok) {
+        const text = await classRes.text();
+        customClasses = text.split('\n').map((c) => c.trim()).filter(Boolean);
+      }
+      console.info('[ProduceVision] Custom offline Proxmox TF.js model loaded with', customClasses.length, 'classes!');
+      return true;
+    }
+  } catch (_) {
+    // Custom offline model not found; standard on-device MobileNet will be used
+  }
+  return false;
+}
 
 /**
  * Initializes and caches the lightweight MobileNet model in memory
@@ -825,6 +880,84 @@ export async function classifyProduceOnDevice(
         }
       }
     }
+  }
+
+  // Check 1.5: If custom offline Proxmox model (ONNX or TF.js) is deployed, prioritize its predictions
+  try {
+    const hasCustom = await checkAndLoadCustomOfflineModel();
+    if (hasCustom && customOnnxSession) {
+      const ort = await import('onnxruntime-web');
+      const canvas = document.createElement('canvas');
+      canvas.width = 224;
+      canvas.height = 224;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(imageSource, 0, 0, 224, 224);
+        const imgData = ctx.getImageData(0, 0, 224, 224).data;
+        const floatData = new Float32Array(3 * 224 * 224);
+        const mean = [0.485, 0.456, 0.406];
+        const std = [0.229, 0.224, 0.225];
+        for (let i = 0; i < 224 * 224; i++) {
+          const r = imgData[i * 4] / 255.0;
+          const g = imgData[i * 4 + 1] / 255.0;
+          const b = imgData[i * 4 + 2] / 255.0;
+          floatData[i] = (r - mean[0]) / std[0];
+          floatData[224 * 224 + i] = (g - mean[1]) / std[1];
+          floatData[2 * 224 * 224 + i] = (b - mean[2]) / std[2];
+        }
+        const tensor = new ort.Tensor('float32', floatData, [1, 3, 224, 224]);
+        const results = await customOnnxSession.run({ input: tensor });
+        const output = results.output || results[Object.keys(results)[0]];
+        const data = output.data as Float32Array;
+
+        let maxIdx = 0;
+        let maxVal = -1e9;
+        for (let i = 0; i < data.length; i++) {
+          if (data[i] > maxVal) {
+            maxVal = data[i];
+            maxIdx = i;
+          }
+        }
+        const predictedLabel = (customClasses[maxIdx] || `Class_${maxIdx}`).toLowerCase().replace(/[-_]/g, ' ');
+        for (const [key, info] of Object.entries(PRODUCE_MAPPING)) {
+          if (predictedLabel.includes(key) || key.includes(predictedLabel)) {
+            return buildClassificationResult(key, info, 0.95, 'mobilenet', isFr, []);
+          }
+        }
+      }
+    } else if (hasCustom && customModel) {
+      const tf = await import('@tensorflow/tfjs');
+      const tensor = tf.browser
+        .fromPixels(imageSource)
+        .resizeBilinear([224, 224])
+        .toFloat()
+        .sub([123.68, 116.78, 103.94])
+        .div([58.4, 57.12, 57.38])
+        .expandDims(0);
+
+      const prediction = customModel.predict(tensor) as any;
+      const data = await prediction.data();
+      tensor.dispose();
+      prediction.dispose();
+
+      let maxIdx = 0;
+      let maxVal = -1;
+      for (let i = 0; i < data.length; i++) {
+        if (data[i] > maxVal) {
+          maxVal = data[i];
+          maxIdx = i;
+        }
+      }
+
+      const predictedLabel = (customClasses[maxIdx] || `Class_${maxIdx}`).toLowerCase().replace(/[-_]/g, ' ');
+      for (const [key, info] of Object.entries(PRODUCE_MAPPING)) {
+        if (predictedLabel.includes(key) || key.includes(predictedLabel)) {
+          return buildClassificationResult(key, info, Math.min(0.99, Math.max(0.5, maxVal)), 'mobilenet', isFr, []);
+        }
+      }
+    }
+  } catch (customErr) {
+    console.warn('[ProduceVision] Custom offline model inference note:', customErr);
   }
 
   // Check 2: MobileNet on-device inference

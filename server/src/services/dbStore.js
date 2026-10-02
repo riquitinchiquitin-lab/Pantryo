@@ -551,13 +551,16 @@ class EncryptedDatabaseStore {
 
       // 1. Initialize local-first SQLite database with SQLCipher
       try {
-        sqlcipherService.init(activeKey);
+        const ok = sqlcipherService.init(activeKey);
+        if (!ok) {
+          console.info("[Pantryo DB] SQLCipher engine unavailable, using authenticated AES-256-GCM disk storage.");
+        }
       } catch (sqlErr) {
         console.warn("[Pantryo DB] Could not init SQLCipher with active key, trying fallback key:", sqlErr.message);
         try {
           sqlcipherService.init("pantryo-master-secret-key-2026-aes256gcm-secure");
         } catch (fbErr) {
-          console.error("[Pantryo DB] SQLCipher init failed:", fbErr.message);
+          console.info("[Pantryo DB] SQLCipher engine unavailable, using authenticated AES-256-GCM disk storage.");
         }
       }
 

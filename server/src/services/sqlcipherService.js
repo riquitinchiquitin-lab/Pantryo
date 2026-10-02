@@ -97,6 +97,11 @@ export class SqlcipherService {
         this.db.pragma("synchronous = NORMAL");
         this.db.pragma("foreign_keys = ON");
         this.db.prepare("SELECT 1").get();
+      } else if (err.message && (err.message.includes("Could not locate the bindings file") || err.message.includes("bindings"))) {
+        console.warn("[SQLCipher] Native binary bindings are missing or uncompiled. Falling back seamlessly to authenticated AES-256-GCM file-level database persistence.");
+        this.isInitialized = false;
+        this.db = null;
+        return false;
       } else {
         console.error("[SQLCipher] Failed to initialize encrypted SQLite database:", err.message);
         this.isInitialized = false;
