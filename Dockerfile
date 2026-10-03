@@ -53,7 +53,7 @@ COPY --from=builder --chown=node:node /app/server ./server
 COPY --from=builder --chown=node:node /app/public ./public
 
 # Ensure write permissions for node user on server data directory
-RUN chown -R node:node /app/server/data
+RUN chown -R node:node /app/server/data && chmod -R 777 /app/server/data
 
 # Switch to non-root user
 USER node

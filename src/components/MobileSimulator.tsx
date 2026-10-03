@@ -128,17 +128,18 @@ function getStoredMembers(): User[] {
   return DEFAULT_MEMBERS;
 }
 
-function getInitialActiveUser(members: User[]): User {
+function getInitialActiveUser(members: User[]): User | null {
   try {
     const savedId = localStorage.getItem(LOCAL_STORAGE_ACTIVE_USER_ID);
-    if (savedId) {
+    const token = localStorage.getItem('pantryo_auth_token');
+    if (savedId && token) {
       const found = members.find((m) => m.id === savedId);
       if (found) return found;
     }
   } catch (e) {
     console.error('Failed reading active user from localStorage:', e);
   }
-  return members[0] || DEFAULT_MEMBERS[0];
+  return null;
 }
 
 interface MobileSimulatorProps {
@@ -221,23 +222,51 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
     return getInitialActiveUser(list);
   });
 
-  // When installed, preserve household session and ensure seamless continuity
+  // When installed, preserve household session only if user is actively authenticated
   useEffect(() => {
-    if (isInstalledEffective) {
+    if (isInstalledEffective && currentUser) {
       try {
         localStorage.setItem('pantryo_pwa_installed', 'true');
-        const active = currentUser || householdMembers[0] || DEFAULT_MEMBERS[0];
-        if (active) {
-          localStorage.setItem(LOCAL_STORAGE_ACTIVE_USER_ID, active.id);
-          if (!currentUser) {
-            setCurrentUser(active);
-          }
-        }
+        localStorage.setItem(LOCAL_STORAGE_ACTIVE_USER_ID, currentUser.id);
       } catch (e) {
         console.warn('Error saving installed state:', e);
       }
     }
-  }, [isInstalledEffective, currentUser, householdMembers]);
+  }, [isInstalledEffective, currentUser]);
+
+  // Validate active session token against server on initial mount
+  useEffect(() => {
+    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('pantryo_auth_token') : null;
+    const savedId = typeof localStorage !== 'undefined' ? localStorage.getItem(LOCAL_STORAGE_ACTIVE_USER_ID) : null;
+
+    if (token && savedId) {
+      fetch('/api/v1/auth/me', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-auth-token': token,
+        },
+      })
+        .then((res) => {
+          if (!res.ok) {
+            console.warn('[Pantryo Auth] Saved session token invalid or expired. Prompting sign in.');
+            localStorage.removeItem(LOCAL_STORAGE_ACTIVE_USER_ID);
+            localStorage.removeItem('pantryo_auth_token');
+            setCurrentUser(null);
+          } else {
+            res.json().then((data) => {
+              if (data?.user) {
+                setCurrentUser((prev) => (prev ? { ...prev, ...data.user } : data.user));
+              }
+            });
+          }
+        })
+        .catch((err) => {
+          console.warn('[Pantryo Auth] Offline session check note:', err);
+        });
+    } else if (!token && currentUser) {
+      setCurrentUser(null);
+    }
+  }, []);
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);

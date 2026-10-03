@@ -124,6 +124,12 @@ export const OnboardingFlowModal: React.FC<OnboardingFlowModalProps> = ({
           return;
         }
 
+        if (data.token) {
+          try {
+            localStorage.setItem('pantryo_auth_token', data.token);
+          } catch (_) {}
+        }
+
         onComplete(data.user);
       } else {
         // Member must change password
@@ -139,6 +145,12 @@ export const OnboardingFlowModal: React.FC<OnboardingFlowModalProps> = ({
         if (!res.ok) {
           setError(data.error || (lang === 'FR' ? 'Erreur lors du changement' : 'Password change failed'));
           return;
+        }
+
+        if (data.token) {
+          try {
+            localStorage.setItem('pantryo_auth_token', data.token);
+          } catch (_) {}
         }
 
         // Also update avatar if changed

@@ -32,15 +32,15 @@ function findUser(identifier) {
  */
 router.get("/policy", (req, res) => {
   try {
-    const policy = dbStore.fido2Policy || { allUsersRequired: true, enforced: true };
+    const policy = dbStore.fido2Policy || { allUsersRequired: false, enforced: false };
     const totalUsers = dbStore.users.length;
     const compliantUsers = dbStore.users.filter(
       (u) => Boolean(u.fido2Enabled && u.fido2Credentials?.length > 0)
     ).length;
 
     res.json({
-      allUsersRequired: policy.allUsersRequired ?? true,
-      enforced: policy.enforced ?? true,
+      allUsersRequired: policy.allUsersRequired ?? false,
+      enforced: policy.enforced ?? false,
       totalUsers,
       compliantUsers,
       nonCompliantUsers: totalUsers - compliantUsers,
@@ -81,7 +81,7 @@ router.get("/status/:userId", (req, res) => {
       lastUsedAt: c.lastUsedAt || null,
     }));
 
-    const isGlobalEnforced = dbStore.fido2Policy?.allUsersRequired ?? true;
+    const isGlobalEnforced = dbStore.fido2Policy?.allUsersRequired ?? false;
     const hasCredentials = Boolean(user.fido2Enabled && credentials.length > 0);
     const hasTotp = Boolean(user.totpEnabled && user.totpSecret);
 
@@ -498,7 +498,7 @@ router.post("/toggle-enforcement", requireAdmin, (req, res) => {
     res.json({
       success: true,
       fido2Enforced: user.fido2Enforced,
-      allUsersRequired: dbStore.fido2Policy?.allUsersRequired ?? true,
+      allUsersRequired: dbStore.fido2Policy?.allUsersRequired ?? false,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -1,13 +1,11 @@
+import "dotenv/config";
 import express from "express";
 import http from "http";
 import path from "path";
-import dotenv from "dotenv";
 import inventoryRouter from "./server/src/routes/inventory.js";
 import recipesRouter from "./server/src/routes/recipes.js";
 import adminRouter from "./server/src/routes/admin.js";
 import authFido2Router from "./server/src/routes/authFido2.js";
-
-dotenv.config();
 
 // Ensure DISABLE_HMR is set in development for AI Studio environment
 if (process.env.DISABLE_HMR === undefined) {

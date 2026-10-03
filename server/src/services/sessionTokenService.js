@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
-import { dbStore } from "./dbStore.js";
+import { dbStore, getActiveServerKey } from "./dbStore.js";
 
 // Session secret key derived from persistent environment or cryptographically generated file
 function getSessionSecret() {
@@ -26,8 +26,9 @@ function getSessionSecret() {
     fs.writeFileSync(secretFile, generated, { encoding: "utf8", mode: 0o600 });
     return generated;
   } catch {
-    // Ephemeral random secret if filesystem is completely read-only
-    return crypto.randomBytes(32).toString("hex");
+    // Stable HMAC fallback derived from master key so sessions survive restarts on readonly volumes
+    const master = getActiveServerKey();
+    return crypto.createHmac("sha256", master).update("pantryo-session-salt-stable-v1").digest("hex");
   }
 }
 

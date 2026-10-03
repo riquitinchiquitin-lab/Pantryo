@@ -205,10 +205,16 @@ export async function validatePasswordNist(password, context = {}) {
 
   for (const term of contextTerms) {
     if (term.length >= 3 && lower.includes(term)) {
-      errors.push(
-        `Password must not contain context-specific terms such as your name, username, email, or application name ("${term}").`
-      );
-      break;
+      if (normalized.length >= 15) {
+        warnings.push(
+          `NIST advisory: Password contains term ("${term}"). Consider avoiding application or account names in passphrases.`
+        );
+      } else {
+        errors.push(
+          `Password must not contain context-specific terms such as your name, username, email, or application name ("${term}").`
+        );
+        break;
+      }
     }
   }
 

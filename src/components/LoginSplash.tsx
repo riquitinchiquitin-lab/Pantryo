@@ -58,7 +58,10 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
   const [loading, setLoading] = useState(false);
   const [webAuthnSupported, setWebAuthnSupported] = useState(false);
 
-  const [directUsername, setDirectUsername] = useState('');
+  const [directUsername, setDirectUsername] = useState('admin');
+  const [loginMode, setLoginMode] = useState<'profiles' | 'direct'>(() =>
+    householdMembers && householdMembers.length > 0 ? 'profiles' : 'direct'
+  );
 
   // Auto-fetch users from server on mount if clean or empty
   useEffect(() => {
@@ -100,7 +103,7 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Authentication failed');
+        throw new Error(data.error || (lang === 'FR' ? 'Identifiants incorrects' : 'Authentication failed'));
       }
 
       if (data.token) {
@@ -109,9 +112,27 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
         } catch (_) {}
       }
 
-      onLoginSuccess(data.user);
+      const authenticatedUser: User = data.user;
+
+      if (authenticatedUser.mustChangePassword || authenticatedUser.mustSetupProfile) {
+        setOnboardingUser(authenticatedUser);
+        return;
+      }
+
+      if (data.requires2FA) {
+        setFidoModal({
+          isOpen: true,
+          targetUser: authenticatedUser,
+          mode: data.requiresEnrollment ? 'ENROLL_MANDATORY' : 'VERIFY',
+          preferredMethod: 'totp',
+          loginType: 'password',
+        });
+        return;
+      }
+
+      onLoginSuccess(authenticatedUser);
     } catch (err: any) {
-      setError(err.message || 'Login error');
+      setError(err.message || (lang === 'FR' ? 'Erreur de connexion' : 'Login error'));
     } finally {
       setLoading(false);
     }
@@ -221,6 +242,12 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
         return;
       }
 
+      if (data.token) {
+        try {
+          localStorage.setItem('pantryo_auth_token', data.token);
+        } catch (_) {}
+      }
+
       const authenticatedUser: User = data.user || selectedUser;
 
       // 1. Check if user is required to setup personalized credentials or change password
@@ -277,12 +304,7 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
         .catch(() => {});
     }
 
-    // Now proceed immediately to mandatory FIDO2 passkey registration
-    setFidoModal({
-      isOpen: true,
-      targetUser: updatedUser,
-      mode: 'ENROLL_MANDATORY',
-    });
+    onLoginSuccess(updatedUser);
   };
 
   return (
@@ -303,7 +325,42 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
 
       {/* Main Login Card */}
       <div className="w-full max-w-md bg-white/95 backdrop-blur-md border border-[#E5DFD0] rounded-3xl p-6 sm:p-7 shadow-xl space-y-6">
-        {householdMembers.length === 0 ? (
+        {/* Login Mode Switcher */}
+        {householdMembers.length > 0 && (
+          <div className="flex bg-[#F0EBE0] p-1 rounded-2xl border border-[#E0D9C8]">
+            <button
+              type="button"
+              onClick={() => {
+                setLoginMode('profiles');
+                setError('');
+              }}
+              className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                loginMode === 'profiles'
+                  ? 'bg-teal-800 text-white shadow-xs'
+                  : 'text-[#476B66] hover:text-[#0D3B37]'
+              }`}
+            >
+              {lang === 'FR' ? 'Profils de cuisine' : 'Household Profiles'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setLoginMode('direct');
+                setError('');
+                if (!directUsername) setDirectUsername('admin');
+              }}
+              className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                loginMode === 'direct'
+                  ? 'bg-teal-800 text-white shadow-xs'
+                  : 'text-[#476B66] hover:text-[#0D3B37]'
+              }`}
+            >
+              {lang === 'FR' ? 'Identifiant / Admin' : 'Username / Admin'}
+            </button>
+          </div>
+        )}
+
+        {(householdMembers.length === 0 || loginMode === 'direct') ? (
           /* ======================================================== */
           /* DIRECT CREDENTIALS LOGIN VIEW                            */
           /* ======================================================== */
@@ -320,8 +377,8 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
               </h2>
               <p className="text-xs text-[#527470]">
                 {lang === 'FR'
-                  ? 'Connectez-vous pour accéder à votre cuisine et inventaire Pantryo.'
-                  : 'Log in to access your Pantryo kitchen inventory.'}
+                  ? 'Connectez-vous avec votre identifiant administrateur (« admin » ou « yan ») ou votre courriel.'
+                  : 'Sign in with your administrator username ("admin" or "yan") or email.'}
               </p>
             </div>
 
@@ -538,13 +595,13 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
                     </button>
                   </div>
 
-                  {/* 2nd Factor 6 digits reminder for password logins */}
+                  {/* Security indicator for password logins */}
                   <div className="flex items-center gap-1.5 pt-1 text-[11px] text-teal-800 font-medium">
-                    <Smartphone className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+                    <ShieldCheck className="w-3.5 h-3.5 text-teal-700 shrink-0" />
                     <span>
                       {lang === 'FR'
-                        ? '2ème facteur requis après mot de passe : code à 6 chiffres (Google Authenticator / TOTP)'
-                        : '2nd factor required after password: 6-digit code (Google Authenticator / TOTP)'}
+                        ? 'Chiffrement sécurisé des mots de passe (NIST SP 800-63B)'
+                        : 'NIST SP 800-63B Secure Authentication'}
                     </span>
                   </div>
                 </div>

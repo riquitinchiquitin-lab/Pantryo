@@ -396,7 +396,7 @@ router.post("/reset", requireAdmin, (req, res) => {
  */
 router.get("/users", requireAdmin, (req, res) => {
   try {
-    const isGlobalEnforced = dbStore.fido2Policy?.allUsersRequired ?? true;
+    const isGlobalEnforced = Boolean(dbStore.fido2Policy?.allUsersRequired);
     const safeUsers = dbStore.users.map(({ passwordHash, recoveryCodes, totpSecret, ...u }) => {
       const hasCreds = Boolean(u.fido2Enabled && u.fido2Credentials?.length > 0);
       return {
@@ -626,7 +626,7 @@ router.delete("/users/:id", requireAdmin, (req, res) => {
     const { id } = req.params;
     const result = dbStore.deleteUser(id);
 
-    const isGlobalEnforced = dbStore.fido2Policy?.allUsersRequired ?? true;
+    const isGlobalEnforced = Boolean(dbStore.fido2Policy?.allUsersRequired);
     const safeUsers = dbStore.users.map(({ passwordHash, recoveryCodes, totpSecret, ...u }) => {
       const hasCreds = Boolean(u.fido2Enabled && u.fido2Credentials?.length > 0);
       return {
@@ -708,9 +708,11 @@ router.post("/users/:id/password", requireAdmin, async (req, res) => {
       });
     }
 
-    dbStore.setUserPassword(req.params.id, validation.normalized);
+    dbStore.setUserPassword(user.id, validation.normalized);
+    const refreshedToken = issueSessionToken(user);
     res.json({
       success: true,
+      token: refreshedToken,
       message: "Password updated successfully in compliance with NIST SP 800-63B.",
       validation: {
         entropyBits: validation.entropyBits,
@@ -765,6 +767,7 @@ router.post("/users/:id/complete-setup", async (req, res) => {
       success: true,
       message: "Personalized administrator account successfully initialized. Default password has been removed.",
       user: updatedUser,
+      token: issueSessionToken(updatedUser),
     });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -809,6 +812,7 @@ router.post("/users/:id/change-password", async (req, res) => {
       success: true,
       message: "Password changed successfully.",
       user: updatedUser,
+      token: issueSessionToken(updatedUser),
     });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -857,12 +861,14 @@ router.post("/login", async (req, res) => {
     rateLimiter.recordSuccess(clientIp, username);
 
     const user = authResult.user;
-    const isGlobalEnforced = dbStore.fido2Policy?.allUsersRequired ?? true;
+    const isGlobalEnforced = Boolean(dbStore.fido2Policy?.allUsersRequired);
     const hasCreds = Boolean(user.fido2Enabled && user.fido2Credentials && user.fido2Credentials.length > 0);
     const hasTotp = Boolean(user.totpEnabled);
 
-    // If global policy or user policy mandates 2FA (FIDO2 or 6-digit TOTP):
-    if (isGlobalEnforced || user.fido2Enforced) {
+    // Only challenge for 2FA if:
+    // - User explicitly has fido2Enforced enabled OR
+    // - Global policy enforces 2FA AND user has enrolled credentials or TOTP
+    if (user.fido2Enforced || (isGlobalEnforced && (hasCreds || hasTotp))) {
       if (hasCreds) {
         return res.json({
           success: true,
@@ -871,7 +877,7 @@ router.post("/login", async (req, res) => {
           userId: user.id,
           user,
           hasTotp,
-          message: "FIDO2 2FA verification required for all users.",
+          message: "FIDO2 2FA verification required.",
         });
       } else if (hasTotp) {
         return res.json({
@@ -882,16 +888,6 @@ router.post("/login", async (req, res) => {
           user,
           hasTotp: true,
           message: "2ème facteur à 6 chiffres requis.",
-        });
-      } else {
-        return res.json({
-          success: true,
-          requires2FA: true,
-          requiresEnrollment: true,
-          authType: "2FA_ENROLLMENT_REQUIRED",
-          userId: user.id,
-          user,
-          message: "Enrôlement 2FA (Passkey ou Code à 6 chiffres) obligatoire.",
         });
       }
     }
@@ -904,6 +900,23 @@ router.post("/login", async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+/**
+ * GET /api/v1/auth/me
+ * Validates the caller's session token and returns the current user profile
+ */
+router.get("/me", (req, res) => {
+  const authUser = getAuthenticatedUserFromRequest(req);
+  if (!authUser) {
+    return res.status(401).json({ error: "Session invalid or expired" });
+  }
+
+  const { passwordHash, recoveryCodes, totpSecret, ...safeUser } = authUser;
+  res.json({
+    success: true,
+    user: safeUser,
+  });
 });
 
 export default router;

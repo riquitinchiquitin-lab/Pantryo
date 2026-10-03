@@ -771,9 +771,15 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
         body: JSON.stringify({ password: newPasswordValue }),
       });
 
+      const data = await res.json();
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to update password');
+        throw new Error(data.error || 'Failed to update password');
+      }
+
+      if (data.token && selectedUserForPassword.id === currentUser?.id) {
+        try {
+          localStorage.setItem('pantryo_auth_token', data.token);
+        } catch (_) {}
       }
 
       setSelectedUserForPassword(null);
