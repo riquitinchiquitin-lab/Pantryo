@@ -824,9 +824,10 @@ class EncryptedDatabaseStore {
       kitchenName: this.household?.name || process.env.KITCHEN_NAME || "The Yan & Kriz Kitchen",
       appUrl: this.systemSettings?.appUrl || process.env.APP_URL || "http://localhost:3000",
       geminiApiKey: includeSensitiveKeys
-        ? (this.systemSettings?.geminiApiKey || process.env.GEMINI_API_KEY || "")
-        : (this.systemSettings?.geminiApiKey || process.env.GEMINI_API_KEY ? "••••••••••••••••" : ""),
-      hasGeminiKey: Boolean(this.systemSettings?.geminiApiKey || process.env.GEMINI_API_KEY),
+        ? (process.env.GEMINI_API_KEY || this.systemSettings?.geminiApiKey || "")
+        : (process.env.GEMINI_API_KEY || this.systemSettings?.geminiApiKey ? "••••••••••••••••" : ""),
+      hasGeminiKey: Boolean(process.env.GEMINI_API_KEY || this.systemSettings?.geminiApiKey),
+      isGoogleManagedKey: Boolean(process.env.GEMINI_API_KEY),
       cloudflareTunnelToken: includeSensitiveKeys
         ? (this.systemSettings?.cloudflareTunnelToken || process.env.CLOUDFLARE_TUNNEL_TOKEN || "")
         : (this.systemSettings?.cloudflareTunnelToken || process.env.CLOUDFLARE_TUNNEL_TOKEN ? "••••••••••••••••" : ""),

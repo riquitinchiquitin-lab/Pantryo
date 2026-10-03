@@ -2,6 +2,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import Tesseract from "tesseract.js";
 import { validateSafeExternalUrl, safeFetch } from "./ssrfGuard.js";
 import { getBilingualNames, translateFoodItem } from "./foodTranslator.js";
+import { dbStore } from "./dbStore.js";
 
 /**
  * Pantryo - Gemini Recipe Parser Service
@@ -15,8 +16,8 @@ let aiClient = null;
 
 function getGeminiClient() {
   if (!aiClient) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
+    const apiKey = (process.env.GEMINI_API_KEY || dbStore?.systemSettings?.geminiApiKey || "").trim();
+    if (!apiKey || apiKey === "MY_GEMINI_API_KEY" || apiKey.startsWith("your_")) {
       throw new Error(
         "GEMINI_API_KEY environment variable is missing. Please configure it in your environment or Settings > Secrets."
       );

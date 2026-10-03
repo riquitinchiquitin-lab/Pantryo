@@ -118,6 +118,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     appUrl: string;
     geminiApiKey: string;
     hasGeminiKey: boolean;
+    isGoogleManagedKey?: boolean;
     cloudflareTunnelToken: string;
     hasTunnelToken: boolean;
     expoPublicApiUrl: string;
@@ -2453,16 +2454,23 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                   </div>
 
                   <div className="space-y-2">
-                    <label className="font-bold text-[#0D3B37] block text-[11px]">
-                      {lang === 'FR' ? 'Clé API Google Gemini (GEMINI_API_KEY)' : 'Google Gemini API Key (GEMINI_API_KEY)'}
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="font-bold text-[#0D3B37] block text-[11px]">
+                        {lang === 'FR' ? 'Clé API Google Gemini (GEMINI_API_KEY)' : 'Google Gemini API Key (GEMINI_API_KEY)'}
+                      </label>
+                      {settings.isGoogleManagedKey && (
+                        <span className="text-[10px] font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200">
+                          {lang === 'FR' ? '✨ Gérée par Google AI Studio' : '✨ Managed by Google AI Studio'}
+                        </span>
+                      )}
+                    </div>
                     <div className="flex gap-2">
                       <div className="relative flex-1">
                         <input
                           type={showGeminiKey ? 'text' : 'password'}
                           value={settings.geminiApiKey}
                           onChange={(e) => setSettings({ ...settings, geminiApiKey: e.target.value })}
-                          placeholder="AIzaSy..."
+                          placeholder={settings.isGoogleManagedKey ? 'Gérée par l’environnement Google (vide = auto)' : 'AIzaSy...'}
                           className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-[#D5CEBD] bg-[#FAF7EE] focus:bg-white focus:outline-teal-800 text-xs font-mono text-[#0D3B37]"
                         />
                         <button
@@ -2477,7 +2485,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                       <button
                         type="button"
                         onClick={handleTestGeminiKey}
-                        disabled={isTestingGemini || !settings.geminiApiKey}
+                        disabled={isTestingGemini || (!settings.geminiApiKey && !settings.hasGeminiKey)}
                         className="px-4 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer shrink-0"
                       >
                         {isTestingGemini ? (

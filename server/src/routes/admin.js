@@ -256,9 +256,10 @@ router.post("/settings", requireAdmin, (req, res) => {
 router.post("/test-gemini", requireAdmin, async (req, res) => {
   try {
     const { apiKey } = req.body;
-    const keyToTest = (apiKey || process.env.GEMINI_API_KEY || "").trim();
+    const cleanInputKey = apiKey && !apiKey.includes("•") ? apiKey.trim() : "";
+    const keyToTest = (cleanInputKey || process.env.GEMINI_API_KEY || dbStore?.systemSettings?.geminiApiKey || "").trim();
     if (!keyToTest) {
-      return res.status(400).json({ error: "Aucune clé API Gemini fournie à tester." });
+      return res.status(400).json({ error: "Aucune clé API Gemini fournie à tester (non trouvée dans l'environnement Google ni dans les paramètres)." });
     }
 
     const { GoogleGenAI } = await import("@google/genai");
@@ -270,15 +271,17 @@ router.post("/test-gemini", requireAdmin, async (req, res) => {
     });
 
     const response = await testClient.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash",
       contents: "Respond with the word 'OK' to test connectivity.",
     });
 
     const reply = response?.text?.trim() || "OK";
+    resetVisionGemini();
+    resetRecipeGemini();
     res.json({
       success: true,
       message: "Connexion API Gemini validée avec succès ! Les fonctionnalités Vision & Recettes IA sont opérationnelles.",
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash",
       reply,
     });
   } catch (err) {
