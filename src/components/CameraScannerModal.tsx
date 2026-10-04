@@ -562,12 +562,19 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
           });
           winningMethod = 'packaging';
           winningMethodLabel = lang === 'FR' ? '✨ Yogourt & Produits laitiers' : '✨ Yogurt & Dairy';
-        } else if (serverData.identifiedMethod === 'produce_plu') {
+        } else if (
+          serverData.identifiedMethod === 'produce_plu' ||
+          serverData.identifiedMethod === 'produce' ||
+          serverData.source === 'gemini_produce_vision' ||
+          serverData.source === 'plu_sticker' ||
+          serverData.source === 'local_produce_model' ||
+          serverData.source === 'produce_keyword'
+        ) {
           items = serverData.items;
           winningMethod = 'produce';
           winningMethodLabel = lang === 'FR'
-            ? (serverData.summary || 'Fruit ou légume frais (PLU)')
-            : 'Fresh produce (PLU sticker)';
+            ? (serverData.summary || 'Fruit ou légume frais')
+            : (serverData.summary || 'Fresh produce');
         } else {
           items = serverData.items;
           winningMethod = serverData.identifiedMethod === 'flyer' ? 'flyer' : 'packaging';
