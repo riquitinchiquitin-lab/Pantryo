@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgBunny" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#DCFCE7" />
+      <stop offset="100%" stop-color="#4ADE80" />
+    </linearGradient>
+    <linearGradient id="carrotGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FB923C" />
+      <stop offset="100%" stop-color="#EA580C" />
+    </linearGradient>
+    <filter id="shadowBunny" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#14532D" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Background Circle -->
+  <circle cx="100" cy="100" r="98" fill="url(#bgBunny)" stroke="#16A34A" stroke-width="4"/>
+
+  <!-- Bunny Ears (Tall and cute) -->
+  <g filter="url(#shadowBunny)">
+    <!-- Left Ear -->
+    <ellipse cx="70" cy="46" rx="14" ry="38" fill="#FFFFFF" transform="rotate(-10 70 46)"/>
+    <ellipse cx="70" cy="46" rx="8" ry="28" fill="#F472B6" opacity="0.6" transform="rotate(-10 70 46)"/>
+    <!-- Right Ear (slightly folded/tilted) -->
+    <ellipse cx="130" cy="46" rx="14" ry="38" fill="#FFFFFF" transform="rotate(10 130 46)"/>
+    <ellipse cx="130" cy="46" rx="8" ry="28" fill="#F472B6" opacity="0.6" transform="rotate(10 130 46)"/>
+
+    <!-- Bunny Head & Body -->
+    <path d="M50 185 C50 130 62 88 100 88 C138 88 150 130 150 185 Z" fill="#F8FAFC"/>
+    <ellipse cx="100" cy="126" rx="44" ry="38" fill="#FFFFFF"/>
+  </g>
+
+  <!-- Bunny Cheeks & Whiskers -->
+  <circle cx="68" cy="136" r="9" fill="#FB7185" opacity="0.5"/>
+  <circle cx="132" cy="136" r="9" fill="#FB7185" opacity="0.5"/>
+  <path d="M66 136 L44 134 M66 141 L42 144" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/>
+  <path d="M134 136 L156 134 M134 141 L158 144" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Big Sparkling Cartoon Eyes -->
+  <ellipse cx="82" cy="120" rx="7" ry="10" fill="#1E293B"/>
+  <ellipse cx="118" cy="120" rx="7" ry="10" fill="#1E293B"/>
+  <circle cx="79.5" cy="116" r="3" fill="#FFFFFF"/>
+  <circle cx="115.5" cy="116" r="3" fill="#FFFFFF"/>
+  <circle cx="84" cy="122" r="1.2" fill="#FFFFFF"/>
+  <circle cx="120" cy="122" r="1.2" fill="#FFFFFF"/>
+
+  <!-- Tiny Pink Nose & Bunny Teeth Smile -->
+  <polygon points="100,132 95,127 105,127" fill="#F43F5E"/>
+  <path d="M96 134 Q100 138 104 134" stroke="#94A3B8" stroke-width="2" fill="none"/>
+  <!-- Cute two front teeth -->
+  <rect x="97" y="137" width="6" height="5" rx="1" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1"/>
+  <line x1="100" y1="137" x2="100" y2="142" stroke="#CBD5E1" stroke-width="1"/>
+
+  <!-- Denim Overalls -->
+  <g filter="url(#shadowBunny)">
+    <path d="M64 175 L64 162 C64 162 76 160 100 160 C124 160 136 162 136 162 L136 185 Z" fill="#0284C7"/>
+    <!-- Straps -->
+    <line x1="72" y1="160" x2="78" y2="175" stroke="#0369A1" stroke-width="6" stroke-linecap="round"/>
+    <line x1="128" y1="160" x2="122" y2="175" stroke="#0369A1" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="76" cy="168" r="2.5" fill="#FCD34D"/>
+    <circle cx="124" cy="168" r="2.5" fill="#FCD34D"/>
+  </g>
+
+  <!-- Big Fresh Carrot held proudly -->
+  <g filter="url(#shadowBunny)" transform="rotate(-20 100 165)">
+    <!-- Carrot Greens -->
+    <path d="M100 135 C95 125 90 120 86 118" stroke="#16A34A" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+    <path d="M100 135 C100 122 102 116 100 112" stroke="#22C55E" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+    <path d="M100 135 C105 125 110 120 114 118" stroke="#16A34A" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+    <!-- Carrot Root -->
+    <polygon points="94,136 106,136 100,172" fill="url(#carrotGrad)"/>
+    <line x1="96" y1="144" x2="102" y2="144" stroke="#C2410C" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="98" y1="154" x2="103" y2="154" stroke="#C2410C" stroke-width="1.5" stroke-linecap="round"/>
+  </g>
+
+  <!-- Little Bunny Paws -->
+  <circle cx="86" cy="168" r="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5"/>
+  <circle cx="114" cy="168" r="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5"/>
+</svg>

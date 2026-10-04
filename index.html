@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <script>
+      (function() {
+        // Suppress [vite] console errors in AI Studio iframe environment
+        var _origError = console.error;
+        console.error = function() {
+          var a = arguments[0];
+          if (typeof a === 'string' && (a.indexOf('[vite]') !== -1 || a.indexOf('websocket') !== -1 || a.indexOf('WebSocket') !== -1)) {
+            return;
+          }
+          return _origError.apply(console, arguments);
+        };
+
+        // Mock Vite dev WebSocket to prevent connection failure loops in proxied preview
+        var OriginalWS = window.WebSocket;
+        if (!OriginalWS) return;
+
+        window.WebSocket = function(url, protocols) {
+          var isViteHmr = false;
+          if (typeof protocols === 'string' && (protocols === 'vite-hmr' || protocols === 'vite-ping')) {
+            isViteHmr = true;
+          } else if (Array.isArray(protocols) && (protocols.indexOf('vite-hmr') !== -1 || protocols.indexOf('vite-ping') !== -1)) {
+            isViteHmr = true;
+          } else if (typeof url === 'string' && (url.indexOf('vite-hmr') !== -1 || url.indexOf('token=') !== -1)) {
+            isViteHmr = true;
+          }
+
+          if (!isViteHmr) {
+            return new OriginalWS(url, protocols);
+          }
+
+          var listeners = {};
+          var dummy = {
+            url: url,
+            protocol: Array.isArray(protocols) ? protocols[0] : (protocols || ''),
+            readyState: 1,
+            OPEN: 1,
+            CONNECTING: 0,
+            CLOSING: 2,
+            CLOSED: 3,
+            send: function() {},
+            close: function() { dummy.readyState = 3; },
+            addEventListener: function(event, fn) {
+              if (!listeners[event]) listeners[event] = [];
+              listeners[event].push(fn);
+              if (event === 'open') {
+                setTimeout(function() {
+                  try { fn({ type: 'open', target: dummy }); } catch(e) {}
+                }, 0);
+              }
+            },
+            removeEventListener: function(event, fn) {
+              if (!listeners[event]) return;
+              listeners[event] = listeners[event].filter(function(cb) { return cb !== fn; });
+            }
+          };
+          return dummy;
+        };
+
+        window.WebSocket.prototype = OriginalWS.prototype;
+        window.WebSocket.CONNECTING = 0;
+        window.WebSocket.OPEN = 1;
+        window.WebSocket.CLOSING = 2;
+        window.WebSocket.CLOSED = 3;
+
+        // Safeguard navigator.getInstalledRelatedApps against iframe DOMException
+        try {
+          var isTopFrame = function() {
+            try { return window.self === window.top; } catch(_) { return false; }
+          };
+          var navProto = Object.getPrototypeOf(navigator) || (typeof Navigator !== 'undefined' ? Navigator.prototype : null);
+          if (navProto && 'getInstalledRelatedApps' in navProto) {
+            var origProtoMethod = navProto.getInstalledRelatedApps;
+            Object.defineProperty(navProto, 'getInstalledRelatedApps', {
+              value: function() {
+                if (!isTopFrame()) return Promise.resolve([]);
+                try {
+                  return origProtoMethod.apply(this, arguments).catch(function() { return []; });
+                } catch(_) {
+                  return Promise.resolve([]);
+                }
+              },
+              configurable: true,
+              writable: true
+            });
+          }
+          if ('getInstalledRelatedApps' in navigator) {
+            var origNavMethod = navigator.getInstalledRelatedApps;
+            Object.defineProperty(navigator, 'getInstalledRelatedApps', {
+              value: function() {
+                if (!isTopFrame()) return Promise.resolve([]);
+                try {
+                  return origNavMethod.apply(navigator, arguments).catch(function() { return []; });
+                } catch(_) {
+                  return Promise.resolve([]);
+                }
+              },
+              configurable: true,
+              writable: true
+            });
+          }
+        } catch(_) {}
+      })();
+    </script>
+    <meta charset="UTF-8" />
+    <base href="/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
+    <title>Pantryo</title>
+    <!-- Web App Manifest for Android Chrome, iOS Safari & Desktop PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="/pantryo-logo.svg" />
+    <link rel="alternate icon" type="image/png" href="/pantryo-logo.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/pwa-192x192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/pwa-512x512.png" />
+    <meta name="msapplication-TileColor" content="#0E766E" />
+    <meta name="msapplication-TileImage" content="/pwa-192x192.png" />
+    <!-- Standalone full-screen mobile app capabilities -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Pantryo" />
+    <meta name="application-name" content="Pantryo" />
+    <meta name="theme-color" content="#0E766E" />
+    <script>
+      // Immediate Service Worker registration for PWA installability
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/sw.js', { scope: '/' })
+            .then(function(reg) {
+              console.log('[Pantryo PWA] Service Worker registered on scope:', reg.scope);
+            })
+            .catch(function(err) {
+              console.warn('[Pantryo PWA] Service Worker registration note:', err);
+            });
+        });
+      }
+    </script>
+    <meta name="description" content="Smart food inventory tracking with grocery receipt parsing, photo/paste OCR scanning, meal planning calendar with date-to-date shopping list generation cross-checked against kitchen stock, visual food cuts, and multilingual French and English support." />
+    <meta property="og:title" content="Pantryo" />
+    <meta property="og:description" content="Smart food inventory tracking with grocery receipt parsing, photo/paste OCR scanning, meal planning calendar with date-to-date shopping list generation cross-checked against kitchen stock, visual food cuts, and multilingual French and English support." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

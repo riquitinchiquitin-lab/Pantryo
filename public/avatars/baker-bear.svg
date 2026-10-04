@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgBear" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FEF08A" />
+      <stop offset="100%" stop-color="#F59E0B" />
+    </linearGradient>
+    <linearGradient id="bearFur" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#B45309" />
+      <stop offset="100%" stop-color="#78350F" />
+    </linearGradient>
+    <linearGradient id="croissantGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FBBF24" />
+      <stop offset="100%" stop-color="#B45309" />
+    </linearGradient>
+    <filter id="shadowBear" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#451A03" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Background Circle -->
+  <circle cx="100" cy="100" r="98" fill="url(#bgBear)" stroke="#D97706" stroke-width="4"/>
+
+  <!-- Sparkles -->
+  <circle cx="35" cy="65" r="3" fill="#FFFFFF" opacity="0.7"/>
+  <circle cx="165" cy="75" r="4" fill="#FFFFFF" opacity="0.7"/>
+
+  <!-- Bear Ears -->
+  <g filter="url(#shadowBear)">
+    <circle cx="52" cy="62" r="22" fill="#92400E"/>
+    <circle cx="52" cy="62" r="14" fill="#FDE68A"/>
+    <circle cx="148" cy="62" r="22" fill="#92400E"/>
+    <circle cx="148" cy="62" r="14" fill="#FDE68A"/>
+
+    <!-- Bear Head & Body -->
+    <path d="M48 185 C48 125 58 76 100 76 C142 76 152 125 152 185 Z" fill="url(#bearFur)"/>
+    <ellipse cx="100" cy="118" rx="46" ry="42" fill="#92400E"/>
+    <!-- Muzzle -->
+    <ellipse cx="100" cy="132" rx="26" ry="20" fill="#FDE68A"/>
+  </g>
+
+  <!-- Flour dust smudge on cheek & forehead -->
+  <ellipse cx="78" cy="102" rx="7" ry="4" fill="#FFFFFF" opacity="0.65" transform="rotate(-15 78 102)"/>
+  <ellipse cx="122" cy="106" rx="6" ry="3.5" fill="#FFFFFF" opacity="0.65" transform="rotate(15 122 106)"/>
+
+  <!-- Eyes -->
+  <ellipse cx="80" cy="110" rx="7" ry="10" fill="#292524"/>
+  <ellipse cx="120" cy="110" rx="7" ry="10" fill="#292524"/>
+  <circle cx="77.5" cy="107" r="3" fill="#FFFFFF"/>
+  <circle cx="117.5" cy="107" r="3" fill="#FFFFFF"/>
+  <circle cx="82" cy="113" r="1" fill="#FFFFFF"/>
+  <circle cx="122" cy="113" r="1" fill="#FFFFFF"/>
+
+  <!-- Cheeks -->
+  <circle cx="66" cy="125" r="8" fill="#F43F5E" opacity="0.4"/>
+  <circle cx="134" cy="125" r="8" fill="#F43F5E" opacity="0.4"/>
+
+  <!-- Nose & Smile -->
+  <ellipse cx="100" cy="126" rx="9" ry="7" fill="#451A03"/>
+  <circle cx="98" cy="124" r="2" fill="#FFFFFF" opacity="0.5"/>
+  <path d="M100 133 L100 138 M93 138 Q100 146 107 138" stroke="#78350F" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+
+  <!-- Baker Chef Toque -->
+  <g filter="url(#shadowBear)">
+    <ellipse cx="78" cy="48" rx="16" ry="16" fill="#FFFFFF"/>
+    <ellipse cx="122" cy="48" rx="16" ry="16" fill="#FFFFFF"/>
+    <ellipse cx="100" cy="40" rx="22" ry="20" fill="#FFFFFF"/>
+    <rect x="74" y="58" width="52" height="18" rx="4" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
+    <line x1="84" y1="62" x2="84" y2="72" stroke="#CBD5E1" stroke-width="1.5"/>
+    <line x1="94" y1="62" x2="94" y2="72" stroke="#CBD5E1" stroke-width="1.5"/>
+    <line x1="106" y1="62" x2="106" y2="72" stroke="#CBD5E1" stroke-width="1.5"/>
+    <line x1="116" y1="62" x2="116" y2="72" stroke="#CBD5E1" stroke-width="1.5"/>
+  </g>
+
+  <!-- Paws holding golden croissant -->
+  <g filter="url(#shadowBear)">
+    <!-- Croissant -->
+    <path d="M78 174 C70 156 86 148 100 152 C114 148 130 156 122 174 C116 166 100 164 84 174 Z" fill="url(#croissantGrad)" stroke="#78350F" stroke-width="2"/>
+    <path d="M92 152 Q100 162 108 152" stroke="#78350F" stroke-width="1.5" fill="none"/>
+    <!-- Paws -->
+    <ellipse cx="72" cy="172" rx="10" ry="8" fill="#92400E" stroke="#78350F" stroke-width="1.5"/>
+    <ellipse cx="128" cy="172" rx="10" ry="8" fill="#92400E" stroke="#78350F" stroke-width="1.5"/>
+  </g>
+</svg>

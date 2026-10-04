@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <!-- Warm ivory rounded background -->
+  <rect width="100" height="100" rx="20" fill="#FAF7EE"/>
+  
+  <!-- Outer Pantry Arch & Letter 'P' Silhouette -->
+  <!-- Left stem and arched top -->
+  <path d="M16 92V36C16 20 28 12 48 12C68 12 84 20 84 38C84 54 74 62 58 64H50C48 64 46 66 46 68V92H16Z" fill="#0E766E"/>
+
+  <!-- Negative space: Upper 'P' bowl cutout -->
+  <path d="M36 26H48C60 26 66 31 66 38C66 45 60 50 48 50H36V26Z" fill="#FAF7EE"/>
+
+  <!-- Graceful inner swoop of the P loop -->
+  <path d="M48 50C54 50 62 48 62 38C62 30 56 26 48 26H36V50H48Z" fill="#FAF7EE"/>
+
+  <!-- Right Pantry Arch Frame (Outer border enclosing the shelf) -->
+  <path d="M84 40V92H80V60C80 58 82 56 84 56" stroke="#0E766E" stroke-width="4" stroke-linecap="round"/>
+  <path d="M56 60H84" stroke="#0E766E" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Horizontal Pantry Shelf -->
+  <rect x="24" y="89" width="60" height="4" rx="2" fill="#0E766E"/>
+
+  <!-- Lower Shelf Item 1: Glass Preserve Jar with Olive Motif -->
+  <g transform="translate(37, 68)">
+    <!-- Screw-top Jar Lid -->
+    <rect x="1" y="0" width="14" height="2.8" rx="0.8" fill="#0E766E"/>
+    <!-- Jar Neck -->
+    <rect x="3" y="2.8" width="10" height="1.8" rx="0.5" fill="#0E766E"/>
+    <!-- Jar Body -->
+    <rect x="0" y="4.5" width="16" height="16.5" rx="3.5" fill="#0E766E"/>
+    <!-- Jar Label (Ivory) -->
+    <rect x="2.5" y="7.5" width="11" height="10.5" rx="1.5" fill="#FAF7EE"/>
+    <!-- Olive on Label -->
+    <ellipse cx="8" cy="12.8" rx="2.5" ry="3.2" fill="#0E766E" transform="rotate(-15 8 12.8)"/>
+    <!-- Olive Stem -->
+    <path d="M8 9.8C8 8.8 8.8 8.2 10 8.2" stroke="#0E766E" stroke-width="0.9" stroke-linecap="round"/>
+  </g>
+
+  <!-- Lower Shelf Item 2: Flour / Grain Sack with Apple Motif -->
+  <g transform="translate(58, 65)">
+    <!-- Scalloped crinkle bag top -->
+    <path d="M2.5 4L5 1.5L8 3.5L11 1.5L14 3.5L16.5 1.5L19 4L18 7H3.5L2.5 4Z" fill="#0E766E"/>
+    <!-- Sack Body -->
+    <path d="M3.5 7C2.5 11 0.8 17.5 1.8 21.5C2.2 23.5 3.8 24 6 24H16C18.2 24 19.8 23.5 20.2 21.5C21.2 17.5 19.5 11 18.5 7H3.5Z" fill="#0E766E"/>
+    <!-- Apple Emblem (Ivory) -->
+    <circle cx="11" cy="15.5" r="4.2" fill="#FAF7EE"/>
+    <path d="M11 11.2V9.8" stroke="#FAF7EE" stroke-width="1" stroke-linecap="round"/>
+    <path d="M11 10.5C12.4 10 13.5 10.6 13.5 10.6C13.5 10.6 13 11.6 11.5 11.2" fill="#FAF7EE"/>
+  </g>
+</svg>

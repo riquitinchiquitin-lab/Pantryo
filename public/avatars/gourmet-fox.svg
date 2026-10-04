@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgFox" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E0E7FF" />
+      <stop offset="100%" stop-color="#818CF8" />
+    </linearGradient>
+    <linearGradient id="foxFur" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#F97316" />
+      <stop offset="100%" stop-color="#C2410C" />
+    </linearGradient>
+    <filter id="shadowFox" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#312E81" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Background Circle -->
+  <circle cx="100" cy="100" r="98" fill="url(#bgFox)" stroke="#6366F1" stroke-width="4"/>
+
+  <!-- Sparkles -->
+  <path d="M162 48 L164 52 L168 54 L164 56 L162 60 L160 56 L156 54 L160 52 Z" fill="#FDE047"/>
+  <path d="M38 120 L39.5 123 L43 124.5 L39.5 126 L38 129 L36.5 126 L33 124.5 L36.5 123 Z" fill="#FDE047"/>
+
+  <!-- Fox Ears -->
+  <g filter="url(#shadowFox)">
+    <!-- Left Ear -->
+    <polygon points="56,75 32,28 78,50" fill="#C2410C"/>
+    <polygon points="54,70 42,38 72,52" fill="#FFFFFF"/>
+    <polygon points="32,28 42,38 38,44" fill="#18181B"/>
+    <!-- Right Ear -->
+    <polygon points="144,75 168,28 122,50" fill="#C2410C"/>
+    <polygon points="146,70 158,38 128,52" fill="#FFFFFF"/>
+    <polygon points="168,28 158,38 162,44" fill="#18181B"/>
+
+    <!-- Fox Head & Body -->
+    <path d="M46 185 C46 128 58 80 100 80 C142 80 154 128 154 185 Z" fill="url(#foxFur)"/>
+    <polygon points="40,116 100,76 160,116 100,165" fill="url(#foxFur)"/>
+    <!-- White Cheeks & Muzzle -->
+    <polygon points="40,116 75,124 100,162 62,148" fill="#FFFFFF"/>
+    <polygon points="160,116 125,124 100,162 138,148" fill="#FFFFFF"/>
+    <polygon points="86,134 114,134 100,162" fill="#FFFFFF"/>
+  </g>
+
+  <!-- Big Sparkling Cartoon Eyes -->
+  <ellipse cx="78" cy="112" rx="7.5" ry="10" fill="#0F172A"/>
+  <ellipse cx="122" cy="112" rx="7.5" ry="10" fill="#0F172A"/>
+  <circle cx="75.5" cy="108" r="3" fill="#FFFFFF"/>
+  <circle cx="119.5" cy="108" r="3" fill="#FFFFFF"/>
+  <circle cx="80" cy="114" r="1.2" fill="#FFFFFF"/>
+  <circle cx="124" cy="114" r="1.2" fill="#FFFFFF"/>
+
+  <!-- Cheeks -->
+  <ellipse cx="64" cy="126" rx="7" ry="5" fill="#FB7185" opacity="0.6"/>
+  <ellipse cx="136" cy="126" rx="7" ry="5" fill="#FB7185" opacity="0.6"/>
+
+  <!-- Fox Nose & Smile -->
+  <polygon points="100,154 94,148 106,148" fill="#18181B"/>
+  <circle cx="98" cy="150" r="1.2" fill="#FFFFFF"/>
+  <path d="M96 156 Q100 160 104 156" stroke="#18181B" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+  <!-- Gourmet Teal Bowtie -->
+  <g filter="url(#shadowFox)">
+    <polygon points="76,170 100,178 76,186" fill="#0D9488"/>
+    <polygon points="124,170 100,178 124,186" fill="#0D9488"/>
+    <circle cx="100" cy="178" r="5" fill="#14B8A6"/>
+  </g>
+
+  <!-- Shiny Silver Fork -->
+  <g filter="url(#shadowFox)" transform="translate(138, 126) rotate(15)">
+    <rect x="0" y="16" width="3.5" height="34" rx="1.5" fill="#94A3B8"/>
+    <path d="M-4 0 L-4 12 C-4 18 8 18 8 12 L8 0 L6 0 L6 10 C6 13 -2 13 -2 10 L-2 0 Z" fill="#CBD5E1"/>
+    <rect x="1" y="0" width="2" height="10" fill="#CBD5E1"/>
+  </g>
+</svg>

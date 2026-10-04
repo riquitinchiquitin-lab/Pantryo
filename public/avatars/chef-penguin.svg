@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgPenguin" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#BAE6FD" />
+      <stop offset="100%" stop-color="#38BDF8" />
+    </linearGradient>
+    <filter id="shadowPen" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#0369A1" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Background Circle -->
+  <circle cx="100" cy="100" r="98" fill="url(#bgPenguin)" stroke="#0284C7" stroke-width="4"/>
+
+  <!-- Penguin Body -->
+  <g filter="url(#shadowPen)">
+    <!-- Black Outer Body -->
+    <path d="M50 185 C45 130 55 75 100 75 C145 75 155 130 150 185 Z" fill="#0F172A"/>
+    <!-- White Belly -->
+    <ellipse cx="100" cy="138" rx="36" ry="46" fill="#F8FAFC"/>
+    <!-- Flippers -->
+    <path d="M48 115 C35 130 36 155 48 170 C48 155 48 135 48 115 Z" fill="#1E293B"/>
+    <path d="M152 115 C165 130 164 155 152 170 C152 155 152 135 152 115 Z" fill="#1E293B"/>
+  </g>
+
+  <!-- Eyes -->
+  <ellipse cx="82" cy="104" rx="7" ry="10" fill="#0F172A"/>
+  <ellipse cx="118" cy="104" rx="7" ry="10" fill="#0F172A"/>
+  <circle cx="79.5" cy="100" r="3" fill="#FFFFFF"/>
+  <circle cx="115.5" cy="100" r="3" fill="#FFFFFF"/>
+  <circle cx="84" cy="106" r="1.2" fill="#FFFFFF"/>
+  <circle cx="120" cy="106" r="1.2" fill="#FFFFFF"/>
+
+  <!-- Cheeks -->
+  <circle cx="68" cy="116" r="7.5" fill="#FB7185" opacity="0.6"/>
+  <circle cx="132" cy="116" r="7.5" fill="#FB7185" opacity="0.6"/>
+
+  <!-- Orange Beak -->
+  <polygon points="100,108 88,118 112,118" fill="#F97316"/>
+  <polygon points="100,126 88,118 112,118" fill="#EA580C"/>
+
+  <!-- Chef Hat -->
+  <g filter="url(#shadowPen)">
+    <ellipse cx="78" cy="46" rx="16" ry="16" fill="#FFFFFF"/>
+    <ellipse cx="122" cy="46" rx="16" ry="16" fill="#FFFFFF"/>
+    <ellipse cx="100" cy="38" rx="22" ry="20" fill="#FFFFFF"/>
+    <rect x="74" y="56" width="52" height="18" rx="4" fill="#F1F5F9" stroke="#E2E8F0" stroke-width="1.5"/>
+    <rect x="76" y="68" width="48" height="4" rx="2" fill="#0284C7"/>
+  </g>
+
+  <!-- Wooden Mixing Spoon held in flipper -->
+  <g filter="url(#shadowPen)" transform="translate(142, 110) rotate(-15)">
+    <rect x="4" y="16" width="4" height="45" rx="2" fill="#D97706"/>
+    <ellipse cx="6" cy="10" rx="9" ry="12" fill="#B45309"/>
+    <ellipse cx="6" cy="10" rx="6" ry="9" fill="#D97706"/>
+  </g>
+</svg>
