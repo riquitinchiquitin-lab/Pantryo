@@ -15,6 +15,47 @@ import { translateFoodItem, getBilingualNames } from "./foodTranslator.js";
 // 1. IFPS GLOBAL PRODUCE PLU DATABASE (Canadian Grocery Retail Standard)
 // ============================================================================
 export const IFPS_PLU_CODES = {
+  // --- BERRIES & POMEGRANATES ---
+  "4249": {
+    nameFr: "Fraises fraîches sucrées du Québec",
+    nameEn: "Fresh Sweet Strawberries",
+    variety: "Strawberry / Fraise",
+    category: "Produce",
+    categoryFr: "Produits frais",
+    location: "Fridge",
+    shelfLifeDays: 4,
+    origin: "Île d’Orléans / Québec • Canada",
+    storageTipFr: "Conserver au frigo non lavées avec un papier absorbant dans le contenant ajouré.",
+    storageTipEn: "Store unwashed with paper towel in original vented clamshell in fridge.",
+    calories: 32, protein: "0.7g", carbs: "7.7g", fat: "0.3g", fiber: "2.0g",
+  },
+  "4240": {
+    nameFr: "Bleuets frais du Lac-Saint-Jean",
+    nameEn: "Fresh Wild Blueberries",
+    variety: "Blueberry / Bleuet",
+    category: "Produce",
+    categoryFr: "Produits frais",
+    location: "Fridge",
+    shelfLifeDays: 8,
+    origin: "Lac-Saint-Jean / Québec • Canada",
+    storageTipFr: "Conserver au frigo sans laver avant consommation.",
+    storageTipEn: "Keep refrigerated and dry until ready to eat.",
+    calories: 57, protein: "0.7g", carbs: "14.5g", fat: "0.3g", fiber: "2.4g",
+  },
+  "4445": {
+    nameFr: "Grenade fraîche Wonderful à arilles rubis",
+    nameEn: "Fresh Wonderful Pomegranate",
+    variety: "Wonderful Pomegranate",
+    category: "Produce",
+    categoryFr: "Produits frais",
+    location: "Fridge",
+    shelfLifeDays: 30,
+    origin: "Californie / Importé",
+    storageTipFr: "Conserver entière au réfrigérateur jusqu’à un mois.",
+    storageTipEn: "Stores well whole in the refrigerator up to a month.",
+    calories: 83, protein: "1.7g", carbs: "18.7g", fat: "1.2g", fiber: "4.0g",
+  },
+
   // --- TROPICAL & EXOTIC FRUITS ---
   "4051": {
     nameFr: "Mangue rouge fraîche (Tommy Atkins / Kent)",

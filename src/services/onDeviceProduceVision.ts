@@ -316,7 +316,7 @@ export const PRODUCE_MAPPING: Record<string, ProduceDetails> = {
     calories: 32,
     category: 'Produce',
     targetHueRange: [345, 15],
-    keywords: ['strawberry', 'fraise', '4249'],
+    keywords: ['strawberry', 'strawberries', 'fraise', 'fraises', '4249', 'garden strawberry'],
   },
   blueberry: {
     nameFr: 'Bleuets frais du Lac-Saint-Jean',
@@ -333,7 +333,7 @@ export const PRODUCE_MAPPING: Record<string, ProduceDetails> = {
     calories: 57,
     category: 'Produce',
     targetHueRange: [220, 260],
-    keywords: ['blueberry', 'bleuet', 'myrtille', '4240'],
+    keywords: ['blueberry', 'blueberries', 'bleuet', 'bleuets', 'myrtille', 'myrtilles', '4240'],
   },
   watermelon: {
     nameFr: 'Pastèque entière sans pépins (Melon d’eau)',
@@ -935,62 +935,70 @@ export async function classifyProduceOnDevice(
         const topRawClass = customClasses[topIdx] || `Class_${topIdx}`;
         console.info(`[ProduceVision] Custom ONNX Top Class #${topIdx}:`, topRawClass, 'Prob:', topProb);
 
-        const catalogItem = findCatalogItemByClass(topRawClass);
-        if (catalogItem) {
-          const alternatives: ProduceAlternative[] = sortedIndices.slice(1, 4).map((idx) => {
-            const altRaw = customClasses[idx] || `Class_${idx}`;
-            const altItem = findCatalogItemByClass(altRaw);
-            const altProb = Math.round(((sumExp > 0 ? exps[idx] / sumExp : 0.1)) * 100);
+        // Strict confidence threshold (>= 0.40):
+        // The custom offline model only has 81 grocery classes and does NOT include fresh berries (e.g. strawberries).
+        // If an unrepresented item like strawberries is shown, topProb is tiny (~3-10%).
+        // We MUST NOT force a decision if topProb < 0.40; instead, let it fall through to MobileNet vision.
+        if (topProb >= 0.40) {
+          const catalogItem = findCatalogItemByClass(topRawClass);
+          if (catalogItem) {
+            const alternatives: ProduceAlternative[] = sortedIndices.slice(1, 4).map((idx) => {
+              const altRaw = customClasses[idx] || `Class_${idx}`;
+              const altItem = findCatalogItemByClass(altRaw);
+              const altProb = Math.round(((sumExp > 0 ? exps[idx] / sumExp : 0.1)) * 100);
+              return {
+                name: isFr ? (altItem?.nameFr || altRaw) : (altItem?.nameEn || altRaw),
+                nameFr: altItem?.nameFr || altRaw,
+                nameEn: altItem?.nameEn || altRaw,
+                pluCode: altItem?.pluCode,
+                confidence: Math.max(1, altProb),
+                location: (altItem?.location || 'Pantry') as 'Fridge' | 'Pantry' | 'Freezer',
+                shelfLife: altItem?.shelfLife || 7,
+              };
+            });
+
+            const reason = isFr
+              ? `Identifié par modèle IA entraîné Proxmox (${catalogItem.nameFr})`
+              : `Identified by Proxmox trained AI model (${catalogItem.nameEn})`;
+
             return {
-              name: isFr ? (altItem?.nameFr || altRaw) : (altItem?.nameEn || altRaw),
-              nameFr: altItem?.nameFr || altRaw,
-              nameEn: altItem?.nameEn || altRaw,
-              pluCode: altItem?.pluCode,
-              confidence: Math.max(1, altProb),
-              location: (altItem?.location || 'Pantry') as 'Fridge' | 'Pantry' | 'Freezer',
-              shelfLife: altItem?.shelfLife || 7,
+              detectedLabel: catalogItem.className,
+              confidence: Math.max(0.60, Math.min(0.99, topProb)),
+              isProduce: true,
+              sourceMethod: 'mobilenet',
+              item: {
+                name: isFr ? catalogItem.nameFr : catalogItem.nameEn,
+                nameFr: catalogItem.nameFr,
+                nameEn: catalogItem.nameEn,
+                pluCode: catalogItem.pluCode,
+                category: isFr ? catalogItem.categoryFr : catalogItem.category,
+                categoryEn: catalogItem.category,
+                recommendedLocation: catalogItem.location,
+                estimatedShelfLifeDays: catalogItem.shelfLife,
+                monthsFrozenShelfLife: 10,
+                brand: catalogItem.brand,
+                gradeOrigin: isFr ? catalogItem.originFr : catalogItem.originEn,
+                packagingFormat: isFr ? catalogItem.packagingFormatFr : catalogItem.packagingFormatEn,
+                dietaryBadges: catalogItem.dietaryBadges,
+                storageTip: isFr ? catalogItem.storageTipFr : catalogItem.storageTipEn,
+                storageReason: reason,
+                freezerTip: isFr ? catalogItem.freezerTipFr : catalogItem.freezerTipEn,
+                calories: catalogItem.calories,
+                nutritionSummary: catalogItem.nutritionSummary,
+              },
+              alternatives,
             };
-          });
-
-          const reason = isFr
-            ? `Identifié par modèle IA entraîné Proxmox (${catalogItem.nameFr})`
-            : `Identified by Proxmox trained AI model (${catalogItem.nameEn})`;
-
-          return {
-            detectedLabel: catalogItem.className,
-            confidence: Math.max(0.75, Math.min(0.99, topProb > 0.1 ? topProb : 0.88)),
-            isProduce: true,
-            sourceMethod: 'mobilenet',
-            item: {
-              name: isFr ? catalogItem.nameFr : catalogItem.nameEn,
-              nameFr: catalogItem.nameFr,
-              nameEn: catalogItem.nameEn,
-              pluCode: catalogItem.pluCode,
-              category: isFr ? catalogItem.categoryFr : catalogItem.category,
-              categoryEn: catalogItem.category,
-              recommendedLocation: catalogItem.location,
-              estimatedShelfLifeDays: catalogItem.shelfLife,
-              monthsFrozenShelfLife: 10,
-              brand: catalogItem.brand,
-              gradeOrigin: isFr ? catalogItem.originFr : catalogItem.originEn,
-              packagingFormat: isFr ? catalogItem.packagingFormatFr : catalogItem.packagingFormatEn,
-              dietaryBadges: catalogItem.dietaryBadges,
-              storageTip: isFr ? catalogItem.storageTipFr : catalogItem.storageTipEn,
-              storageReason: reason,
-              freezerTip: isFr ? catalogItem.freezerTipFr : catalogItem.freezerTipEn,
-              calories: catalogItem.calories,
-              nutritionSummary: catalogItem.nutritionSummary,
-            },
-            alternatives,
-          };
-        }
-
-        // Fallback to PRODUCE_MAPPING
-        const predictedLabel = topRawClass.toLowerCase().replace(/[-_]/g, ' ');
-        for (const [key, info] of Object.entries(PRODUCE_MAPPING)) {
-          if (predictedLabel.includes(key) || key.includes(predictedLabel)) {
-            return buildClassificationResult(key, info, 0.95, 'mobilenet', isFr, []);
           }
+
+          // Fallback to PRODUCE_MAPPING
+          const predictedLabel = topRawClass.toLowerCase().replace(/[-_]/g, ' ');
+          for (const [key, info] of Object.entries(PRODUCE_MAPPING)) {
+            if (predictedLabel.includes(key) || key.includes(predictedLabel)) {
+              return buildClassificationResult(key, info, Math.max(0.60, topProb), 'mobilenet', isFr, []);
+            }
+          }
+        } else {
+          console.info(`[ProduceVision] Custom ONNX model top probability ${topProb.toFixed(3)} for ${topRawClass} is below 0.40 threshold. Falling through to general MobileNet & chroma vision.`);
         }
       }
     } else if (hasCustom && customModel) {
@@ -1017,49 +1025,79 @@ export async function classifyProduceOnDevice(
         }
       }
 
-      const topRawClass = customClasses[maxIdx] || `Class_${maxIdx}`;
-      const catalogItem = findCatalogItemByClass(topRawClass);
-      if (catalogItem) {
-        return {
-          detectedLabel: catalogItem.className,
-          confidence: 0.92,
-          isProduce: true,
-          sourceMethod: 'mobilenet',
-          item: {
-            name: isFr ? catalogItem.nameFr : catalogItem.nameEn,
-            nameFr: catalogItem.nameFr,
-            nameEn: catalogItem.nameEn,
-            pluCode: catalogItem.pluCode,
-            category: isFr ? catalogItem.categoryFr : catalogItem.category,
-            categoryEn: catalogItem.category,
-            recommendedLocation: catalogItem.location,
-            estimatedShelfLifeDays: catalogItem.shelfLife,
-            monthsFrozenShelfLife: 10,
-            brand: catalogItem.brand,
-            gradeOrigin: isFr ? catalogItem.originFr : catalogItem.originEn,
-            packagingFormat: isFr ? catalogItem.packagingFormatFr : catalogItem.packagingFormatEn,
-            dietaryBadges: catalogItem.dietaryBadges,
-            storageTip: isFr ? catalogItem.storageTipFr : catalogItem.storageTipEn,
-            storageReason: isFr ? 'Identifié par modèle Proxmox TF.js' : 'Identified by Proxmox TF.js model',
-            freezerTip: isFr ? catalogItem.freezerTipFr : catalogItem.freezerTipEn,
-            calories: catalogItem.calories,
-            nutritionSummary: catalogItem.nutritionSummary,
-          },
-          alternatives: [],
-        };
+      let sumExp = 0;
+      for (let i = 0; i < data.length; i++) {
+        sumExp += Math.exp(data[i] - maxVal);
+      }
+      const topProb = sumExp > 0 ? Math.exp(maxVal - maxVal) / sumExp : 0.05;
+
+      if (topProb >= 0.40) {
+        const topRawClass = customClasses[maxIdx] || `Class_${maxIdx}`;
+        const catalogItem = findCatalogItemByClass(topRawClass);
+        if (catalogItem) {
+          return {
+            detectedLabel: catalogItem.className,
+            confidence: Math.max(0.60, Math.min(0.99, topProb)),
+            isProduce: true,
+            sourceMethod: 'mobilenet',
+            item: {
+              name: isFr ? catalogItem.nameFr : catalogItem.nameEn,
+              nameFr: catalogItem.nameFr,
+              nameEn: catalogItem.nameEn,
+              pluCode: catalogItem.pluCode,
+              category: isFr ? catalogItem.categoryFr : catalogItem.category,
+              categoryEn: catalogItem.category,
+              recommendedLocation: catalogItem.location,
+              estimatedShelfLifeDays: catalogItem.shelfLife,
+              monthsFrozenShelfLife: 10,
+              brand: catalogItem.brand,
+              gradeOrigin: isFr ? catalogItem.originFr : catalogItem.originEn,
+              packagingFormat: isFr ? catalogItem.packagingFormatFr : catalogItem.packagingFormatEn,
+              dietaryBadges: catalogItem.dietaryBadges,
+              storageTip: isFr ? catalogItem.storageTipFr : catalogItem.storageTipEn,
+              storageReason: isFr ? 'Identifié par modèle Proxmox TF.js' : 'Identified by Proxmox TF.js model',
+              freezerTip: isFr ? catalogItem.freezerTipFr : catalogItem.freezerTipEn,
+              calories: catalogItem.calories,
+              nutritionSummary: catalogItem.nutritionSummary,
+            },
+            alternatives: [],
+          };
+        }
+      } else {
+        console.info(`[ProduceVision] Custom TF.js top probability ${topProb.toFixed(3)} is below threshold. Falling through to MobileNet.`);
       }
     }
   } catch (customErr) {
     console.warn('[ProduceVision] Custom offline model inference note:', customErr);
   }
 
-  // Check 2: MobileNet on-device inference
+  // Check 2: MobileNet on-device inference with optical chroma profile verification
   try {
+    // Extract color profile to corroborate visual identification (e.g. vivid red for strawberries)
+    let colorProfile: { hue: number; saturation: number; brightness: number; dominantColorName: string } | null = null;
+    try {
+      const sampleCanvas = document.createElement('canvas');
+      sampleCanvas.width = 64;
+      sampleCanvas.height = 64;
+      const sCtx = sampleCanvas.getContext('2d');
+      if (sCtx) {
+        sCtx.drawImage(imageSource, 0, 0, 64, 64);
+        colorProfile = extractProduceColorProfile(sampleCanvas);
+        console.info('[ProduceVision] Optical Chroma Profile:', colorProfile);
+      }
+    } catch (_) {}
+
+    const isDominantRed = Boolean(
+      colorProfile &&
+      (colorProfile.dominantColorName === 'red' || colorProfile.hue >= 340 || colorProfile.hue <= 20) &&
+      colorProfile.saturation >= 25
+    );
+
     const model = await getProduceVisionModel();
     if (model) {
       const predictions: Array<{ className: string; probability: number }> = await model.classify(imageSource, 8);
       if (predictions && predictions.length > 0) {
-        console.info('[ProduceVision] Top Predictions:', predictions);
+        console.info('[ProduceVision] MobileNet Top Predictions:', predictions);
 
         const candidates: Array<{ key: string; info: ProduceDetails; prob: number; rawClass: string }> = [];
 
@@ -1070,10 +1108,26 @@ export async function classifyProduceOnDevice(
             const hasKeywordMatch = info.keywords?.some((kw) => lowerClass.includes(kw));
             if (lowerClass.includes(key) || key.includes(lowerClass.split(',')[0].trim()) || hasKeywordMatch) {
               if (!candidates.some((c) => c.key === key)) {
-                candidates.push({ key, info, prob: pred.probability, rawClass: pred.className });
+                let adjustedProb = pred.probability;
+                // If this is strawberry and image chroma is vividly red, boost confidence
+                if (key === 'strawberry' && isDominantRed) {
+                  adjustedProb = Math.max(adjustedProb, 0.82);
+                }
+                candidates.push({ key, info, prob: adjustedProb, rawClass: pred.className });
               }
             }
           }
+        }
+
+        // Special check: If MobileNet directly identified 'strawberry' anywhere in top predictions
+        const strawberryDirect = predictions.find((p) => p.className.toLowerCase().includes('strawberr'));
+        if (strawberryDirect && PRODUCE_MAPPING.strawberry && !candidates.some((c) => c.key === 'strawberry')) {
+          candidates.push({
+            key: 'strawberry',
+            info: PRODUCE_MAPPING.strawberry,
+            prob: isDominantRed ? Math.max(strawberryDirect.probability, 0.85) : strawberryDirect.probability,
+            rawClass: strawberryDirect.className,
+          });
         }
 
         if (candidates.length > 0) {
@@ -1081,8 +1135,9 @@ export async function classifyProduceOnDevice(
           candidates.sort((a, b) => b.prob - a.prob);
           const best = candidates[0];
 
-          // Require reasonable confidence threshold (>= 0.38) to avoid falsely misclassifying packaged foods (like yogurt) as produce
-          if (best.prob >= 0.38) {
+          // Reasonable confidence threshold (0.22 if corroborated by red chroma, else 0.35)
+          const minThreshold = (best.key === 'strawberry' && isDominantRed) ? 0.20 : 0.35;
+          if (best.prob >= minThreshold) {
             const alternatives: ProduceAlternative[] = candidates.slice(1, 4).map((c) => ({
               name: isFr ? c.info.nameFr : c.info.nameEn,
               nameFr: c.info.nameFr,
@@ -1093,7 +1148,8 @@ export async function classifyProduceOnDevice(
               shelfLife: c.info.shelfLife,
             }));
 
-            return buildClassificationResult(best.key, best.info, best.prob, 'mobilenet', isFr, alternatives);
+            const finalConfidence = Math.max(0.65, Math.min(0.98, best.prob));
+            return buildClassificationResult(best.key, best.info, finalConfidence, 'mobilenet', isFr, alternatives);
           }
         }
       }
