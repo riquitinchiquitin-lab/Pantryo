@@ -58,6 +58,8 @@ const highCapacityUrlParser = express.urlencoded({ extended: true, limit: "50mb"
 
 // Apply high-capacity parser specifically to image/backup upload routes
 const HIGH_CAPACITY_PREFIXES = [
+  "/api/v1/inventory/upload-model",
+  "/api/inventory/upload-model",
   "/api/v1/inventory/ai-scan",
   "/api/inventory/ai-scan",
   "/api/v1/inventory/barcode/packaging",

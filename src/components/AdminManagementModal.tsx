@@ -150,6 +150,19 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
   const [geminiTestResult, setGeminiTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [settingsStatus, setSettingsStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  // Produce Vision AI Model (399 Classes) State
+  const [modelStatus, setModelStatus] = useState<{
+    totalClasses?: number;
+    modelName?: string;
+    fileSizeMB?: number;
+    classes399Available?: boolean;
+    totalMetadataEntries?: number;
+    status?: string;
+  } | null>(null);
+  const [isUploadingModel, setIsUploadingModel] = useState(false);
+  const [modelUploadMessage, setModelUploadMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const modelFileInputRef = useRef<HTMLInputElement>(null);
+
   // Backup State
   const [backupPassphrase, setBackupPassphrase] = useState(() => {
     return (typeof window !== 'undefined' && localStorage.getItem('pantryo_active_db_key')) || '';
@@ -337,6 +350,74 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
       }
     } catch (err) {
       console.warn('Settings fetch note:', err);
+    }
+
+    try {
+      const modelRes = await fetch('/api/v1/inventory/model-status');
+      if (modelRes.ok) {
+        const modelData = await modelRes.json();
+        setModelStatus(modelData);
+      }
+    } catch (err) {
+      console.warn('Model status fetch note:', err);
+    }
+  };
+
+  const handleModelFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingModel(true);
+    setModelUploadMessage(null);
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const result = reader.result as string;
+          const base64 = result.split(',')[1] || result;
+          const res = await fetch('/api/v1/inventory/upload-model', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ modelBase64: base64, activate399Classes: true }),
+          });
+          const data = await res.json();
+          if (data.success) {
+            setModelStatus(data.modelStatus);
+            setModelUploadMessage({
+              type: 'success',
+              message: lang === 'FR'
+                ? `Modèle IA 399 classes déployé et activé avec succès (${data.modelStatus?.fileSizeMB || ''} Mo) !`
+                : `399-class AI model deployed and activated successfully (${data.modelStatus?.fileSizeMB || ''} MB)!`,
+            });
+          } else {
+            setModelUploadMessage({
+              type: 'error',
+              message: data.error || (lang === 'FR' ? 'Erreur de téléversement' : 'Upload error'),
+            });
+          }
+        } catch (err: any) {
+          setModelUploadMessage({
+            type: 'error',
+            message: err.message || 'Erreur réseau',
+          });
+        } finally {
+          setIsUploadingModel(false);
+        }
+      };
+      reader.onerror = () => {
+        setModelUploadMessage({
+          type: 'error',
+          message: lang === 'FR' ? 'Erreur lors de la lecture du fichier' : 'Error reading file',
+        });
+        setIsUploadingModel(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      setModelUploadMessage({
+        type: 'error',
+        message: err.message || 'Erreur',
+      });
+      setIsUploadingModel(false);
     }
   };
 
@@ -2688,6 +2769,115 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                           : 'Notice: changing this key immediately re-encrypts the SQLCipher database storage on disk.'}
                       </p>
                     </div>
+                  </div>
+                </div>
+
+                {/* 6. On-Device Produce Vision Model (399 Classes) */}
+                <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-[#F0EBE1] flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <Camera className="w-4 h-4 text-teal-800" />
+                      <h3 className="font-bold text-[#0D3B37] text-xs uppercase tracking-wider">
+                        {lang === 'FR' ? '6. Modèle IA Produce Vision (399 Classes)' : '6. Produce Vision AI Model (399 Classes)'}
+                      </h3>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      <span>{lang === 'FR' ? '399 Classes & Métadonnées Prêtes' : '399 Classes & Metadata Ready'}</span>
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-[#FAF7EE] border border-[#E0D9C8] space-y-2">
+                    <div className="flex items-center justify-between text-[11px] flex-wrap gap-2">
+                      <span className="font-bold text-[#0D3B37]">
+                        {lang === 'FR' ? 'Architecture du Modèle :' : 'Model Architecture:'}
+                      </span>
+                      <span className="font-mono text-teal-800 font-bold">
+                        MobileNetV2 (ONNX Runtime WASM • 399 Classes)
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] flex-wrap gap-2">
+                      <span className="font-bold text-[#0D3B37]">
+                        {lang === 'FR' ? 'Couverture Produit :' : 'Produce Coverage:'}
+                      </span>
+                      <span className="text-[#527470]">
+                        {lang === 'FR'
+                          ? '399 catégories (Fruits du monde, légumes asiatiques, herbes culinaires, baies fraîches)'
+                          : '399 categories (World fruits, Asian vegetables, culinary herbs, fresh berries)'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] flex-wrap gap-2">
+                      <span className="font-bold text-[#0D3B37]">
+                        {lang === 'FR' ? 'Fichiers Associés :' : 'Associated Artifacts:'}
+                      </span>
+                      <span className="font-mono text-[10px] text-slate-600">
+                        classes_399.txt • classes_metadata.json (399 entrées bilingues)
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Upload new .onnx file */}
+                  <div className="space-y-2">
+                    <label className="font-bold text-[#0D3B37] block text-[11px]">
+                      {lang === 'FR'
+                        ? 'Téléverser ou Mettre à Jour le Modèle Entraîné (grocery_model.onnx)'
+                        : 'Deploy / Upload Trained ONNX Model (grocery_model.onnx)'}
+                    </label>
+                    <div className="flex flex-col sm:flex-row items-center gap-3">
+                      <input
+                        type="file"
+                        accept=".onnx"
+                        ref={modelFileInputRef}
+                        className="hidden"
+                        onChange={handleModelFileSelected}
+                      />
+                      <button
+                        type="button"
+                        disabled={isUploadingModel}
+                        onClick={() => modelFileInputRef.current?.click()}
+                        className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        {isUploadingModel ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Upload className="w-3.5 h-3.5" />
+                        )}
+                        <span>
+                          {isUploadingModel
+                            ? (lang === 'FR' ? 'Déploiement en cours...' : 'Deploying...')
+                            : (lang === 'FR' ? 'Sélectionner grocery_model.onnx' : 'Select grocery_model.onnx')}
+                        </span>
+                      </button>
+
+                      <div className="text-[11px] text-[#527470]">
+                        {modelStatus?.fileSizeMB ? (
+                          <span>
+                            {lang === 'FR' ? 'Taille active :' : 'Active size:'}{' '}
+                            <strong className="text-[#0D3B37]">{modelStatus.fileSizeMB} Mo</strong> •{' '}
+                            {modelStatus.totalClasses} {lang === 'FR' ? 'classes actives' : 'active classes'}
+                          </span>
+                        ) : (
+                          <span>{lang === 'FR' ? 'Modèle ONNX prêt pour inférence locale' : 'ONNX model ready for local inference'}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {modelUploadMessage && (
+                      <div
+                        className={`p-2.5 rounded-xl text-[11px] flex items-center gap-2 ${
+                          modelUploadMessage.type === 'success'
+                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                            : 'bg-red-50 text-red-800 border border-red-200'
+                        }`}
+                      >
+                        {modelUploadMessage.type === 'success' ? (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        ) : (
+                          <AlertCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                        )}
+                        <span>{modelUploadMessage.message}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 

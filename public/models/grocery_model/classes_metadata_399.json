@@ -1,0 +1,2396 @@
+{
+  "Allium_Cepa_(Onion)": {
+    "index": 0,
+    "label_en": "Allium Cepa (Onion)",
+    "label_fr": "Allium Cepa (Oignon)",
+    "category": "produce"
+  },
+  "Almonds_1": {
+    "index": 1,
+    "label_en": "Almonds 1",
+    "label_fr": "Almonds 1",
+    "category": "produce"
+  },
+  "Aloe_Barbadensis_Miller_(Aloevera)": {
+    "index": 2,
+    "label_en": "Aloe Barbadensis Miller (Aloevera)",
+    "label_fr": "Aloe Barbadensis Miller (Aloevera)",
+    "category": "herb"
+  },
+  "Alpinia_Galanga_(Rasna)": {
+    "index": 3,
+    "label_en": "Alpinia Galanga (Rasna)",
+    "label_fr": "Alpinia Galanga (Rasna)",
+    "category": "produce"
+  },
+  "Amaranthus_Viridis_(Arive_Dantu)": {
+    "index": 4,
+    "label_en": "Amaranthus Viridis (Arive Dantu)",
+    "label_fr": "Amaranthus Viridis (Arive Dantu)",
+    "category": "produce"
+  },
+  "Andrographis_Paniculata_(Nelavembu)": {
+    "index": 5,
+    "label_en": "Andrographis Paniculata (Nelavembu)",
+    "label_fr": "Andrographis Paniculata (Nelavembu)",
+    "category": "produce"
+  },
+  "Annona_Squamosa_(Seethapala)": {
+    "index": 6,
+    "label_en": "Annona Squamosa (Seethapala)",
+    "label_fr": "Annona Squamosa (Seethapala)",
+    "category": "produce"
+  },
+  "Apple": {
+    "index": 7,
+    "label_en": "Apple",
+    "label_fr": "Pomme",
+    "category": "produce"
+  },
+  "Apple_10": {
+    "index": 8,
+    "label_en": "Apple 10",
+    "label_fr": "Pomme 10",
+    "category": "produce"
+  },
+  "Apple_11": {
+    "index": 9,
+    "label_en": "Apple 11",
+    "label_fr": "Pomme 11",
+    "category": "produce"
+  },
+  "Apple_12": {
+    "index": 10,
+    "label_en": "Apple 12",
+    "label_fr": "Pomme 12",
+    "category": "produce"
+  },
+  "Apple_13": {
+    "index": 11,
+    "label_en": "Apple 13",
+    "label_fr": "Pomme 13",
+    "category": "produce"
+  },
+  "Apple_14": {
+    "index": 12,
+    "label_en": "Apple 14",
+    "label_fr": "Pomme 14",
+    "category": "produce"
+  },
+  "Apple_17": {
+    "index": 13,
+    "label_en": "Apple 17",
+    "label_fr": "Pomme 17",
+    "category": "produce"
+  },
+  "Apple_18": {
+    "index": 14,
+    "label_en": "Apple 18",
+    "label_fr": "Pomme 18",
+    "category": "produce"
+  },
+  "Apple_19": {
+    "index": 15,
+    "label_en": "Apple 19",
+    "label_fr": "Pomme 19",
+    "category": "produce"
+  },
+  "Apple_20": {
+    "index": 16,
+    "label_en": "Apple 20",
+    "label_fr": "Pomme 20",
+    "category": "produce"
+  },
+  "Apple_21": {
+    "index": 17,
+    "label_en": "Apple 21",
+    "label_fr": "Pomme 21",
+    "category": "produce"
+  },
+  "Apple_22": {
+    "index": 18,
+    "label_en": "Apple 22",
+    "label_fr": "Pomme 22",
+    "category": "produce"
+  },
+  "Apple_23": {
+    "index": 19,
+    "label_en": "Apple 23",
+    "label_fr": "Pomme 23",
+    "category": "produce"
+  },
+  "Apple_5": {
+    "index": 20,
+    "label_en": "Apple 5",
+    "label_fr": "Pomme 5",
+    "category": "produce"
+  },
+  "Apple_6": {
+    "index": 21,
+    "label_en": "Apple 6",
+    "label_fr": "Pomme 6",
+    "category": "produce"
+  },
+  "Apple_7": {
+    "index": 22,
+    "label_en": "Apple 7",
+    "label_fr": "Pomme 7",
+    "category": "produce"
+  },
+  "Apple_8": {
+    "index": 23,
+    "label_en": "Apple 8",
+    "label_fr": "Pomme 8",
+    "category": "produce"
+  },
+  "Apple_9": {
+    "index": 24,
+    "label_en": "Apple 9",
+    "label_fr": "Pomme 9",
+    "category": "produce"
+  },
+  "Apple_Braeburn_1": {
+    "index": 25,
+    "label_en": "Apple Braeburn 1",
+    "label_fr": "Pomme Braeburn 1",
+    "category": "produce"
+  },
+  "Apple_Crimson_Snow_1": {
+    "index": 26,
+    "label_en": "Apple Crimson Snow 1",
+    "label_fr": "Pomme Crimson Snow 1",
+    "category": "produce"
+  },
+  "Apple_Golden_1": {
+    "index": 27,
+    "label_en": "Apple Golden 1",
+    "label_fr": "Pomme dorée (Golden) 1",
+    "category": "produce"
+  },
+  "Apple_Golden_2": {
+    "index": 28,
+    "label_en": "Apple Golden 2",
+    "label_fr": "Pomme dorée (Golden) 2",
+    "category": "produce"
+  },
+  "Apple_Golden_3": {
+    "index": 29,
+    "label_en": "Apple Golden 3",
+    "label_fr": "Pomme dorée (Golden) 3",
+    "category": "produce"
+  },
+  "Apple_Granny_Smith_1": {
+    "index": 30,
+    "label_en": "Apple Granny Smith 1",
+    "label_fr": "Pomme Granny Smith 1",
+    "category": "produce"
+  },
+  "Apple_Pink_Lady_1": {
+    "index": 31,
+    "label_en": "Apple Pink Lady 1",
+    "label_fr": "Pomme Pink Lady 1",
+    "category": "produce"
+  },
+  "Apple_Red_1": {
+    "index": 32,
+    "label_en": "Apple Red 1",
+    "label_fr": "Pomme rouge 1",
+    "category": "produce"
+  },
+  "Apple_Red_2": {
+    "index": 33,
+    "label_en": "Apple Red 2",
+    "label_fr": "Pomme rouge 2",
+    "category": "produce"
+  },
+  "Apple_Red_3": {
+    "index": 34,
+    "label_en": "Apple Red 3",
+    "label_fr": "Pomme rouge 3",
+    "category": "produce"
+  },
+  "Apple_Red_Delicious_1": {
+    "index": 35,
+    "label_en": "Apple Red Delicious 1",
+    "label_fr": "Pomme Red Delicious 1",
+    "category": "produce"
+  },
+  "Apple_Red_Yellow_1": {
+    "index": 36,
+    "label_en": "Apple Red Yellow 1",
+    "label_fr": "Pomme Red Yellow 1",
+    "category": "produce"
+  },
+  "Apple_Red_Yellow_2": {
+    "index": 37,
+    "label_en": "Apple Red Yellow 2",
+    "label_fr": "Pomme Red Yellow 2",
+    "category": "produce"
+  },
+  "Apricot_1": {
+    "index": 38,
+    "label_en": "Apricot 1",
+    "label_fr": "Abricot 1",
+    "category": "produce"
+  },
+  "Artocarpus_Heterophyllus_(Jackfruit)": {
+    "index": 39,
+    "label_en": "Artocarpus Heterophyllus (Jackfruit)",
+    "label_fr": "Artocarpus Heterophyllus (Jackfruit)",
+    "category": "produce"
+  },
+  "Avocado_1": {
+    "index": 40,
+    "label_en": "Avocado 1",
+    "label_fr": "Avocat 1",
+    "category": "produce"
+  },
+  "Avocado_2": {
+    "index": 41,
+    "label_en": "Avocado 2",
+    "label_fr": "Avocat 2",
+    "category": "produce"
+  },
+  "Avocado_Black_1": {
+    "index": 42,
+    "label_en": "Avocado Black 1",
+    "label_fr": "Avocat Black 1",
+    "category": "produce"
+  },
+  "Avocado_Black_2": {
+    "index": 43,
+    "label_en": "Avocado Black 2",
+    "label_fr": "Avocat Black 2",
+    "category": "produce"
+  },
+  "Avocado_Green_1": {
+    "index": 44,
+    "label_en": "Avocado Green 1",
+    "label_fr": "Avocat Green 1",
+    "category": "produce"
+  },
+  "Azadirachta_Indica_(Neem)": {
+    "index": 45,
+    "label_en": "Azadirachta Indica (Neem)",
+    "label_fr": "Azadirachta Indica (Neem)",
+    "category": "produce"
+  },
+  "Bacopa_Monnieri_(Bhrami)": {
+    "index": 46,
+    "label_en": "Bacopa Monnieri (Bhrami)",
+    "label_fr": "Bacopa Monnieri (Bhrami)",
+    "category": "produce"
+  },
+  "Bambusa_Vulgaris_(Bamboo)": {
+    "index": 47,
+    "label_en": "Bambusa Vulgaris (Bamboo)",
+    "label_fr": "Bambusa Vulgaris (Bamboo)",
+    "category": "produce"
+  },
+  "Banana": {
+    "index": 48,
+    "label_en": "Banana",
+    "label_fr": "Banane",
+    "category": "produce"
+  },
+  "Banana_1": {
+    "index": 49,
+    "label_en": "Banana 1",
+    "label_fr": "Banane 1",
+    "category": "produce"
+  },
+  "Banana_3": {
+    "index": 50,
+    "label_en": "Banana 3",
+    "label_fr": "Banane 3",
+    "category": "produce"
+  },
+  "Banana_4": {
+    "index": 51,
+    "label_en": "Banana 4",
+    "label_fr": "Banane 4",
+    "category": "produce"
+  },
+  "Banana_Lady_Finger_1": {
+    "index": 52,
+    "label_en": "Banana Lady Finger 1",
+    "label_fr": "Banane naine (Lady Finger) 1",
+    "category": "produce"
+  },
+  "Banana_Red_1": {
+    "index": 53,
+    "label_en": "Banana Red 1",
+    "label_fr": "Banane rouge 1",
+    "category": "produce"
+  },
+  "Basella_Alba_(Malabar_Spinach)": {
+    "index": 54,
+    "label_en": "Basella Alba (Malabar Spinach)",
+    "label_fr": "Basella Alba (Malabar Épinard)",
+    "category": "produce"
+  },
+  "Bean": {
+    "index": 55,
+    "label_en": "Bean",
+    "label_fr": "Bean",
+    "category": "produce"
+  },
+  "Bean_Pod_1": {
+    "index": 56,
+    "label_en": "Bean Pod 1",
+    "label_fr": "Bean Pod 1",
+    "category": "produce"
+  },
+  "Beetroot": {
+    "index": 57,
+    "label_en": "Beetroot",
+    "label_fr": "Betterave",
+    "category": "produce"
+  },
+  "Beetroot_1": {
+    "index": 58,
+    "label_en": "Beetroot 1",
+    "label_fr": "Betterave 1",
+    "category": "produce"
+  },
+  "Bell_Pepper": {
+    "index": 59,
+    "label_en": "Bell Pepper",
+    "label_fr": "Poivron",
+    "category": "produce"
+  },
+  "Bitter_Melon": {
+    "index": 60,
+    "label_en": "Bitter Melon",
+    "label_fr": "Margose",
+    "category": "produce"
+  },
+  "Blackberry_1": {
+    "index": 61,
+    "label_en": "Blackberry 1",
+    "label_fr": "Mûre 1",
+    "category": "produce"
+  },
+  "Blackberry_2": {
+    "index": 62,
+    "label_en": "Blackberry 2",
+    "label_fr": "Mûre 2",
+    "category": "produce"
+  },
+  "Blackberry_3": {
+    "index": 63,
+    "label_en": "Blackberry 3",
+    "label_fr": "Mûre 3",
+    "category": "produce"
+  },
+  "Blackberry_4": {
+    "index": 64,
+    "label_en": "Blackberry 4",
+    "label_fr": "Mûre 4",
+    "category": "produce"
+  },
+  "Blackberry_5": {
+    "index": 65,
+    "label_en": "Blackberry 5",
+    "label_fr": "Mûre 5",
+    "category": "produce"
+  },
+  "Blueberry_1": {
+    "index": 66,
+    "label_en": "Blueberry 1",
+    "label_fr": "Bleuet 1",
+    "category": "produce"
+  },
+  "Bottle_Gourd": {
+    "index": 67,
+    "label_en": "Bottle Gourd",
+    "label_fr": "Calebasse",
+    "category": "produce"
+  },
+  "Brassica_Juncea_(Indian_Mustard)": {
+    "index": 68,
+    "label_en": "Brassica Juncea (Indian Mustard)",
+    "label_fr": "Brassica Juncea (Indian Mustard)",
+    "category": "produce"
+  },
+  "Brassica_Oleracea_(Kohlrabi)": {
+    "index": 69,
+    "label_en": "Brassica Oleracea (Kohlrabi)",
+    "label_fr": "Brassica Oleracea (Chou-rave)",
+    "category": "produce"
+  },
+  "Broccoli": {
+    "index": 70,
+    "label_en": "Broccoli",
+    "label_fr": "Brocoli",
+    "category": "produce"
+  },
+  "Cabbage": {
+    "index": 71,
+    "label_en": "Cabbage",
+    "label_fr": "Chou",
+    "category": "produce"
+  },
+  "Cabbage_Red_1": {
+    "index": 72,
+    "label_en": "Cabbage Red 1",
+    "label_fr": "Chou rouge 1",
+    "category": "produce"
+  },
+  "Cabbage_White_1": {
+    "index": 73,
+    "label_en": "Cabbage White 1",
+    "label_fr": "Chou blanc / vert 1",
+    "category": "produce"
+  },
+  "Cactus_Fruit_1": {
+    "index": 74,
+    "label_en": "Cactus Fruit 1",
+    "label_fr": "Cactus Fruit 1",
+    "category": "produce"
+  },
+  "Cactus_Fruit_Green_1": {
+    "index": 75,
+    "label_en": "Cactus Fruit Green 1",
+    "label_fr": "Cactus Fruit Green 1",
+    "category": "produce"
+  },
+  "Cactus_Fruit_Red_1": {
+    "index": 76,
+    "label_en": "Cactus Fruit Red 1",
+    "label_fr": "Cactus Fruit Red 1",
+    "category": "produce"
+  },
+  "Caju_Seed_1": {
+    "index": 77,
+    "label_en": "Caju Seed 1",
+    "label_fr": "Caju Seed 1",
+    "category": "produce"
+  },
+  "Calotropis_Gigantea_(Crown_Flower_Ekka)": {
+    "index": 78,
+    "label_en": "Calotropis Gigantea (Crown Flower Ekka)",
+    "label_fr": "Calotropis Gigantea (Crown Flower Ekka)",
+    "category": "produce"
+  },
+  "Cantaloupe_1": {
+    "index": 79,
+    "label_en": "Cantaloupe 1",
+    "label_fr": "Cantaloup 1",
+    "category": "produce"
+  },
+  "Cantaloupe_2": {
+    "index": 80,
+    "label_en": "Cantaloupe 2",
+    "label_fr": "Cantaloup 2",
+    "category": "produce"
+  },
+  "Cantaloupe_3": {
+    "index": 81,
+    "label_en": "Cantaloupe 3",
+    "label_fr": "Cantaloup 3",
+    "category": "produce"
+  },
+  "Capsicum_Annuum_(Chilly)": {
+    "index": 82,
+    "label_en": "Capsicum Annuum (Chilly)",
+    "label_fr": "Capsicum Annuum (Chilly)",
+    "category": "produce"
+  },
+  "Carambola_1": {
+    "index": 83,
+    "label_en": "Carambola 1",
+    "label_fr": "Carambola 1",
+    "category": "produce"
+  },
+  "Carambola_2": {
+    "index": 84,
+    "label_en": "Carambola 2",
+    "label_fr": "Carambola 2",
+    "category": "produce"
+  },
+  "Carambola_3": {
+    "index": 85,
+    "label_en": "Carambola 3",
+    "label_fr": "Carambola 3",
+    "category": "produce"
+  },
+  "Cardiospermum_Halicacabum_(Balloon_Vine)": {
+    "index": 86,
+    "label_en": "Cardiospermum Halicacabum (Balloon Vine)",
+    "label_fr": "Cardiospermum Halicacabum (Balloon Vine)",
+    "category": "produce"
+  },
+  "Carica_Papaya_(Papaya)": {
+    "index": 87,
+    "label_en": "Carica Papaya (Papaya)",
+    "label_fr": "Carica Papaye (Papaye)",
+    "category": "produce"
+  },
+  "Carissa_Carandas_(Karanda)": {
+    "index": 88,
+    "label_en": "Carissa Carandas (Karanda)",
+    "label_fr": "Carissa Carandas (Karanda)",
+    "category": "produce"
+  },
+  "Carrot": {
+    "index": 89,
+    "label_en": "Carrot",
+    "label_fr": "Carotte",
+    "category": "produce"
+  },
+  "Carrot_1": {
+    "index": 90,
+    "label_en": "Carrot 1",
+    "label_fr": "Carotte 1",
+    "category": "produce"
+  },
+  "Catharanthus_Roseus_(Catharanthus)": {
+    "index": 91,
+    "label_en": "Catharanthus Roseus (Catharanthus)",
+    "label_fr": "Catharanthus Roseus (Catharanthus)",
+    "category": "produce"
+  },
+  "Cauliflower": {
+    "index": 92,
+    "label_en": "Cauliflower",
+    "label_fr": "Chou-fleur",
+    "category": "produce"
+  },
+  "Cauliflower_1": {
+    "index": 93,
+    "label_en": "Cauliflower 1",
+    "label_fr": "Chou-fleur 1",
+    "category": "produce"
+  },
+  "Celery_1": {
+    "index": 94,
+    "label_en": "Celery 1",
+    "label_fr": "Céleri 1",
+    "category": "produce"
+  },
+  "Chamaecostus_Cuspidatus_(Insulin)": {
+    "index": 95,
+    "label_en": "Chamaecostus Cuspidatus (Insulin)",
+    "label_fr": "Chamaecostus Cuspidatus (Insulin)",
+    "category": "produce"
+  },
+  "Cherimoya_1": {
+    "index": 96,
+    "label_en": "Cherimoya 1",
+    "label_fr": "Cherimoya 1",
+    "category": "produce"
+  },
+  "Cherry_1": {
+    "index": 97,
+    "label_en": "Cherry 1",
+    "label_fr": "Cerise 1",
+    "category": "produce"
+  },
+  "Cherry_2": {
+    "index": 98,
+    "label_en": "Cherry 2",
+    "label_fr": "Cerise 2",
+    "category": "produce"
+  },
+  "Cherry_3": {
+    "index": 99,
+    "label_en": "Cherry 3",
+    "label_fr": "Cerise 3",
+    "category": "produce"
+  },
+  "Cherry_4": {
+    "index": 100,
+    "label_en": "Cherry 4",
+    "label_fr": "Cerise 4",
+    "category": "produce"
+  },
+  "Cherry_5": {
+    "index": 101,
+    "label_en": "Cherry 5",
+    "label_fr": "Cerise 5",
+    "category": "produce"
+  },
+  "Cherry_Rainier_1": {
+    "index": 102,
+    "label_en": "Cherry Rainier 1",
+    "label_fr": "Cerise Rainier 1",
+    "category": "produce"
+  },
+  "Cherry_Rainier_2": {
+    "index": 103,
+    "label_en": "Cherry Rainier 2",
+    "label_fr": "Cerise Rainier 2",
+    "category": "produce"
+  },
+  "Cherry_Rainier_3": {
+    "index": 104,
+    "label_en": "Cherry Rainier 3",
+    "label_fr": "Cerise Rainier 3",
+    "category": "produce"
+  },
+  "Cherry_Sour_1": {
+    "index": 105,
+    "label_en": "Cherry Sour 1",
+    "label_fr": "Cerise Sour 1",
+    "category": "produce"
+  },
+  "Cherry_Wax_1": {
+    "index": 106,
+    "label_en": "Cherry Wax 1",
+    "label_fr": "Cerise Wax 1",
+    "category": "produce"
+  },
+  "Cherry_Wax_2": {
+    "index": 107,
+    "label_en": "Cherry Wax 2",
+    "label_fr": "Cerise Wax 2",
+    "category": "produce"
+  },
+  "Cherry_Wax_Black_1": {
+    "index": 108,
+    "label_en": "Cherry Wax Black 1",
+    "label_fr": "Cerise Wax Black 1",
+    "category": "produce"
+  },
+  "Cherry_Wax_Red_1": {
+    "index": 109,
+    "label_en": "Cherry Wax Red 1",
+    "label_fr": "Cerise Wax Red 1",
+    "category": "produce"
+  },
+  "Cherry_Wax_Red_2": {
+    "index": 110,
+    "label_en": "Cherry Wax Red 2",
+    "label_fr": "Cerise Wax Red 2",
+    "category": "produce"
+  },
+  "Cherry_Wax_Red_3": {
+    "index": 111,
+    "label_en": "Cherry Wax Red 3",
+    "label_fr": "Cerise Wax Red 3",
+    "category": "produce"
+  },
+  "Cherry_Wax_Yellow_1": {
+    "index": 112,
+    "label_en": "Cherry Wax Yellow 1",
+    "label_fr": "Cerise Wax Yellow 1",
+    "category": "produce"
+  },
+  "Chestnut_1": {
+    "index": 113,
+    "label_en": "Chestnut 1",
+    "label_fr": "Châtaigne 1",
+    "category": "produce"
+  },
+  "Chili_Pepper": {
+    "index": 114,
+    "label_en": "Chili Pepper",
+    "label_fr": "Piment",
+    "category": "produce"
+  },
+  "Cinnamomum_Camphora_(Camphor)": {
+    "index": 115,
+    "label_en": "Cinnamomum Camphora (Camphor)",
+    "label_fr": "Cinnamomum Camphora (Camphor)",
+    "category": "herb"
+  },
+  "Citrus_Limon_(Lemon)": {
+    "index": 116,
+    "label_en": "Citrus Limon (Lemon)",
+    "label_fr": "Citrus Limon (Citron)",
+    "category": "produce"
+  },
+  "Citrus_Medica_(Herelikai)": {
+    "index": 117,
+    "label_en": "Citrus Medica (Herelikai)",
+    "label_fr": "Citrus Medica (Herelikai)",
+    "category": "produce"
+  },
+  "Clementine_1": {
+    "index": 118,
+    "label_en": "Clementine 1",
+    "label_fr": "Clémentine 1",
+    "category": "produce"
+  },
+  "Cocos_1": {
+    "index": 119,
+    "label_en": "Cocos 1",
+    "label_fr": "Cocos 1",
+    "category": "produce"
+  },
+  "Coffea_Arabica_(Coffee)": {
+    "index": 120,
+    "label_en": "Coffea Arabica (Coffee)",
+    "label_fr": "Coffea Arabica (Coffee)",
+    "category": "produce"
+  },
+  "Coleus_Amboinicus_(Mexican_Mint_Doddpathre)": {
+    "index": 121,
+    "label_en": "Coleus Amboinicus (Mexican Mint Doddpathre)",
+    "label_fr": "Gros thym / Menthe mexicaine",
+    "category": "herb"
+  },
+  "Colocasia_Esculenta_(Taro)": {
+    "index": 122,
+    "label_en": "Colocasia Esculenta (Taro)",
+    "label_fr": "Colocasia Esculenta (Taro)",
+    "category": "produce"
+  },
+  "Coriandrum_Sativum_(Coriander)": {
+    "index": 123,
+    "label_en": "Coriandrum Sativum (Coriander)",
+    "label_fr": "Coriandrum Sativum (Coriandre)",
+    "category": "herb"
+  },
+  "Corn": {
+    "index": 124,
+    "label_en": "Corn",
+    "label_fr": "Maïs",
+    "category": "produce"
+  },
+  "Corn_1": {
+    "index": 125,
+    "label_en": "Corn 1",
+    "label_fr": "Maïs 1",
+    "category": "produce"
+  },
+  "Corn_Husk_1": {
+    "index": 126,
+    "label_en": "Corn Husk 1",
+    "label_fr": "Maïs Husk 1",
+    "category": "produce"
+  },
+  "Cucumber": {
+    "index": 127,
+    "label_en": "Cucumber",
+    "label_fr": "Concombre",
+    "category": "produce"
+  },
+  "Cucumber_1": {
+    "index": 128,
+    "label_en": "Cucumber 1",
+    "label_fr": "Concombre 1",
+    "category": "produce"
+  },
+  "Cucumber_10": {
+    "index": 129,
+    "label_en": "Cucumber 10",
+    "label_fr": "Concombre 10",
+    "category": "produce"
+  },
+  "Cucumber_11": {
+    "index": 130,
+    "label_en": "Cucumber 11",
+    "label_fr": "Concombre 11",
+    "category": "produce"
+  },
+  "Cucumber_12": {
+    "index": 131,
+    "label_en": "Cucumber 12",
+    "label_fr": "Concombre 12",
+    "category": "produce"
+  },
+  "Cucumber_13": {
+    "index": 132,
+    "label_en": "Cucumber 13",
+    "label_fr": "Concombre 13",
+    "category": "produce"
+  },
+  "Cucumber_3": {
+    "index": 133,
+    "label_en": "Cucumber 3",
+    "label_fr": "Concombre 3",
+    "category": "produce"
+  },
+  "Cucumber_4": {
+    "index": 134,
+    "label_en": "Cucumber 4",
+    "label_fr": "Concombre 4",
+    "category": "produce"
+  },
+  "Cucumber_5": {
+    "index": 135,
+    "label_en": "Cucumber 5",
+    "label_fr": "Concombre 5",
+    "category": "produce"
+  },
+  "Cucumber_6": {
+    "index": 136,
+    "label_en": "Cucumber 6",
+    "label_fr": "Concombre 6",
+    "category": "produce"
+  },
+  "Cucumber_7": {
+    "index": 137,
+    "label_en": "Cucumber 7",
+    "label_fr": "Concombre 7",
+    "category": "produce"
+  },
+  "Cucumber_8": {
+    "index": 138,
+    "label_en": "Cucumber 8",
+    "label_fr": "Concombre 8",
+    "category": "produce"
+  },
+  "Cucumber_9": {
+    "index": 139,
+    "label_en": "Cucumber 9",
+    "label_fr": "Concombre 9",
+    "category": "produce"
+  },
+  "Cucurbita_(Pumpkin)": {
+    "index": 140,
+    "label_en": "Cucurbita (Pumpkin)",
+    "label_fr": "Cucurbita (Citrouille)",
+    "category": "produce"
+  },
+  "Curcuma_Longa_(Turmeric)": {
+    "index": 141,
+    "label_en": "Curcuma Longa (Turmeric)",
+    "label_fr": "Curcuma Longa (Turmeric)",
+    "category": "produce"
+  },
+  "Cymbopogon_(Lemongrass)": {
+    "index": 142,
+    "label_en": "Cymbopogon (Lemongrass)",
+    "label_fr": "Cymbopogon (Citrongrass)",
+    "category": "herb"
+  },
+  "Dates_1": {
+    "index": 143,
+    "label_en": "Dates 1",
+    "label_fr": "Dates 1",
+    "category": "produce"
+  },
+  "Dates_2": {
+    "index": 144,
+    "label_en": "Dates 2",
+    "label_fr": "Dates 2",
+    "category": "produce"
+  },
+  "Ducati_Panigale_(Ganigale)": {
+    "index": 145,
+    "label_en": "Ducati Panigale (Ganigale)",
+    "label_fr": "Ducati Panigale (Ganigale)",
+    "category": "produce"
+  },
+  "Eclipta_Prostrata_(Bringaraja)": {
+    "index": 146,
+    "label_en": "Eclipta Prostrata (Bringaraja)",
+    "label_fr": "Eclipta Prostrata (Bringaraja)",
+    "category": "produce"
+  },
+  "Eggplant": {
+    "index": 147,
+    "label_en": "Eggplant",
+    "label_fr": "Aubergine",
+    "category": "produce"
+  },
+  "Eggplant_1": {
+    "index": 148,
+    "label_en": "Eggplant 1",
+    "label_fr": "Aubergine 1",
+    "category": "produce"
+  },
+  "Eggplant_Long_1": {
+    "index": 149,
+    "label_en": "Eggplant Long 1",
+    "label_fr": "Aubergine Long 1",
+    "category": "produce"
+  },
+  "Eucalyptus_Globulus_Labill_(Eucalyptus)": {
+    "index": 150,
+    "label_en": "Eucalyptus Globulus Labill (Eucalyptus)",
+    "label_fr": "Eucalyptus Globulus Labill (Eucalyptus)",
+    "category": "produce"
+  },
+  "Euphorbia_Hirta_(Astma_Weed)": {
+    "index": 151,
+    "label_en": "Euphorbia Hirta (Astma Weed)",
+    "label_fr": "Euphorbia Hirta (Astma Weed)",
+    "category": "produce"
+  },
+  "Ficus_Auriculata_(Roxburgh_Fig)": {
+    "index": 152,
+    "label_en": "Ficus Auriculata (Roxburgh Fig)",
+    "label_fr": "Ficus Auriculata (Roxburgh Figue)",
+    "category": "produce"
+  },
+  "Ficus_Religiosa_(Peepal_Tree)": {
+    "index": 153,
+    "label_en": "Ficus Religiosa (Peepal Tree)",
+    "label_fr": "Ficus Religiosa (Peepal Tree)",
+    "category": "produce"
+  },
+  "Fig_1": {
+    "index": 154,
+    "label_en": "Fig 1",
+    "label_fr": "Figue 1",
+    "category": "produce"
+  },
+  "Garlic": {
+    "index": 155,
+    "label_en": "Garlic",
+    "label_fr": "Ail",
+    "category": "produce"
+  },
+  "Garlic_Bulb_1": {
+    "index": 156,
+    "label_en": "Garlic Bulb 1",
+    "label_fr": "Ail Bulb 1",
+    "category": "produce"
+  },
+  "Ginger": {
+    "index": 157,
+    "label_en": "Ginger",
+    "label_fr": "Gingembre",
+    "category": "produce"
+  },
+  "Ginger_2": {
+    "index": 158,
+    "label_en": "Ginger 2",
+    "label_fr": "Gingembre 2",
+    "category": "produce"
+  },
+  "Ginger_Root_1": {
+    "index": 159,
+    "label_en": "Ginger Root 1",
+    "label_fr": "Gingembre Root 1",
+    "category": "produce"
+  },
+  "Gomphrena_Globosa_(Globe_Amarnath)": {
+    "index": 160,
+    "label_en": "Gomphrena Globosa (Globe Amarnath)",
+    "label_fr": "Gomphrena Globosa (Globe Amarnath)",
+    "category": "produce"
+  },
+  "Gooseberry_1": {
+    "index": 161,
+    "label_en": "Gooseberry 1",
+    "label_fr": "Groseille à maquereau 1",
+    "category": "produce"
+  },
+  "Granadilla_1": {
+    "index": 162,
+    "label_en": "Granadilla 1",
+    "label_fr": "Grenadelle / Fruit de la passion 1",
+    "category": "produce"
+  },
+  "Grape_1": {
+    "index": 163,
+    "label_en": "Grape 1",
+    "label_fr": "Raisin 1",
+    "category": "produce"
+  },
+  "Grape_Blue_1": {
+    "index": 164,
+    "label_en": "Grape Blue 1",
+    "label_fr": "Raisin bleu / noir 1",
+    "category": "produce"
+  },
+  "Grape_Pink_1": {
+    "index": 165,
+    "label_en": "Grape Pink 1",
+    "label_fr": "Raisin rosé 1",
+    "category": "produce"
+  },
+  "Grape_Pink_2": {
+    "index": 166,
+    "label_en": "Grape Pink 2",
+    "label_fr": "Raisin rosé 2",
+    "category": "produce"
+  },
+  "Grape_White_1": {
+    "index": 167,
+    "label_en": "Grape White 1",
+    "label_fr": "Raisin vert / blanc 1",
+    "category": "produce"
+  },
+  "Grape_White_2": {
+    "index": 168,
+    "label_en": "Grape White 2",
+    "label_fr": "Raisin vert / blanc 2",
+    "category": "produce"
+  },
+  "Grape_White_3": {
+    "index": 169,
+    "label_en": "Grape White 3",
+    "label_fr": "Raisin vert / blanc 3",
+    "category": "produce"
+  },
+  "Grape_White_4": {
+    "index": 170,
+    "label_en": "Grape White 4",
+    "label_fr": "Raisin vert / blanc 4",
+    "category": "produce"
+  },
+  "Grapefruit_Pink_1": {
+    "index": 171,
+    "label_en": "Grapefruit Pink 1",
+    "label_fr": "Pamplemousse rose 1",
+    "category": "produce"
+  },
+  "Grapefruit_White_1": {
+    "index": 172,
+    "label_en": "Grapefruit White 1",
+    "label_fr": "Pamplemousse blanc 1",
+    "category": "produce"
+  },
+  "Grapes": {
+    "index": 173,
+    "label_en": "Grapes",
+    "label_fr": "Raisins",
+    "category": "produce"
+  },
+  "Graptophyllum_Pictum_(Caricature)": {
+    "index": 174,
+    "label_en": "Graptophyllum Pictum (Caricature)",
+    "label_fr": "Graptophyllum Pictum (Caricature)",
+    "category": "produce"
+  },
+  "Guava_1": {
+    "index": 175,
+    "label_en": "Guava 1",
+    "label_fr": "Goyave 1",
+    "category": "produce"
+  },
+  "Hazelnut_1": {
+    "index": 176,
+    "label_en": "Hazelnut 1",
+    "label_fr": "Noisette 1",
+    "category": "produce"
+  },
+  "Hibiscus_Rosa_Sinensis_(Hibiscus)": {
+    "index": 177,
+    "label_en": "Hibiscus Rosa Sinensis (Hibiscus)",
+    "label_fr": "Hibiscus Rosa Sinensis (Hibiscus)",
+    "category": "produce"
+  },
+  "Huckleberry_1": {
+    "index": 178,
+    "label_en": "Huckleberry 1",
+    "label_fr": "Huckleberry 1",
+    "category": "produce"
+  },
+  "Hymenaea_Courbaril_(Chakte)": {
+    "index": 179,
+    "label_en": "Hymenaea Courbaril (Chakte)",
+    "label_fr": "Hymenaea Courbaril (Chakte)",
+    "category": "produce"
+  },
+  "Ixora_Coccinea_(Jungle_Geranium_Kepala)": {
+    "index": 180,
+    "label_en": "Ixora Coccinea (Jungle Geranium Kepala)",
+    "label_fr": "Ixora Coccinea (Jungle Geranium Kepala)",
+    "category": "produce"
+  },
+  "Jalepeno": {
+    "index": 181,
+    "label_en": "Jalepeno",
+    "label_fr": "Jalepeno",
+    "category": "produce"
+  },
+  "Jasminum_(Jasmine)": {
+    "index": 182,
+    "label_en": "Jasminum (Jasmine)",
+    "label_fr": "Jasminum (Jasmine)",
+    "category": "produce"
+  },
+  "Justicia_Adhatoda_(Malabar_Nut)": {
+    "index": 183,
+    "label_en": "Justicia Adhatoda (Malabar Nut)",
+    "label_fr": "Justicia Adhatoda (Malabar Nut)",
+    "category": "produce"
+  },
+  "Kaki_1": {
+    "index": 184,
+    "label_en": "Kaki 1",
+    "label_fr": "Kaki 1",
+    "category": "produce"
+  },
+  "Kiwi": {
+    "index": 185,
+    "label_en": "Kiwi",
+    "label_fr": "Kiwi",
+    "category": "produce"
+  },
+  "Kiwi_1": {
+    "index": 186,
+    "label_en": "Kiwi 1",
+    "label_fr": "Kiwi 1",
+    "category": "produce"
+  },
+  "Kohlrabi_1": {
+    "index": 187,
+    "label_en": "Kohlrabi 1",
+    "label_fr": "Chou-rave 1",
+    "category": "produce"
+  },
+  "Kumquats_1": {
+    "index": 188,
+    "label_en": "Kumquats 1",
+    "label_fr": "Kumquats 1",
+    "category": "produce"
+  },
+  "Lantana_Camara_(Lantana)": {
+    "index": 189,
+    "label_en": "Lantana Camara (Lantana)",
+    "label_fr": "Lantana Camara (Lantana)",
+    "category": "produce"
+  },
+  "Lawsonia_Inermis_(Henna)": {
+    "index": 190,
+    "label_en": "Lawsonia Inermis (Henna)",
+    "label_fr": "Lawsonia Inermis (Henna)",
+    "category": "produce"
+  },
+  "Lemon": {
+    "index": 191,
+    "label_en": "Lemon",
+    "label_fr": "Citron",
+    "category": "produce"
+  },
+  "Lemon_1": {
+    "index": 192,
+    "label_en": "Lemon 1",
+    "label_fr": "Citron 1",
+    "category": "produce"
+  },
+  "Lemon_Meyer_1": {
+    "index": 193,
+    "label_en": "Lemon Meyer 1",
+    "label_fr": "Citron Meyer 1",
+    "category": "produce"
+  },
+  "Lettuce": {
+    "index": 194,
+    "label_en": "Lettuce",
+    "label_fr": "Laitue",
+    "category": "produce"
+  },
+  "Leucas_Aspera_(Kambajala)": {
+    "index": 195,
+    "label_en": "Leucas Aspera (Kambajala)",
+    "label_fr": "Leucas Aspera (Kambajala)",
+    "category": "produce"
+  },
+  "Limes_1": {
+    "index": 196,
+    "label_en": "Limes 1",
+    "label_fr": "Limes 1",
+    "category": "produce"
+  },
+  "Lychee_1": {
+    "index": 197,
+    "label_en": "Lychee 1",
+    "label_fr": "Litchi 1",
+    "category": "produce"
+  },
+  "Magnolia_Champaca_(Sampige)": {
+    "index": 198,
+    "label_en": "Magnolia Champaca (Sampige)",
+    "label_fr": "Magnolia Champaca (Sampige)",
+    "category": "produce"
+  },
+  "Mandarine_1": {
+    "index": 199,
+    "label_en": "Mandarine 1",
+    "label_fr": "Mandarine 1",
+    "category": "produce"
+  },
+  "Mangifera_Indica_(Mango)": {
+    "index": 200,
+    "label_en": "Mangifera Indica (Mango)",
+    "label_fr": "Mangifera Indica (Mangue)",
+    "category": "produce"
+  },
+  "Mango": {
+    "index": 201,
+    "label_en": "Mango",
+    "label_fr": "Mangue",
+    "category": "produce"
+  },
+  "Mango_1": {
+    "index": 202,
+    "label_en": "Mango 1",
+    "label_fr": "Mangue 1",
+    "category": "produce"
+  },
+  "Mango_Red_1": {
+    "index": 203,
+    "label_en": "Mango Red 1",
+    "label_fr": "Mangue Red 1",
+    "category": "produce"
+  },
+  "Mangostan_1": {
+    "index": 204,
+    "label_en": "Mangostan 1",
+    "label_fr": "Mangoustan 1",
+    "category": "produce"
+  },
+  "Manilkara_Zapota_(Sapota)": {
+    "index": 205,
+    "label_en": "Manilkara Zapota (Sapota)",
+    "label_fr": "Manilkara Zapota (Sapota)",
+    "category": "produce"
+  },
+  "Maracuja_1": {
+    "index": 206,
+    "label_en": "Maracuja 1",
+    "label_fr": "Maracuja 1",
+    "category": "produce"
+  },
+  "Melon_Piel_De_Sapo_1": {
+    "index": 207,
+    "label_en": "Melon Piel De Sapo 1",
+    "label_fr": "Melon Piel De Sapo 1",
+    "category": "produce"
+  },
+  "Mentha_(Mint)": {
+    "index": 208,
+    "label_en": "Mentha (Mint)",
+    "label_fr": "Mentha (Menthe)",
+    "category": "herb"
+  },
+  "Momordica_Dioica_(Thumbai_Spiny_Gourd)": {
+    "index": 209,
+    "label_en": "Momordica Dioica (Thumbai Spiny Gourd)",
+    "label_fr": "Momordica Dioica (Thumbai Spiny Gourd)",
+    "category": "produce"
+  },
+  "Morinda_Citrifolia_(Nooni)": {
+    "index": 210,
+    "label_en": "Morinda Citrifolia (Nooni)",
+    "label_fr": "Morinda Citrifolia (Nooni)",
+    "category": "produce"
+  },
+  "Moringa_Oleifera_(Moringa_Drumstick)": {
+    "index": 211,
+    "label_en": "Moringa Oleifera (Moringa Drumstick)",
+    "label_fr": "Moringa Oleifera (Moringa Drumstick)",
+    "category": "produce"
+  },
+  "Mulberry_1": {
+    "index": 212,
+    "label_en": "Mulberry 1",
+    "label_fr": "Mulberry 1",
+    "category": "produce"
+  },
+  "Muntingia_Calabura_(Jamaica_Cherry_Gasagase)": {
+    "index": 213,
+    "label_en": "Muntingia Calabura (Jamaica Cherry Gasagase)",
+    "label_fr": "Muntingia Calabura (Jamaica Cerise Gasagase)",
+    "category": "produce"
+  },
+  "Murraya_Koenigii_(Curry)": {
+    "index": 214,
+    "label_en": "Murraya Koenigii (Curry)",
+    "label_fr": "Murraya Koenigii (Curry)",
+    "category": "produce"
+  },
+  "Mushroom_Champignon_1": {
+    "index": 215,
+    "label_en": "Mushroom Champignon 1",
+    "label_fr": "Champignon de Paris blanc 1",
+    "category": "produce"
+  },
+  "Mushroom_Champignon_2": {
+    "index": 216,
+    "label_en": "Mushroom Champignon 2",
+    "label_fr": "Champignon de Paris blanc 2",
+    "category": "produce"
+  },
+  "Mushroom_Champignon_3": {
+    "index": 217,
+    "label_en": "Mushroom Champignon 3",
+    "label_fr": "Champignon de Paris blanc 3",
+    "category": "produce"
+  },
+  "Mushroom_Champignon_4": {
+    "index": 218,
+    "label_en": "Mushroom Champignon 4",
+    "label_fr": "Champignon de Paris blanc 4",
+    "category": "produce"
+  },
+  "Mushroom_Champignon_5": {
+    "index": 219,
+    "label_en": "Mushroom Champignon 5",
+    "label_fr": "Champignon de Paris blanc 5",
+    "category": "produce"
+  },
+  "Nectarine_1": {
+    "index": 220,
+    "label_en": "Nectarine 1",
+    "label_fr": "Nectarine 1",
+    "category": "produce"
+  },
+  "Nectarine_Flat_1": {
+    "index": 221,
+    "label_en": "Nectarine Flat 1",
+    "label_fr": "Nectarine Flat 1",
+    "category": "produce"
+  },
+  "Nectarine_Flat_2": {
+    "index": 222,
+    "label_en": "Nectarine Flat 2",
+    "label_fr": "Nectarine Flat 2",
+    "category": "produce"
+  },
+  "Neolamarckia_Cadamba_(Burflower_Tree_Kasambruga)": {
+    "index": 223,
+    "label_en": "Neolamarckia Cadamba (Burflower Tree Kasambruga)",
+    "label_fr": "Neolamarckia Cadamba (Burflower Tree Kasambruga)",
+    "category": "produce"
+  },
+  "Nerium_Oleander_(Arali)": {
+    "index": 224,
+    "label_en": "Nerium Oleander (Arali)",
+    "label_fr": "Nerium Oleander (Arali)",
+    "category": "produce"
+  },
+  "Nut_1": {
+    "index": 225,
+    "label_en": "Nut 1",
+    "label_fr": "Nut 1",
+    "category": "produce"
+  },
+  "Nut_2": {
+    "index": 226,
+    "label_en": "Nut 2",
+    "label_fr": "Nut 2",
+    "category": "produce"
+  },
+  "Nut_3": {
+    "index": 227,
+    "label_en": "Nut 3",
+    "label_fr": "Nut 3",
+    "category": "produce"
+  },
+  "Nut_4": {
+    "index": 228,
+    "label_en": "Nut 4",
+    "label_fr": "Nut 4",
+    "category": "produce"
+  },
+  "Nut_5": {
+    "index": 229,
+    "label_en": "Nut 5",
+    "label_fr": "Nut 5",
+    "category": "produce"
+  },
+  "Nut_Forest_1": {
+    "index": 230,
+    "label_en": "Nut Forest 1",
+    "label_fr": "Nut Forest 1",
+    "category": "produce"
+  },
+  "Nut_Pecan_1": {
+    "index": 231,
+    "label_en": "Nut Pecan 1",
+    "label_fr": "Nut Pecan 1",
+    "category": "produce"
+  },
+  "Nyctanthes_Arbor_Tristis_(Parijatha)": {
+    "index": 232,
+    "label_en": "Nyctanthes Arbor Tristis (Parijatha)",
+    "label_fr": "Nyctanthes Arbor Tristis (Parijatha)",
+    "category": "produce"
+  },
+  "Ocimum_Basilicum_(Kamakasturi)": {
+    "index": 233,
+    "label_en": "Ocimum Basilicum (Kamakasturi)",
+    "label_fr": "Basilic sacré / Kamakasturi",
+    "category": "herb"
+  },
+  "Ocimum_Tenuiflorum_(Tulsi)": {
+    "index": 234,
+    "label_en": "Ocimum Tenuiflorum (Tulsi)",
+    "label_fr": "Ocimum Tenuiflorum (Tulsi)",
+    "category": "herb"
+  },
+  "Onion": {
+    "index": 235,
+    "label_en": "Onion",
+    "label_fr": "Oignon",
+    "category": "produce"
+  },
+  "Onion_2": {
+    "index": 236,
+    "label_en": "Onion 2",
+    "label_fr": "Oignon 2",
+    "category": "produce"
+  },
+  "Onion_Red_1": {
+    "index": 237,
+    "label_en": "Onion Red 1",
+    "label_fr": "Oignon rouge 1",
+    "category": "produce"
+  },
+  "Onion_Red_2": {
+    "index": 238,
+    "label_en": "Onion Red 2",
+    "label_fr": "Oignon rouge 2",
+    "category": "produce"
+  },
+  "Onion_Red_3": {
+    "index": 239,
+    "label_en": "Onion Red 3",
+    "label_fr": "Oignon rouge 3",
+    "category": "produce"
+  },
+  "Onion_White_1": {
+    "index": 240,
+    "label_en": "Onion White 1",
+    "label_fr": "Oignon blanc 1",
+    "category": "produce"
+  },
+  "Onion_White_2": {
+    "index": 241,
+    "label_en": "Onion White 2",
+    "label_fr": "Oignon blanc 2",
+    "category": "produce"
+  },
+  "Orange": {
+    "index": 242,
+    "label_en": "Orange",
+    "label_fr": "Orange",
+    "category": "produce"
+  },
+  "Orange_1": {
+    "index": 243,
+    "label_en": "Orange 1",
+    "label_fr": "Orange 1",
+    "category": "produce"
+  },
+  "Orange_2": {
+    "index": 244,
+    "label_en": "Orange 2",
+    "label_fr": "Orange 2",
+    "category": "produce"
+  },
+  "Orange_3": {
+    "index": 245,
+    "label_en": "Orange 3",
+    "label_fr": "Orange 3",
+    "category": "produce"
+  },
+  "Orange_4": {
+    "index": 246,
+    "label_en": "Orange 4",
+    "label_fr": "Orange 4",
+    "category": "produce"
+  },
+  "Orange_5": {
+    "index": 247,
+    "label_en": "Orange 5",
+    "label_fr": "Orange 5",
+    "category": "produce"
+  },
+  "Orange_Peeled_1": {
+    "index": 248,
+    "label_en": "Orange Peeled 1",
+    "label_fr": "Orange Peeled 1",
+    "category": "produce"
+  },
+  "Papaver_Somniferum_(Poppy_Seed_Gasagase)": {
+    "index": 249,
+    "label_en": "Papaver Somniferum (Poppy Seed Gasagase)",
+    "label_fr": "Papaver Somniferum (Poppy Seed Gasagase)",
+    "category": "produce"
+  },
+  "Papaya": {
+    "index": 250,
+    "label_en": "Papaya",
+    "label_fr": "Papaye",
+    "category": "produce"
+  },
+  "Papaya_1": {
+    "index": 251,
+    "label_en": "Papaya 1",
+    "label_fr": "Papaye 1",
+    "category": "produce"
+  },
+  "Papaya_2": {
+    "index": 252,
+    "label_en": "Papaya 2",
+    "label_fr": "Papaye 2",
+    "category": "produce"
+  },
+  "Paprika": {
+    "index": 253,
+    "label_en": "Paprika",
+    "label_fr": "Paprika",
+    "category": "produce"
+  },
+  "Passion_Fruit_1": {
+    "index": 254,
+    "label_en": "Passion Fruit 1",
+    "label_fr": "Fruit de la passion 1",
+    "category": "produce"
+  },
+  "Peach_1": {
+    "index": 255,
+    "label_en": "Peach 1",
+    "label_fr": "Pêche 1",
+    "category": "produce"
+  },
+  "Peach_2": {
+    "index": 256,
+    "label_en": "Peach 2",
+    "label_fr": "Pêche 2",
+    "category": "produce"
+  },
+  "Peach_3": {
+    "index": 257,
+    "label_en": "Peach 3",
+    "label_fr": "Pêche 3",
+    "category": "produce"
+  },
+  "Peach_4": {
+    "index": 258,
+    "label_en": "Peach 4",
+    "label_fr": "Pêche 4",
+    "category": "produce"
+  },
+  "Peach_5": {
+    "index": 259,
+    "label_en": "Peach 5",
+    "label_fr": "Pêche 5",
+    "category": "produce"
+  },
+  "Peach_6": {
+    "index": 260,
+    "label_en": "Peach 6",
+    "label_fr": "Pêche 6",
+    "category": "produce"
+  },
+  "Peach_Flat_1": {
+    "index": 261,
+    "label_en": "Peach Flat 1",
+    "label_fr": "Pêche Flat 1",
+    "category": "produce"
+  },
+  "Peanut_Shell_1X_1": {
+    "index": 262,
+    "label_en": "Peanut Shell 1X 1",
+    "label_fr": "Petits poisnut Shell 1X 1",
+    "category": "produce"
+  },
+  "Pear": {
+    "index": 263,
+    "label_en": "Pear",
+    "label_fr": "Poire",
+    "category": "produce"
+  },
+  "Pear_1": {
+    "index": 264,
+    "label_en": "Pear 1",
+    "label_fr": "Poire 1",
+    "category": "produce"
+  },
+  "Pear_10": {
+    "index": 265,
+    "label_en": "Pear 10",
+    "label_fr": "Poire 10",
+    "category": "produce"
+  },
+  "Pear_11": {
+    "index": 266,
+    "label_en": "Pear 11",
+    "label_fr": "Poire 11",
+    "category": "produce"
+  },
+  "Pear_12": {
+    "index": 267,
+    "label_en": "Pear 12",
+    "label_fr": "Poire 12",
+    "category": "produce"
+  },
+  "Pear_13": {
+    "index": 268,
+    "label_en": "Pear 13",
+    "label_fr": "Poire 13",
+    "category": "produce"
+  },
+  "Pear_14": {
+    "index": 269,
+    "label_en": "Pear 14",
+    "label_fr": "Poire 14",
+    "category": "produce"
+  },
+  "Pear_2": {
+    "index": 270,
+    "label_en": "Pear 2",
+    "label_fr": "Poire 2",
+    "category": "produce"
+  },
+  "Pear_3": {
+    "index": 271,
+    "label_en": "Pear 3",
+    "label_fr": "Poire 3",
+    "category": "produce"
+  },
+  "Pear_5": {
+    "index": 272,
+    "label_en": "Pear 5",
+    "label_fr": "Poire 5",
+    "category": "produce"
+  },
+  "Pear_6": {
+    "index": 273,
+    "label_en": "Pear 6",
+    "label_fr": "Poire 6",
+    "category": "produce"
+  },
+  "Pear_7": {
+    "index": 274,
+    "label_en": "Pear 7",
+    "label_fr": "Poire 7",
+    "category": "produce"
+  },
+  "Pear_8": {
+    "index": 275,
+    "label_en": "Pear 8",
+    "label_fr": "Poire 8",
+    "category": "produce"
+  },
+  "Pear_9": {
+    "index": 276,
+    "label_en": "Pear 9",
+    "label_fr": "Poire 9",
+    "category": "produce"
+  },
+  "Pear_Abate_1": {
+    "index": 277,
+    "label_en": "Pear Abate 1",
+    "label_fr": "Poire Abate 1",
+    "category": "produce"
+  },
+  "Pear_Forelle_1": {
+    "index": 278,
+    "label_en": "Pear Forelle 1",
+    "label_fr": "Poire Forelle 1",
+    "category": "produce"
+  },
+  "Pear_Kaiser_1": {
+    "index": 279,
+    "label_en": "Pear Kaiser 1",
+    "label_fr": "Poire Kaiser 1",
+    "category": "produce"
+  },
+  "Pear_Monster_1": {
+    "index": 280,
+    "label_en": "Pear Monster 1",
+    "label_fr": "Poire Monster 1",
+    "category": "produce"
+  },
+  "Pear_Red_1": {
+    "index": 281,
+    "label_en": "Pear Red 1",
+    "label_fr": "Poire Red 1",
+    "category": "produce"
+  },
+  "Pear_Stone_1": {
+    "index": 282,
+    "label_en": "Pear Stone 1",
+    "label_fr": "Poire Stone 1",
+    "category": "produce"
+  },
+  "Pear_Williams_1": {
+    "index": 283,
+    "label_en": "Pear Williams 1",
+    "label_fr": "Poire Williams 1",
+    "category": "produce"
+  },
+  "Peas": {
+    "index": 284,
+    "label_en": "Peas",
+    "label_fr": "Petits pois",
+    "category": "produce"
+  },
+  "Pepino_1": {
+    "index": 285,
+    "label_en": "Pepino 1",
+    "label_fr": "Pepino 1",
+    "category": "produce"
+  },
+  "Pepper_1": {
+    "index": 286,
+    "label_en": "Pepper 1",
+    "label_fr": "Pepper 1",
+    "category": "produce"
+  },
+  "Pepper_2": {
+    "index": 287,
+    "label_en": "Pepper 2",
+    "label_fr": "Pepper 2",
+    "category": "produce"
+  },
+  "Pepper_Green_1": {
+    "index": 288,
+    "label_en": "Pepper Green 1",
+    "label_fr": "Poivron vert 1",
+    "category": "produce"
+  },
+  "Pepper_Orange_1": {
+    "index": 289,
+    "label_en": "Pepper Orange 1",
+    "label_fr": "Poivron orange 1",
+    "category": "produce"
+  },
+  "Pepper_Orange_2": {
+    "index": 290,
+    "label_en": "Pepper Orange 2",
+    "label_fr": "Poivron orange 2",
+    "category": "produce"
+  },
+  "Pepper_Red_1": {
+    "index": 291,
+    "label_en": "Pepper Red 1",
+    "label_fr": "Poivron rouge 1",
+    "category": "produce"
+  },
+  "Pepper_Red_2": {
+    "index": 292,
+    "label_en": "Pepper Red 2",
+    "label_fr": "Poivron rouge 2",
+    "category": "produce"
+  },
+  "Pepper_Red_3": {
+    "index": 293,
+    "label_en": "Pepper Red 3",
+    "label_fr": "Poivron rouge 3",
+    "category": "produce"
+  },
+  "Pepper_Red_4": {
+    "index": 294,
+    "label_en": "Pepper Red 4",
+    "label_fr": "Poivron rouge 4",
+    "category": "produce"
+  },
+  "Pepper_Red_5": {
+    "index": 295,
+    "label_en": "Pepper Red 5",
+    "label_fr": "Poivron rouge 5",
+    "category": "produce"
+  },
+  "Pepper_Yellow_1": {
+    "index": 296,
+    "label_en": "Pepper Yellow 1",
+    "label_fr": "Poivron jaune 1",
+    "category": "produce"
+  },
+  "Phaseolus_Vulgaris_(Beans)": {
+    "index": 297,
+    "label_en": "Phaseolus Vulgaris (Beans)",
+    "label_fr": "Phaseolus Vulgaris (Beans)",
+    "category": "produce"
+  },
+  "Phyllanthus_Emblica_(Amla)": {
+    "index": 298,
+    "label_en": "Phyllanthus Emblica (Amla)",
+    "label_fr": "Phyllanthus Emblica (Amla)",
+    "category": "produce"
+  },
+  "Physalis_1": {
+    "index": 299,
+    "label_en": "Physalis 1",
+    "label_fr": "Physalis 1",
+    "category": "produce"
+  },
+  "Physalis_With_Husk_1": {
+    "index": 300,
+    "label_en": "Physalis With Husk 1",
+    "label_fr": "Physalis With Husk 1",
+    "category": "produce"
+  },
+  "Pineapple": {
+    "index": 301,
+    "label_en": "Pineapple",
+    "label_fr": "PinePomme",
+    "category": "produce"
+  },
+  "Pineapple_1": {
+    "index": 302,
+    "label_en": "Pineapple 1",
+    "label_fr": "PinePomme 1",
+    "category": "produce"
+  },
+  "Pineapple_Mini_1": {
+    "index": 303,
+    "label_en": "Pineapple Mini 1",
+    "label_fr": "PinePomme Mini 1",
+    "category": "produce"
+  },
+  "Piper_Betle_(Betel)": {
+    "index": 304,
+    "label_en": "Piper Betle (Betel)",
+    "label_fr": "Piper Betle (Betel)",
+    "category": "produce"
+  },
+  "Piper_Nigrum_(Black_Pepper)": {
+    "index": 305,
+    "label_en": "Piper Nigrum (Black Pepper)",
+    "label_fr": "Piper Nigrum (Black Pepper)",
+    "category": "produce"
+  },
+  "Pistachio_1": {
+    "index": 306,
+    "label_en": "Pistachio 1",
+    "label_fr": "Pistache 1",
+    "category": "produce"
+  },
+  "Pisum_Sativum_(Pea)": {
+    "index": 307,
+    "label_en": "Pisum Sativum (Pea)",
+    "label_fr": "Pisum Sativum (Petits pois)",
+    "category": "produce"
+  },
+  "Pitahaya_Red_1": {
+    "index": 308,
+    "label_en": "Pitahaya Red 1",
+    "label_fr": "Pitahaya Red 1",
+    "category": "produce"
+  },
+  "Pitahaya_Red_2": {
+    "index": 309,
+    "label_en": "Pitahaya Red 2",
+    "label_fr": "Pitahaya Red 2",
+    "category": "produce"
+  },
+  "Plectranthus_Amboinicus_(Mexican_Mint)": {
+    "index": 310,
+    "label_en": "Plectranthus Amboinicus (Mexican Mint)",
+    "label_fr": "Plectranthus Amboinicus (Mexican Menthe)",
+    "category": "herb"
+  },
+  "Plum_1": {
+    "index": 311,
+    "label_en": "Plum 1",
+    "label_fr": "Prune 1",
+    "category": "produce"
+  },
+  "Plum_2": {
+    "index": 312,
+    "label_en": "Plum 2",
+    "label_fr": "Prune 2",
+    "category": "produce"
+  },
+  "Plum_3": {
+    "index": 313,
+    "label_en": "Plum 3",
+    "label_fr": "Prune 3",
+    "category": "produce"
+  },
+  "Plum_4": {
+    "index": 314,
+    "label_en": "Plum 4",
+    "label_fr": "Prune 4",
+    "category": "produce"
+  },
+  "Plum_5": {
+    "index": 315,
+    "label_en": "Plum 5",
+    "label_fr": "Prune 5",
+    "category": "produce"
+  },
+  "Pomegranate": {
+    "index": 316,
+    "label_en": "Pomegranate",
+    "label_fr": "Grenade",
+    "category": "produce"
+  },
+  "Pomegranate_1": {
+    "index": 317,
+    "label_en": "Pomegranate 1",
+    "label_fr": "Grenade 1",
+    "category": "produce"
+  },
+  "Pomelo_Sweetie_1": {
+    "index": 318,
+    "label_en": "Pomelo Sweetie 1",
+    "label_fr": "Pomelo Sweetie 1",
+    "category": "produce"
+  },
+  "Pongamia_Pinnata_(Pongamia_Honge)": {
+    "index": 319,
+    "label_en": "Pongamia Pinnata (Pongamia Honge)",
+    "label_fr": "Pongamia Pinnata (Pongamia Honge)",
+    "category": "produce"
+  },
+  "Potato": {
+    "index": 320,
+    "label_en": "Potato",
+    "label_fr": "Pomme de terre",
+    "category": "produce"
+  },
+  "Potato_Red_1": {
+    "index": 321,
+    "label_en": "Potato Red 1",
+    "label_fr": "Pomme de terre rouge 1",
+    "category": "produce"
+  },
+  "Potato_Red_2": {
+    "index": 322,
+    "label_en": "Potato Red 2",
+    "label_fr": "Pomme de terre rouge 2",
+    "category": "produce"
+  },
+  "Potato_Sweet_1": {
+    "index": 323,
+    "label_en": "Potato Sweet 1",
+    "label_fr": "Patate douce 1",
+    "category": "produce"
+  },
+  "Potato_White_1": {
+    "index": 324,
+    "label_en": "Potato White 1",
+    "label_fr": "Pomme de terre blanche 1",
+    "category": "produce"
+  },
+  "Psidium_Guajava_(Guava)": {
+    "index": 325,
+    "label_en": "Psidium Guajava (Guava)",
+    "label_fr": "Psidium Guajava (Goyave)",
+    "category": "produce"
+  },
+  "Pumpkin": {
+    "index": 326,
+    "label_en": "Pumpkin",
+    "label_fr": "Citrouille",
+    "category": "produce"
+  },
+  "Punica_Granatum_(Pomoegranate)": {
+    "index": 327,
+    "label_en": "Punica Granatum (Pomoegranate)",
+    "label_fr": "Punica Granatum (Pomoegranate)",
+    "category": "produce"
+  },
+  "Quince_1": {
+    "index": 328,
+    "label_en": "Quince 1",
+    "label_fr": "Coing 1",
+    "category": "produce"
+  },
+  "Quince_2": {
+    "index": 329,
+    "label_en": "Quince 2",
+    "label_fr": "Coing 2",
+    "category": "produce"
+  },
+  "Quince_3": {
+    "index": 330,
+    "label_en": "Quince 3",
+    "label_fr": "Coing 3",
+    "category": "produce"
+  },
+  "Quince_4": {
+    "index": 331,
+    "label_en": "Quince 4",
+    "label_fr": "Coing 4",
+    "category": "produce"
+  },
+  "Radermachera_Xylocarpa_(Padri)": {
+    "index": 332,
+    "label_en": "Radermachera Xylocarpa (Padri)",
+    "label_fr": "Radermachera Xylocarpa (Padri)",
+    "category": "produce"
+  },
+  "Radish": {
+    "index": 333,
+    "label_en": "Radish",
+    "label_fr": "Radis",
+    "category": "produce"
+  },
+  "Rambutan_1": {
+    "index": 334,
+    "label_en": "Rambutan 1",
+    "label_fr": "Rambutan 1",
+    "category": "produce"
+  },
+  "Raphanus_Sativus_(Raddish)": {
+    "index": 335,
+    "label_en": "Raphanus Sativus (Raddish)",
+    "label_fr": "Raphanus Sativus (Raddish)",
+    "category": "produce"
+  },
+  "Raspberry_1": {
+    "index": 336,
+    "label_en": "Raspberry 1",
+    "label_fr": "Framboise 1",
+    "category": "produce"
+  },
+  "Raspberry_2": {
+    "index": 337,
+    "label_en": "Raspberry 2",
+    "label_fr": "Framboise 2",
+    "category": "produce"
+  },
+  "Raspberry_3": {
+    "index": 338,
+    "label_en": "Raspberry 3",
+    "label_fr": "Framboise 3",
+    "category": "produce"
+  },
+  "Raspberry_4": {
+    "index": 339,
+    "label_en": "Raspberry 4",
+    "label_fr": "Framboise 4",
+    "category": "produce"
+  },
+  "Raspberry_5": {
+    "index": 340,
+    "label_en": "Raspberry 5",
+    "label_fr": "Framboise 5",
+    "category": "produce"
+  },
+  "Raspberry_6": {
+    "index": 341,
+    "label_en": "Raspberry 6",
+    "label_fr": "Framboise 6",
+    "category": "produce"
+  },
+  "Redcurrant_1": {
+    "index": 342,
+    "label_en": "Redcurrant 1",
+    "label_fr": "Groseille rouge 1",
+    "category": "produce"
+  },
+  "Ricinus_Communis_(Castor)": {
+    "index": 343,
+    "label_en": "Ricinus Communis (Castor)",
+    "label_fr": "Ricinus Communis (Castor)",
+    "category": "produce"
+  },
+  "Rosa_Rubiginosa_(Rose)": {
+    "index": 344,
+    "label_en": "Rosa Rubiginosa (Rose)",
+    "label_fr": "Rosa Rubiginosa (Rose)",
+    "category": "produce"
+  },
+  "Ruta_Graveolens_(Common_Rue_Naagdalli)": {
+    "index": 345,
+    "label_en": "Ruta Graveolens (Common Rue Naagdalli)",
+    "label_fr": "Ruta Graveolens (Common Rue Naagdalli)",
+    "category": "produce"
+  },
+  "Salak_1": {
+    "index": 346,
+    "label_en": "Salak 1",
+    "label_fr": "Salak 1",
+    "category": "produce"
+  },
+  "Santalum_Album_(Sandalwood)": {
+    "index": 347,
+    "label_en": "Santalum Album (Sandalwood)",
+    "label_fr": "Santalum Album (Sandalwood)",
+    "category": "produce"
+  },
+  "Saraca_Asoca_(Ashoka)": {
+    "index": 348,
+    "label_en": "Saraca Asoca (Ashoka)",
+    "label_fr": "Saraca Asoca (Ashoka)",
+    "category": "produce"
+  },
+  "Saraca_Asoca_(Seethaashoka)": {
+    "index": 349,
+    "label_en": "Saraca Asoca (Seethaashoka)",
+    "label_fr": "Saraca Asoca (Seethaashoka)",
+    "category": "produce"
+  },
+  "Solanum_Lycopersicum_(Tomato)": {
+    "index": 350,
+    "label_en": "Solanum Lycopersicum (Tomato)",
+    "label_fr": "Solanum Lycopersicum (Tomate)",
+    "category": "produce"
+  },
+  "Solanum_Nigrum_(Blackberry_Nightshade_Ganike)": {
+    "index": 351,
+    "label_en": "Solanum Nigrum (Blackberry Nightshade Ganike)",
+    "label_fr": "Solanum Nigrum (Mûre Nightshade Ganike)",
+    "category": "produce"
+  },
+  "Soybeans": {
+    "index": 352,
+    "label_en": "Soybeans",
+    "label_fr": "Soya",
+    "category": "produce"
+  },
+  "Spinach": {
+    "index": 353,
+    "label_en": "Spinach",
+    "label_fr": "Épinard",
+    "category": "produce"
+  },
+  "Spinacia_Oleracea_(Palak(Spinach))": {
+    "index": 354,
+    "label_en": "Spinacia Oleracea (Palak (Spinach))",
+    "label_fr": "Spinacia Oleracea (Palak (Épinard))",
+    "category": "produce"
+  },
+  "Strawberry_1": {
+    "index": 355,
+    "label_en": "Strawberry 1",
+    "label_fr": "Fraise 1",
+    "category": "produce"
+  },
+  "Strawberry_2": {
+    "index": 356,
+    "label_en": "Strawberry 2",
+    "label_fr": "Fraise 2",
+    "category": "produce"
+  },
+  "Strawberry_3": {
+    "index": 357,
+    "label_en": "Strawberry 3",
+    "label_fr": "Fraise 3",
+    "category": "produce"
+  },
+  "Strawberry_Wedge_1": {
+    "index": 358,
+    "label_en": "Strawberry Wedge 1",
+    "label_fr": "Fraise coupée en quartiers 1",
+    "category": "produce"
+  },
+  "Sweetpotato": {
+    "index": 359,
+    "label_en": "Sweetpotato",
+    "label_fr": "Patate douce",
+    "category": "produce"
+  },
+  "Syzygium_Cumini_(Nerale)": {
+    "index": 360,
+    "label_en": "Syzygium Cumini (Nerale)",
+    "label_fr": "Syzygium Cumini (Nerale)",
+    "category": "produce"
+  },
+  "Syzygium_Jambos_(Rose_Apple)": {
+    "index": 361,
+    "label_en": "Syzygium Jambos (Rose Apple)",
+    "label_fr": "Syzygium Jambos (Rose Pomme)",
+    "category": "produce"
+  },
+  "Tabernaemontana_Divaricata_(Crape_Jasmine)": {
+    "index": 362,
+    "label_en": "Tabernaemontana Divaricata (Crape Jasmine)",
+    "label_fr": "Tabernaemontana Divaricata (Crape Jasmine)",
+    "category": "produce"
+  },
+  "Tagetes_(Marigold)": {
+    "index": 363,
+    "label_en": "Tagetes (Marigold)",
+    "label_fr": "Tagetes (Marigold)",
+    "category": "produce"
+  },
+  "Tamarillo_1": {
+    "index": 364,
+    "label_en": "Tamarillo 1",
+    "label_fr": "Tamarillo 1",
+    "category": "produce"
+  },
+  "Tamarindus_Indica_(Tamarind)": {
+    "index": 365,
+    "label_en": "Tamarindus Indica (Tamarind)",
+    "label_fr": "Tamarindus Indica (Tamarind)",
+    "category": "produce"
+  },
+  "Tangelo_1": {
+    "index": 366,
+    "label_en": "Tangelo 1",
+    "label_fr": "Tangelo 1",
+    "category": "produce"
+  },
+  "Tecoma_Stans_(Tecoma)": {
+    "index": 367,
+    "label_en": "Tecoma Stans (Tecoma)",
+    "label_fr": "Tecoma Stans (Tecoma)",
+    "category": "produce"
+  },
+  "Tinospora_Cordifolia_(Amruthaballi)": {
+    "index": 368,
+    "label_en": "Tinospora Cordifolia (Amruthaballi)",
+    "label_fr": "Tinospora Cordifolia (Amruthaballi)",
+    "category": "produce"
+  },
+  "Tomato": {
+    "index": 369,
+    "label_en": "Tomato",
+    "label_fr": "Tomate",
+    "category": "produce"
+  },
+  "Tomato_1": {
+    "index": 370,
+    "label_en": "Tomato 1",
+    "label_fr": "Tomate 1",
+    "category": "produce"
+  },
+  "Tomato_10": {
+    "index": 371,
+    "label_en": "Tomato 10",
+    "label_fr": "Tomate 10",
+    "category": "produce"
+  },
+  "Tomato_11": {
+    "index": 372,
+    "label_en": "Tomato 11",
+    "label_fr": "Tomate 11",
+    "category": "produce"
+  },
+  "Tomato_2": {
+    "index": 373,
+    "label_en": "Tomato 2",
+    "label_fr": "Tomate 2",
+    "category": "produce"
+  },
+  "Tomato_3": {
+    "index": 374,
+    "label_en": "Tomato 3",
+    "label_fr": "Tomate 3",
+    "category": "produce"
+  },
+  "Tomato_4": {
+    "index": 375,
+    "label_en": "Tomato 4",
+    "label_fr": "Tomate 4",
+    "category": "produce"
+  },
+  "Tomato_5": {
+    "index": 376,
+    "label_en": "Tomato 5",
+    "label_fr": "Tomate 5",
+    "category": "produce"
+  },
+  "Tomato_7": {
+    "index": 377,
+    "label_en": "Tomato 7",
+    "label_fr": "Tomate 7",
+    "category": "produce"
+  },
+  "Tomato_8": {
+    "index": 378,
+    "label_en": "Tomato 8",
+    "label_fr": "Tomate 8",
+    "category": "produce"
+  },
+  "Tomato_9": {
+    "index": 379,
+    "label_en": "Tomato 9",
+    "label_fr": "Tomate 9",
+    "category": "produce"
+  },
+  "Tomato_Cherry_Maroon_1": {
+    "index": 380,
+    "label_en": "Tomato Cherry Maroon 1",
+    "label_fr": "Tomate cerise pourpre 1",
+    "category": "produce"
+  },
+  "Tomato_Cherry_Orange_1": {
+    "index": 381,
+    "label_en": "Tomato Cherry Orange 1",
+    "label_fr": "Tomate cerise orange 1",
+    "category": "produce"
+  },
+  "Tomato_Cherry_Red_1": {
+    "index": 382,
+    "label_en": "Tomato Cherry Red 1",
+    "label_fr": "Tomate cerise rouge 1",
+    "category": "produce"
+  },
+  "Tomato_Cherry_Red_2": {
+    "index": 383,
+    "label_en": "Tomato Cherry Red 2",
+    "label_fr": "Tomate cerise rouge 2",
+    "category": "produce"
+  },
+  "Tomato_Cherry_Yellow_1": {
+    "index": 384,
+    "label_en": "Tomato Cherry Yellow 1",
+    "label_fr": "Tomate cerise jaune 1",
+    "category": "produce"
+  },
+  "Tomato_Heart_1": {
+    "index": 385,
+    "label_en": "Tomato Heart 1",
+    "label_fr": "Tomate Cœur de bœuf 1",
+    "category": "produce"
+  },
+  "Tomato_Maroon_1": {
+    "index": 386,
+    "label_en": "Tomato Maroon 1",
+    "label_fr": "Tomate noire de Crimée / pourpre 1",
+    "category": "produce"
+  },
+  "Tomato_Maroon_2": {
+    "index": 387,
+    "label_en": "Tomato Maroon 2",
+    "label_fr": "Tomate pourpre 2",
+    "category": "produce"
+  },
+  "Tomato_Yellow_1": {
+    "index": 388,
+    "label_en": "Tomato Yellow 1",
+    "label_fr": "Tomate jaune 1",
+    "category": "produce"
+  },
+  "Trigonella_Foenum_Graecum_(Fenugreek)": {
+    "index": 389,
+    "label_en": "Trigonella Foenum Graecum (Fenugreek)",
+    "label_fr": "Trigonella Foenum Graecum (Fenugreek)",
+    "category": "produce"
+  },
+  "Turnip": {
+    "index": 390,
+    "label_en": "Turnip",
+    "label_fr": "Navet",
+    "category": "produce"
+  },
+  "Walnut_1": {
+    "index": 391,
+    "label_en": "Walnut 1",
+    "label_fr": "Noix 1",
+    "category": "produce"
+  },
+  "Watermelon": {
+    "index": 392,
+    "label_en": "Watermelon",
+    "label_fr": "Pastèque",
+    "category": "produce"
+  },
+  "Watermelon_1": {
+    "index": 393,
+    "label_en": "Watermelon 1",
+    "label_fr": "Melon d'eau / Pastèque 1",
+    "category": "produce"
+  },
+  "Wrightia_Tinctoria_(Badipala)": {
+    "index": 394,
+    "label_en": "Wrightia Tinctoria (Badipala)",
+    "label_fr": "Wrightia Tinctoria (Badipala)",
+    "category": "produce"
+  },
+  "Zingiber_Officinale_(Ginger)": {
+    "index": 395,
+    "label_en": "Zingiber Officinale (Ginger)",
+    "label_fr": "Zingiber Officinale (Gingembre)",
+    "category": "produce"
+  },
+  "Zucchini_1": {
+    "index": 396,
+    "label_en": "Zucchini 1",
+    "label_fr": "Courgette fraîche 1",
+    "category": "produce"
+  },
+  "Zucchini_Dark_1": {
+    "index": 397,
+    "label_en": "Zucchini Dark 1",
+    "label_fr": "Courgette vert foncé 1",
+    "category": "produce"
+  },
+  "Zucchini_Green_1": {
+    "index": 398,
+    "label_en": "Zucchini Green 1",
+    "label_fr": "Courgette verte 1",
+    "category": "produce"
+  }
+}

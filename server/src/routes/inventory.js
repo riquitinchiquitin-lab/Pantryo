@@ -1,4 +1,6 @@
 import express from "express";
+import fs from "fs";
+import path from "path";
 import Tesseract from "tesseract.js";
 import { analyzeFoodImage, analyzeReceiptText, analyzeReceiptImage, analyzeFlyerImage } from "../services/geminiVision.js";
 import { dbStore } from "../services/dbStore.js";
@@ -8,7 +10,7 @@ import { parseQuebecReceiptText } from "../services/quebecReceiptParser.js";
 import { getBilingualNames, translateFoodItem } from "../services/foodTranslator.js";
 import { requireAdmin } from "./admin.js";
 import { requireAuth } from "../services/sessionTokenService.js";
-import { getModelStatus, classifyTensor, getModelClasses } from "../services/groceryModelService.js";
+import { getModelStatus, classifyTensor, getModelClasses, resetModelSession } from "../services/groceryModelService.js";
 
 const router = express.Router();
 
@@ -626,6 +628,62 @@ router.get("/model-status", async (req, res) => {
 });
 
 /**
+ * POST /api/v1/inventory/upload-model
+ * Allows uploading or replacing grocery_model.onnx directly from the desktop/browser.
+ * Automatically activates classes_399.txt and updates the runtime session.
+ */
+router.post("/upload-model", async (req, res) => {
+  try {
+    const { modelBase64, activate399Classes = true } = req.body;
+    if (!modelBase64) {
+      return res.status(400).json({ success: false, error: "modelBase64 is required" });
+    }
+
+    const modelBuffer = Buffer.from(modelBase64, "base64");
+    if (modelBuffer.length < 5000) {
+      return res.status(400).json({ success: false, error: "Invalid model file (too small for ONNX)" });
+    }
+
+    const modelDir = path.resolve(process.cwd(), "public/models/grocery_model");
+    if (!fs.existsSync(modelDir)) {
+      fs.mkdirSync(modelDir, { recursive: true });
+    }
+
+    const modelPath = path.join(modelDir, "grocery_model.onnx");
+    fs.writeFileSync(modelPath, modelBuffer);
+
+    // Also mirror to dist if dist exists
+    const distModelDir = path.resolve(process.cwd(), "dist/models/grocery_model");
+    if (fs.existsSync(distModelDir)) {
+      fs.writeFileSync(path.join(distModelDir, "grocery_model.onnx"), modelBuffer);
+    }
+
+    // Activate classes_399.txt if requested
+    const p399 = path.join(modelDir, "classes_399.txt");
+    const pActive = path.join(modelDir, "classes.txt");
+    if (activate399Classes && fs.existsSync(p399)) {
+      fs.copyFileSync(p399, pActive);
+      if (fs.existsSync(distModelDir)) {
+        fs.copyFileSync(p399, path.join(distModelDir, "classes.txt"));
+      }
+    }
+
+    // Reset ONNX session cache so server reloads fresh model on next request
+    resetModelSession();
+
+    const status = await getModelStatus();
+    return res.json({
+      success: true,
+      message: "Model uploaded and activated successfully!",
+      modelStatus: status,
+    });
+  } catch (err) {
+    console.error("[Inventory] Error uploading model:", err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * POST /api/v1/inventory/classify-produce-model
  * Runs the trained 81-class grocery model
  */
@@ -645,7 +703,7 @@ router.post("/classify-produce-model", async (req, res) => {
     const prediction = await classifyTensor(floatArray);
     return res.json({
       success: true,
-      model: "GroceryStore MobileNetV2 ONNX (81 Classes)",
+      model: "MobileNetV2 ONNX (399 Global Produce & Herb Classes)",
       prediction,
       message: isFr ? "Prédiction du modèle entraîné exécutée avec succès" : "Trained model prediction executed successfully",
     });
