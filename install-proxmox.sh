@@ -297,6 +297,18 @@ systemctl daemon-reload
 systemctl enable pantryo.service
 systemctl restart pantryo.service
 
+# Configure daily automated package security patches & updates
+cat <<EOF_CRON > /etc/cron.daily/pantryo-autoupdate
+#!/usr/bin/env bash
+# Pantryo automated daily vulnerability remediation and package updater
+cd "${INSTALL_DIR}" || exit 0
+if [ -f "scripts/auto-update-dependencies.js" ]; then
+  node scripts/auto-update-dependencies.js >> /var/log/pantryo-autoupdate.log 2>&1
+  systemctl restart pantryo.service || true
+fi
+EOF_CRON
+chmod +x /etc/cron.daily/pantryo-autoupdate
+
 echo -e "\n${GREEN}${BOLD}========================================================================${NC}"
 echo -e "${GREEN}${BOLD}           🎉 Pantryo Installed & Running Successfully!                ${NC}"
 echo -e "${GREEN}${BOLD}========================================================================${NC}"

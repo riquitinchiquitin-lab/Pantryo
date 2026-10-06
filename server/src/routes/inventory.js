@@ -632,7 +632,7 @@ router.get("/model-status", async (req, res) => {
  * Allows uploading or replacing grocery_model.onnx directly from the desktop/browser.
  * Automatically activates classes_399.txt and updates the runtime session.
  */
-router.post("/upload-model", async (req, res) => {
+router.post("/upload-model", requireAdmin, async (req, res) => {
   try {
     const { modelBase64, activate399Classes = true } = req.body;
     if (!modelBase64) {
@@ -640,8 +640,8 @@ router.post("/upload-model", async (req, res) => {
     }
 
     const modelBuffer = Buffer.from(modelBase64, "base64");
-    if (modelBuffer.length < 5000) {
-      return res.status(400).json({ success: false, error: "Invalid model file (too small for ONNX)" });
+    if (modelBuffer.length < 5000 || modelBuffer.length > 30 * 1024 * 1024) {
+      return res.status(400).json({ success: false, error: "Invalid model file (size must be between 5KB and 30MB)" });
     }
 
     const modelDir = path.resolve(process.cwd(), "public/models/grocery_model");

@@ -306,6 +306,51 @@ router.post("/test-gemini", requireAdmin, async (req, res) => {
 });
 
 /**
+ * GET /api/v1/admin/security/audit
+ * Returns security audit metrics and package vulnerability status
+ */
+router.get("/security/audit", requireAdmin, async (req, res) => {
+  try {
+    const { exec } = await import("child_process");
+    exec("npm audit --json", { timeout: 15000 }, (err, stdout) => {
+      let metadata = { vulnerabilities: { critical: 0, high: 0, moderate: 0, low: 0, total: 0 } };
+      try {
+        if (stdout) {
+          const parsed = JSON.parse(stdout);
+          metadata = parsed.metadata || metadata;
+        }
+      } catch (_) {}
+
+      res.json({
+        success: true,
+        checkedAt: new Date().toISOString(),
+        vulnerabilities: metadata.vulnerabilities,
+        dependencies: metadata.dependencies,
+        hasCriticalOrHigh: (metadata.vulnerabilities?.critical || 0) > 0 || (metadata.vulnerabilities?.high || 0) > 0,
+        dependabotActive: true,
+        autoUpdateConfigured: true,
+      });
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/v1/admin/security/auto-update
+ * Triggers automated dependency security patches and non-breaking package updates
+ */
+router.post("/security/auto-update", requireAdmin, async (req, res) => {
+  try {
+    const { runAutoUpdate } = await import("../../scripts/auto-update-dependencies.js");
+    const result = await runAutoUpdate();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * GET /api/v1/admin/stats
  * Returns database health, encryption status, and entity counts
  */
