@@ -24,7 +24,7 @@
     "@simplewebauthn/server": "^14.0.3",
     "@tensorflow-models/mobilenet": "^2.1.1",
     "@tensorflow/tfjs": "^4.22.0",
-    "better-sqlite3-multiple-ciphers": "^12.11.1",
+    "better-sqlite3-multiple-ciphers": "^13.0.3",
     "dotenv": "^18.0.4",
     "express": "^5.2.1",
     "lucide-react": "^1.48.0",
