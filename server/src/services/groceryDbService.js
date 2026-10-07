@@ -2023,7 +2023,17 @@ export async function resolveBarcodeUnified(barcode, language = "FR") {
           const prod = data.product;
           const brand = prod.brands ? prod.brands.split(",")[0].trim() : null;
           let nameFr = prod.product_name_fr || prod.generic_name_fr || null;
-          let nameEn = prod.product_name_en || prod.generic_name_en || prod.product_name || "Food Product";
+          let nameEn = prod.product_name_en || prod.generic_name_en || null;
+
+          // If general product_name exists, intelligently check language:
+          if (prod.product_name) {
+            const rawProdName = prod.product_name.trim();
+            if (isTextFrench(rawProdName)) {
+              if (!nameFr) nameFr = rawProdName;
+            } else {
+              if (!nameEn) nameEn = rawProdName;
+            }
+          }
 
           if (brand) {
             if (nameFr && !nameFr.toLowerCase().includes(brand.toLowerCase())) {
@@ -2034,12 +2044,22 @@ export async function resolveBarcodeUnified(barcode, language = "FR") {
             }
           }
 
+          // Full bidirectional translation guarantees both names exist:
           if (!nameFr && nameEn) {
             nameFr = translateFoodItem(nameEn, "FR");
           }
           if (!nameEn && nameFr) {
             nameEn = translateFoodItem(nameFr, "EN");
           }
+
+          // If nameEn still has French words (e.g. from generic_name_fr or mixed brand), translate it:
+          if (nameEn && isTextFrench(nameEn)) {
+            nameEn = translateFoodItem(nameEn, "EN");
+          }
+          if (nameFr && !isTextFrench(nameFr)) {
+            nameFr = translateFoodItem(nameFr, "FR");
+          }
+
           if (!nameFr) nameFr = "Produit alimentaire";
           if (!nameEn) nameEn = "Food Product";
 
@@ -2082,9 +2102,9 @@ export async function resolveBarcodeUnified(barcode, language = "FR") {
           const badges = [];
           if (prod.nutriscore_grade) badges.push(`Nutri-Score ${prod.nutriscore_grade.toUpperCase()}`);
           if (prod.ecoscore_grade) badges.push(`Eco-Score ${prod.ecoscore_grade.toUpperCase()}`);
-          if (prod.nova_group) badges.push(`NOVA Groupe ${prod.nova_group}`);
+          if (prod.nova_group) badges.push(isFr ? `NOVA Groupe ${prod.nova_group}` : `NOVA Group ${prod.nova_group}`);
           if (prod.countries_tags && prod.countries_tags.some((c) => c.includes("canada"))) {
-            badges.push("Marché canadien");
+            badges.push(isFr ? "Marché canadien" : "Canadian Market");
           }
 
           const nutrition = prod.nutriments ? {
@@ -2111,14 +2131,18 @@ export async function resolveBarcodeUnified(barcode, language = "FR") {
               category: isFr ? categoryFr : category,
               categoryEn: category,
               quantity: 1,
-              unit: prod.quantity || "1 unité",
+              unit: prod.quantity
+                ? prod.quantity.trim().replace(/^(?:1\s+)+(unit[ée]?s?|mcx|pcs?)$/i, isFr ? "unité" : "unit").replace(/^(?:1\s+)+1$/i, isFr ? "unité" : "unit")
+                : (isFr ? "unité" : "unit"),
               recommendedLocation,
               estimatedShelfLifeDays: recommendedLocation === "Fridge" ? 14 : recommendedLocation === "Freezer" ? 180 : 60,
               monthsFrozenShelfLife: 6,
               gradeOrigin: prod.origins || (prod.countries_tags ? prod.countries_tags.join(", ").replace(/en:/g, "") : null),
               packagingFormat: prod.packaging || (isFr ? "Emballage commercial" : "Retail package"),
               dietaryBadges: badges,
-              storageTip: isFr ? `Conserver au ${recommendedLocation.toLowerCase()} pour une fraîcheur optimale.` : `Store in ${recommendedLocation.toLowerCase()} for maximum freshness.`,
+              storageTip: isFr
+                ? `Conserver au ${recommendedLocation === "Fridge" ? "réfrigérateur" : recommendedLocation === "Freezer" ? "congélateur" : "garde-manger"} pour une fraîcheur optimale.`
+                : `Store in ${recommendedLocation.toLowerCase()} for maximum freshness.`,
               nutrition,
               imageUrl: prod.image_front_url || prod.image_url || null,
               barcode: cleanCode,

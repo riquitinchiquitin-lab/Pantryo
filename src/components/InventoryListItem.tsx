@@ -15,6 +15,14 @@ import { InventoryItem } from '../types';
 import { FoodVisualBadge } from './FoodVisualBadge';
 import { getFoodVisual } from '../utils/foodVisuals';
 import { getCategoryLocalizedName, getLocationLocalizedName } from '../utils/i18n';
+import {
+  getItemDisplayName,
+  formatLocalizedQuantityUnit,
+  getLocalizedBadge,
+  getLocalizedPackaging,
+  getLocalizedStorageTip,
+  getLocalizedOrigin,
+} from '../utils/foodTranslator';
 
 interface InventoryListItemProps {
   item: InventoryItem;
@@ -48,7 +56,7 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
   const isFreezer = item.locationType === 'FREEZER';
   const daysLeft = item.daysUntilExpiration;
   const isSoon = item.isExpiringSoon || (daysLeft !== null && daysLeft <= 3);
-  const displayName = lang === 'FR' ? (item.nameFr || item.name) : (item.nameEn || item.name);
+  const displayName = getItemDisplayName(item, lang);
   const visual = getFoodVisual(displayName, item.categoryName);
   const CategoryIcon = visual.icon;
 
@@ -112,7 +120,7 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
             </h3>
             <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#EDF3EC] text-[#344837] inline-block">
-                {item.quantity} {item.unit}
+                {formatLocalizedQuantityUnit(item.quantity, item.unit, lang)}
               </span>
               {item.isLeftover && (
                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-200/80 inline-flex items-center gap-0.5 shadow-2xs">
@@ -209,7 +217,7 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
           {/* Food Type & Quantity Pill + Category Pill */}
           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#EDF3EC] text-[#344837]">
-              {item.quantity} {item.unit}
+              {formatLocalizedQuantityUnit(item.quantity, item.unit, lang)}
             </span>
 
             {/* Food Category Tag with Icon */}
@@ -289,7 +297,7 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
 
           {item.notes ? (
             <span className="text-[10px] text-[#697F6C] truncate max-w-[180px] italic">
-              {item.notes}
+              {getLocalizedStorageTip(item.notes, lang)}
             </span>
           ) : (
             <span className="text-[10px] text-[#556D58]">
@@ -349,7 +357,7 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
                 <span className="text-[9px] font-bold text-[#6D8371] uppercase tracking-wider">
                   {lang === 'FR' ? 'Grade & Origine' : 'Grade & Origin'}
                 </span>
-                <span className="font-semibold text-[#1F3323]">{item.gradeOrigin}</span>
+                <span className="font-semibold text-[#1F3323]">{getLocalizedOrigin(item.gradeOrigin, lang)}</span>
               </div>
             )}
 
@@ -358,7 +366,7 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
                 <span className="text-[9px] font-bold text-[#6D8371] uppercase tracking-wider">
                   {lang === 'FR' ? 'Format d’emballage' : 'Packaging Format'}
                 </span>
-                <span className="font-semibold text-[#1F3323]">{item.packagingFormat}</span>
+                <span className="font-semibold text-[#1F3323]">{getLocalizedPackaging(item.packagingFormat, lang)}</span>
               </div>
             )}
 
@@ -368,7 +376,7 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
                   {lang === 'FR' ? 'Stockage non ouvert' : 'Unopened Storage'}
                 </span>
                 <span className="font-semibold text-[#1F3323]">
-                  {item.unopenedLocation}
+                  {getLocationLocalizedName(item.unopenedLocation, lang)}
                   {item.unopenedShelfLifeDays ? ` (${item.unopenedShelfLifeDays} ${lang === 'FR' ? 'j' : 'days'})` : ''}
                 </span>
               </div>
@@ -380,7 +388,7 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
                   {lang === 'FR' ? 'Après ouverture' : 'After Opening'}
                 </span>
                 <span className="font-semibold text-[#1F3323]">
-                  {item.openedLocation}
+                  {getLocationLocalizedName(item.openedLocation, lang)}
                   {item.openedShelfLifeDays ? ` (${item.openedShelfLifeDays} ${lang === 'FR' ? 'j' : 'days'})` : ''}
                 </span>
               </div>
@@ -395,7 +403,7 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
                   key={idx}
                   className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-100/90 text-emerald-900 border border-emerald-300"
                 >
-                  ✓ {badge}
+                  ✓ {getLocalizedBadge(badge, lang)}
                 </span>
               ))}
             </div>
@@ -405,14 +413,14 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
           {item.storageTip && (
             <div className="p-2 rounded-xl bg-teal-50/80 border border-teal-200/80 text-[11px] text-teal-950 flex items-start gap-1.5">
               <span className="shrink-0 text-sm">💡</span>
-              <span className="font-medium leading-relaxed">{item.storageTip}</span>
+              <span className="font-medium leading-relaxed">{getLocalizedStorageTip(item.storageTip, lang)}</span>
             </div>
           )}
 
           {item.freezerTip && (
             <div className="p-2 rounded-xl bg-blue-50/80 border border-blue-200/80 text-[11px] text-blue-950 flex items-start gap-1.5">
               <span className="shrink-0 text-sm">❄️</span>
-              <span className="font-medium leading-relaxed">{item.freezerTip}</span>
+              <span className="font-medium leading-relaxed">{getLocalizedStorageTip(item.freezerTip, lang)}</span>
             </div>
           )}
         </div>

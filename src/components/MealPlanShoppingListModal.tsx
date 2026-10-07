@@ -22,7 +22,8 @@ import {
 } from 'lucide-react';
 import { PlannedMeal, InventoryItem, StorageType, SavedGroceryList } from '../types';
 import { getFoodVisual } from '../utils/foodVisuals';
-import { useLanguage } from '../utils/i18n';
+import { useLanguage, getLocationLocalizedName } from '../utils/i18n';
+import { getItemDisplayName, formatLocalizedQuantityUnit } from '../utils/foodTranslator';
 
 const SAVED_LISTS_STORAGE_KEY = 'kitchen_komrade_saved_grocery_lists_v1';
 
@@ -805,7 +806,7 @@ export const MealPlanShoppingListModal: React.FC<MealPlanShoppingListModalProps>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-xs font-black text-[#0D3B37] truncate">
-                            {item.name}
+                            {getItemDisplayName(item, lang)}
                           </span>
 
                           {item.inStock ? (
@@ -813,7 +814,7 @@ export const MealPlanShoppingListModal: React.FC<MealPlanShoppingListModalProps>
                               <Check className="w-2.5 h-2.5" />
                               <span>
                                 {item.stockDetail
-                                  ? `${lang === 'FR' ? 'En cuisine' : 'In kitchen'} (${item.stockDetail.quantity} ${item.stockDetail.unit} - ${item.stockDetail.location})`
+                                  ? `${lang === 'FR' ? 'En cuisine' : 'In kitchen'} (${formatLocalizedQuantityUnit(item.stockDetail.quantity, item.stockDetail.unit, lang)} - ${getLocationLocalizedName(item.stockDetail.location, lang)})`
                                   : lang === 'FR'
                                   ? 'En stock'
                                   : 'In stock'}

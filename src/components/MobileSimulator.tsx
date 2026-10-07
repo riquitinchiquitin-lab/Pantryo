@@ -75,6 +75,7 @@ import {
   getSubcategoryLocalizedName,
   getLocationLocalizedName,
 } from '../utils/i18n';
+import { getItemDisplayName, formatLocalizedQuantityUnit } from '../utils/foodTranslator';
 
 const INITIAL_GROCERY_ITEMS: GroceryCartItem[] = [];
 
@@ -1333,7 +1334,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                       <span className="font-bold text-rose-800 shrink-0">
                         {expiringItems.length} {lang === 'FR' ? 'à sauver :' : 'to rescue:'}
                       </span>
-                      <span className="truncate">{expiringItems[0]?.name}</span>
+                      <span className="truncate">{getItemDisplayName(expiringItems[0], lang)}</span>
                       <span className="text-[10px] text-rose-700 font-bold shrink-0">
                         ({expiringItems[0]?.daysUntilExpiration} {lang === 'FR' ? 'j' : 'd'})
                       </span>
@@ -1465,7 +1466,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                     </div>
                     {expiringItems.length > 0 ? (
                       <div className="mt-2 space-y-1">
-                        <p className="text-xs font-bold text-[#203222] truncate">{expiringItems[0]?.name}</p>
+                        <p className="text-xs font-bold text-[#203222] truncate">{getItemDisplayName(expiringItems[0], lang)}</p>
                         <p className="text-[10px] text-rose-700 font-semibold flex items-center gap-1">
                           <Clock className="w-2.5 h-2.5" /> {expiringItems[0]?.daysUntilExpiration}{' '}
                           {lang === 'FR' ? 'j restant' : 'day left'}
@@ -1861,7 +1862,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                         </button>
                         <img
                           src={item.imageUrl || visual.defaultImage}
-                          alt={item.name}
+                          alt={getItemDisplayName(item, lang)}
                           referrerPolicy="no-referrer"
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
@@ -1895,7 +1896,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                         </div>
                         {/* Quantity Pill on bottom-left */}
                         <div className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-black/65 backdrop-blur-md text-white">
-                          {item.quantity} {item.unit}
+                          {formatLocalizedQuantityUnit(item.quantity, item.unit, lang)}
                         </div>
                       </div>
 
@@ -1906,7 +1907,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                           className="font-bold text-xs text-[#1F3323] leading-tight line-clamp-2 cursor-pointer hover:text-teal-700 transition-colors"
                           title={lang === 'FR' ? "Cliquer pour modifier l'article" : "Click to edit item"}
                         >
-                          {item.name}
+                          {getItemDisplayName(item, lang)}
                         </h3>
 
                         {isFreezer ? (
@@ -2590,7 +2591,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             return [...newItems, ...prev.filter((i) => !newIds.has(i.id))];
           });
           const count = newItems.length;
-          const names = newItems.map((i) => i.name).slice(0, 2).join(', ');
+          const names = newItems.map((i) => getItemDisplayName(i, lang)).slice(0, 2).join(', ');
           const more = count > 2 ? ` (+${count - 2})` : '';
           setBannerNotice(
             lang === 'FR'
@@ -2733,9 +2734,9 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 .filter((item) => selectedItemIds.has(item.id))
                 .map((item) => (
                   <div key={item.id} className="flex items-center justify-between text-slate-700 py-0.5">
-                    <span className="truncate font-semibold">{item.name}</span>
+                    <span className="truncate font-semibold">{getItemDisplayName(item, lang)}</span>
                     <span className="text-[10px] text-slate-400 shrink-0 ml-2">
-                      {item.quantity} {item.unit}
+                      {formatLocalizedQuantityUnit(item.quantity, item.unit, lang)}
                     </span>
                   </div>
                 ))}

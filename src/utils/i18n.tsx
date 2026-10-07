@@ -601,11 +601,32 @@ const CATEGORY_NAMES_FR: Record<string, string> = {
   Spices: 'Épices & Assaisonnements',
 };
 
+const CATEGORY_NAMES_EN: Record<string, string> = {
+  'Produits frais': 'Produce',
+  'Produits laitiers & œufs': 'Dairy & Eggs',
+  'Produits laitiers': 'Dairy & Eggs',
+  'Viandes & Poissons': 'Meat & Seafood',
+  'Viandes & Volailles': 'Meat & Poultry',
+  Boulangerie: 'Bakery',
+  'Garde-manger & Épicerie': 'Pantry Staples',
+  'Garde-manger': 'Pantry Staples',
+  'Surgelés & Plats Congelés': 'Frozen Meals',
+  Surgelés: 'Frozen Meals',
+  Boissons: 'Beverages',
+  'Collations & Friandises': 'Snacks',
+  Collations: 'Snacks',
+  'Condiments & Sauces': 'Condiments',
+  Condiments: 'Condiments',
+  'Épices & Assaisonnements': 'Spices',
+  Épices: 'Spices',
+};
+
 export const getCategoryLocalizedName = (catName: string, lang: Language): string => {
+  if (!catName) return '';
   if (lang === 'FR') {
     return CATEGORY_NAMES_FR[catName] || catName;
   }
-  return catName;
+  return CATEGORY_NAMES_EN[catName] || catName;
 };
 
 /**
@@ -643,11 +664,16 @@ const SUBCATEGORY_NAMES_FR: Record<string, string> = {
   'Sea Scallops': 'Pétoncles Frais',
 };
 
+const SUBCATEGORY_NAMES_EN: Record<string, string> = Object.fromEntries(
+  Object.entries(SUBCATEGORY_NAMES_FR).map(([en, fr]) => [fr, en])
+);
+
 export const getSubcategoryLocalizedName = (subName: string, lang: Language): string => {
+  if (!subName) return '';
   if (lang === 'FR') {
     return SUBCATEGORY_NAMES_FR[subName] || subName;
   }
-  return subName;
+  return SUBCATEGORY_NAMES_EN[subName] || subName;
 };
 
 /**
@@ -657,16 +683,22 @@ export const getLocationLocalizedName = (
   loc: 'FRIDGE' | 'FREEZER' | 'PANTRY' | string,
   lang: Language
 ): string => {
+  if (!loc) return '';
+  const trimmed = String(loc).trim();
+  const upper = trimmed.toUpperCase();
+
   if (lang === 'FR') {
-    if (loc === 'FRIDGE') return 'Frigo';
-    if (loc === 'FREEZER') return 'Congélateur';
-    if (loc === 'PANTRY') return 'Garde-manger';
-    return loc;
+    if (upper === 'FRIDGE' || upper === 'REFRIGERATOR' || trimmed === 'Fridge') return 'Frigo';
+    if (upper === 'FREEZER' || trimmed === 'Freezer') return 'Congélateur';
+    if (upper === 'PANTRY' || trimmed === 'Pantry') return 'Garde-manger';
+    return trimmed;
   }
-  if (loc === 'FRIDGE') return 'Fridge';
-  if (loc === 'FREEZER') return 'Freezer';
-  if (loc === 'PANTRY') return 'Pantry';
-  return loc;
+
+  // English mode
+  if (upper === 'FRIDGE' || upper === 'REFRIGERATOR' || trimmed === 'Frigo' || trimmed === 'Réfrigérateur') return 'Fridge';
+  if (upper === 'FREEZER' || trimmed === 'Congélateur') return 'Freezer';
+  if (upper === 'PANTRY' || trimmed === 'Garde-manger') return 'Pantry';
+  return trimmed;
 };
 
 /**

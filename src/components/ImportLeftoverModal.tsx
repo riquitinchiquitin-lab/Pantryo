@@ -1311,8 +1311,8 @@ export const ImportLeftoverModal: React.FC<ImportLeftoverModalProps> = ({
                   <option key={cat.id} value={cat.id}>
                     {lang === 'FR' ? cat.nameFr : cat.nameEn} (
                     {manualLocation === 'FREEZER'
-                      ? `${cat.freezerMonths} mois congelé`
-                      : `${cat.fridgeDays}j frigo`}
+                      ? (lang === 'FR' ? `${cat.freezerMonths} mois congelé` : `${cat.freezerMonths} mos freezer`)
+                      : (lang === 'FR' ? `${cat.fridgeDays}j frigo` : `${cat.fridgeDays}d fridge`)}
                     )
                   </option>
                 ))}

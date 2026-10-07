@@ -1,12 +1,60 @@
 import { MealType } from '../types';
 
 export interface RecipeIngredient {
-  name: string;
+  id?: string;
+  amount: string; // e.g. "1", "1/2", "250"
+  unit?: string; // e.g. "cup", "tsp", "ml", "to_taste", "unit"
+  name: string; // e.g. "Huile d'olive"
+  storage?: string; // e.g. "pantry", "fridge", "freezer", "spices"
   nameFr?: string;
-  amount: string;
   inKitchenItemName?: string; // name in kitchen inventory if matched
   category?: string;
   locationType?: 'FRIDGE' | 'FREEZER' | 'PANTRY';
+}
+
+export function formatRecipeIngredientAmount(
+  ing: { amount?: string; unit?: string },
+  lang: 'FR' | 'EN' = 'FR'
+): string {
+  if (!ing) return '';
+  const unit = ing.unit;
+  const amt = (ing.amount || '').trim();
+
+  if (unit === 'to_taste') {
+    return lang === 'FR' ? 'au goût' : 'to taste';
+  }
+
+  if (!unit || unit === 'unit') {
+    return amt;
+  }
+
+  const num = parseFloat(amt);
+  const isPlural = !isNaN(num) && num > 1;
+
+  const unitLabels: Record<string, { fr: string; frPlural: string; en: string; enPlural: string }> = {
+    tsp: { fr: 'c. à thé', frPlural: 'c. à thé', en: 'tsp', enPlural: 'tsp' },
+    tbsp: { fr: 'c. à soupe', frPlural: 'c. à soupe', en: 'tbsp', enPlural: 'tbsp' },
+    cup: { fr: 'tasse', frPlural: 'tasses', en: 'cup', enPlural: 'cups' },
+    pinch: { fr: 'pincée', frPlural: 'pincées', en: 'pinch', enPlural: 'pinches' },
+    ml: { fr: 'ml', frPlural: 'ml', en: 'ml', enPlural: 'ml' },
+    l: { fr: 'L', frPlural: 'L', en: 'L', enPlural: 'L' },
+    g: { fr: 'g', frPlural: 'g', en: 'g', enPlural: 'g' },
+    kg: { fr: 'kg', frPlural: 'kg', en: 'kg', enPlural: 'kg' },
+    oz: { fr: 'oz', frPlural: 'oz', en: 'oz', enPlural: 'oz' },
+    fl_oz: { fr: 'fl oz', frPlural: 'fl oz', en: 'fl oz', enPlural: 'fl oz' },
+    lb: { fr: 'lb', frPlural: 'lbs', en: 'lb', enPlural: 'lbs' },
+    clove: { fr: 'gousse', frPlural: 'gousses', en: 'clove', enPlural: 'cloves' },
+    slice: { fr: 'tranche', frPlural: 'tranches', en: 'slice', enPlural: 'slices' },
+    can: { fr: 'boîte', frPlural: 'boîtes', en: 'can', enPlural: 'cans' },
+  };
+
+  const labelDef = unitLabels[unit];
+  if (!labelDef) {
+    return amt ? `${amt} ${unit}` : unit;
+  }
+
+  const label = lang === 'FR' ? (isPlural ? labelDef.frPlural : labelDef.fr) : (isPlural ? labelDef.enPlural : labelDef.en);
+  return amt ? `${amt} ${label}` : label;
 }
 
 export interface RicardoRecipe {

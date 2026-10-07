@@ -371,6 +371,31 @@ export const EN_TO_FR_DICTIONARY = {
   "black beans": "haricots noirs",
   "chickpeas": "pois chiches",
   "lentils": "lentilles",
+  "whole kernel corn": "maïs en grains entiers",
+  "whole kernel": "grains entiers",
+  "canned": "en boîte",
+  "whole kernel canned corn": "maïs en grains entiers en conserve",
+  "canned whole kernel corn": "maïs en grains entiers en conserve",
+  "canned corn": "maïs en conserve",
+  "cream style corn": "maïs en crème",
+  "sweet corn": "maïs sucré",
+  "corn on the cob": "maïs en épi",
+  "corn": "maïs",
+  "canned beans": "haricots en conserve",
+  "baked beans": "fèves au lard",
+  "baked beans with maple syrup": "fèves au lard au sirop d'érable",
+  "canned green peas": "petits pois en conserve",
+  "green peas": "petits pois",
+  "peas": "pois",
+  "canned tuna": "thon en conserve",
+  "flaked light tuna": "thon pâle émietté",
+  "chunk light tuna": "thon pâle en morceaux",
+  "canned salmon": "saumon en conserve",
+  "canned soup": "soupe en conserve",
+  "chicken noodle soup": "soupe poulet et nouilles",
+  "tomato soup": "soupe aux tomates",
+  "cream of mushroom soup": "crème de champignons",
+  "cream of chicken soup": "crème de poulet",
   "chicken broth": "bouillon de poulet",
   "beef broth": "bouillon de bœuf",
   "vegetable broth": "bouillon de légumes",
@@ -532,6 +557,82 @@ const EXTRA_FR_TO_EN = {
   "concombre": "cucumber",
   "poivrons": "bell peppers",
   "poivron": "bell pepper",
+  // Corn & canned staples
+  "maïs en grains entiers": "whole kernel corn",
+  "mais en grains entiers": "whole kernel corn",
+  "maïs en grains": "whole kernel corn",
+  "mais en grains": "whole kernel corn",
+  "maïs en boîte": "canned corn",
+  "mais en boite": "canned corn",
+  "maïs en conserve": "canned corn",
+  "mais en conserve": "canned corn",
+  "maïs sucré": "sweet corn",
+  "mais sucre": "sweet corn",
+  "maïs en crème": "cream style corn",
+  "mais en creme": "cream style corn",
+  "maïs": "corn",
+  "mais": "corn",
+  "blé d'inde": "sweet corn",
+  "ble d'inde": "sweet corn",
+  "en conserve": "canned",
+  "en boîte": "canned",
+  "en boite": "canned",
+  "boîte de conserve": "canned",
+  "boite de conserve": "canned",
+  "grains entiers": "whole kernel",
+  "haricots en conserve": "canned beans",
+  "haricots en boîte": "canned beans",
+  "haricots en boite": "canned beans",
+  "fèves au lard": "baked beans",
+  "feves au lard": "baked beans",
+  "petits pois": "green peas",
+  "petits pois en conserve": "canned green peas",
+  "petits pois en boîte": "canned green peas",
+  "petits pois en boite": "canned green peas",
+  "pois chiches": "chickpeas",
+  "pois chiches en conserve": "canned chickpeas",
+  "pois chiches en boîte": "canned chickpeas",
+  "pois chiches en boite": "canned chickpeas",
+  "thon en boîte": "canned tuna",
+  "thon en boite": "canned tuna",
+  "thon en conserve": "canned tuna",
+  "thon blanc": "white albacore tuna",
+  "thon pâle": "light tuna",
+  "thon pale": "light tuna",
+  "thon": "tuna",
+  "saumon en boîte": "canned salmon",
+  "saumon en boite": "canned salmon",
+  "saumon en conserve": "canned salmon",
+  // Badges & descriptors
+  "marché canadien": "canadian market",
+  "marche canadien": "canadian market",
+  "aliment du québec": "food of quebec",
+  "aliment du quebec": "food of quebec",
+  "produit du canada": "product of canada",
+  "produit du québec": "product of quebec",
+  "produit du quebec": "product of quebec",
+  "100% lait canadien": "100% canadian milk",
+  "produits laitiers frais": "fresh dairy",
+  "produits frais": "fresh produce",
+  "produit frais": "fresh produce",
+  "sans emballage": "packaging-free",
+  "certifié biologique": "certified organic",
+  "certifie biologique": "certified organic",
+  "biologique": "organic",
+  "format familial": "family size",
+  "emballage commercial": "retail package",
+  "fruit/légume frais en vrac": "whole fresh loose produce",
+  "fruit/legume frais en vrac": "whole fresh loose produce",
+  "en vrac": "loose produce",
+  "pot de yogourt": "yogurt tub",
+  "pot en plastique": "plastic tub",
+  "bocal en verre": "glass jar",
+  "bouteille plastique": "plastic bottle",
+  "sac plastique": "plastic bag",
+  "boîte de carton": "cardboard box",
+  "boite de carton": "cardboard box",
+  "barquette refermable": "clamshell container",
+  "emballage sous vide": "vacuum pack",
 };
 
 for (const [frKey, enVal] of Object.entries(EXTRA_FR_TO_EN)) {
@@ -554,18 +655,43 @@ function cleanKey(text) {
  */
 export function isTextFrench(text) {
   if (!text) return false;
-  const lower = text.toLowerCase();
-  // Check typical French food words or accents
+  // If it has typical French accents (à, â, é, è, ê, ë, î, ï, ô, ù, û, ü, ç, œ), it's strongly French:
   if (/[àâéèêëîïôùûüçœ]/i.test(text)) return true;
+
+  const lower = text.toLowerCase();
+
+  // Strong English signals that mean it's English
+  const enSignals = [
+    "whole", "kernel", "canned", "sweet", "frozen", "fresh", "sliced", "ground", "smoked",
+    "roasted", "organic", "breast", "breasts", "thigh", "thighs", "steak", "roast", "pork",
+    "beef", "chicken", "turkey", "salmon", "tuna", "beans", "corn", "peas", "carrots",
+    "apples", "onions", "potatoes", "bread", "cheese", "milk", "butter", "cream", "water",
+    "juice", "chips", "crackers", "cookies", "dressing", "flavour", "flavor", "syrup",
+    "sauce", "broth", "soup", "bacon", "sausage", "leftover", "leftovers"
+  ];
+  const hasEnWord = enSignals.some((w) => new RegExp(`\\b${w}\\b`, "i").test(lower));
+
   const frSignals = [
-    "lait", "yogourt", "fromage", "beurre", "oeuf", "œuf", "poulet", "bœuf", "boeuf",
+    "lait", "yogourt", "yaourt", "fromage", "beurre", "oeuf", "œuf", "poulet", "bœuf", "boeuf",
     "porc", "saumon", "poisson", "crevette", "pomme", "fraise", "bleuet", "framboise",
     "raisin", "mangue", "avocat", "tomate", "carotte", "oignon", "ail", "épinard",
-    "pain", "farine", "sucre", "sel", "poivre", "huile", "vinaigre", "riz", "pâte",
-    "sans nom", "sélection", "irrésistibles", "restes", "cuit", "rôti", "tranché", "frais",
-    "surgelé", "biologique"
+    "pain", "farine", "sucre", "sel", "poivre", "huile", "vinaigre", "riz", "pâte", "pates",
+    "sans nom", "sélection", "irrésistibles", "restes", "cuit",
+    "rôti", "tranché", "frais", "surgelé", "biologique",
+    "maïs", "mais", "grain", "grains", "entier", "entiers", "boîte", "boite", "conserve",
+    "conserves", "haricot", "haricots", "fève", "fèves", "pois", "thon",
+    "bouillon", "soupe", "confiture", "sirop", "crème", "creme", "moutarde",
+    "vinaigrette", "gruau", "flocons", "avoine", "canneberge", "érable",
+    "collation", "biscuit", "biscuits", "craquelin", "craquelins", "croustille", "croustilles",
+    "tranches", "sachet", "bocal", "bouteille", "paquet", "canette", "portion",
+    "portions", "unité", "unite", "morceau", "morceaux", "doux", "épicé", "sucré", "salé",
+    "préparé", "canadien", "canadienne", "québécois", "garde-manger", "repas", "recette"
   ];
-  return frSignals.some((w) => new RegExp(`\\b${w}\\b`, "i").test(lower));
+  const hasFrWord = frSignals.some((w) => new RegExp(`\\b${w}\\b`, "i").test(lower));
+
+  if (hasEnWord && !hasFrWord) return false;
+  if (hasFrWord && !hasEnWord) return true;
+  return hasFrWord;
 }
 
 /**

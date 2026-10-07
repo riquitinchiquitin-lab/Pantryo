@@ -16,6 +16,7 @@ import { FoodVisualBadge } from './FoodVisualBadge';
 import { getFoodVisual } from '../utils/foodVisuals';
 import { SavedListsModal } from './SavedListsModal';
 import { useLanguage } from '../utils/i18n';
+import { getItemDisplayName, formatLocalizedQuantityUnit, getBilingualNames } from '../utils/foodTranslator';
 
 export interface GroceryCartItem {
   id: string;
@@ -231,14 +232,20 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
     try {
       const payload = inCartItems.map((item) => {
         const visual = getFoodVisual(item.name);
+        const biling = getBilingualNames(item.name, lang);
+        const resolvedNameFr = (item as any).nameFr || biling.nameFr;
+        const resolvedNameEn = (item as any).nameEn || biling.nameEn;
+        const chosenName = lang === 'FR' ? resolvedNameFr : resolvedNameEn;
         return {
-          name: item.name,
+          name: chosenName,
+          nameFr: resolvedNameFr,
+          nameEn: resolvedNameEn,
           quantity: item.quantity,
           unit: item.unit,
           locationType: item.locationType || inferLocation(item.name, item.category),
           categoryName: item.category || visual.badgeLabel,
           imageUrl: item.imageUrl || visual.defaultImage,
-          notes: `Acheté en magasin par ${currentUser.name}`,
+          notes: lang === 'FR' ? `Acheté en magasin par ${currentUser.name}` : `Purchased in-store by ${currentUser.name}`,
         };
       });
 
@@ -516,7 +523,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
 
                   <div className={item.inCart ? 'opacity-60 grayscale-[30%]' : ''}>
                     <FoodVisualBadge
-                      itemName={item.name}
+                      itemName={getItemDisplayName(item, lang)}
                       categoryName={item.category || visual.badgeLabel}
                       size="sm"
                     />
@@ -531,7 +538,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                             : 'text-[#233527]'
                         }`}
                       >
-                        {item.name}
+                        {getItemDisplayName(item, lang)}
                       </span>
                     </div>
 
@@ -543,7 +550,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                             : 'bg-[#EDF3EC] text-[#39503D]'
                         }`}
                       >
-                        {item.quantity} {item.unit}
+                        {formatLocalizedQuantityUnit(item.quantity, item.unit, lang)}
                       </span>
                       {item.autoSuggested && (
                         <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 font-semibold">

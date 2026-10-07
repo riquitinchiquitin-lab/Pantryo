@@ -7,7 +7,7 @@ import { dbStore } from "../services/dbStore.js";
 import { analyzePackagingText, analyzeMultiItemPackagingText } from "../services/packagingAnalyzer.js";
 import { resolveBarcodeUnified, searchCanadianAndPluDatabase, IFPS_PLU_CODES, CANADIAN_NUTRIENT_FILE_CATALOG } from "../services/groceryDbService.js";
 import { parseQuebecReceiptText } from "../services/quebecReceiptParser.js";
-import { getBilingualNames, translateFoodItem } from "../services/foodTranslator.js";
+import { getBilingualNames, translateFoodItem, isTextFrench } from "../services/foodTranslator.js";
 import { requireAdmin } from "./admin.js";
 import { requireAuth } from "../services/sessionTokenService.js";
 import { getModelStatus, classifyTensor, getModelClasses, resetModelSession } from "../services/groceryModelService.js";
@@ -1779,8 +1779,15 @@ router.post("/item", (req, res) => {
 
     // Guarantee that every imported/created item has complete bilingual French and English names
     const biling = getBilingualNames(name, "FR");
-    const resolvedNameFr = (nameFr && nameFr.trim()) || biling.nameFr || name.trim();
-    const resolvedNameEn = (nameEn && nameEn.trim()) || biling.nameEn || name.trim();
+    let resolvedNameFr = (nameFr && nameFr.trim()) || biling.nameFr || name.trim();
+    let resolvedNameEn = (nameEn && nameEn.trim()) || biling.nameEn || name.trim();
+
+    if (resolvedNameEn && isTextFrench(resolvedNameEn)) {
+      resolvedNameEn = translateFoodItem(resolvedNameEn, "EN");
+    }
+    if (resolvedNameFr && !isTextFrench(resolvedNameFr)) {
+      resolvedNameFr = translateFoodItem(resolvedNameFr, "FR");
+    }
 
     const newItem = {
       id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,

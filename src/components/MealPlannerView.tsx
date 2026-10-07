@@ -27,6 +27,7 @@ import {
 import { PlannedMeal, MealType, InventoryItem, PlannedMealIngredient } from '../types';
 import { getFoodVisual } from '../utils/foodVisuals';
 import { useLanguage } from '../utils/i18n';
+import { getItemDisplayName } from '../utils/foodTranslator';
 import { SmartMealSuggestionsModal } from './SmartMealSuggestionsModal';
 import { MealPlanShoppingListModal } from './MealPlanShoppingListModal';
 import { ScrollableRow } from './ScrollableRow';
@@ -675,24 +676,27 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
             </div>
           </div>
           <ScrollableRow className="pb-1 text-xs" showChevrons={true}>
-            {expiringItems.slice(0, 5).map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setMealTitle(lang === 'FR' ? `Cuisiner avec ${item.name}` : `Cook with ${item.name}`);
-                  setMealType('DINNER');
-                  setIngredientsText(item.name);
-                  setImageUrl(item.imageUrl || '');
-                  setIsModalOpen(true);
-                }}
-                className="px-2.5 py-1 rounded-xl bg-white border border-amber-200 text-[11px] font-semibold text-amber-900 shrink-0 hover:bg-amber-100/50 flex items-center gap-1 shadow-2xs"
-              >
-                <span>{item.name}</span>
-                <span className="text-[10px] font-bold text-amber-600">
-                  ({item.daysUntilExpiration !== null && item.daysUntilExpiration <= 0 ? (lang === 'FR' ? 'Expiré' : 'Expiring') : `${item.daysUntilExpiration}j`})
-                </span>
-              </button>
-            ))}
+            {expiringItems.slice(0, 5).map((item) => {
+              const localizedName = getItemDisplayName(item, lang);
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setMealTitle(lang === 'FR' ? `Cuisiner avec ${localizedName}` : `Cook with ${localizedName}`);
+                    setMealType('DINNER');
+                    setIngredientsText(localizedName);
+                    setImageUrl(item.imageUrl || '');
+                    setIsModalOpen(true);
+                  }}
+                  className="px-2.5 py-1 rounded-xl bg-white border border-amber-200 text-[11px] font-semibold text-amber-900 shrink-0 hover:bg-amber-100/50 flex items-center gap-1 shadow-2xs"
+                >
+                  <span>{localizedName}</span>
+                  <span className="text-[10px] font-bold text-amber-600">
+                    ({item.daysUntilExpiration !== null && item.daysUntilExpiration <= 0 ? (lang === 'FR' ? 'Expiré' : 'Expiring') : `${item.daysUntilExpiration}j`})
+                  </span>
+                </button>
+              );
+            })}
           </ScrollableRow>
         </div>
       )}

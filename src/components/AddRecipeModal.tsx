@@ -31,13 +31,161 @@ import {
   ChevronDown,
   Image as ImageIcon,
 } from 'lucide-react';
-import { RicardoRecipe, RecipeIngredient } from '../data/ricardoRecipes';
+import { RicardoRecipe } from '../data/ricardoRecipes';
 import { useLanguage } from '../utils/i18n';
 import {
   RecipeWebsiteSource,
   getStoredRecipeWebsites,
   saveStoredRecipeWebsites,
 } from '../data/recipeWebsites';
+
+export interface RecipeIngredient {
+  id: string;
+  amount: string; // e.g. "1", "1/2", "250"
+  unit: string; // e.g. "cup", "tsp", "ml", "to_taste", "unit"
+  name: string; // e.g. "Huile d'olive"
+  storage: string; // e.g. "pantry", "fridge", "freezer", "spices"
+  nameFr?: string;
+  category?: string;
+  locationType?: 'FRIDGE' | 'FREEZER' | 'PANTRY';
+  inKitchenItemName?: string;
+}
+
+export function parseAmountAndUnit(rawAmount: string = ''): { amount: string; unit: string } {
+  const str = (rawAmount || '').trim();
+  if (!str) return { amount: '1', unit: 'unit' };
+
+  const lower = str.toLowerCase();
+
+  // Check for to_taste / au goût
+  if (
+    lower.includes('au goût') ||
+    lower.includes('au gout') ||
+    lower.includes('to taste') ||
+    lower.includes('as needed') ||
+    lower === '—' ||
+    lower === '-'
+  ) {
+    return { amount: '', unit: 'to_taste' };
+  }
+
+  // Regex to match leading number or fraction (e.g. 1, 1.5, 1/2, 2 1/2, 250)
+  const numMatch = str.match(/^([0-9]+(?:\.[0-9]+)?(?:\s*[\/\-]\s*[0-9]+)?|\d+\/\d+|\d+)\s*(.*)$/);
+
+  if (!numMatch) {
+    return { amount: str, unit: 'unit' };
+  }
+
+  const detectedAmount = numMatch[1].trim();
+  const rest = (numMatch[2] || '').trim().toLowerCase();
+
+  if (!rest) {
+    return { amount: detectedAmount, unit: 'unit' };
+  }
+
+  if (/^(c\.?\s*à\s*t(?:hé)?|c\.?à\.?t|cuill(?:è|e)re?s?\s*à\s*thé|tsp|teaspoon(?:s)?)/i.test(rest)) {
+    return { amount: detectedAmount, unit: 'tsp' };
+  }
+  if (/^(c\.?\s*à\s*s(?:oupe)?|c\.?à\.?s|cuill(?:è|e)re?s?\s*à\s*soupe|tbsp|tablespoon(?:s)?)/i.test(rest)) {
+    return { amount: detectedAmount, unit: 'tbsp' };
+  }
+  if (/^(tasse(?:s)?|cup(?:s)?)/i.test(rest)) {
+    return { amount: detectedAmount, unit: 'cup' };
+  }
+  if (/^(pincée(?:s)?|pincee(?:s)?|pinch(?:es)?)/i.test(rest)) {
+    return { amount: detectedAmount, unit: 'pinch' };
+  }
+  if (/^(ml|millilitre(?:s)?|milliliter(?:s)?)/i.test(rest)) {
+    return { amount: detectedAmount, unit: 'ml' };
+  }
+  if (/^(l|litre(?:s)?|liter(?:s)?)\b/i.test(rest)) {
+    return { amount: detectedAmount, unit: 'l' };
+  }
+  if (/^(kg|kilogramme(?:s)?|kilogram(?:s)?)/i.test(rest)) {
+    return { amount: detectedAmount, unit: 'kg' };
+  }
+  if (/^(g|gramme(?:s)?|gram(?:s)?)\b/i.test(rest)) {
+    return { amount: detectedAmount, unit: 'g' };
+  }
+  if (/^(fl\s*oz|fluid\s*ounce(?:s)?)/i.test(rest)) {
+    return { amount: detectedAmount, unit: 'fl_oz' };
+  }
+  if (/^(oz|ounce(?:s)?|once(?:s)?)/i.test(rest)) {
+    return { amount: detectedAmount, unit: 'oz' };
+  }
+  if (/^(lb(?:s)?|pound(?:s)?|livre(?:s)?)/i.test(rest)) {
+    return { amount: detectedAmount, unit: 'lb' };
+  }
+  if (/^(gousse(?:s)?|clove(?:s)?)/i.test(rest)) {
+    return { amount: detectedAmount, unit: 'clove' };
+  }
+  if (/^(tranche(?:s)?|slice(?:s)?)/i.test(rest)) {
+    return { amount: detectedAmount, unit: 'slice' };
+  }
+  if (/^(bo[îi]te(?:s)?|conserve(?:s)?|can(?:s)?|tin(?:s)?)/i.test(rest)) {
+    return { amount: detectedAmount, unit: 'can' };
+  }
+
+  return { amount: detectedAmount, unit: 'unit' };
+}
+
+export function normalizeStorage(
+  storage?: string,
+  locationType?: string,
+  name?: string
+): { storage: string; locationType: 'FRIDGE' | 'FREEZER' | 'PANTRY' } {
+  const s = (storage || '').toLowerCase().trim();
+  if (s === 'spices' || s === 'épices' || s === 'epices') {
+    return { storage: 'spices', locationType: 'PANTRY' };
+  }
+  if (s === 'freezer' || s === 'congélateur' || s === 'congelateur' || locationType === 'FREEZER') {
+    return { storage: 'freezer', locationType: 'FREEZER' };
+  }
+  if (s === 'fridge' || s === 'frigo' || locationType === 'FRIDGE') {
+    return { storage: 'fridge', locationType: 'FRIDGE' };
+  }
+  if (s === 'pantry' || s === 'garde-manger' || locationType === 'PANTRY') {
+    return { storage: 'pantry', locationType: 'PANTRY' };
+  }
+  const n = (name || '').toLowerCase();
+  if (
+    /sel|poivre|paprika|curry|cumin|origan|thym|cannelle|épice|muscade|spices|pepper|salt|cinnamon|oregano|thyme|chili|cumin|clove/i.test(
+      n
+    )
+  ) {
+    return { storage: 'spices', locationType: 'PANTRY' };
+  }
+  return { storage: 'pantry', locationType: 'PANTRY' };
+}
+
+export function normalizeRecipeIngredient(ing: any, idx: number = 0): RecipeIngredient {
+  const parsed = parseAmountAndUnit(ing.amount);
+  const unit = ing.unit || parsed.unit || 'unit';
+  const amount = unit === 'to_taste' ? '' : (ing.amount && ing.unit ? ing.amount : parsed.amount || '1');
+  const { storage, locationType } = normalizeStorage(ing.storage, ing.locationType, ing.name || ing.nameFr);
+
+  return {
+    id: ing.id || `ing-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
+    amount,
+    unit,
+    name: ing.name || ing.nameFr || '',
+    nameFr: ing.nameFr || ing.name || '',
+    storage,
+    locationType,
+    category: ing.category || 'Pantry Staples',
+    inKitchenItemName: ing.inKitchenItemName,
+  };
+}
+
+export function normalizeRecipe(recipe: any): RicardoRecipe | null {
+  if (!recipe) return null;
+  return {
+    ...recipe,
+    ingredients: (recipe.ingredients || []).map((ing: any, idx: number) =>
+      normalizeRecipeIngredient(ing, idx)
+    ),
+  };
+}
 
 interface AddRecipeModalProps {
   isOpen: boolean;
@@ -110,7 +258,7 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
   // Synchronize when editing an existing recipe
   useEffect(() => {
     if (recipeToEdit && isOpen) {
-      setParsedRecipe(JSON.parse(JSON.stringify(recipeToEdit)));
+      setParsedRecipe(normalizeRecipe(recipeToEdit));
     } else if (!isOpen && !recipeToEdit) {
       setParsedRecipe(null);
     }
@@ -121,10 +269,13 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
     setParsedRecipe((prev) => {
       if (!prev) return null;
       const newIng: RecipeIngredient = {
+        id: `ing-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         name: '',
         nameFr: '',
         amount: '1',
-        locationType: 'FRIDGE',
+        unit: 'unit',
+        storage: 'pantry',
+        locationType: 'PANTRY',
         category: 'Pantry Staples',
       };
       return {
@@ -287,7 +438,7 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
         throw new Error(data.error || 'Failed to parse recipe photo');
       }
 
-      setParsedRecipe(data.recipe);
+      setParsedRecipe(normalizeRecipe(data.recipe));
     } catch (err: any) {
       console.error('AI Parse/Import failed:', err);
       setErrorMsg(err.message || 'Error communicating with AI service');
@@ -535,18 +686,14 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
       descriptionFr: recipe.descriptionFr || recipe.zeroWasteReason || '',
       tags: recipe.tags || ['Web Recipe', 'Anti-Gaspillage'],
       suggestedPantryNeeds: recipe.suggestedPantryNeeds || [],
-      ingredients: (recipe.ingredients || []).map((ing: any) => ({
-        name: ing.name,
-        nameFr: ing.nameFr || ing.name,
-        amount: ing.amount || '1 portion',
-        category: ing.category || 'Pantry Staples',
-        locationType: ing.locationType || 'FRIDGE',
-      })),
+      ingredients: (recipe.ingredients || []).map((ing: any, idx: number) =>
+        normalizeRecipeIngredient(ing, idx)
+      ),
       instructionsEn: recipe.instructionsEn || [],
       instructionsFr: recipe.instructionsFr || [],
       createdAt: new Date().toISOString(),
     };
-    setParsedRecipe(mapped);
+    setParsedRecipe(normalizeRecipe(mapped));
     setDiscoveredWebsiteRecipes([]);
     setInspectedSiteName(null);
     setInspectionNotice(null);
@@ -700,7 +847,7 @@ Instructions:
           throw new Error(data.error || 'Failed to import recipe from URL');
         }
 
-        setParsedRecipe(data.recipe);
+        setParsedRecipe(normalizeRecipe(data.recipe));
       } else {
         // Fallback or other tabs (youtube, text, photo)
         let payload: any = {
@@ -739,7 +886,7 @@ Instructions:
           throw new Error(data.error || 'Failed to parse recipe');
         }
 
-        setParsedRecipe(data.recipe);
+        setParsedRecipe(normalizeRecipe(data.recipe));
       }
     } catch (err: any) {
       console.error('AI Parse/Import failed:', err);
@@ -766,7 +913,7 @@ Instructions:
 
       const data = await res.json();
       if (data.success && data.recipe) {
-        setParsedRecipe(data.recipe);
+        setParsedRecipe(normalizeRecipe(data.recipe));
       }
     } catch (err: any) {
       console.error('Translation failed:', err);
@@ -787,6 +934,9 @@ Instructions:
       isCustom: true,
       updatedAt: new Date().toISOString(),
       createdAt: parsedRecipe.createdAt || new Date().toISOString(),
+      ingredients: (parsedRecipe.ingredients || []).map((ing, idx) =>
+        normalizeRecipeIngredient(ing, idx)
+      ),
     };
 
     try {
@@ -1922,7 +2072,7 @@ Instructions:
                     </span>
                   </h3>
                   <p className="text-[10px] text-slate-500 mt-0.5">
-                    {lang === 'FR' ? 'Modifiez les noms, quantités et zones de rangement' : 'Adjust ingredient names, amounts, and storage zones'}
+                    {lang === 'FR' ? 'Modifiez les quantités, unités, noms et zones de rangement' : 'Adjust amounts, kitchen units, ingredient names, and storage zones'}
                   </p>
                 </div>
 
@@ -1932,7 +2082,7 @@ Instructions:
                   className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                  <span>{lang === 'FR' ? '+ Ajouter un ingrédient' : '+ Add Ingredient'}</span>
+                  <span>{lang === 'FR' ? 'Ajouter un ingrédient' : 'Add Ingredient'}</span>
                 </button>
               </div>
 
@@ -1944,76 +2094,182 @@ Instructions:
                   <button
                     type="button"
                     onClick={handleAddIngredient}
-                    className="px-3.5 py-1.5 rounded-xl bg-emerald-700 text-white text-xs font-black inline-flex items-center gap-1"
+                    className="px-3.5 py-1.5 rounded-xl bg-emerald-700 text-white text-xs font-black inline-flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer"
                   >
-                    <Plus className="w-3.5 h-3.5" />
+                    <Plus className="w-3.5 h-3.5 stroke-[3]" />
                     <span>{lang === 'FR' ? 'Ajouter le premier ingrédient' : 'Add First Ingredient'}</span>
                   </button>
                 </div>
               ) : (
-                <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                  {parsedRecipe.ingredients.map((ing, idx) => (
-                    <div
-                      key={idx}
-                      className="p-2.5 rounded-xl bg-[#FAFBF9] border border-[#D5E1D2] flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs hover:border-emerald-400 transition-all group"
-                    >
-                      {/* Name input */}
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black flex items-center justify-center shrink-0">
-                          {idx + 1}
-                        </span>
-                        <input
-                          type="text"
-                          value={lang === 'FR' && ing.nameFr ? ing.nameFr : ing.name}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            handleUpdateIngredient(
-                              idx,
-                              lang === 'FR' ? { nameFr: val, name: ing.name || val } : { name: val, nameFr: ing.nameFr || val }
-                            );
-                          }}
-                          placeholder={lang === 'FR' ? "Nom de l'ingrédient (ex: Poulet)..." : "Ingredient name (e.g. Chicken)..."}
-                          className="flex-1 font-bold text-xs text-[#1E3022] border-b border-transparent hover:border-slate-300 focus:border-emerald-600 focus:outline-none bg-transparent px-1.5 py-1"
-                        />
-                      </div>
+                <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                  {/* Table Column Titles for Desktop / Large Screens */}
+                  <div className="hidden md:flex items-center gap-2 px-2.5 pb-1 text-[10px] font-black text-slate-400 uppercase tracking-wider select-none">
+                    <span className="w-6 text-center shrink-0">#</span>
+                    <span className="w-20 shrink-0 text-center">{lang === 'FR' ? 'Quantité' : 'Amount'}</span>
+                    <span className="w-36 shrink-0">{lang === 'FR' ? 'Unité' : 'Unit'}</span>
+                    <span className="flex-1 min-w-[140px]">{lang === 'FR' ? "Nom de l'ingrédient" : 'Ingredient name'}</span>
+                    <span className="w-40 shrink-0">{lang === 'FR' ? 'Zone de rangement' : 'Storage zone'}</span>
+                    <span className="w-7 text-center shrink-0"></span>
+                  </div>
 
-                      {/* Amount, Location selector, Delete */}
-                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-                        <input
-                          type="text"
-                          value={ing.amount || ''}
-                          onChange={(e) => handleUpdateIngredient(idx, { amount: e.target.value })}
-                          placeholder={lang === 'FR' ? "Quantité (ex: 2 tasses)" : "Amount (e.g. 2 cups)"}
-                          className="w-28 text-xs font-semibold text-slate-700 border border-slate-200 rounded-lg px-2 py-1 focus:border-emerald-600 focus:outline-none bg-white"
-                        />
+                  <div className="overflow-x-auto pb-1">
+                    <div className="min-w-[620px] md:min-w-0 space-y-2">
+                      {parsedRecipe.ingredients.map((ing, idx) => {
+                        const isToTaste = ing.unit === 'to_taste';
+                        const activeStorage =
+                          ing.storage ||
+                          (ing.locationType === 'FREEZER'
+                            ? 'freezer'
+                            : ing.locationType === 'PANTRY'
+                            ? 'pantry'
+                            : 'fridge');
 
-                        <select
-                          value={ing.locationType || 'FRIDGE'}
-                          onChange={(e) => handleUpdateIngredient(idx, { locationType: e.target.value as any })}
-                          className={`text-[10px] font-black px-2 py-1 rounded-lg border focus:outline-none focus:border-emerald-600 cursor-pointer ${
-                            ing.locationType === 'FREEZER'
-                              ? 'bg-blue-50 text-blue-800 border-blue-200'
-                              : ing.locationType === 'PANTRY'
-                              ? 'bg-amber-50 text-amber-800 border-amber-200'
-                              : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                          }`}
-                        >
-                          <option value="FRIDGE">❄️ {lang === 'FR' ? 'Frigo' : 'Fridge'}</option>
-                          <option value="PANTRY">🥫 {lang === 'FR' ? 'Garde-manger' : 'Pantry'}</option>
-                          <option value="FREEZER">🧊 {lang === 'FR' ? 'Congélateur' : 'Freezer'}</option>
-                        </select>
+                        return (
+                          <div
+                            key={ing.id || idx}
+                            className="p-2 sm:p-2.5 rounded-xl bg-[#FAFBF9] border border-[#D5E1D2] flex items-center gap-2 shadow-2xs hover:border-emerald-400 transition-all group"
+                          >
+                            {/* [ # ] Index Badge on the far left */}
+                            <span className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-800 text-[11px] font-black flex items-center justify-center shrink-0 select-none shadow-2xs">
+                              {idx + 1}
+                            </span>
 
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveIngredient(idx)}
-                          className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                          title={lang === 'FR' ? 'Supprimer cet ingrédient' : 'Remove ingredient'}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                            {/* [ Quantité ] Text/Number input supporting fractions & decimals */}
+                            <div className="w-16 sm:w-20 shrink-0">
+                              <input
+                                type="text"
+                                disabled={isToTaste}
+                                value={isToTaste ? '' : (ing.amount || '')}
+                                onChange={(e) => handleUpdateIngredient(idx, { amount: e.target.value })}
+                                placeholder={isToTaste ? '—' : (lang === 'FR' ? 'ex. 1' : 'e.g. 1')}
+                                className="w-full text-xs font-bold text-slate-700 border border-slate-200 rounded-lg px-2 py-1.5 focus:border-emerald-600 focus:outline-none bg-white text-center disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors"
+                                title={lang === 'FR' ? 'Quantité (ex. 1, 1/2, 1.5, 250)' : 'Amount (e.g. 1, 1/2, 1.5, 250)'}
+                              />
+                            </div>
+
+                            {/* [ Sélecteur d'unité ] Kitchen Unit Selector with optgroup */}
+                            <div className="w-32 sm:w-36 shrink-0">
+                              <select
+                                value={ing.unit || 'unit'}
+                                onChange={(e) => {
+                                  const newUnit = e.target.value;
+                                  handleUpdateIngredient(idx, {
+                                    unit: newUnit,
+                                    amount:
+                                      newUnit === 'to_taste'
+                                        ? ''
+                                        : ing.amount && ing.amount !== '—'
+                                        ? ing.amount
+                                        : '1',
+                                  });
+                                }}
+                                className="w-full text-[11px] sm:text-xs font-semibold text-slate-700 border border-slate-200 rounded-lg px-2 py-1.5 focus:border-emerald-600 focus:outline-none bg-white cursor-pointer transition-colors"
+                              >
+                                <optgroup label={lang === 'FR' ? 'Général' : 'General'}>
+                                  <option value="unit">
+                                    {lang === 'FR' ? 'Sans unité (unité entière)' : 'No unit (whole unit)'}
+                                  </option>
+                                </optgroup>
+                                <optgroup label={lang === 'FR' ? 'Mesures culinaires' : 'Culinary measures'}>
+                                  <option value="tsp">{lang === 'FR' ? 'c. à thé (c.à.t / tsp)' : 'tsp (teaspoon)'}</option>
+                                  <option value="tbsp">{lang === 'FR' ? 'c. à soupe (c.à.s / tbsp)' : 'tbsp (tablespoon)'}</option>
+                                  <option value="cup">{lang === 'FR' ? 'tasse (cup)' : 'cup'}</option>
+                                  <option value="pinch">{lang === 'FR' ? 'pincée' : 'pinch'}</option>
+                                </optgroup>
+                                <optgroup label={lang === 'FR' ? 'Système métrique' : 'Metric system'}>
+                                  <option value="ml">ml</option>
+                                  <option value="l">L</option>
+                                  <option value="g">g</option>
+                                  <option value="kg">kg</option>
+                                </optgroup>
+                                <optgroup label={lang === 'FR' ? 'Système impérial / US' : 'Imperial / US system'}>
+                                  <option value="oz">oz</option>
+                                  <option value="fl_oz">fl oz</option>
+                                  <option value="lb">lb</option>
+                                </optgroup>
+                                <optgroup label={lang === 'FR' ? 'Spécifique & Approximations' : 'Specific & Approximations'}>
+                                  <option value="to_taste">
+                                    {lang === 'FR' ? 'Au goût (to taste)' : 'To taste (au goût)'}
+                                  </option>
+                                  <option value="clove">{lang === 'FR' ? 'gousse' : 'clove'}</option>
+                                  <option value="slice">{lang === 'FR' ? 'tranche' : 'slice'}</option>
+                                  <option value="can">{lang === 'FR' ? 'boîte / conserve' : 'can / tin'}</option>
+                                </optgroup>
+                              </select>
+                            </div>
+
+                            {/* [ Nom de l'ingrédient ] Free text input for canonical ingredient name */}
+                            <div className="flex-1 min-w-[130px]">
+                              <input
+                                type="text"
+                                value={lang === 'FR' && ing.nameFr ? ing.nameFr : ing.name}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  handleUpdateIngredient(
+                                    idx,
+                                    lang === 'FR'
+                                      ? { nameFr: val, name: ing.name || val }
+                                      : { name: val, nameFr: ing.nameFr || val }
+                                  );
+                                }}
+                                placeholder={
+                                  lang === 'FR'
+                                    ? "ex. Huile d'olive, Sel, Farine..."
+                                    : 'e.g. Olive oil, Salt, Flour...'
+                                }
+                                className="w-full font-bold text-xs text-[#1E3022] border border-slate-200 rounded-lg px-2.5 py-1.5 focus:border-emerald-600 focus:outline-none bg-white placeholder:font-normal placeholder:text-slate-400 transition-colors"
+                              />
+                            </div>
+
+                            {/* [ Zone de rangement ] Retained styled dropdown for kitchen locations */}
+                            <div className="w-32 sm:w-40 shrink-0">
+                              <select
+                                value={activeStorage}
+                                onChange={(e) => {
+                                  const newStorage = e.target.value;
+                                  const locType: 'FRIDGE' | 'FREEZER' | 'PANTRY' =
+                                    newStorage === 'freezer'
+                                      ? 'FREEZER'
+                                      : newStorage === 'fridge'
+                                      ? 'FRIDGE'
+                                      : 'PANTRY';
+                                  handleUpdateIngredient(idx, {
+                                    storage: newStorage,
+                                    locationType: locType,
+                                  });
+                                }}
+                                className={`w-full text-[10px] sm:text-xs font-black px-2 py-1.5 rounded-lg border focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer transition-colors ${
+                                  activeStorage === 'freezer'
+                                    ? 'bg-blue-50 text-blue-900 border-blue-200'
+                                    : activeStorage === 'spices'
+                                    ? 'bg-purple-50 text-purple-900 border-purple-200'
+                                    : activeStorage === 'pantry'
+                                    ? 'bg-amber-50 text-amber-900 border-amber-200'
+                                    : 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                                }`}
+                              >
+                                <option value="pantry">🥫 {lang === 'FR' ? 'Garde-manger' : 'Pantry'}</option>
+                                <option value="fridge">❄️ {lang === 'FR' ? 'Frigo' : 'Fridge'}</option>
+                                <option value="freezer">🧊 {lang === 'FR' ? 'Congélateur' : 'Freezer'}</option>
+                                <option value="spices">🧂 {lang === 'FR' ? 'Épices' : 'Spices'}</option>
+                              </select>
+                            </div>
+
+                            {/* [ Supprimer ] Icon button (Trash icon) to remove row */}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveIngredient(idx)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer shrink-0"
+                              title={lang === 'FR' ? 'Supprimer cet ingrédient' : 'Remove ingredient'}
+                              aria-label={lang === 'FR' ? 'Supprimer cet ingrédient' : 'Remove ingredient'}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
-                  ))}
+                  </div>
                 </div>
               )}
             </div>

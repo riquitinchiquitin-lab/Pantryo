@@ -1,4 +1,6 @@
 import express from "express";
+import path from "path";
+import { pathToFileURL } from "url";
 import { dbStore } from "../services/dbStore.js";
 import { validatePasswordNist } from "../services/nistPasswordValidator.js";
 import { rateLimiter } from "../services/rateLimiter.js";
@@ -342,7 +344,8 @@ router.get("/security/audit", requireAdmin, async (req, res) => {
  */
 router.post("/security/auto-update", requireAdmin, async (req, res) => {
   try {
-    const { runAutoUpdate } = await import("../../scripts/auto-update-dependencies.js");
+    const scriptPath = path.resolve(process.cwd(), "scripts/auto-update-dependencies.js");
+    const { runAutoUpdate } = await import(pathToFileURL(scriptPath).href);
     const result = await runAutoUpdate();
     res.json(result);
   } catch (err) {

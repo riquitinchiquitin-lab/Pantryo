@@ -22,6 +22,7 @@ import { GroceryCartItem } from './GroceryListView';
 import { FoodVisualBadge } from './FoodVisualBadge';
 import { getFoodVisual } from '../utils/foodVisuals';
 import { useLanguage } from '../utils/i18n';
+import { getItemDisplayName, formatLocalizedQuantityUnit } from '../utils/foodTranslator';
 
 const STORAGE_KEY = 'kitchen_komrade_saved_grocery_lists_v1';
 
@@ -805,7 +806,7 @@ export const SavedListsModal: React.FC<SavedListsModalProps> = ({
                         key={item.id}
                         className="px-2 py-0.5 rounded-lg bg-white border border-[#D5E1D2] text-[10px] font-bold text-[#324936]"
                       >
-                        {item.name} ({item.quantity} {item.unit})
+                        {getItemDisplayName(item, lang)} ({formatLocalizedQuantityUnit(item.quantity, item.unit, lang)})
                       </span>
                     ))}
                     {currentGroceryItems.length > 8 && (
@@ -1123,18 +1124,18 @@ export const SavedListsModal: React.FC<SavedListsModalProps> = ({
                                       {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
                                     </div>
                                     <FoodVisualBadge
-                                      itemName={item.name}
+                                      itemName={getItemDisplayName(item, lang)}
                                       categoryName={item.category || visual.badgeLabel}
                                       size="sm"
                                     />
                                     <span className="font-bold text-[#233527] truncate">
-                                      {item.name}
+                                      {getItemDisplayName(item, lang)}
                                     </span>
                                   </div>
 
                                   <div className="flex items-center gap-2 shrink-0">
                                     <span className="text-[10px] text-[#556D58] font-bold px-1.5 py-0.2 rounded bg-[#EDF3EC]">
-                                      {item.quantity} {item.unit}
+                                      {formatLocalizedQuantityUnit(item.quantity, item.unit, lang)}
                                     </span>
                                     {/* Quick delete single item */}
                                     <button

@@ -39,9 +39,10 @@ import {
   Pencil,
 } from 'lucide-react';
 import { InventoryItem, PlannedMeal, MealType } from '../types';
-import { RICARDO_RECIPES, RicardoRecipe } from '../data/ricardoRecipes';
+import { RICARDO_RECIPES, RicardoRecipe, formatRecipeIngredientAmount } from '../data/ricardoRecipes';
 import { AddRecipeModal } from './AddRecipeModal';
 import { useLanguage } from '../utils/i18n';
+import { getItemDisplayName } from '../utils/foodTranslator';
 import { ScrollableRow } from './ScrollableRow';
 import { detectSafeCookingRule, SAFE_COOKING_GUIDELINES, SafeCookingRule } from '../utils/safeCookingInstructions';
 
@@ -533,7 +534,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
       notes: lang === 'FR' ? planningRecipe.descriptionFr : planningRecipe.descriptionEn,
       isCooked: false,
       ingredients: planningRecipe.ingredients.map((ing) => ({
-        name: lang === 'FR' && ing.nameFr ? ing.nameFr : ing.name,
+        name: getItemDisplayName(ing, lang),
         inStock: isIngredientInKitchen(ing.name, ing.inKitchenItemName),
       })),
     };
@@ -562,7 +563,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
       );
       missing.forEach((ing) => {
         onAddMissingToGrocery({
-          name: lang === 'FR' && ing.nameFr ? ing.nameFr : ing.name,
+          name: getItemDisplayName(ing, lang),
           category: ing.category,
           locationType: ing.locationType,
           recipeTitle: recipeTitle,
@@ -1461,7 +1462,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                     <div className="space-y-1.5">
                       {recipe.ingredients.map((ing, i) => {
                         const inStock = isIngredientInKitchen(ing.name, ing.inKitchenItemName);
-                        const ingDisplayName = lang === 'FR' && ing.nameFr ? ing.nameFr : ing.name;
+                        const ingDisplayName = getItemDisplayName(ing, lang);
 
                         return (
                           <div
@@ -1488,7 +1489,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                               </div>
                               <span className="font-bold truncate">{ingDisplayName}</span>
                               <span className="text-[10px] text-slate-400 font-normal shrink-0">
-                                ({ing.amount})
+                                ({formatRecipeIngredientAmount(ing, lang)})
                               </span>
                             </div>
 

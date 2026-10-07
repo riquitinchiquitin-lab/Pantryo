@@ -36,7 +36,17 @@ import {
   CanadianFlyerBanner,
   svgToDataUrl,
 } from '../data/canadianFlyersData';
-import { getBilingualNames, translateFoodItem } from '../utils/foodTranslator';
+import {
+  getBilingualNames,
+  translateFoodItem,
+  getItemDisplayName,
+  formatLocalizedQuantityUnit,
+  getLocalizedBadge,
+  getLocalizedPackaging,
+  getLocalizedStorageTip,
+  getLocalizedOrigin,
+  isTextFrench,
+} from '../utils/foodTranslator';
 
 /**
  * Optical Barcode Detector helper
@@ -386,8 +396,15 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
       .join(' • ') || (lang === 'FR' ? 'Ajouté par vision IA' : 'Added via Picture Vision');
 
     const biling = getBilingualNames(candidate.name, lang);
-    const resolvedNameFr = (candidate as any).nameFr || biling.nameFr || candidate.name;
-    const resolvedNameEn = (candidate as any).nameEn || biling.nameEn || candidate.name;
+    let resolvedNameFr = (candidate as any).nameFr || biling.nameFr || candidate.name;
+    let resolvedNameEn = (candidate as any).nameEn || biling.nameEn || candidate.name;
+
+    if (resolvedNameEn && isTextFrench(resolvedNameEn)) {
+      resolvedNameEn = translateFoodItem(resolvedNameEn, 'EN');
+    }
+    if (resolvedNameFr && !isTextFrench(resolvedNameFr)) {
+      resolvedNameFr = translateFoodItem(resolvedNameFr, 'FR');
+    }
     const chosenName = lang === 'FR' ? resolvedNameFr : resolvedNameEn;
 
     const payload = {
@@ -1523,7 +1540,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <h4 className="font-black text-sm text-[#0D3B37] truncate">
-                          {inspectingItem.name}
+                          {getItemDisplayName(inspectingItem, lang)}
                         </h4>
                         {inspectingItem.identifiedMethodLabel && (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-950 border border-emerald-300 shadow-2xs">
@@ -1537,7 +1554,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                         )}
                       </div>
                       <p className="text-[11px] text-[#527470] mt-0.5">
-                        {inspectingItem.netContent || `${inspectingItem.quantity} ${inspectingItem.unit}`} • {getLocationLocalizedName(inspectingItem.locationName, lang)}
+                        {formatLocalizedQuantityUnit(inspectingItem.quantity, inspectingItem.netContent || inspectingItem.unit, lang)} • {getLocationLocalizedName(inspectingItem.locationName, lang)}
                       </p>
                     </div>
                   </div>
@@ -1562,7 +1579,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                           </td>
                           <td className="py-2 px-3">
                             <span className="font-extrabold text-sm text-[#0D3B37]">
-                              {inspectingItem.name}
+                              {getItemDisplayName(inspectingItem, lang)}
                             </span>
                           </td>
                         </tr>
@@ -1597,7 +1614,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                               {lang === 'FR' ? 'Grade / Origine' : 'Grade / Origin'}
                             </td>
                             <td className="py-2 px-3 font-medium text-[#1F3323]">
-                              {inspectingItem.gradeOrigin}
+                              {getLocalizedOrigin(inspectingItem.gradeOrigin, lang)}
                             </td>
                           </tr>
                         )}
@@ -1607,7 +1624,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                             {lang === 'FR' ? 'Quantité / Volume net' : 'Net Quantity / Weight'}
                           </td>
                           <td className="py-2 px-3 font-extrabold text-[#0D3B37]">
-                            {inspectingItem.netContent || `${inspectingItem.quantity} ${inspectingItem.unit}`}
+                            {formatLocalizedQuantityUnit(inspectingItem.quantity, inspectingItem.netContent || inspectingItem.unit, lang)}
                           </td>
                         </tr>
 
@@ -1617,7 +1634,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                               {lang === 'FR' ? 'Format d’emballage' : 'Packaging Format'}
                             </td>
                             <td className="py-2 px-3 font-medium text-[#1F3323]">
-                              {inspectingItem.packagingFormat}
+                              {getLocalizedPackaging(inspectingItem.packagingFormat, lang)}
                             </td>
                           </tr>
                         )}
@@ -1634,7 +1651,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                                     key={bIdx}
                                     className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300"
                                   >
-                                    ✓ {badge}
+                                    ✓ {getLocalizedBadge(badge, lang)}
                                   </span>
                                 ))}
                               </div>
@@ -1659,12 +1676,12 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                             <td className="py-2 px-3 space-y-0.5">
                               {inspectingItem.unopenedLocation && (
                                 <p className="text-[11px] text-[#1F3323]">
-                                  • <span className="font-bold">{lang === 'FR' ? 'Fermé :' : 'Unopened:'}</span> {inspectingItem.unopenedLocation}
+                                  • <span className="font-bold">{lang === 'FR' ? 'Fermé :' : 'Unopened:'}</span> {getLocationLocalizedName(inspectingItem.unopenedLocation, lang)}
                                 </p>
                               )}
                               {inspectingItem.openedLocation && (
                                 <p className="text-[11px] text-[#1F3323]">
-                                  • <span className="font-bold">{lang === 'FR' ? 'Après ouverture :' : 'After opening:'}</span> {inspectingItem.openedLocation}
+                                  • <span className="font-bold">{lang === 'FR' ? 'Après ouverture :' : 'After opening:'}</span> {getLocationLocalizedName(inspectingItem.openedLocation, lang)}
                                 </p>
                               )}
                             </td>
@@ -1697,7 +1714,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                               {lang === 'FR' ? 'Conservation congélateur' : 'Freezer Shelf Life'}
                             </td>
                             <td className="py-2 px-3 font-medium text-blue-900">
-                              {inspectingItem.freezerTip}
+                              {getLocalizedStorageTip(inspectingItem.freezerTip, lang)}
                             </td>
                           </tr>
                         )}
@@ -1708,7 +1725,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                               {lang === 'FR' ? 'Conseil fraîcheur' : 'Storage Tip'}
                             </td>
                             <td className="py-2 px-3 text-[#1F3323] leading-relaxed">
-                              {inspectingItem.storageTip}
+                              {getLocalizedStorageTip(inspectingItem.storageTip, lang)}
                             </td>
                           </tr>
                         )}
@@ -1814,11 +1831,11 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                               className="w-8 h-8 rounded-lg object-cover border border-[#D5E1D2] shrink-0"
                             />
                           ) : (
-                            <FoodVisualBadge itemName={item.name} categoryName={item.categoryName} size="sm" />
+                            <FoodVisualBadge itemName={getItemDisplayName(item, lang)} categoryName={item.categoryName} size="sm" />
                           )}
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <p className="text-xs font-bold text-[#0D3B37] truncate">{item.name}</p>
+                              <p className="text-xs font-bold text-[#0D3B37] truncate">{getItemDisplayName(item, lang)}</p>
                               {item.identifiedMethodLabel && (
                                 <span className="text-[9px] font-black text-emerald-950 bg-emerald-100 border border-emerald-300 px-1.5 py-0.2 rounded-md">
                                   ✨ {item.identifiedMethodLabel}
@@ -1831,7 +1848,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                               )}
                             </div>
                             <p className="text-[10px] text-[#527470]">
-                              {item.netContent || `${item.quantity} ${item.unit}`} • {getLocationLocalizedName(item.locationName, lang)} • {item.addedAt}
+                              {formatLocalizedQuantityUnit(item.quantity, item.netContent || item.unit, lang)} • {getLocationLocalizedName(item.locationName, lang)} • {item.addedAt}
                             </p>
                           </div>
                         </div>

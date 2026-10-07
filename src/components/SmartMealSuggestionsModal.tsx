@@ -32,7 +32,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { InventoryItem, MealType, SmartMealSuggestion, PlannedMealIngredient } from '../types';
-import { RicardoRecipe, RICARDO_RECIPES, inferRecipeMealTypes } from '../data/ricardoRecipes';
+import { RicardoRecipe, RICARDO_RECIPES, inferRecipeMealTypes, formatRecipeIngredientAmount } from '../data/ricardoRecipes';
 import { useLanguage } from '../utils/i18n';
 import {
   RecipeWebsiteSource,
@@ -513,10 +513,13 @@ export const SmartMealSuggestionsModal: React.FC<SmartMealSuggestionsModalProps>
       const parsedPrepMinutes = parseInt(recipe.prepTime || '25', 10) || 25;
       const parsedServings = parseInt(recipe.servings || '4', 10) || 4;
 
-      const plannedIngredients: PlannedMealIngredient[] = recipe.ingredients.map((ing) => ({
-        name: `${lang === 'FR' && ing.nameFr ? ing.nameFr : ing.name}${ing.amount ? ` (${ing.amount})` : ''}`,
-        inStock: ing.inStock,
-      }));
+      const plannedIngredients: PlannedMealIngredient[] = recipe.ingredients.map((ing) => {
+        const formattedAmt = formatRecipeIngredientAmount(ing, lang) || ing.amount;
+        return {
+          name: `${lang === 'FR' && ing.nameFr ? ing.nameFr : ing.name}${formattedAmt ? ` (${formattedAmt})` : ''}`,
+          inStock: ing.inStock,
+        };
+      });
 
       await onPlanMeal({
         title: lang === 'FR' && recipe.titleFr ? recipe.titleFr : recipe.title,
