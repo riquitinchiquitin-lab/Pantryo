@@ -1710,7 +1710,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                 <div className="flex items-center gap-2 flex-wrap">
                   <button
                     onClick={() => {
-                      setSelectedUserForPassword(currentUser);
+                      setSelectedUserForPassword(activeUser);
                       setNewPasswordValue('');
                     }}
                     className="px-3.5 py-1.5 rounded-xl bg-amber-700 hover:bg-amber-800 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all active:scale-95"
