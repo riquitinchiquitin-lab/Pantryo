@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgSeal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#CCFBF1" />
+      <stop offset="100%" stop-color="#0D9488" />
+    </linearGradient>
+    <filter id="shSeal" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#115E59" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+  <circle cx="100" cy="100" r="98" fill="url(#bgSeal)" stroke="#0F766E" stroke-width="4"/>
+  <!-- Head & Body (Cute Round White Seal) -->
+  <g filter="url(#shSeal)">
+    <ellipse cx="100" cy="130" rx="54" ry="48" fill="#F8FAFC"/>
+    <circle cx="100" cy="96" r="42" fill="#FFFFFF"/>
+  </g>
+  <!-- Sushi Nigiri on Head (Salmon / Nori) -->
+  <g filter="url(#shSeal)">
+    <rect x="75" y="46" width="50" height="18" rx="9" fill="#FB923C" stroke="#EA580C" stroke-width="2"/>
+    <!-- Salmon texture stripes -->
+    <line x1="85" y1="48" x2="82" y2="62" stroke="#FFFFFF" stroke-width="1.5" opacity="0.7"/>
+    <line x1="98" y1="48" x2="95" y2="62" stroke="#FFFFFF" stroke-width="1.5" opacity="0.7"/>
+    <line x1="112" y1="48" x2="109" y2="62" stroke="#FFFFFF" stroke-width="1.5" opacity="0.7"/>
+    <!-- Nori band -->
+    <rect x="94" y="46" width="12" height="24" rx="1" fill="#0F172A"/>
+  </g>
+  <!-- Eyes -->
+  <circle cx="84" cy="98" r="5.5" fill="#0F172A"/>
+  <circle cx="116" cy="98" r="5.5" fill="#0F172A"/>
+  <circle cx="82" cy="96" r="2" fill="#FFFFFF"/>
+  <circle cx="114" cy="96" r="2" fill="#FFFFFF"/>
+  <!-- Pink Cheeks -->
+  <circle cx="72" cy="106" r="7" fill="#FDA4AF" opacity="0.7"/>
+  <circle cx="128" cy="106" r="7" fill="#FDA4AF" opacity="0.7"/>
+  <!-- Seal Muzzle -->
+  <ellipse cx="100" cy="106" rx="10" ry="7" fill="#E2E8F0"/>
+  <circle cx="100" cy="103" r="3" fill="#0F172A"/>
+  <path d="M96 107 Q100 110 104 107" stroke="#0F172A" stroke-width="1.8" fill="none"/>
+  <!-- Seal Flippers -->
+  <ellipse cx="55" cy="145" rx="14" ry="8" fill="#F1F5F9" transform="rotate(-20 55 145)"/>
+  <ellipse cx="145" cy="145" rx="14" ry="8" fill="#F1F5F9" transform="rotate(20 145 145)"/>
+</svg>

@@ -238,8 +238,8 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
           };
         });
 
-      // Auto-resolve image from food visual if none provided
-      const resolvedImage = imageUrl.trim() || getFoodVisual(mealTitle).defaultImage;
+      // Only use provided user image, no stock unsplash fallback
+      const resolvedImage = imageUrl.trim() && !imageUrl.includes('unsplash.com') ? imageUrl.trim() : undefined;
 
       if (editingMeal) {
         await onUpdateMeal(editingMeal.id, {
@@ -290,7 +290,7 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
     ingredients: PlannedMealIngredient[];
     addMissingToGrocery: boolean;
   }) => {
-    const resolvedImage = params.imageUrl || getFoodVisual(params.title).defaultImage;
+    const resolvedImage = params.imageUrl && !params.imageUrl.includes('unsplash.com') ? params.imageUrl : undefined;
 
     await onAddMeal({
       householdId,
@@ -779,16 +779,28 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                         }`}
                       >
                         <div className="flex items-start gap-3">
-                          {/* Meal Photo Thumbnail */}
+                          {/* Meal Photo Thumbnail or Category Icon */}
                           <div className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-[#E5DFD0] bg-slate-100">
-                            <img
-                              src={meal.imageUrl || getFoodVisual(meal.title).defaultImage}
-                              alt={meal.title}
-                              referrerPolicy="no-referrer"
-                              className={`w-full h-full object-cover transition-transform duration-300 ${
-                                meal.isCooked ? 'grayscale-25' : ''
-                              }`}
-                            />
+                            {meal.imageUrl && !meal.imageUrl.includes('unsplash.com') ? (
+                              <img
+                                src={meal.imageUrl}
+                                alt={meal.title}
+                                referrerPolicy="no-referrer"
+                                className={`w-full h-full object-cover transition-transform duration-300 ${
+                                  meal.isCooked ? 'grayscale-25' : ''
+                                }`}
+                              />
+                            ) : (
+                              (() => {
+                                const visual = getFoodVisual(meal.title);
+                                const MealIcon = visual.icon;
+                                return (
+                                  <div className={`w-full h-full flex items-center justify-center ${visual.bgColor} ${visual.textColor}`}>
+                                    <MealIcon className="w-8 h-8 stroke-[1.6]" />
+                                  </div>
+                                );
+                              })()
+                            )}
                             {meal.isCooked && (
                               <div className="absolute inset-0 bg-emerald-900/40 flex items-center justify-center text-white">
                                 <Check className="w-5 h-5 stroke-[3]" />
@@ -1091,7 +1103,7 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                 </label>
                 <input
                   type="url"
-                  placeholder="https://images.unsplash.com/..."
+                  placeholder="https://example.com/recipe.jpg"
                   value={imageUrl}
                   onChange={(e) => setImageUrl(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-white border border-[#D5CDBC] text-xs"

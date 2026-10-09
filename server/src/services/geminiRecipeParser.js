@@ -392,12 +392,12 @@ function normalizeRecipeOutput(parsed, extra = {}) {
     imageUrl = `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
   }
   if (!imageUrl) {
-    imageUrl = "https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=600&q=80";
+    imageUrl = "";
   }
 
   const ingredients = (parsed.ingredients || []).map((ing) => {
     let loc = (ing.locationType || "PANTRY").toUpperCase();
-    if (!["FRIDGE", "FREEZER", "PANTRY"].includes(loc)) {
+    if (!["FRIDGE", "FREEZER", "PANTRY", "SPICE_RACK"].includes(loc)) {
       loc = "FRIDGE";
     }
     return {
@@ -612,7 +612,7 @@ export function parseRecipeTextDirectly(text, { language = "EN", source = "Perso
     ricardoUrlFr: youtubeUrl || "",
     youtubeUrl: youtubeUrl || null,
     youtubeVideoId: youtubeId || null,
-    imageUrl: imageUrl || (youtubeId ? `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg` : "https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=600&q=80"),
+    imageUrl: imageUrl || (youtubeId ? `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg` : ""),
     time: cookTime,
     prepTime,
     cookTime,
@@ -994,7 +994,7 @@ Output a JSON array of 3 to 4 recipe objects inside a \`\`\`json\`\`\` code bloc
       sourceUrl: item.url,
       imageUrl:
         item.image ||
-        "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80",
+        "",
       prepTime: "15 mins",
       cookTime: "25 mins",
       totalTime: "40 mins",
@@ -1474,7 +1474,7 @@ export async function generateSmartMealSuggestions({
       sourceUrl: recipe.ricardoUrlEn || recipe.youtubeUrl || "",
       imageUrl:
         recipe.imageUrl ||
-        "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80",
+        "",
       prepTime: recipe.prepTime || "15 mins",
       cookTime: recipe.cookTime || "20 mins",
       totalTime: recipe.time || "35 mins",
@@ -1710,7 +1710,7 @@ Each recipe object must have:
               sourceUrl,
               imageUrl:
                 r.imageUrl ||
-                "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80",
+                "",
               prepTime: r.prepTime || "15 mins",
               cookTime: r.cookTime || "20 mins",
               totalTime: r.totalTime || "35 mins",
@@ -1799,7 +1799,7 @@ function generateFallbackWebSuggestions({
         titleFr: `Poêlée déjeuner dorée aux œufs et ${heroItem}`,
         source: "Ricardo Cuisine (Web)",
         sourceUrl: "https://www.ricardocuisine.com/en/recipes/breakfast-and-brunch",
-        imageUrl: "https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&w=600&q=80",
+        imageUrl: "",
         prepTime: "5 mins",
         cookTime: "12 mins",
         totalTime: "17 mins",
@@ -1843,7 +1843,7 @@ function generateFallbackWebSuggestions({
         titleFr: `Omelette paysanne moelleuse au ${heroItem}`,
         source: "Marmiton (Web)",
         sourceUrl: "https://www.marmiton.org/recettes/recherche.aspx?aqt=omelette",
-        imageUrl: "https://images.unsplash.com/photo-1510693206972-df098062cb71?auto=format&fit=crop&w=600&q=80",
+        imageUrl: "",
         prepTime: "5 mins",
         cookTime: "8 mins",
         totalTime: "13 mins",
@@ -1887,7 +1887,7 @@ function generateFallbackWebSuggestions({
         titleFr: `Panini artisanal grillé du midi au ${heroItem}`,
         source: "Serious Eats (Web)",
         sourceUrl: "https://www.seriouseats.com/sandwich-recipes",
-        imageUrl: "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=600&q=80",
+        imageUrl: "",
         prepTime: "8 mins",
         cookTime: "6 mins",
         totalTime: "14 mins",
@@ -1927,7 +1927,7 @@ function generateFallbackWebSuggestions({
         titleFr: `Bol repas méditerranéen du midi au ${heroItem}`,
         source: "Trois Fois Par Jour (Web)",
         sourceUrl: "https://www.troisfoisparjour.com",
-        imageUrl: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=600&q=80",
+        imageUrl: "",
         prepTime: "10 mins",
         cookTime: "0 mins",
         totalTime: "10 mins",
@@ -1972,7 +1972,7 @@ function generateFallbackWebSuggestions({
         titleFr: `Bouchées croustillantes et épicées de ${heroItem} rôti`,
         source: "Allrecipes (Web)",
         sourceUrl: "https://www.allrecipes.com/recipes/76/appetizers-and-snacks",
-        imageUrl: "https://images.unsplash.com/photo-1541592106381-b31e9677c0e5?auto=format&fit=crop&w=600&q=80",
+        imageUrl: "",
         prepTime: "5 mins",
         cookTime: "12 mins",
         totalTime: "17 mins",
@@ -2010,7 +2010,7 @@ function generateFallbackWebSuggestions({
         titleFr: `Trempette crémeuse au ${heroItem} et croustilles de pita`,
         source: "Marmiton (Web)",
         sourceUrl: "https://www.marmiton.org/recettes/recherche.aspx?aqt=apero",
-        imageUrl: "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=600&q=80",
+        imageUrl: "",
         prepTime: "8 mins",
         cookTime: "0 mins",
         totalTime: "8 mins",
@@ -2052,7 +2052,7 @@ function generateFallbackWebSuggestions({
       titleFr: `Poêlée croustillante au beurre d'ail avec ${heroItem}`,
       source: "Ricardo Cuisine (Web)",
       sourceUrl: "https://www.ricardocuisine.com/en/recipes/sheet-pan-dinners",
-      imageUrl: "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=600&q=80",
+      imageUrl: "",
       prepTime: "10 mins",
       cookTime: "15 mins",
       totalTime: "25 mins",
@@ -2096,7 +2096,7 @@ function generateFallbackWebSuggestions({
       titleFr: `Frittata anti-gaspillage du chef au ${heroItem}`,
       source: "Serious Eats (Web)",
       sourceUrl: "https://www.seriouseats.com/easy-frittata-recipes",
-      imageUrl: "https://images.unsplash.com/photo-1510693206972-df098062cb71?auto=format&fit=crop&w=600&q=80",
+      imageUrl: "",
       prepTime: "10 mins",
       cookTime: "20 mins",
       totalTime: "30 mins",

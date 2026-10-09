@@ -508,7 +508,7 @@ export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
             <img
               src={
                 targetUser.avatarUrl ||
-                'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80'
+                '/avatars/chef-cat.svg'
               }
               alt={targetUser.name}
               className="w-11 h-11 rounded-full object-cover border border-[#D5CEBD] shrink-0"

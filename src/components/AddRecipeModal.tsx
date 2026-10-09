@@ -47,7 +47,7 @@ export interface RecipeIngredient {
   storage: string; // e.g. "pantry", "fridge", "freezer", "spices"
   nameFr?: string;
   category?: string;
-  locationType?: 'FRIDGE' | 'FREEZER' | 'PANTRY';
+  locationType?: 'FRIDGE' | 'FREEZER' | 'PANTRY' | 'SPICE_RACK';
   inKitchenItemName?: string;
 }
 
@@ -133,10 +133,10 @@ export function normalizeStorage(
   storage?: string,
   locationType?: string,
   name?: string
-): { storage: string; locationType: 'FRIDGE' | 'FREEZER' | 'PANTRY' } {
+): { storage: string; locationType: 'FRIDGE' | 'FREEZER' | 'PANTRY' | 'SPICE_RACK' } {
   const s = (storage || '').toLowerCase().trim();
-  if (s === 'spices' || s === 'épices' || s === 'epices') {
-    return { storage: 'spices', locationType: 'PANTRY' };
+  if (s === 'spices' || s === 'épices' || s === 'epices' || locationType === 'SPICE_RACK') {
+    return { storage: 'spices', locationType: 'SPICE_RACK' };
   }
   if (s === 'freezer' || s === 'congélateur' || s === 'congelateur' || locationType === 'FREEZER') {
     return { storage: 'freezer', locationType: 'FREEZER' };
@@ -149,11 +149,11 @@ export function normalizeStorage(
   }
   const n = (name || '').toLowerCase();
   if (
-    /sel|poivre|paprika|curry|cumin|origan|thym|cannelle|épice|muscade|spices|pepper|salt|cinnamon|oregano|thyme|chili|cumin|clove/i.test(
+    /sel|poivre|paprika|curry|cumin|origan|thym|cannelle|épice|muscade|spices|pepper|salt|cinnamon|oregano|thyme|chili|clove/i.test(
       n
     )
   ) {
-    return { storage: 'spices', locationType: 'PANTRY' };
+    return { storage: 'spices', locationType: 'SPICE_RACK' };
   }
   return { storage: 'pantry', locationType: 'PANTRY' };
 }
@@ -670,8 +670,7 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
       ricardoUrlEn: recipe.sourceUrl || '',
       ricardoUrlFr: recipe.sourceUrl || '',
       imageUrl:
-        recipe.imageUrl ||
-        'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80',
+        recipe.imageUrl && !recipe.imageUrl.includes('unsplash.com') ? recipe.imageUrl : '',
       time: recipe.totalTime || recipe.cookTime || '30 mins',
       prepTime: recipe.prepTime || '15 mins',
       cookTime: recipe.cookTime || '20 mins',
@@ -1887,7 +1886,7 @@ Instructions:
                       type="url"
                       value={parsedRecipe.imageUrl || ''}
                       onChange={(e) => setParsedRecipe((prev) => (prev ? { ...prev, imageUrl: e.target.value } : null))}
-                      placeholder="https://images.unsplash.com/photo-..."
+                      placeholder="https://example.com/recipe-photo.jpg"
                       className="w-full text-xs text-[#1E3022] font-mono bg-white border border-[#D5E1D2] rounded-lg px-2.5 py-1.5 mt-1 focus:outline-none focus:border-emerald-600"
                     />
                   </div>

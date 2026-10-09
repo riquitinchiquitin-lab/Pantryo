@@ -36,7 +36,7 @@ export const Fido2SecurityPanel: React.FC<Fido2SecurityPanelProps> = ({
   householdMembers,
 }) => {
   const { lang } = useLanguage();
-  const [selectedUserId, setSelectedUserId] = useState<string>(user.id);
+  const [selectedUserId, setSelectedUserId] = useState<string>(user?.id || 'usr_admin');
   const [policy, setPolicy] = useState<Fido2PolicyInfo | null>(null);
   const [fido2Status, setFido2Status] = useState<Fido2Status | null>(null);
   const [loading, setLoading] = useState(true);
@@ -182,6 +182,14 @@ export const Fido2SecurityPanel: React.FC<Fido2SecurityPanelProps> = ({
       }
 
       if (result.success && result.verified) {
+        if (result.token) {
+          try {
+            localStorage.setItem('pantryo_auth_token', result.token);
+            if (result.user?.id) {
+              localStorage.setItem('pantryo_active_user_id', result.user.id);
+            }
+          } catch (_) {}
+        }
         setStatusNotice({
           type: 'success',
           text:
@@ -344,6 +352,7 @@ export const Fido2SecurityPanel: React.FC<Fido2SecurityPanelProps> = ({
   const handleToggleGlobalPolicy = async (enforced: boolean = true) => {
     try {
       setActionLoading(true);
+      setStatusNotice(null);
       await fido2Client.toggleGlobalEnforcement(enforced);
       setStatusNotice({
         type: 'success',
@@ -355,9 +364,34 @@ export const Fido2SecurityPanel: React.FC<Fido2SecurityPanelProps> = ({
               ? 'Politique globale assouplie.'
               : 'Global policy relaxed.'),
       });
+      setPolicy((prev) =>
+        prev
+          ? { ...prev, allUsersRequired: enforced, enforced }
+          : {
+              allUsersRequired: enforced,
+              enforced,
+              totalUsers: householdMembers?.length || 1,
+              compliantUsers: householdMembers?.filter((m) => m.fido2Enabled).length || 1,
+              nonCompliantUsers: 0,
+              users: (householdMembers || []).map((m) => ({
+                id: m.id,
+                name: m.name,
+                email: m.email,
+                role: m.role,
+                fido2Enabled: Boolean(m.fido2Enabled),
+                fido2Enforced: enforced,
+                credentialsCount: (m.fido2Credentials || []).length,
+                isCompliant: Boolean(m.fido2Enabled),
+              })),
+            }
+      );
+      if (onUserUpdated && user) {
+        onUserUpdated({ ...user, fido2Enforced: enforced });
+      }
       await loadFido2Status(selectedUserId);
     } catch (err: any) {
-      setStatusNotice({ type: 'error', text: err.message });
+      console.error('Error toggling global FIDO2 policy:', err);
+      setStatusNotice({ type: 'error', text: err.message || 'Failed to update global FIDO2 policy' });
     } finally {
       setActionLoading(false);
     }
@@ -451,7 +485,7 @@ export const Fido2SecurityPanel: React.FC<Fido2SecurityPanelProps> = ({
               </div>
               <p className="text-xs text-teal-200/90 mt-0.5">
                 {lang === 'FR'
-                  ? 'Tous les utilisateurs (Yan, Kriz et nouveaux membres) doivent détenir et utiliser une clé FIDO2 / Passkey.'
+                  ? 'Tous les utilisateurs (administrateur et membres) doivent détenir et utiliser une clé FIDO2 / Passkey.'
                   : 'All household users (Admins and Members) are required to register and use a FIDO2 Passkey / Key.'}
               </p>
             </div>
@@ -487,8 +521,7 @@ export const Fido2SecurityPanel: React.FC<Fido2SecurityPanelProps> = ({
               {lang === 'FR' ? 'Profil géré :' : 'Managing:'}
             </span>
             {(policy?.users || [
-              { id: 'usr_yan', name: 'Yan', role: 'ADMIN', isCompliant: true },
-              { id: 'usr_kriz', name: 'Kriz', role: 'MEMBER', isCompliant: false },
+              { id: 'usr_admin', name: 'Admin', role: 'ADMIN', isCompliant: true },
             ]).map((u) => {
               const isSelected = u.id === selectedUserId;
               return (
@@ -537,11 +570,11 @@ export const Fido2SecurityPanel: React.FC<Fido2SecurityPanelProps> = ({
                   {lang === 'FR'
                     ? `Authentification 2FA FIDO2 — ${
                         policy?.users?.find((u) => u.id === selectedUserId)?.name ||
-                        (selectedUserId === user.id ? user.name : 'Utilisateur')
+                        (selectedUserId === user?.id ? user?.name : 'Utilisateur')
                       }`
                     : `Two-Factor Authentication (FIDO2 Standard) — ${
                         policy?.users?.find((u) => u.id === selectedUserId)?.name ||
-                        (selectedUserId === user.id ? user.name : 'User')
+                        (selectedUserId === user?.id ? user?.name : 'User')
                       }`}
                 </h3>
                 {fido2Status?.fido2Enabled ? (
@@ -651,7 +684,7 @@ export const Fido2SecurityPanel: React.FC<Fido2SecurityPanelProps> = ({
             onChange={(e) => setKeyNickname(e.target.value)}
             placeholder={
               lang === 'FR'
-                ? 'Nom de la clé (ex: YubiKey 5C NFC Yan, MacBook Touch ID)'
+                ? 'Nom de la clé (ex: YubiKey 5C NFC, MacBook Touch ID)'
                 : 'Key name (e.g., YubiKey 5C NFC, Work MacBook Touch ID)'
             }
             className="flex-1 px-3.5 py-2 text-xs rounded-xl bg-[#FAF7EE] border border-[#D5CEBD] focus:outline-none focus:ring-2 focus:ring-teal-700 text-[#0D3B37]"
@@ -868,12 +901,12 @@ export const Fido2SecurityPanel: React.FC<Fido2SecurityPanelProps> = ({
               onClick={() => handleToggleGlobalPolicy(!policy?.allUsersRequired)}
               disabled={actionLoading}
               className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer disabled:opacity-40 ${
-                policy?.allUsersRequired !== false ? 'bg-teal-800' : 'bg-slate-300'
+                Boolean(policy?.allUsersRequired) ? 'bg-teal-800' : 'bg-slate-300'
               }`}
             >
               <div
                 className={`w-4 h-4 rounded-full bg-white transition-transform absolute top-1 ${
-                  policy?.allUsersRequired !== false ? 'left-6' : 'left-1'
+                  Boolean(policy?.allUsersRequired) ? 'left-6' : 'left-1'
                 }`}
               />
             </button>

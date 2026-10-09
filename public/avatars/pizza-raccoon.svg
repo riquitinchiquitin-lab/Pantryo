@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgRaccoon" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FED7AA" />
+      <stop offset="100%" stop-color="#EA580C" />
+    </linearGradient>
+    <filter id="shRaccoon" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#431407" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+  <circle cx="100" cy="100" r="98" fill="url(#bgRaccoon)" stroke="#C2410C" stroke-width="4"/>
+  <!-- Raccoon Ears -->
+  <g filter="url(#shRaccoon)">
+    <polygon points="52,70 36,36 74,52" fill="#475569"/>
+    <polygon points="54,64 44,42 68,52" fill="#F1F5F9"/>
+    <polygon points="148,70 164,36 126,52" fill="#475569"/>
+    <polygon points="146,64 156,42 132,52" fill="#F1F5F9"/>
+    <!-- Head & Body -->
+    <path d="M48 185 C48 120 58 76 100 76 C142 76 152 120 152 185 Z" fill="#64748B"/>
+    <ellipse cx="100" cy="118" rx="46" ry="38" fill="#94A3B8"/>
+    <ellipse cx="100" cy="130" rx="24" ry="16" fill="#F8FAFC"/>
+  </g>
+  <!-- Mask Pattern -->
+  <path d="M60 114 C65 102 78 102 88 114 C78 122 65 122 60 114 Z" fill="#1E293B"/>
+  <path d="M140 114 C135 102 122 102 112 114 C122 122 135 122 140 114 Z" fill="#1E293B"/>
+  <!-- Eyes -->
+  <circle cx="74" cy="112" r="5" fill="#FFFFFF"/>
+  <circle cx="126" cy="112" r="5" fill="#FFFFFF"/>
+  <circle cx="74" cy="112" r="3" fill="#0F172A"/>
+  <circle cx="126" cy="112" r="3" fill="#0F172A"/>
+  <!-- Nose & Mouth -->
+  <ellipse cx="100" cy="124" rx="5" ry="3.5" fill="#0F172A"/>
+  <path d="M96 128 Q100 133 104 128" stroke="#0F172A" stroke-width="2" fill="none"/>
+  <!-- Slice of Pizza Held -->
+  <g filter="url(#shRaccoon)">
+    <polygon points="100,140 76,182 124,182" fill="#F59E0B" stroke="#B45309" stroke-width="2"/>
+    <path d="M74 182 Q100 190 126 182" stroke="#78350F" stroke-width="5" stroke-linecap="round"/>
+    <!-- Pepperonis -->
+    <circle cx="96" cy="155" r="4.5" fill="#DC2626"/>
+    <circle cx="108" cy="168" r="4" fill="#DC2626"/>
+    <circle cx="88" cy="172" r="3.5" fill="#DC2626"/>
+  </g>
+</svg>

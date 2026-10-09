@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgTaco" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FEF08A" />
+      <stop offset="100%" stop-color="#F59E0B" />
+    </linearGradient>
+    <filter id="shTaco" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#78350F" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+  <circle cx="100" cy="100" r="98" fill="url(#bgTaco)" stroke="#D97706" stroke-width="4"/>
+  <!-- Turtle Body & Shell -->
+  <g filter="url(#shTaco)">
+    <ellipse cx="100" cy="145" rx="54" ry="42" fill="#15803D"/>
+    <!-- Taco Shell as Back -->
+    <path d="M52 145 C52 105 74 88 100 88 C126 88 148 105 148 145 Z" fill="#FBBF24" stroke="#D97706" stroke-width="3"/>
+    <!-- Taco Fillings (Lettuce, Tomato, Cheese) -->
+    <path d="M58 140 Q68 128 78 140 Q88 128 98 140 Q108 128 118 140 Q128 128 142 140" fill="#22C55E"/>
+    <circle cx="75" cy="136" r="5" fill="#EF4444"/>
+    <circle cx="102" cy="133" r="5.5" fill="#EF4444"/>
+    <circle cx="125" cy="137" r="4.5" fill="#EF4444"/>
+    <!-- Turtle Head -->
+    <circle cx="100" cy="80" r="26" fill="#4ADE80" stroke="#15803D" stroke-width="2.5"/>
+  </g>
+  <!-- Sombrero / Chef Hat -->
+  <ellipse cx="100" cy="58" rx="36" ry="8" fill="#B45309"/>
+  <path d="M84 58 C84 42 90 38 100 38 C110 38 116 42 116 58 Z" fill="#D97706"/>
+  <rect x="84" y="54" width="32" height="4" fill="#EF4444"/>
+  <!-- Eyes -->
+  <circle cx="90" cy="78" r="4.5" fill="#0F172A"/>
+  <circle cx="110" cy="78" r="4.5" fill="#0F172A"/>
+  <circle cx="88.5" cy="76.5" r="1.5" fill="#FFFFFF"/>
+  <circle cx="108.5" cy="76.5" r="1.5" fill="#FFFFFF"/>
+  <path d="M94 86 Q100 91 106 86" stroke="#15803D" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <!-- Cheeks -->
+  <circle cx="84" cy="83" r="4" fill="#F43F5E" opacity="0.5"/>
+  <circle cx="116" cy="83" r="4" fill="#F43F5E" opacity="0.5"/>
+</svg>

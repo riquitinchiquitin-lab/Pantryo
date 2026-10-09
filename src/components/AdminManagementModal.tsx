@@ -40,13 +40,17 @@ import {
   Radio,
   Terminal,
   ChefHat,
+  ArrowLeft,
+  Home,
+  CalendarDays,
+  ShoppingCart,
 } from 'lucide-react';
 import { User, DatabaseStats, DatabaseBackupPackage } from '../types';
 import { useLanguage } from '../utils/i18n';
 import { Fido2SecurityPanel } from './Fido2SecurityPanel';
 import { NistPasswordValidator } from './NistPasswordValidator';
 import { generatePassphrase } from '../utils/nistPassword';
-import { ChangeAvatarModal } from './ChangeAvatarModal';
+import { ChangeAvatarModal, CARTOON_AVATARS } from './ChangeAvatarModal';
 import { PWAInstallButton } from './PWAInstallButton';
 import {
   generateDatabaseEncryptionKey,
@@ -82,9 +86,9 @@ const DEFAULT_DATABASE_STATS: DatabaseStats = {
     categories: 10,
   },
   household: {
-    id: 'hh_yan_kriz_01',
-    name: 'The Yan & Kriz Kitchen',
-    inviteCode: 'PANTRY-YK77',
+    id: 'hh_pantryo_main',
+    name: 'Your Kitchen',
+    inviteCode: 'PANTRY-MAIN26',
   },
   lastBackupAt: null,
   lastRestoreAt: null,
@@ -94,20 +98,35 @@ const DEFAULT_DATABASE_STATS: DatabaseStats = {
 interface AdminManagementModalProps {
   isOpen: boolean;
   onClose: () => void;
-  currentUser: User;
+  currentUser?: User | null;
+  initialTab?: 'backup' | 'users' | 'security' | 'settings';
   onUserChange?: (user: User) => void;
   onDatabaseRestored?: () => void;
+  onNavigateToAppTab?: (tab: 'home' | 'meals' | 'grocery' | 'cooking' | 'sync') => void;
 }
+
+const FALLBACK_ADMIN_USER: User = {
+  id: 'usr_admin',
+  name: 'Admin',
+  email: 'admin@example.com',
+  role: 'ADMIN',
+  avatarUrl: '/avatars/chef-cat.svg',
+  fido2Enabled: false,
+  fido2Enforced: false,
+  isCompliant: true,
+};
 
 export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
   isOpen,
   onClose,
   currentUser,
+  initialTab = 'backup',
   onUserChange,
   onDatabaseRestored,
+  onNavigateToAppTab,
 }) => {
   const { lang } = useLanguage();
-  const [activeTab, setActiveTab] = useState<'backup' | 'users' | 'security' | 'settings'>('backup');
+  const [activeTab, setActiveTab] = useState<'backup' | 'users' | 'security' | 'settings'>(initialTab);
   const [stats, setStats] = useState<DatabaseStats>(DEFAULT_DATABASE_STATS);
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
@@ -128,7 +147,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     nodeEnv: string;
     updatedAt?: string | null;
   }>({
-    kitchenName: 'The Yan & Kriz Kitchen',
+    kitchenName: 'Your Kitchen',
     appUrl: '',
     geminiApiKey: '',
     hasGeminiKey: false,
@@ -140,7 +159,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     dbEncryptionKey: '',
     nodeEnv: 'production',
   });
-  const [adminKitchenNameInput, setAdminKitchenNameInput] = useState('The Yan & Kriz Kitchen');
+  const [adminKitchenNameInput, setAdminKitchenNameInput] = useState('Your Kitchen');
   const [isSavingAdminKitchenName, setIsSavingAdminKitchenName] = useState(false);
   const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [showTunnelToken, setShowTunnelToken] = useState(false);
@@ -205,12 +224,14 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
 
   // Users State
   const [usersList, setUsersList] = useState<User[]>([]);
+  const activeUser = currentUser || usersList.find((u) => u.role === 'ADMIN') || usersList[0] || FALLBACK_ADMIN_USER;
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserRole, setNewUserRole] = useState<'ADMIN' | 'MEMBER'>('MEMBER');
   const [newUserPassword, setNewUserPassword] = useState(() => generatePassphrase(4, '-'));
   const [showNewUserPassword, setShowNewUserPassword] = useState(true);
+  const [newUserAvatar, setNewUserAvatar] = useState<string>(CARTOON_AVATARS[0].url);
 
   // Change Password State
   const [selectedUserForPassword, setSelectedUserForPassword] = useState<User | null>(null);
@@ -232,7 +253,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     return {
       Accept: 'application/json',
       ...(token ? { Authorization: `Bearer ${token}`, 'x-auth-token': token } : {}),
-      'x-user-id': currentUser?.id || 'usr_yan',
+      'x-user-id': currentUser?.id || 'usr_admin',
       ...customHeaders,
     };
   };
@@ -261,8 +282,8 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
       setUsersList((prev) =>
         prev.map((u) => (u.id === updatedUser.id ? { ...u, name: updatedUser.name, email: updatedUser.email } : u))
       );
-      if (onUserChange && currentUser.id === updatedUser.id) {
-        onUserChange({ ...currentUser, name: updatedUser.name, email: updatedUser.email });
+      if (onUserChange && activeUser.id === updatedUser.id) {
+        onUserChange({ ...activeUser, name: updatedUser.name, email: updatedUser.email });
       }
 
       setSelectedUserForProfile(null);
@@ -289,8 +310,8 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
         setUsersList((prev) =>
           prev.map((u) => (u.id === userToUpdate.id ? { ...u, avatarUrl: newAvatarUrl } : u))
         );
-        if (currentUser.id === userToUpdate.id && onUserChange) {
-          onUserChange({ ...currentUser, avatarUrl: newAvatarUrl });
+        if (activeUser.id === userToUpdate.id && onUserChange) {
+          onUserChange({ ...activeUser, avatarUrl: newAvatarUrl });
         }
         setStatusMessage({
           text:
@@ -330,8 +351,12 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
         const statsData = await statsRes.json();
         setStats(statsData);
         if (statsData.household?.name) {
-          setAdminKitchenNameInput(statsData.household.name);
-          setSettings((prev) => ({ ...prev, kitchenName: statsData.household.name }));
+          const cleanName =
+            statsData.household.name.includes('Yan') || statsData.household.name.includes('Kriz')
+              ? 'Your Kitchen'
+              : statsData.household.name;
+          setAdminKitchenNameInput(cleanName);
+          setSettings((prev) => ({ ...prev, kitchenName: cleanName }));
         }
       } else if (retryCount < 2) {
         setTimeout(() => fetchStatsAndUsers(retryCount + 1), 600);
@@ -342,6 +367,21 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
       if (usersRes.ok && usersType.includes('application/json')) {
         const usersData = await usersRes.json();
         setUsersList(usersData);
+        try {
+          localStorage.setItem('kitchen_komrade_household_members', JSON.stringify(usersData));
+        } catch (_) {}
+        if (currentUser && onUserChange) {
+          const updatedSelf = usersData.find((u: User) => u.id === currentUser.id);
+          if (
+            updatedSelf &&
+            (updatedSelf.name !== currentUser.name ||
+              updatedSelf.role !== currentUser.role ||
+              updatedSelf.email !== currentUser.email ||
+              updatedSelf.avatarUrl !== currentUser.avatarUrl)
+          ) {
+            onUserChange(updatedSelf);
+          }
+        }
       }
     } catch (err) {
       console.warn('Admin stats fetch note:', err);
@@ -551,15 +591,21 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     }
   };
 
+  const prevIsOpenRef = useRef(false);
+
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !prevIsOpenRef.current) {
+      setActiveTab(initialTab || 'backup');
       fetchStatsAndUsers();
       fetchSettings();
       setStatusMessage(null);
       setSettingsStatus(null);
       setGeminiTestResult(null);
+    } else if (isOpen && initialTab) {
+      setActiveTab(initialTab);
     }
-  }, [isOpen, currentUser]);
+    prevIsOpenRef.current = isOpen;
+  }, [isOpen, initialTab]);
 
   if (!isOpen) return null;
 
@@ -834,6 +880,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
           email: newUserEmail.trim(),
           role: newUserRole,
           password: newUserPassword,
+          avatarUrl: newUserAvatar,
         }),
       });
 
@@ -846,6 +893,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
       setNewUserName('');
       setNewUserEmail('');
       setNewUserPassword(generatePassphrase(4, '-'));
+      setNewUserAvatar(CARTOON_AVATARS[(usersList.length + 1) % CARTOON_AVATARS.length].url);
       fetchStatsAndUsers();
       setStatusMessage({
         text: lang === 'FR' ? 'Membre ajouté avec succès !' : 'Household member added successfully!',
@@ -972,6 +1020,16 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
+              className="px-3.5 py-1.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-sm cursor-pointer"
+              title={lang === 'FR' ? 'Retourner à l’application' : 'Return to Pantryo App'}
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span className="hidden sm:inline">{lang === 'FR' ? 'Retour à l’app' : 'Back to App'}</span>
+              <span className="sm:hidden">{lang === 'FR' ? 'Retour' : 'Back'}</span>
+            </button>
+
+            <button
+              onClick={onClose}
               className="px-3.5 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
               title={lang === 'FR' ? 'Fermer / Quitter' : 'Close / Exit'}
             >
@@ -980,6 +1038,63 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Pantryo App Tabs Quick Bar - seamless jump back to app views */}
+        {onNavigateToAppTab && (
+          <div className="px-5 sm:px-8 py-2 bg-[#F6F2E8] border-b border-[#E8E2D5] flex items-center justify-between gap-2 overflow-x-auto text-xs shrink-0">
+            <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#527470] whitespace-nowrap shrink-0">
+              <span className="hidden sm:inline">{lang === 'FR' ? 'Accès direct aux onglets :' : 'Direct access to tabs:'}</span>
+              <span className="sm:hidden">{lang === 'FR' ? 'Onglets :' : 'Tabs:'}</span>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => onNavigateToAppTab('home')}
+                className="px-2.5 py-1 rounded-lg bg-white hover:bg-teal-50 hover:text-teal-900 text-[#0D3B37] border border-[#D5CEBD] font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap shadow-2xs"
+                title={lang === 'FR' ? 'Aller à l’inventaire' : 'Go to Inventory'}
+              >
+                <Home className="w-3 h-3 text-teal-700" />
+                <span>{lang === 'FR' ? 'Inventaire' : 'Inventory'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onNavigateToAppTab('meals')}
+                className="px-2.5 py-1 rounded-lg bg-white hover:bg-teal-50 hover:text-teal-900 text-[#0D3B37] border border-[#D5CEBD] font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap shadow-2xs"
+                title={lang === 'FR' ? 'Aller au planning repas' : 'Go to Meals'}
+              >
+                <CalendarDays className="w-3 h-3 text-indigo-600" />
+                <span>{lang === 'FR' ? 'Repas' : 'Meals'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onNavigateToAppTab('grocery')}
+                className="px-2.5 py-1 rounded-lg bg-white hover:bg-teal-50 hover:text-teal-900 text-[#0D3B37] border border-[#D5CEBD] font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap shadow-2xs"
+                title={lang === 'FR' ? 'Aller à l’épicerie' : 'Go to Grocery'}
+              >
+                <ShoppingCart className="w-3 h-3 text-teal-700" />
+                <span>{lang === 'FR' ? 'Épicerie' : 'Grocery'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onNavigateToAppTab('cooking')}
+                className="px-2.5 py-1 rounded-lg bg-white hover:bg-teal-50 hover:text-teal-900 text-[#0D3B37] border border-[#D5CEBD] font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap shadow-2xs"
+                title={lang === 'FR' ? 'Aller aux idées cuisine' : 'Go to Cooking Ideas'}
+              >
+                <ChefHat className="w-3 h-3 text-teal-700" />
+                <span>{lang === 'FR' ? 'Idées Recettes' : 'Cooking'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onNavigateToAppTab('sync')}
+                className="px-2.5 py-1 rounded-lg bg-white hover:bg-teal-50 hover:text-teal-900 text-[#0D3B37] border border-[#D5CEBD] font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap shadow-2xs"
+                title={lang === 'FR' ? 'Aller à la famille' : 'Go to Family'}
+              >
+                <Users className="w-3 h-3 text-teal-700" />
+                <span>{lang === 'FR' ? 'Famille' : 'Family'}</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Global Toast / Feedback */}
         {statusMessage && (
@@ -1080,7 +1195,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                       </span>
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        {stats?.status || 'HEALTHY'}
+                        {lang === 'FR' ? ((stats?.status === 'HEALTHY' || !stats?.status) ? 'OPÉRATIONNEL' : stats.status) : (stats?.status || 'HEALTHY')}
                       </span>
                     </div>
                     <p className="text-xs text-[#527470] mt-0.5">
@@ -1615,81 +1730,6 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                 </div>
               </div>
 
-              {/* Household & Kitchen Name Customization Banner */}
-              <div className="p-4 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-teal-800 text-white flex items-center justify-center shrink-0 shadow-xs">
-                      <ChefHat className="w-5 h-5 text-teal-200" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-sm text-[#0D3B37]">
-                          {lang === 'FR' ? 'Personnalisation du Nom de la Cuisine' : 'Kitchen Name Customization'}
-                        </span>
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-teal-100 text-teal-800 border border-teal-200">
-                          KITCHEN_NAME
-                        </span>
-                      </div>
-                      <p className="text-[#527470] text-xs mt-0.5">
-                        {lang === 'FR'
-                          ? 'Personnalisez le nom affiché de votre cuisine dans toute l’application et sur les terminaux synchronisés.'
-                          : 'Customize the display name of your kitchen across all app views and synchronized clients.'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 pt-1 border-t border-[#F0EBE1]">
-                  <input
-                    type="text"
-                    value={adminKitchenNameInput}
-                    onChange={(e) => setAdminKitchenNameInput(e.target.value)}
-                    placeholder="e.g. The Yan & Kriz Kitchen"
-                    className="flex-1 px-3.5 py-2 rounded-xl border border-[#D5CEBD] bg-[#FAF7EE] focus:bg-white focus:outline-teal-800 text-xs font-bold text-[#0D3B37]"
-                  />
-                  <button
-                    type="button"
-                    disabled={isSavingAdminKitchenName || !adminKitchenNameInput.trim()}
-                    onClick={async () => {
-                      if (!adminKitchenNameInput.trim()) return;
-                      setIsSavingAdminKitchenName(true);
-                      try {
-                        const res = await fetch('/api/v1/admin/household/name', {
-                          method: 'PUT',
-                          headers: await getAdminHeaders({ 'Content-Type': 'application/json' }),
-                          body: JSON.stringify({ name: adminKitchenNameInput.trim() }),
-                        });
-                        if (res.ok) {
-                          const data = await res.json();
-                          const saved = data.household?.name || adminKitchenNameInput.trim();
-                          setStats((prev) => ({
-                            ...prev,
-                            household: { ...prev.household, name: saved },
-                          }));
-                          setSettings((prev) => ({ ...prev, kitchenName: saved }));
-                          try {
-                            localStorage.setItem('kitchen_komrade_kitchen_name', saved);
-                          } catch (_) {}
-                          setStatusMessage({
-                            text: lang === 'FR' ? `Nom de cuisine mis à jour : "${saved}"` : `Kitchen name updated: "${saved}"`,
-                            type: 'success',
-                          });
-                        }
-                      } catch (err: any) {
-                        setStatusMessage({ text: err.message, type: 'error' });
-                      } finally {
-                        setIsSavingAdminKitchenName(false);
-                      }
-                    }}
-                    className="px-4 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 disabled:opacity-50"
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                    <span>{isSavingAdminKitchenName ? '...' : (lang === 'FR' ? 'Enregistrer le nom' : 'Save Name')}</span>
-                  </button>
-                </div>
-              </div>
-
               {/* Global FIDO2 Policy Status Banner */}
               <div className="p-3.5 rounded-2xl bg-teal-50 border border-teal-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-teal-900">
                 <div className="flex items-center gap-2.5">
@@ -2052,6 +2092,65 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                           )}
                         </div>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Cartoon Avatar Picker for New Household Member */}
+                  <div className="space-y-2 pt-2 border-t border-[#EFEAE0]">
+                    <div className="flex items-center justify-between">
+                      <label className="block font-bold text-[#0D3B37] text-xs flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                        <span>{lang === 'FR' ? 'Choisir un Avatar Cartoon' : 'Select Cartoon Avatar'}</span>
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-teal-800 font-extrabold bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200">
+                          {CARTOON_AVATARS.find((a) => a.url === newUserAvatar)?.[lang === 'FR' ? 'labelFr' : 'labelEn'] || 'Chef Cat'}
+                        </span>
+                        <span className="text-[9px] text-[#527470] bg-[#FAF7EE] px-1.5 py-0.5 rounded-full border border-[#E8E2D5] font-bold">
+                          {CARTOON_AVATARS.length} options
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 max-h-56 overflow-y-auto pr-1">
+                      {CARTOON_AVATARS.map((avatar) => {
+                        const isChosen = newUserAvatar === avatar.url;
+                        return (
+                          <button
+                            key={avatar.id}
+                            type="button"
+                            onClick={() => setNewUserAvatar(avatar.url)}
+                            className={`relative p-2 rounded-xl border flex flex-col items-center gap-1.5 transition-all cursor-pointer text-center ${
+                              isChosen
+                                ? 'border-teal-700 bg-teal-50/90 ring-2 ring-teal-700/30 shadow-xs scale-102'
+                                : 'border-[#E0EBDD] bg-[#FAF7EE] hover:border-teal-400 hover:bg-white'
+                            }`}
+                          >
+                            <div className="relative w-12 h-12 rounded-full overflow-hidden shrink-0 border-2 border-white shadow-xs bg-white">
+                              <img
+                                src={avatar.url}
+                                alt={lang === 'FR' ? avatar.labelFr : avatar.labelEn}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <span className="text-[10px] font-black text-[#1F3323] truncate block leading-tight">
+                              {lang === 'FR' ? avatar.labelFr : avatar.labelEn}
+                            </span>
+                            {avatar.badgeColor && (
+                              <span
+                                className={`text-[8px] font-bold px-1.5 py-0.2 rounded-md border truncate ${avatar.badgeColor}`}
+                              >
+                                {lang === 'FR' ? avatar.tagFr : avatar.tagEn}
+                              </span>
+                            )}
+                            {isChosen && (
+                              <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-teal-700 text-white flex items-center justify-center shadow-xs">
+                                <Check className="w-2 h-2 stroke-[3]" />
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -2605,7 +2704,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                       type="text"
                       value={settings.kitchenName || ''}
                       onChange={(e) => setSettings({ ...settings, kitchenName: e.target.value })}
-                      placeholder="The Yan & Kriz Kitchen"
+                      placeholder="Your Kitchen"
                       className="w-full px-3.5 py-2.5 rounded-xl border border-[#D5CEBD] bg-[#FAF7EE] focus:bg-white focus:outline-teal-800 text-xs font-bold text-[#0D3B37]"
                     />
                     <p className="text-[10px] text-[#527470]">
@@ -2635,7 +2734,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                           type="url"
                           value={settings.appUrl}
                           onChange={(e) => setSettings({ ...settings, appUrl: e.target.value })}
-                          placeholder="https://pantryo.yknet.org ou http://192.168.1.50:3000"
+                          placeholder="https://pantryo.example.com ou http://192.168.1.50:3000"
                           className="flex-1 px-3.5 py-2.5 rounded-xl border border-[#D5CEBD] bg-[#FAF7EE] focus:bg-white focus:outline-teal-800 text-xs text-[#0D3B37]"
                         />
                         {settings.appUrl && (
@@ -2833,7 +2932,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                         type="text"
                         value={settings.expoPublicApiUrl}
                         onChange={(e) => setSettings({ ...settings, expoPublicApiUrl: e.target.value })}
-                        placeholder="https://pantryo.yknet.org/api/v1/inventory"
+                        placeholder="https://pantryo.example.com/api/v1/inventory"
                         className="flex-1 px-3.5 py-2.5 rounded-xl border border-[#D5CEBD] bg-[#FAF7EE] focus:bg-white focus:outline-teal-800 text-xs text-[#0D3B37]"
                       />
                       <button
@@ -3082,12 +3181,21 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
             </span>
           </div>
 
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-[#FAF7EE] hover:bg-[#EFEAE0] text-[#0D3B37] font-bold text-xs border border-[#D5CEBD] transition-colors cursor-pointer"
-          >
-            {lang === 'FR' ? 'Fermer la console' : 'Close Console'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs shadow-xs transition-transform active:scale-95 flex items-center gap-1.5 cursor-pointer"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>{lang === 'FR' ? 'Retour à la cuisine' : 'Back to Kitchen'}</span>
+            </button>
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl bg-[#FAF7EE] hover:bg-[#EFEAE0] text-[#0D3B37] font-bold text-xs border border-[#D5CEBD] transition-colors cursor-pointer"
+            >
+              {lang === 'FR' ? 'Fermer la console' : 'Close Console'}
+            </button>
+          </div>
         </div>
 
         {/* Change Avatar Modal for Admin User Management */}

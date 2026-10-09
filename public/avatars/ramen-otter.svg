@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgOtter" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#BAE6FD" />
+      <stop offset="100%" stop-color="#0284C7" />
+    </linearGradient>
+    <filter id="shOtter" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#0369A1" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+  <circle cx="100" cy="100" r="98" fill="url(#bgOtter)" stroke="#0284C7" stroke-width="4"/>
+  <!-- Head & Body -->
+  <g filter="url(#shOtter)">
+    <circle cx="60" cy="70" r="12" fill="#78350F"/>
+    <circle cx="140" cy="70" r="12" fill="#78350F"/>
+    <path d="M50 185 C50 115 62 65 100 65 C138 65 150 115 150 185 Z" fill="#92400E"/>
+    <ellipse cx="100" cy="102" rx="40" ry="34" fill="#B45309"/>
+    <ellipse cx="100" cy="114" rx="24" ry="18" fill="#FDE68A"/>
+  </g>
+  <!-- Eyes -->
+  <circle cx="85" cy="98" r="5" fill="#0F172A"/>
+  <circle cx="115" cy="98" r="5" fill="#0F172A"/>
+  <circle cx="83" cy="96" r="1.8" fill="#FFFFFF"/>
+  <circle cx="113" cy="96" r="1.8" fill="#FFFFFF"/>
+  <!-- Nose & Whiskers -->
+  <polygon points="100,108 95,104 105,104" fill="#1E293B"/>
+  <path d="M100 108 L100 113 M95 113 Q100 117 105 113" stroke="#1E293B" stroke-width="2" fill="none"/>
+  <!-- Ramen Bowl -->
+  <g filter="url(#shOtter)">
+    <path d="M60 145 C60 180 140 180 140 145 Z" fill="#DC2626" stroke="#991B1B" stroke-width="3"/>
+    <ellipse cx="100" cy="145" rx="40" ry="12" fill="#F59E0B"/>
+    <!-- Chopsticks -->
+    <line x1="70" y1="130" x2="135" y2="120" stroke="#78350F" stroke-width="3" stroke-linecap="round"/>
+    <line x1="70" y1="135" x2="138" y2="123" stroke="#78350F" stroke-width="3" stroke-linecap="round"/>
+    <!-- Narutomaki / Swirl -->
+    <circle cx="100" cy="145" r="8" fill="#FFFFFF"/>
+    <circle cx="100" cy="145" r="4" stroke="#EC4899" stroke-width="2" fill="none"/>
+  </g>
+</svg>

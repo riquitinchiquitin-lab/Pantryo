@@ -8,7 +8,7 @@ export const translations = {
   EN: {
     // Top Navigation & Branding
     app_name: 'Pantryo',
-    kitchen_name: 'The Yan & Kriz Kitchen',
+    kitchen_name: 'Your Kitchen',
     nav_inventory: 'Inventory',
     nav_meals: 'Meal Planner',
     nav_grocery: 'Grocery Cart',
@@ -31,6 +31,8 @@ export const translations = {
     fridge_label: 'Fridge',
     freezer_label: 'Freezer',
     pantry_label: 'Pantry',
+    spice_rack_label: 'Spice Rack',
+    spices_label: 'Spices',
     items_count: '{count} items',
     rescue_label: 'Rescue',
     rescue_soon: '{count} soon',
@@ -106,7 +108,7 @@ export const translations = {
     preset_1_month: '+1 Month',
     preset_6_months: '+6 Months (Freezer)',
     field_image_url: 'Photo / Image URL (Optional)',
-    field_image_placeholder: 'https://images.unsplash.com/...',
+    field_image_placeholder: 'https://example.com/photo.jpg',
     field_notes: 'Notes / Storage Details (Optional)',
     field_notes_placeholder: 'e.g., Opened on Tuesday, bottom crisper drawer...',
     btn_cancel: 'Cancel',
@@ -219,7 +221,7 @@ export const translations = {
     // Family Sync View
     family_title: 'Household & Family Sync',
     family_subtitle: 'Real-time collaborative access for all household members',
-    household_name: 'Household: The Yan & Kriz Kitchen',
+    household_name: 'Household: Your Kitchen',
     invite_code_label: 'Household Invite Code:',
     btn_copy_code: 'Copy Link',
     code_copied: 'Copied!',
@@ -262,7 +264,7 @@ export const translations = {
   FR: {
     // Top Navigation & Branding
     app_name: 'Pantryo',
-    kitchen_name: 'La Cuisine de Yan & Kriz',
+    kitchen_name: 'Votre Cuisine',
     nav_inventory: 'Inventaire',
     nav_meals: 'Planificateur',
     nav_grocery: 'Épicerie',
@@ -285,6 +287,8 @@ export const translations = {
     fridge_label: 'Frigo',
     freezer_label: 'Congélateur',
     pantry_label: 'Garde-manger',
+    spice_rack_label: 'Armoire à épices',
+    spices_label: 'Épices',
     items_count: '{count} aliments',
     rescue_label: 'Anti-Gaspillage',
     rescue_soon: '{count} bientôt',
@@ -360,7 +364,7 @@ export const translations = {
     preset_1_month: '+1 Mois',
     preset_6_months: '+6 Mois (Congélateur)',
     field_image_url: "URL de l'image (Facultatif)",
-    field_image_placeholder: 'https://images.unsplash.com/...',
+    field_image_placeholder: 'https://example.com/photo.jpg',
     field_notes: 'Notes / Détails de conservation (Facultatif)',
     field_notes_placeholder: "ex. Ouvert mardi, bac à légumes du bas...",
     btn_cancel: 'Annuler',
@@ -473,7 +477,7 @@ export const translations = {
     // Family Sync View
     family_title: 'Foyer & Synchronisation Familiale',
     family_subtitle: 'Accès collaboratif en temps réel pour tous les membres du foyer',
-    household_name: 'Foyer : La Cuisine de Yan & Kriz',
+    household_name: 'Foyer : Votre Cuisine',
     invite_code_label: "Code d'invitation du foyer :",
     btn_copy_code: "Copier le lien",
     code_copied: 'Copié !',
@@ -539,14 +543,12 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (saved === 'FR' || saved === 'EN') {
         return saved;
       }
-      // Auto-detect browser language if french
-      if (typeof navigator !== 'undefined' && navigator.language?.toLowerCase().startsWith('fr')) {
-        return 'FR';
-      }
+      // Default to French as primary language for the household app
+      return 'FR';
     } catch {
       // ignore
     }
-    return 'EN';
+    return 'FR';
   });
 
   const setLang = (newLang: Language) => {
@@ -585,28 +587,48 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
  */
 const CATEGORY_NAMES_FR: Record<string, string> = {
   Produce: 'Fruits & Légumes',
+  'Fruits & Vegetables': 'Fruits & Légumes',
   Dairy: 'Produits Laitiers & Œufs',
   'Dairy & Eggs': 'Produits Laitiers & Œufs',
   Meat: 'Viandes & Poissons',
   'Meat & Seafood': 'Viandes & Poissons',
   'Meat & Poultry': 'Viandes & Volailles',
+  Seafood: 'Poissons & Fruits de mer',
   Bakery: 'Boulangerie',
   Pantry: 'Garde-manger & Épicerie',
   'Pantry Staples': 'Garde-manger & Épicerie',
   Frozen: 'Surgelés & Plats Congelés',
   'Frozen Meals': 'Surgelés & Plats Congelés',
+  'Frozen Foods': 'Surgelés & Plats Congelés',
   Beverages: 'Boissons',
   Snacks: 'Collations & Friandises',
   Condiments: 'Condiments & Sauces',
   Spices: 'Épices & Assaisonnements',
+  'Spices & Seasonings': 'Épices & Assaisonnements',
+  'Spice Rack': 'Armoire à épices',
+  'Deli & Prepared': 'Charcuterie & Traiteur',
+  Deli: 'Charcuterie & Traiteur',
+  'Canned Goods': 'Conserves & Bocaux',
+  Canned: 'Conserves & Bocaux',
+  'Sweets & Desserts': 'Desserts & Friandises',
+  Sweet: 'Desserts & Friandises',
+  'Grains & Pasta': 'Pâtes & Céréales',
+  Grains: 'Pâtes & Céréales',
+  'Oils & Vinegars': 'Huiles & Vinaigres',
+  Leftovers: 'Restes Cuisinés',
+  'Cooked Leftovers': 'Restes Cuisinés',
+  Other: 'Autre',
 };
 
 const CATEGORY_NAMES_EN: Record<string, string> = {
   'Produits frais': 'Produce',
+  'Fruits & Légumes': 'Produce',
   'Produits laitiers & œufs': 'Dairy & Eggs',
+  'Produits Laitiers & Œufs': 'Dairy & Eggs',
   'Produits laitiers': 'Dairy & Eggs',
   'Viandes & Poissons': 'Meat & Seafood',
   'Viandes & Volailles': 'Meat & Poultry',
+  'Poissons & Fruits de mer': 'Seafood',
   Boulangerie: 'Bakery',
   'Garde-manger & Épicerie': 'Pantry Staples',
   'Garde-manger': 'Pantry Staples',
@@ -617,8 +639,17 @@ const CATEGORY_NAMES_EN: Record<string, string> = {
   Collations: 'Snacks',
   'Condiments & Sauces': 'Condiments',
   Condiments: 'Condiments',
-  'Épices & Assaisonnements': 'Spices',
+  'Épices & Assaisonnements': 'Spices & Seasonings',
   Épices: 'Spices',
+  'Armoire à épices': 'Spice Rack',
+  'Charcuterie & Traiteur': 'Deli & Prepared',
+  'Conserves & Bocaux': 'Canned Goods',
+  Conserves: 'Canned Goods',
+  'Desserts & Friandises': 'Sweets & Desserts',
+  'Pâtes & Céréales': 'Grains & Pasta',
+  'Huiles & Vinaigres': 'Oils & Vinegars',
+  'Restes Cuisinés': 'Leftovers',
+  Autre: 'Other',
 };
 
 export const getCategoryLocalizedName = (catName: string, lang: Language): string => {
@@ -639,29 +670,76 @@ const SUBCATEGORY_NAMES_FR: Record<string, string> = {
   'Ground Beef': 'Bœuf Haché',
   'Chicken Breasts & Cutlets': 'Poitrines de Poulet & Escalopes',
   'Chicken Breasts': 'Poitrines de Poulet',
+  'Chicken Breast': 'Poitrine de Poulet',
+  'Chicken Thighs & Wings': 'Cuisses & Ailes de Poulet',
+  'Chicken Cuts': 'Morceaux de Poulet',
   'Chicken Thighs & Drumsticks': 'Cuisses & Pilons de Poulet',
   'Chicken Thighs': 'Cuisses de Poulet',
+  'Whole Roast Chicken': 'Poulet Entier Rôti',
+  'Whole Bird': 'Volaille Entière',
   'Whole Chicken & Roaster': 'Poulet Entier à Rôtir',
   'Whole Chicken': 'Poulet Entier',
+  'Pork Chops & Loins': 'Côtelettes & Longes de Porc',
+  'Pork Cuts': 'Coupes de Porc',
   'Pork Chops & Tenderloin': 'Côtelettes & Filet de Porc',
   'Pork Chops': 'Côtelettes de Porc',
+  'Bacon & Pancetta': 'Bacon & Pancetta',
+  'Crispy Bacon': 'Bacon Croustillant',
   'Bacon & Cured Pork': 'Bacon & Lardons Fumés',
   'Smoked Bacon': 'Bacon Fumé',
-  'Sausages & Bratwurst': 'Saucisses & Merguez',
-  'Fresh Sausages': 'Saucisses Fraîches',
-  'Lamb Chops & Leg of Lamb': "Côtelettes & Gigot d'Agneau",
+  'Pork Ribs & BBQ Cuts': 'Côtes Levées & Grillades',
+  'Pork Ribs': 'Côtes Levées',
+  'Lamb & Mutton': 'Agneau & Mouton',
   'Lamb Cuts': "Coupes d'Agneau",
+  'Lamb Chops & Leg of Lamb': "Côtelettes & Gigot d'Agneau",
+  'Turkey & Game Birds': 'Dinde & Volailles Sauvages',
+  'Turkey': 'Dinde',
+  'Duck & Confit': 'Canard & Confit',
+  'Duck': 'Canard',
+  'Sausages & Bratwurst': 'Saucisses & Saucissons',
+  'Sausages': 'Saucisses',
+  'Fresh Sausages': 'Saucisses Fraîches',
+  'Charcuterie & Deli Meats': 'Charcuterie & Salaisons',
+  'Charcuterie': 'Charcuterie',
   'Fresh Salmon Fillets': 'Filets de Saumon Frais',
   'Fresh Salmon': 'Saumon Frais',
   'Smoked Salmon & Lox': 'Saumon Fumé & Gravlax',
   'Smoked Lox': 'Saumon Fumé',
-  'White Fish Fillets (Cod, Halibut, Tilapia)': 'Filets de Poisson Blanc (Morue, Flétan)',
+  'White Fish Fillets (Cod, Halibut, Tilapia)': 'Filets de Poisson Blanc (Morue, Flétan, Tilapia)',
   'White Fish': 'Poisson Blanc',
-  'Ahi Tuna & Steaks': 'Thon Ahi & Steaks',
+  'Ahi Tuna & Steaks': 'Thon Ahi & Steaks de Thon',
   'Ahi Tuna': 'Thon Ahi',
   'Shrimp & Prawns': 'Crevettes & Gambas',
+  'Lobster & Crab': 'Homard & Crabe',
   'Scallops & Shellfish': 'Pétoncles & Coquillages',
   'Sea Scallops': 'Pétoncles Frais',
+  'Scallops': 'Pétoncles',
+  'Mussels, Clams & Oysters': 'Moules, Palourdes & Huîtres',
+  'Mussels & Clams': 'Moules & Huîtres',
+  'Calamari, Squid & Octopus': 'Calmars, Seiches & Pieuvres',
+  'Calamari & Squid': 'Calmars & Seiches',
+  'Canned Tuna & Sardines': 'Thon en Boîte & Sardines',
+  'Canned Seafood': 'Conserves de la Mer',
+  'Berries & Small Fruits': 'Petits Fruits & Baies',
+  'Berries': 'Petits Fruits',
+  'Citrus Fruits': 'Agrumes',
+  'Citrus': 'Agrumes',
+  'Salad Greens & Herbs': 'Salades, Verdure & Fines Herbes',
+  'Greens & Herbs': 'Verdure & Fines Herbes',
+  'Root Vegetables': 'Légumes-Racines',
+  'Cheeses & Curds': 'Fromages & Fromages en Grains',
+  'Artisan Cheese': 'Fromage Artisanal',
+  'Farm Eggs': 'Œufs Frais de Ferme',
+  'Pasta & Noodles': 'Pâtes Alimentaires & Nouilles',
+  'Artisanal Bread & Sourdough': 'Pain Artisanal & Levain',
+  'Fresh Bakery': 'Boulangerie Fraîche',
+  'Ground Spices': 'Épices Moulues',
+  'Whole Spices': 'Épices Entières',
+  'Dried Herbs': 'Herbes Séchées',
+  'Seasoning Blends & Salts': 'Mélanges d’Épices & Sels',
+  'Blends & Salts': 'Sels & Épices',
+  'Extracts & Baking Aromatics': 'Extraits & Arômes de Pâtisserie',
+  'Extracts': 'Extraits & Arômes',
 };
 
 const SUBCATEGORY_NAMES_EN: Record<string, string> = Object.fromEntries(
@@ -677,10 +755,147 @@ export const getSubcategoryLocalizedName = (subName: string, lang: Language): st
 };
 
 /**
+ * Item status translation helper
+ */
+export const getItemStatusLocalizedName = (status: string, lang: Language): string => {
+  if (!status) return '';
+  const upper = status.toUpperCase().trim();
+  if (lang === 'FR') {
+    switch (upper) {
+      case 'ACTIVE':
+        return 'En stock';
+      case 'CONSUMED':
+        return 'Consommé';
+      case 'EXPIRED':
+        return 'Expiré';
+      case 'DISCARDED':
+        return 'Éliminé';
+      case 'PENDING':
+        return 'En attente';
+      case 'BOUGHT':
+        return 'Acheté';
+      case 'HEALTHY':
+        return 'Opérationnel';
+      default:
+        return status;
+    }
+  }
+  switch (upper) {
+    case 'ACTIVE':
+      return 'Active';
+    case 'CONSUMED':
+      return 'Consumed';
+    case 'EXPIRED':
+      return 'Expired';
+    case 'DISCARDED':
+      return 'Discarded';
+    case 'PENDING':
+      return 'Pending';
+    case 'BOUGHT':
+      return 'Bought';
+    case 'HEALTHY':
+      return 'Healthy';
+    default:
+      return status;
+  }
+};
+
+/**
+ * Recipe difficulty translation helper
+ */
+export const getDifficultyLocalizedName = (difficulty: string | undefined | null, lang: Language): string => {
+  if (!difficulty) return lang === 'FR' ? 'Facile' : 'Easy';
+  const trimmed = difficulty.trim().toLowerCase();
+  if (lang === 'FR') {
+    if (trimmed === 'easy' || trimmed === 'facile') return 'Facile';
+    if (trimmed === 'medium' || trimmed === 'moyen' || trimmed === 'intermediate') return 'Moyen';
+    if (trimmed === 'advanced' || trimmed === 'hard' || trimmed === 'avancé' || trimmed === 'difficile') return 'Avancé';
+    return difficulty;
+  }
+  if (trimmed === 'facile' || trimmed === 'easy') return 'Easy';
+  if (trimmed === 'moyen' || trimmed === 'medium' || trimmed === 'intermediate') return 'Medium';
+  if (trimmed === 'avancé' || trimmed === 'difficile' || trimmed === 'advanced' || trimmed === 'hard') return 'Advanced';
+  return difficulty;
+};
+
+/**
+ * Meal type translation helper
+ */
+export const getMealTypeLocalizedName = (type: string, lang: Language): string => {
+  const upper = (type || '').toUpperCase().trim();
+  if (lang === 'FR') {
+    if (upper === 'BREAKFAST') return 'Petit-déjeuner';
+    if (upper === 'LUNCH') return 'Déjeuner';
+    if (upper === 'DINNER') return 'Dîner';
+    if (upper === 'SNACK') return 'Collation';
+    return type;
+  }
+  if (upper === 'BREAKFAST') return 'Breakfast';
+  if (upper === 'LUNCH') return 'Lunch';
+  if (upper === 'DINNER') return 'Dinner';
+  if (upper === 'SNACK') return 'Snack';
+  return type;
+};
+
+/**
+ * Saved lists metadata translation helper
+ */
+export const getSavedListLocalizedMetadata = (
+  list: { id?: string; name: string; description?: string; categoryTag?: string },
+  lang: Language
+): { name: string; description: string; categoryTag: string } => {
+  if (lang === 'EN') {
+    return {
+      name: list.name,
+      description: list.description || '',
+      categoryTag: list.categoryTag || 'Curated Pack',
+    };
+  }
+
+  // French translations for default curated packs
+  if (list.id === 'list_weekly_staples' || list.name.includes('Weekly Household Staples')) {
+    return {
+      name: 'Essentiels Hebdomadaires du Foyer',
+      description: 'Articles récurrents de base pour le foyer',
+      categoryTag: 'Routine Hebdo',
+    };
+  }
+  if (list.id === 'list_freezer_restock' || list.name.includes('Sub-Zero Bulk Restock')) {
+    return {
+      name: 'Réapprovisionnement Congélateur',
+      description: 'Protéines et fruits surgelés pour préparation de repas',
+      categoryTag: 'Congélateur Vrac',
+    };
+  }
+  if (list.id === 'list_taco_night' || list.name.includes('Taco Fiesta Pack')) {
+    return {
+      name: 'Pack Soirée Tacos',
+      description: 'Ingrédients pour souper tacos avec coriandre fraîche et limes',
+      categoryTag: 'Thème Repas',
+    };
+  }
+
+  // Category tags general translation
+  let tag = list.categoryTag || 'Pack';
+  if (tag === 'Weekly Routine') tag = 'Routine Hebdo';
+  else if (tag === 'Freezer Bulk') tag = 'Congélateur Vrac';
+  else if (tag === 'Meal Theme' || tag === 'Theme') tag = 'Thème Repas';
+  else if (tag === 'Meal Prep') tag = 'Préparation Repas';
+  else if (tag === 'Curated Pack') tag = 'Pack Recommandé';
+  else if (tag === 'Custom') tag = 'Personnalisé';
+
+  return {
+    name: list.name,
+    description: list.description || '',
+    categoryTag: tag,
+  };
+};
+
+/**
  * Storage location localized labels
  */
 export const getLocationLocalizedName = (
-  loc: 'FRIDGE' | 'FREEZER' | 'PANTRY' | string,
+  loc: 'FRIDGE' | 'FREEZER' | 'PANTRY' | 'SPICE_RACK' | string,
   lang: Language
 ): string => {
   if (!loc) return '';
@@ -691,6 +906,7 @@ export const getLocationLocalizedName = (
     if (upper === 'FRIDGE' || upper === 'REFRIGERATOR' || trimmed === 'Fridge') return 'Frigo';
     if (upper === 'FREEZER' || trimmed === 'Freezer') return 'Congélateur';
     if (upper === 'PANTRY' || trimmed === 'Pantry') return 'Garde-manger';
+    if (upper === 'SPICE_RACK' || upper === 'SPICE RACK' || upper === 'SPICES' || trimmed === 'Spice Rack' || trimmed === 'Spice') return 'Épices';
     return trimmed;
   }
 
@@ -698,6 +914,7 @@ export const getLocationLocalizedName = (
   if (upper === 'FRIDGE' || upper === 'REFRIGERATOR' || trimmed === 'Frigo' || trimmed === 'Réfrigérateur') return 'Fridge';
   if (upper === 'FREEZER' || trimmed === 'Congélateur') return 'Freezer';
   if (upper === 'PANTRY' || trimmed === 'Garde-manger') return 'Pantry';
+  if (upper === 'SPICE_RACK' || upper === 'SPICE RACK' || upper === 'SPICES' || trimmed === 'Armoire à épices' || trimmed === 'Épices') return 'Spice Rack';
   return trimmed;
 };
 

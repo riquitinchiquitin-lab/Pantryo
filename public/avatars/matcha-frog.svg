@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgFrog" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#DCFCE7" />
+      <stop offset="100%" stop-color="#16A34A" />
+    </linearGradient>
+    <filter id="shFrog" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#14532D" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+  <circle cx="100" cy="100" r="98" fill="url(#bgFrog)" stroke="#15803D" stroke-width="4"/>
+  <!-- Big Bulging Frog Eyes on Top -->
+  <g filter="url(#shFrog)">
+    <circle cx="68" cy="65" r="22" fill="#4ADE80"/>
+    <circle cx="132" cy="65" r="22" fill="#4ADE80"/>
+    <!-- Head & Body -->
+    <ellipse cx="100" cy="110" rx="54" ry="42" fill="#4ADE80"/>
+    <!-- Light Belly -->
+    <ellipse cx="100" cy="124" rx="36" ry="24" fill="#BBF7D0"/>
+  </g>
+  <!-- Eye Pupils -->
+  <circle cx="68" cy="65" r="12" fill="#FFFFFF"/>
+  <circle cx="132" cy="65" r="12" fill="#FFFFFF"/>
+  <circle cx="68" cy="65" r="7" fill="#0F172A"/>
+  <circle cx="132" cy="65" r="7" fill="#0F172A"/>
+  <circle cx="65" cy="62" r="2.5" fill="#FFFFFF"/>
+  <circle cx="129" cy="62" r="2.5" fill="#FFFFFF"/>
+  <!-- Wide Friendly Smile -->
+  <path d="M74 112 Q100 128 126 112" stroke="#15803D" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <!-- Rosy Cheeks -->
+  <circle cx="66" cy="112" r="7" fill="#F472B6" opacity="0.6"/>
+  <circle cx="134" cy="112" r="7" fill="#F472B6" opacity="0.6"/>
+  <!-- Traditional Matcha Bowl (Chawan) -->
+  <g filter="url(#shFrog)">
+    <path d="M72 148 C72 178 128 178 128 148 Z" fill="#1E293B" stroke="#0F172A" stroke-width="2"/>
+    <!-- Foamy Green Matcha -->
+    <ellipse cx="100" cy="148" rx="28" ry="9" fill="#22C55E"/>
+    <!-- Matcha Whisk (Chasen) -->
+    <line x1="115" y1="136" x2="128" y2="122" stroke="#D97706" stroke-width="4" stroke-linecap="round"/>
+  </g>
+</svg>

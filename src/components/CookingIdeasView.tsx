@@ -41,7 +41,7 @@ import {
 import { InventoryItem, PlannedMeal, MealType } from '../types';
 import { RICARDO_RECIPES, RicardoRecipe, formatRecipeIngredientAmount } from '../data/ricardoRecipes';
 import { AddRecipeModal } from './AddRecipeModal';
-import { useLanguage } from '../utils/i18n';
+import { useLanguage, getDifficultyLocalizedName } from '../utils/i18n';
 import { getItemDisplayName } from '../utils/foodTranslator';
 import { ScrollableRow } from './ScrollableRow';
 import { detectSafeCookingRule, SAFE_COOKING_GUIDELINES, SafeCookingRule } from '../utils/safeCookingInstructions';
@@ -55,7 +55,7 @@ interface CookingIdeasViewProps {
     category?: string;
     quantity?: number;
     unit?: string;
-    locationType?: 'FRIDGE' | 'FREEZER' | 'PANTRY';
+    locationType?: 'FRIDGE' | 'FREEZER' | 'PANTRY' | 'SPICE_RACK';
     recipeTitle?: string;
   }) => void;
   onPlanMeal?: (meal: Omit<PlannedMeal, 'id' | 'createdAt' | 'updatedAt'>) => Promise<boolean>;
@@ -379,7 +379,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
   const handleAddMissing = (
     ingName: string,
     category?: string,
-    locType?: 'FRIDGE' | 'FREEZER' | 'PANTRY',
+    locType?: 'FRIDGE' | 'FREEZER' | 'PANTRY' | 'SPICE_RACK',
     recipeTitle?: string
   ) => {
     if (onAddMissingToGrocery) {
@@ -518,7 +518,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
       lang === 'FR' ? planningRecipe.ricardoUrlFr : planningRecipe.ricardoUrlEn;
 
     const plannedMealPayload: Omit<PlannedMeal, 'id' | 'createdAt' | 'updatedAt'> = {
-      householdId: 'hh_yan_kriz_01',
+      householdId: 'hh_pantryo_main',
       title: recipeTitle,
       date: targetDate,
       mealType: targetMealSlot,
@@ -544,7 +544,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
       success = await onPlanMeal(plannedMealPayload);
     } else {
       try {
-        const res = await fetch('/api/v1/inventory/household/hh_yan_kriz_01/meals', {
+        const res = await fetch('/api/v1/inventory/household/hh_pantryo_main/meals', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(plannedMealPayload),
@@ -1032,7 +1032,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
             const title = lang === 'FR' ? recipe.titleFr : recipe.title;
             const desc = lang === 'FR' ? recipe.descriptionFr : recipe.descriptionEn;
             const instructions = lang === 'FR' ? recipe.instructionsFr : recipe.instructionsEn;
-            const difficultyLabel = lang === 'FR' ? recipe.difficultyFr : recipe.difficulty;
+            const difficultyLabel = lang === 'FR' ? (recipe.difficultyFr || getDifficultyLocalizedName(recipe.difficulty, 'FR')) : (recipe.difficulty || 'Easy');
             const isYoutube = Boolean(recipe.youtubeUrl || recipe.youtubeVideoId || recipe.source === 'YouTube');
             const isUserCustom = Boolean(recipe.isCustom);
             const isSaved = isRecipeSaved(recipe);
@@ -1074,13 +1074,19 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                   {/* Left: Thumbnail & Main Info */}
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     {/* Recipe Thumbnail */}
-                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden bg-slate-100 shrink-0 relative shadow-2xs">
-                      <img
-                        src={recipe.imageUrl}
-                        alt={title}
-                        referrerPolicy="no-referrer"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden bg-[#EAF2E8] shrink-0 relative shadow-2xs flex items-center justify-center">
+                      {recipe.imageUrl && !recipe.imageUrl.includes('unsplash.com') ? (
+                        <img
+                          src={recipe.imageUrl}
+                          alt={title}
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-[#EAF2E8] flex flex-col items-center justify-center text-[#2D5A34]">
+                          <ChefHat className="w-7 h-7 text-[#2D5A34]/80 stroke-[1.8]" />
+                        </div>
+                      )}
                       {recipe.authorBadge ? (
                         <span className="absolute bottom-1 left-1 px-1 py-0.5 rounded bg-black/75 text-[8px] font-black text-white leading-none shadow-2xs backdrop-blur-xs">
                           {recipe.authorBadge}
@@ -1248,18 +1254,24 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                       onClick={() => setPlayingVideoId(null)}
                       className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-black/80 hover:bg-black text-white text-[10px] font-bold backdrop-blur-xs cursor-pointer"
                     >
-                      ✕ Close Video
+                      {lang === 'FR' ? '✕ Fermer la vidéo' : '✕ Close Video'}
                     </button>
                   </div>
                 ) : (
                   /* Recipe Image Banner (Hero) */
-                  <div className="h-36 w-full relative overflow-hidden bg-slate-100">
-                    <img
-                      src={recipe.imageUrl}
-                      alt={title}
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
+                  <div className="h-36 w-full relative overflow-hidden bg-[#1E3022]">
+                    {recipe.imageUrl && !recipe.imageUrl.includes('unsplash.com') ? (
+                      <img
+                        src={recipe.imageUrl}
+                        alt={title}
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-[#1A2E1D] via-[#24422A] to-[#2D5A34] flex items-center justify-center">
+                        <ChefHat className="w-16 h-16 text-emerald-400/20" />
+                      </div>
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
 
                     {/* Badges on image */}
@@ -1285,12 +1297,12 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                         ) : recipe.source === 'Photo Import' ? (
                           <span className="px-2.5 py-0.5 rounded-full bg-emerald-700 text-white text-[10px] font-black backdrop-blur-xs flex items-center gap-1 shadow-xs">
                             <Camera className="w-3 h-3" />
-                            <span>PHOTO SCAN</span>
+                            <span>{lang === 'FR' ? 'SCAN PHOTO' : 'PHOTO SCAN'}</span>
                           </span>
                         ) : (
                           <span className="px-2.5 py-0.5 rounded-full bg-[#18281B]/90 text-white text-[10px] font-black backdrop-blur-xs flex items-center gap-1 shadow-xs">
                             <FileText className="w-3 h-3" />
-                            <span>MY RECIPE</span>
+                            <span>{lang === 'FR' ? 'MA RECETTE' : 'MY RECIPE'}</span>
                           </span>
                         )}
 
@@ -1307,7 +1319,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                           <button
                             onClick={() => handleDeleteCustomRecipe(recipe.id, title)}
                             className="p-1 rounded-full bg-black/50 hover:bg-red-600 text-white transition-colors cursor-pointer"
-                            title="Delete custom recipe"
+                            title={lang === 'FR' ? 'Supprimer la recette personnalisée' : 'Delete custom recipe'}
                           >
                             <Trash2 className="w-2.5 h-2.5" />
                           </button>
@@ -1351,7 +1363,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                           className="px-2.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[10px] font-black flex items-center gap-1 shadow-lg transition-all active:scale-95 shrink-0 cursor-pointer"
                         >
                           <Play className="w-3 h-3 fill-white" />
-                          <span>Play</span>
+                          <span>{lang === 'FR' ? 'Lire' : 'Play'}</span>
                         </button>
                       ) : ricardoLink ? (
                         <a
@@ -1359,7 +1371,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                           target="_blank"
                           rel="noopener noreferrer"
                           className="p-2 rounded-xl bg-white/20 hover:bg-white text-white hover:text-red-900 backdrop-blur-xs transition-all shrink-0 active:scale-95 shadow-md flex items-center gap-1 text-[10px] font-extrabold"
-                          title="Open recipe link"
+                          title={lang === 'FR' ? 'Ouvrir le lien de la recette' : 'Open recipe link'}
                         >
                           <span>{recipe.isRicardoOfficial ? 'Ricardo' : 'Source'}</span>
                           <ExternalLink className="w-3 h-3" />
@@ -1746,12 +1758,18 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
             <div className="p-4 space-y-4 overflow-y-auto flex-1">
               {/* Recipe Summary Card */}
               <div className="p-2.5 rounded-2xl bg-[#F6F9F5] border border-[#D5E1D2] flex items-center gap-3">
-                <img
-                  src={planningRecipe.imageUrl}
-                  alt={planningRecipe.title}
-                  referrerPolicy="no-referrer"
-                  className="w-14 h-14 rounded-xl object-cover shrink-0 shadow-2xs"
-                />
+                {planningRecipe.imageUrl && !planningRecipe.imageUrl.includes('unsplash.com') ? (
+                  <img
+                    src={planningRecipe.imageUrl}
+                    alt={planningRecipe.title}
+                    referrerPolicy="no-referrer"
+                    className="w-14 h-14 rounded-xl object-cover shrink-0 shadow-2xs"
+                  />
+                ) : (
+                  <div className="w-14 h-14 rounded-xl bg-[#EAF2E8] flex items-center justify-center shrink-0 text-[#2D5A34]">
+                    <ChefHat className="w-7 h-7 text-[#2D5A34]/80 stroke-[1.8]" />
+                  </div>
+                )}
                 <div className="min-w-0 flex-1">
                   <h4 className="font-extrabold text-xs text-[#1F3323] truncate">
                     {lang === 'FR' ? planningRecipe.titleFr || planningRecipe.title : planningRecipe.title}

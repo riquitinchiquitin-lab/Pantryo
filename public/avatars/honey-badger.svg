@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgBadger" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FEF3C7" />
+      <stop offset="100%" stop-color="#B45309" />
+    </linearGradient>
+    <filter id="shBadger" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#451A03" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+  <circle cx="100" cy="100" r="98" fill="url(#bgBadger)" stroke="#92400E" stroke-width="4"/>
+  <!-- Head & Body -->
+  <g filter="url(#shBadger)">
+    <path d="M50 185 C50 120 60 70 100 70 C140 70 150 120 150 185 Z" fill="#1E293B"/>
+    <!-- White Crest / Stripe on Back of Head -->
+    <path d="M76 70 C76 45 100 40 100 40 C100 40 124 45 124 70 L115 140 L85 140 Z" fill="#F8FAFC"/>
+    <ellipse cx="100" cy="110" rx="38" ry="32" fill="#0F172A"/>
+  </g>
+  <!-- Eyes -->
+  <circle cx="84" cy="105" r="4.5" fill="#F59E0B"/>
+  <circle cx="116" cy="105" r="4.5" fill="#F59E0B"/>
+  <circle cx="84" cy="105" r="2.5" fill="#0F172A"/>
+  <circle cx="116" cy="105" r="2.5" fill="#0F172A"/>
+  <!-- Muzzle -->
+  <ellipse cx="100" cy="122" rx="16" ry="12" fill="#334155"/>
+  <ellipse cx="100" cy="118" rx="5" ry="3.5" fill="#0F172A"/>
+  <!-- Honey Pot in front -->
+  <g filter="url(#shBadger)">
+    <path d="M80 150 C75 180 125 180 120 150 Z" fill="#D97706" stroke="#92400E" stroke-width="2"/>
+    <ellipse cx="100" cy="150" rx="20" ry="5" fill="#F59E0B"/>
+    <!-- Honey Drips -->
+    <path d="M94 150 Q96 160 98 150 Q102 165 106 150" stroke="#FDE047" stroke-width="4" stroke-linecap="round" fill="none"/>
+  </g>
+</svg>

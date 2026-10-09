@@ -20,7 +20,8 @@ export const FoodVisualBadge: React.FC<FoodVisualBadgeProps> = ({
   const visual = getFoodVisual(itemName, categoryName);
   const Icon = visual.icon;
 
-  const resolvedImage = !imageError && (imageUrl || visual.defaultImage);
+  // Only display real user-captured images; stock/unsplash photos are removed in favor of clean category icons
+  const isUserImage = Boolean(imageUrl && imageUrl.trim() && !imageUrl.includes('unsplash.com') && !imageError);
 
   const dimensions = {
     sm: 'w-10 h-10 rounded-xl',
@@ -42,10 +43,10 @@ export const FoodVisualBadge: React.FC<FoodVisualBadgeProps> = ({
 
   return (
     <div className={`relative shrink-0 ${dimensions} overflow-hidden border ${visual.borderColor} shadow-2xs group`}>
-      {resolvedImage ? (
+      {isUserImage ? (
         <>
           <img
-            src={resolvedImage}
+            src={imageUrl!}
             alt={itemName}
             referrerPolicy="no-referrer"
             onError={() => setImageError(true)}

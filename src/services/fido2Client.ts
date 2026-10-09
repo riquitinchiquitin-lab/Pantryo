@@ -38,6 +38,40 @@ export interface AuthenticationResult {
   error?: string;
 }
 
+function getAuthHeaders(customHeaders: Record<string, string> = {}): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    ...customHeaders,
+  };
+  if (typeof localStorage !== "undefined") {
+    const token = localStorage.getItem("pantryo_auth_token");
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+      headers["x-auth-token"] = token;
+    }
+    const activeUserId = localStorage.getItem("pantryo_active_user_id");
+    if (activeUserId) {
+      headers["x-user-id"] = activeUserId;
+    }
+  }
+  return headers;
+}
+
+function saveAuthSession(data: any) {
+  if (!data || typeof localStorage === "undefined") return;
+  if (data.token) {
+    try {
+      localStorage.setItem("pantryo_auth_token", data.token);
+    } catch (_) {}
+  }
+  if (data.user?.id) {
+    try {
+      localStorage.setItem("pantryo_active_user_id", data.user.id);
+    } catch (_) {}
+  }
+}
+
 export const fido2Client = {
   /**
    * Checks browser and environment support for WebAuthn
@@ -71,7 +105,9 @@ export const fido2Client = {
    * Get enrolled FIDO2 credentials and 2FA status for a user
    */
   async getStatus(userId: string): Promise<Fido2Status> {
-    const res = await fetch(`/api/v1/auth/fido2/status/${encodeURIComponent(userId)}`);
+    const res = await fetch(`/api/v1/auth/fido2/status/${encodeURIComponent(userId)}`, {
+      headers: getAuthHeaders(),
+    });
     if (!res.ok) {
       throw new Error(`Failed to fetch FIDO2 status: ${res.statusText}`);
     }
@@ -88,7 +124,7 @@ export const fido2Client = {
     // 1. Get options from server
     const optRes = await fetch("/api/v1/auth/fido2/register-options", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ userId }),
     });
 
@@ -115,7 +151,7 @@ export const fido2Client = {
     // 3. Send response to server for cryptographic verification
     const verifyRes = await fetch("/api/v1/auth/fido2/register-verify", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({
         userId,
         response: attResp,
@@ -128,7 +164,9 @@ export const fido2Client = {
       throw new Error(err.error || "Failed to verify registration on server");
     }
 
-    return verifyRes.json();
+    const data = await verifyRes.json();
+    saveAuthSession(data);
+    return data;
   },
 
   /**
@@ -138,7 +176,7 @@ export const fido2Client = {
     // 1. Get auth options from server
     const optRes = await fetch("/api/v1/auth/fido2/auth-options", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ userId: userIdOrUsername }),
     });
 
@@ -165,7 +203,7 @@ export const fido2Client = {
     // 3. Send signature to server to verify
     const verifyRes = await fetch("/api/v1/auth/fido2/auth-verify", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({
         userId: userIdOrUsername,
         response: asseResp,
@@ -177,7 +215,9 @@ export const fido2Client = {
       throw new Error(err.error || "Failed to verify security key signature");
     }
 
-    return verifyRes.json();
+    const data = await verifyRes.json();
+    saveAuthSession(data);
+    return data;
   },
 
   /**
@@ -189,7 +229,7 @@ export const fido2Client = {
   ): Promise<AuthenticationResult> {
     const res = await fetch("/api/v1/auth/fido2/verify-recovery-code", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({
         userId: userIdOrUsername,
         code,
@@ -201,7 +241,9 @@ export const fido2Client = {
       throw new Error(err.error || "Invalid recovery code");
     }
 
-    return res.json();
+    const data = await res.json();
+    saveAuthSession(data);
+    return data;
   },
 
   /**
@@ -219,10 +261,9 @@ export const fido2Client = {
 
     const res = await fetch("/api/v1/auth/fido2/simulate-enroll", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
+      headers: getAuthHeaders({
         "x-pwa-standalone": isAppInstalledOrStandalone() ? "true" : "false",
-      },
+      }),
       body: JSON.stringify({ userId, friendlyName }),
     });
 
@@ -231,7 +272,9 @@ export const fido2Client = {
       throw new Error(err.error || "Failed to enroll virtual security token");
     }
 
-    return res.json();
+    const data = await res.json();
+    saveAuthSession(data);
+    return data;
   },
 
   /**
@@ -249,10 +292,9 @@ export const fido2Client = {
 
     const res = await fetch("/api/v1/auth/fido2/auth-verify", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
+      headers: getAuthHeaders({
         "x-pwa-standalone": isAppInstalledOrStandalone() ? "true" : "false",
-      },
+      }),
       body: JSON.stringify({
         userId: userIdOrUsername,
         response: { id: credentialId },
@@ -264,7 +306,9 @@ export const fido2Client = {
       throw new Error(err.error || "Failed to verify virtual token");
     }
 
-    return res.json();
+    const data = await res.json();
+    saveAuthSession(data);
+    return data;
   },
 
   /**
@@ -278,10 +322,7 @@ export const fido2Client = {
         `/api/v1/auth/fido2/credentials/${encodedId}?userId=${encodedUserId}`,
         {
           method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-            "x-user-id": userId,
-          },
+          headers: getAuthHeaders({ "x-user-id": userId }),
           body: JSON.stringify({ userId, credentialId }),
         }
       );
@@ -296,10 +337,7 @@ export const fido2Client = {
     // POST Fallback for restrictive proxies / iframes
     const fallbackRes = await fetch("/api/v1/auth/fido2/delete-credential", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-user-id": userId,
-      },
+      headers: getAuthHeaders({ "x-user-id": userId }),
       body: JSON.stringify({ userId, credentialId }),
     });
 
@@ -321,10 +359,7 @@ export const fido2Client = {
         `/api/v1/auth/fido2/credentials/all?userId=${encodedUserId}`,
         {
           method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-            "x-user-id": userId,
-          },
+          headers: getAuthHeaders({ "x-user-id": userId }),
           body: JSON.stringify({ userId, credentialId: "all" }),
         }
       );
@@ -338,10 +373,7 @@ export const fido2Client = {
 
     const fallbackRes = await fetch("/api/v1/auth/fido2/delete-credential", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-user-id": userId,
-      },
+      headers: getAuthHeaders({ "x-user-id": userId }),
       body: JSON.stringify({ userId, credentialId: "all" }),
     });
 
@@ -359,7 +391,7 @@ export const fido2Client = {
   async regenerateRecoveryCodes(userId: string): Promise<string[]> {
     const res = await fetch("/api/v1/auth/fido2/recovery-codes/regenerate", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ userId }),
     });
 
@@ -378,7 +410,7 @@ export const fido2Client = {
   async toggleEnforcement(userId: string, enforced: boolean): Promise<boolean> {
     const res = await fetch("/api/v1/auth/fido2/toggle-enforcement", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ userId, enforced }),
     });
 
@@ -395,7 +427,9 @@ export const fido2Client = {
    * Get global FIDO2 security policy
    */
   async getGlobalPolicy(): Promise<Fido2PolicyInfo> {
-    const res = await fetch("/api/v1/auth/fido2/policy");
+    const res = await fetch("/api/v1/auth/fido2/policy", {
+      headers: getAuthHeaders(),
+    });
     if (!res.ok) {
       throw new Error("Failed to fetch FIDO2 security policy");
     }
@@ -408,7 +442,7 @@ export const fido2Client = {
   async toggleGlobalEnforcement(enforced: boolean = true): Promise<{ success: boolean; allUsersRequired: boolean }> {
     const res = await fetch("/api/v1/auth/fido2/toggle-enforcement", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ allUsers: true, enforced }),
     });
     if (!res.ok) {
@@ -437,7 +471,7 @@ export const fido2Client = {
   }> {
     const res = await fetch("/api/v1/auth/fido2/totp/setup", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ userId }),
     });
 
@@ -458,7 +492,7 @@ export const fido2Client = {
   ): Promise<RegistrationResult> {
     const res = await fetch("/api/v1/auth/fido2/totp/confirm", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ userId, secret, code }),
     });
 
@@ -466,7 +500,9 @@ export const fido2Client = {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || "Invalid 6-digit verification code");
     }
-    return res.json();
+    const data = await res.json();
+    saveAuthSession(data);
+    return data;
   },
 
   /**
@@ -478,7 +514,7 @@ export const fido2Client = {
   ): Promise<AuthenticationResult> {
     const res = await fetch("/api/v1/auth/fido2/totp/verify", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ userId: userIdOrUsername, code }),
     });
 
@@ -486,6 +522,8 @@ export const fido2Client = {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || "Invalid 6-digit code");
     }
-    return res.json();
+    const data = await res.json();
+    saveAuthSession(data);
+    return data;
   },
 };

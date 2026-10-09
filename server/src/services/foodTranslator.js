@@ -387,7 +387,6 @@ export const EN_TO_FR_DICTIONARY = {
   "canned green peas": "petits pois en conserve",
   "green peas": "petits pois",
   "peas": "pois",
-  "canned tuna": "thon en conserve",
   "flaked light tuna": "thon pâle émietté",
   "chunk light tuna": "thon pâle en morceaux",
   "canned salmon": "saumon en conserve",

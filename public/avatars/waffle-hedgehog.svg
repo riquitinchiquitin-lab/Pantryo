@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgHedgehog" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FED7AA" />
+      <stop offset="100%" stop-color="#D97706" />
+    </linearGradient>
+    <filter id="shHedgehog" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#78350F" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+  <circle cx="100" cy="100" r="98" fill="url(#bgHedgehog)" stroke="#B45309" stroke-width="4"/>
+  <!-- Waffle Grid Quills / Back -->
+  <g filter="url(#shHedgehog)">
+    <ellipse cx="100" cy="110" rx="54" ry="48" fill="#F59E0B" stroke="#B45309" stroke-width="3"/>
+    <!-- Waffle Grid Lines -->
+    <path d="M60 90 L140 90 M55 110 L145 110 M60 130 L140 130" stroke="#B45309" stroke-width="2.5" opacity="0.6"/>
+    <path d="M80 70 L80 150 M100 65 L100 155 M120 70 L120 150" stroke="#B45309" stroke-width="2.5" opacity="0.6"/>
+    <!-- Cute Hedgehog Face -->
+    <ellipse cx="100" cy="130" rx="34" ry="28" fill="#FEF3C7"/>
+  </g>
+  <!-- Eyes -->
+  <circle cx="86" cy="124" r="4.5" fill="#0F172A"/>
+  <circle cx="114" cy="124" r="4.5" fill="#0F172A"/>
+  <circle cx="84" cy="122" r="1.6" fill="#FFFFFF"/>
+  <circle cx="112" cy="122" r="1.6" fill="#FFFFFF"/>
+  <!-- Nose & Smile -->
+  <circle cx="100" cy="134" r="4.5" fill="#0F172A"/>
+  <path d="M96 140 Q100 144 104 140" stroke="#0F172A" stroke-width="1.8" fill="none"/>
+  <!-- Tiny Chef Hat on Waffle -->
+  <rect x="90" y="58" width="20" height="8" rx="2" fill="#FFFFFF"/>
+  <path d="M88 58 C84 48 90 42 100 44 C110 42 116 48 112 58 Z" fill="#FFFFFF"/>
+</svg>

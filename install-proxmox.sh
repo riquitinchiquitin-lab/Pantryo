@@ -122,7 +122,7 @@ APP_PORT="${INPUT_PORT:-$DEFAULT_PORT}"
 # --- SECTION B: Network, Public Domain, Cloudflare & External Integrations ---
 echo -e "\n${CYAN}${BOLD}--- Network, External Domain & Integrations ---${NC}"
 
-# 6. Public Application URL (e.g. https://pantryo.yknet.org or http://IP:PORT)
+# 6. Public Application URL (e.g. https://pantryo.example.com or http://IP:PORT)
 DEFAULT_APP_URL="${APP_URL:-http://${HOST_IP}:${APP_PORT}}"
 read -rp "$(echo -e "${BOLD}Public Application URL / Domain [${GREEN}${DEFAULT_APP_URL}${NC}${BOLD}]: ${NC}")" INPUT_APP_URL
 APP_URL="${INPUT_APP_URL:-$DEFAULT_APP_URL}"

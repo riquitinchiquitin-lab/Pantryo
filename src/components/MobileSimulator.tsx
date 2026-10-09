@@ -85,9 +85,9 @@ const LOCAL_STORAGE_ACTIVE_USER_ID = 'pantryo_active_user_id';
 // Default household members for Pantryo (Initial install: Administrator only)
 const DEFAULT_MEMBERS: User[] = [
   {
-    id: 'usr_yan',
-    name: 'Yan',
-    email: 'yjsboily@gmail.com',
+    id: 'usr_admin',
+    name: 'Admin',
+    email: 'admin@example.com',
     role: 'ADMIN',
     avatarUrl: '/avatars/chef-cat.svg',
     fido2Enabled: false,
@@ -106,8 +106,8 @@ function getStoredMembers(): User[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // Clean out any stale initial mock members
-        const cleaned = parsed.filter((u: any) => u && u.id !== 'usr_kriz');
+        // Clean out any invalid members
+        const cleaned = parsed.filter((u: any) => u && u.id);
         if (cleaned.length > 0) {
           return cleaned;
         }
@@ -203,7 +203,8 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   };
 
   const [activeNav, setActiveNav] = useState<'home' | 'meals' | 'grocery' | 'cooking' | 'sync'>('home');
-  const [filterLocation, setFilterLocation] = useState<'ALL' | 'FRIDGE' | 'PANTRY' | 'FREEZER' | 'EXPIRING'>('ALL');
+  const [filterLocation, setFilterLocation] = useState<'ALL' | 'FRIDGE' | 'PANTRY' | 'FREEZER' | 'SPICE_RACK' | 'EXPIRING'>('ALL');
+  const [modalDefaultLocation, setModalDefaultLocation] = useState<'FRIDGE' | 'FREEZER' | 'PANTRY' | 'SPICE_RACK' | undefined>(undefined);
   const [selectedFoodType, setSelectedFoodType] = useState<string | 'ALL'>('ALL');
   const [selectedSubCategory, setSelectedSubCategory] = useState<string | 'ALL'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -319,6 +320,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   const [isAddEditModalOpen, setIsAddEditModalOpen] = useState(false);
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+  const [adminModalInitialTab, setAdminModalInitialTab] = useState<'backup' | 'users' | 'security' | 'settings'>('backup');
   const [isAdminRestrictedOpen, setIsAdminRestrictedOpen] = useState(false);
   const [isImportLeftoverOpen, setIsImportLeftoverOpen] = useState(false);
   const [selectedMealForLeftover, setSelectedMealForLeftover] = useState<PlannedMeal | null>(null);
@@ -334,9 +336,13 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   const [kitchenName, setKitchenName] = useState<string>(() => {
     try {
       const stored = localStorage.getItem('kitchen_komrade_kitchen_name');
-      if (stored) return stored;
+      if (stored && (stored.includes('Yan') || stored.includes('Kriz'))) {
+        localStorage.removeItem('kitchen_komrade_kitchen_name');
+      } else if (stored) {
+        return stored;
+      }
     } catch (_) {}
-    return (typeof import.meta !== 'undefined' && import.meta.env?.VITE_KITCHEN_NAME) || 'The Yan & Kriz Kitchen';
+    return (typeof import.meta !== 'undefined' && import.meta.env?.VITE_KITCHEN_NAME) || 'Your Kitchen';
   });
   // Multi-Selection State & Actions
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
@@ -380,7 +386,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           itemIds: idsArray,
-          userId: currentUser?.id || 'usr_yan',
+          userId: currentUser?.id || 'usr_admin',
         }),
       });
       const data = await res.json();
@@ -411,7 +417,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           itemIds: idsArray,
-          userId: currentUser?.id || 'usr_yan',
+          userId: currentUser?.id || 'usr_admin',
         }),
       });
       const data = await res.json();
@@ -439,7 +445,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         method: 'DELETE',
         headers: {
           'x-user-role': currentUser?.role || 'ADMIN',
-          'x-user-id': currentUser?.id || 'usr_yan',
+          'x-user-id': currentUser?.id || 'usr_admin',
         },
       });
 
@@ -496,7 +502,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             quantity: update.quantity,
             unit: update.unit,
             notes: update.notes,
-            userId: currentUser?.id || 'usr_yan',
+            userId: currentUser?.id || 'usr_admin',
           }),
         }).catch((e) => console.warn('Item partial update failed:', e));
       }
@@ -559,7 +565,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
           quantity: update.quantity,
           unit: update.unit,
           notes: update.notes,
-          userId: currentUser?.id || 'usr_yan',
+          userId: currentUser?.id || 'usr_admin',
         }),
       }).catch((e) => console.warn('Item partial update failed:', e));
     }
@@ -668,8 +674,8 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         inCart: true,
         notes:
           lang === 'FR'
-            ? `Réapprovisionnement demandé par ${currentUser?.name || 'Yan'}`
-            : `Restock requested by ${currentUser?.name || 'Yan'}`,
+            ? `Réapprovisionnement demandé par ${currentUser?.name || 'Admin'}`
+            : `Restock requested by ${currentUser?.name || 'Admin'}`,
       },
       ...prev,
     ]);
@@ -685,7 +691,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   const fetchInventory = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/v1/inventory/household/hh_yan_kriz_01', {
+      const res = await fetch('/api/v1/inventory/household/hh_pantryo_main', {
         headers: { Accept: 'application/json' },
       });
       if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
@@ -695,9 +701,13 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             setItems(data.allItems);
           }
           if (data.household?.name) {
-            setKitchenName(data.household.name);
+            const cleanKitchen =
+              data.household.name.includes('Yan') || data.household.name.includes('Kriz')
+                ? 'Your Kitchen'
+                : data.household.name;
+            setKitchenName(cleanKitchen);
             try {
-              localStorage.setItem('kitchen_komrade_kitchen_name', data.household.name);
+              localStorage.setItem('kitchen_komrade_kitchen_name', cleanKitchen);
             } catch (_) {}
           }
         }
@@ -712,7 +722,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   // Fetch planned meals for household
   const fetchPlannedMeals = async () => {
     try {
-      const res = await fetch('/api/v1/inventory/household/hh_yan_kriz_01/meals', {
+      const res = await fetch('/api/v1/inventory/household/hh_pantryo_main/meals', {
         headers: { Accept: 'application/json' },
       });
       if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
@@ -757,7 +767,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
 
   const handleAddMeal = async (mealData: Omit<PlannedMeal, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
-      const res = await fetch('/api/v1/inventory/household/hh_yan_kriz_01/meals', {
+      const res = await fetch('/api/v1/inventory/household/hh_pantryo_main/meals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(mealData),
@@ -829,9 +839,67 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
     setTimeout(() => setBannerNotice(null), 3000);
   };
 
-  const handleOpenAddModal = () => {
+  const handleOpenAddModal = (prefLoc?: 'FRIDGE' | 'FREEZER' | 'PANTRY' | 'SPICE_RACK' | React.MouseEvent) => {
     setItemToEdit(null);
+    const isExplicitLoc =
+      typeof prefLoc === 'string' && ['FRIDGE', 'FREEZER', 'PANTRY', 'SPICE_RACK'].includes(prefLoc);
+    const targetLoc = isExplicitLoc
+      ? (prefLoc as 'FRIDGE' | 'FREEZER' | 'PANTRY' | 'SPICE_RACK')
+      : filterLocation === 'SPICE_RACK'
+      ? 'SPICE_RACK'
+      : filterLocation === 'FREEZER'
+      ? 'FREEZER'
+      : filterLocation === 'PANTRY'
+      ? 'PANTRY'
+      : filterLocation === 'FRIDGE'
+      ? 'FRIDGE'
+      : undefined;
+    setModalDefaultLocation(targetLoc);
     setIsAddEditModalOpen(true);
+  };
+
+  const handleQuickAddSpiceToInventory = async (spiceEn: string, spiceFr: string) => {
+    if (!currentUser) return;
+    const chosenName = lang === 'FR' ? spiceFr : spiceEn;
+    const twoYearsFromNow = new Date(Date.now() + 730 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    const payload = {
+      name: chosenName,
+      nameFr: spiceFr,
+      nameEn: spiceEn,
+      quantity: 1,
+      unit: 'pot',
+      locationName: 'Spice Rack',
+      locationType: 'SPICE_RACK' as StorageType,
+      categoryName: 'Spices & Seasonings',
+      expirationDate: twoYearsFromNow,
+      notes: lang === 'FR' ? 'Ajouté depuis la section Épices' : 'Added from Spices section',
+    };
+
+    try {
+      const res = await fetch('/api/v1/inventory', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('pantryo_auth_token') || ''}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.item) {
+          setItems((prev) => [data.item, ...prev]);
+          setBannerNotice(
+            lang === 'FR'
+              ? `🧂 "${chosenName}" ajouté à votre armoire à épices !`
+              : `🧂 Added "${chosenName}" to your spice rack!`
+          );
+          setTimeout(() => setBannerNotice(null), 3000);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to quick add spice:', err);
+    }
   };
 
   const handleOpenEditModal = (item: InventoryItem) => {
@@ -945,6 +1013,12 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
       if (!item.isExpiringSoon && (item.daysUntilExpiration === null || item.daysUntilExpiration > 3)) {
         return false;
       }
+    } else if (filterLocation === 'SPICE_RACK') {
+      const isSpiceLoc = item.locationType === 'SPICE_RACK';
+      const isSpiceCat = (item.categoryName || '').toLowerCase().includes('spice') || (item.categoryName || '').toLowerCase().includes('épice');
+      if (!isSpiceLoc && !isSpiceCat) {
+        return false;
+      }
     } else if (filterLocation !== 'ALL' && item.locationType !== filterLocation) {
       return false;
     }
@@ -980,6 +1054,9 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   const fridgeCount = items.filter((i) => i.locationType === 'FRIDGE').length;
   const pantryCount = items.filter((i) => i.locationType === 'PANTRY').length;
   const freezerCount = items.filter((i) => i.locationType === 'FREEZER').length;
+  const spiceCount = items.filter(
+    (i) => i.locationType === 'SPICE_RACK' || (i.categoryName || '').toLowerCase().includes('spice') || (i.categoryName || '').toLowerCase().includes('épice')
+  ).length;
   const leftoversCount = items.filter((i) => i.isLeftover).length;
 
   if (!currentUser) {
@@ -1259,11 +1336,11 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 </div>
 
                 {/* Compact Location Quick Pills */}
-                <div className="grid grid-cols-4 gap-1.5">
+                <div className="grid grid-cols-5 gap-1 sm:gap-1.5">
                   <button
                     type="button"
                     onClick={() => setFilterLocation(filterLocation === 'FRIDGE' ? 'ALL' : 'FRIDGE')}
-                    className={`py-1.5 px-1.5 sm:px-2 rounded-xl text-center border transition-all cursor-pointer ${
+                    className={`py-1.5 px-1 rounded-xl text-center border transition-all cursor-pointer ${
                       filterLocation === 'FRIDGE'
                         ? 'bg-teal-700 text-white border-teal-700 shadow-xs'
                         : 'bg-[#F7FAF9] border-[#E0ECE8] text-[#244E49] hover:bg-[#EBF3F1]'
@@ -1278,7 +1355,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                   <button
                     type="button"
                     onClick={() => setFilterLocation(filterLocation === 'FREEZER' ? 'ALL' : 'FREEZER')}
-                    className={`py-1.5 px-1.5 sm:px-2 rounded-xl text-center border transition-all cursor-pointer ${
+                    className={`py-1.5 px-1 rounded-xl text-center border transition-all cursor-pointer ${
                       filterLocation === 'FREEZER'
                         ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
                         : 'bg-[#F0F6FA] border-[#D7E6F2] text-[#244563] hover:bg-[#E4F0F9]'
@@ -1293,7 +1370,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                   <button
                     type="button"
                     onClick={() => setFilterLocation(filterLocation === 'PANTRY' ? 'ALL' : 'PANTRY')}
-                    className={`py-1.5 px-1.5 sm:px-2 rounded-xl text-center border transition-all cursor-pointer ${
+                    className={`py-1.5 px-1 rounded-xl text-center border transition-all cursor-pointer ${
                       filterLocation === 'PANTRY'
                         ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
                         : 'bg-[#FAF6EE] border-[#EFE5D0] text-[#544122] hover:bg-[#F5EDDC]'
@@ -1307,8 +1384,23 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
 
                   <button
                     type="button"
+                    onClick={() => setFilterLocation(filterLocation === 'SPICE_RACK' ? 'ALL' : 'SPICE_RACK')}
+                    className={`py-1.5 px-1 rounded-xl text-center border transition-all cursor-pointer ${
+                      filterLocation === 'SPICE_RACK'
+                        ? 'bg-orange-600 text-white border-orange-600 shadow-xs'
+                        : 'bg-[#FFF7ED] border-[#FED7AA] text-[#9A3412] hover:bg-[#FFEDD5]'
+                    }`}
+                  >
+                    <span className="text-[10px] font-semibold block opacity-85 truncate">
+                      {lang === 'FR' ? 'Épices' : 'Spices'}
+                    </span>
+                    <span className="text-xs font-black block leading-tight">{spiceCount}</span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => setFilterLocation(filterLocation === 'EXPIRING' ? 'ALL' : 'EXPIRING')}
-                    className={`py-1.5 px-1.5 sm:px-2 rounded-xl text-center border transition-all cursor-pointer ${
+                    className={`py-1.5 px-1 rounded-xl text-center border transition-all cursor-pointer ${
                       filterLocation === 'EXPIRING'
                         ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
                         : expiringItems.length > 0
@@ -1387,7 +1479,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                     </div>
 
                     {/* Storage Compartment Bento Pills */}
-                    <div className="grid grid-cols-3 gap-1.5 mt-2.5 pt-2 border-t border-[#F2ECE0]">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mt-2.5 pt-2 border-t border-[#F2ECE0]">
                       <button
                         type="button"
                         onClick={() => setFilterLocation(filterLocation === 'FRIDGE' ? 'ALL' : 'FRIDGE')}
@@ -1441,6 +1533,24 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                           {pantryCount} {lang === 'FR' ? 'articles' : 'items'}
                         </p>
                       </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setFilterLocation(filterLocation === 'SPICE_RACK' ? 'ALL' : 'SPICE_RACK')}
+                        className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${
+                          filterLocation === 'SPICE_RACK'
+                            ? 'bg-orange-600 text-white border-orange-600 shadow-xs'
+                            : 'bg-[#FFF7ED] border-[#FED7AA] text-[#9A3412] hover:bg-[#FFEDD5]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="font-bold">{t('spice_rack_label')}</span>
+                          <Flame className="w-3.5 h-3.5 opacity-90 text-orange-500" />
+                        </div>
+                        <p className="text-xs font-extrabold mt-0.5">
+                          {spiceCount} {lang === 'FR' ? 'articles' : 'items'}
+                        </p>
+                      </button>
                     </div>
                   </div>
 
@@ -1482,7 +1592,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
 
                   {/* Bento Tile 3 (1 Col): Sub-Zero Deep Freeze Compartment */}
                   <div
-                    onClick={() => setFilterLocation('FREEZER')}
+                    onClick={() => setFilterLocation(filterLocation === 'FREEZER' ? 'ALL' : 'FREEZER')}
                     className="p-3 rounded-2xl bg-gradient-to-b from-blue-50/70 to-white border border-blue-200/80 hover:border-blue-300 transition-all cursor-pointer flex flex-col justify-between shadow-2xs"
                   >
                     <div className="flex items-center justify-between">
@@ -1503,6 +1613,39 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                       <p className="text-[10px] text-blue-700 font-semibold flex items-center gap-1">
                         <Flame className="w-3 h-3 text-amber-500" />{' '}
                         {lang === 'FR' ? 'Prêt à décongeler' : 'Defrost ready'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Bento Tile 4 (1 Col): Dedicated Spice Rack Compartment */}
+                  <div
+                    onClick={() => setFilterLocation(filterLocation === 'SPICE_RACK' ? 'ALL' : 'SPICE_RACK')}
+                    className={`p-3 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between shadow-2xs ${
+                      filterLocation === 'SPICE_RACK'
+                        ? 'bg-gradient-to-b from-orange-100 to-amber-50/80 border-orange-400 ring-2 ring-orange-500/30'
+                        : 'bg-gradient-to-b from-orange-50/70 to-white border-orange-200/80 hover:border-orange-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-6 h-6 rounded-lg bg-orange-100 text-orange-700 flex items-center justify-center">
+                          <Flame className="w-3.5 h-3.5 text-orange-600" />
+                        </div>
+                        <span className="text-[10px] font-bold text-orange-950">
+                          {lang === 'FR' ? 'Armoire à Épices' : 'Spice Rack'}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-orange-100 text-orange-800">
+                        {spiceCount} {lang === 'FR' ? 'pots' : 'jars'}
+                      </span>
+                    </div>
+                    <div className="mt-2 space-y-1">
+                      <p className="text-xs font-bold text-[#1F3323]">
+                        {spiceCount} {lang === 'FR' ? 'épices & herbes' : 'spices & seasonings'}
+                      </p>
+                      <p className="text-[10px] text-orange-700 font-semibold flex items-center gap-1">
+                        <Sparkles className="w-2.5 h-2.5 text-orange-500" />
+                        {lang === 'FR' ? 'Arômes & sels' : 'Flavors & aromatics'}
                       </p>
                     </div>
                   </div>
@@ -1595,13 +1738,8 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                           : 'bg-white border-[#D5E1D2] text-[#334D37] hover:bg-[#F2F7F1]'
                       }`}
                     >
-                      <div className="w-5 h-5 rounded-full overflow-hidden shrink-0 border border-black/10 shadow-2xs">
-                        <img
-                          src={cat.imageUrl}
-                          alt={cat.name}
-                          referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover"
-                        />
+                      <div className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 ${cat.bgColor} ${cat.textColor}`}>
+                        <cat.icon className="w-3.5 h-3.5" />
                       </div>
                       <span>{getCategoryLocalizedName(cat.name, lang)}</span>
                     </button>
@@ -1610,7 +1748,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               </ScrollableRow>
             </div>
 
-            {/* Specific Cuts & Subcategories with Web Photography */}
+            {/* Specific Cuts & Subcategories */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between px-1 text-[11px] font-bold text-[#556D58]">
                 <span className="flex items-center gap-1.5">
@@ -1656,13 +1794,8 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                           : 'bg-white border-[#D5E1D2] text-[#334D37] hover:bg-[#F2F7F1]'
                       }`}
                     >
-                      <div className="w-6 h-6 rounded-full overflow-hidden shrink-0 border border-black/10 shadow-2xs">
-                        <img
-                          src={sub.imageUrl}
-                          alt={sub.name}
-                          referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover"
-                        />
+                      <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${sub.bgColor} ${sub.textColor}`}>
+                        <sub.icon className="w-3.5 h-3.5" />
                       </div>
                       <span className="leading-tight text-[11px]">
                         {getSubcategoryLocalizedName(sub.badgeLabel || sub.name, lang)}
@@ -1718,6 +1851,18 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 >
                   <Snowflake className="w-3 h-3" />
                   {lang === 'FR' ? `Congélateur (${freezerCount})` : `Freezer (${freezerCount})`}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterLocation(filterLocation === 'SPICE_RACK' ? 'ALL' : 'SPICE_RACK')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1 transition-all shrink-0 cursor-pointer ${
+                    filterLocation === 'SPICE_RACK'
+                      ? 'bg-orange-600 text-white shadow-xs'
+                      : 'bg-white border border-[#D5E1D2] text-[#4F6553] hover:bg-[#EAF1E8]'
+                  }`}
+                >
+                  <Flame className="w-3 h-3 text-orange-500" />
+                  {lang === 'FR' ? `Épices (${spiceCount})` : `Spices (${spiceCount})`}
                 </button>
                 <button
                   onClick={() => setFilterLocation('EXPIRING')}
@@ -1785,6 +1930,139 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               </div>
             </div>
 
+            {/* DEDICATED SPICES & SEASONINGS SECTION BANNER & CONTROLS */}
+            {filterLocation === 'SPICE_RACK' && (
+              <div className="p-3.5 sm:p-4 rounded-3xl bg-gradient-to-br from-orange-50 via-[#FFF9F0] to-amber-50 border border-[#FED7AA] space-y-3 shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-orange-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <Flame className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-sm font-black text-orange-950">
+                          {lang === 'FR' ? 'Armoire à Épices & Assaisonnements' : 'Spice Rack & Seasonings'}
+                        </h2>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-200 text-orange-800">
+                          {spiceCount} {lang === 'FR' ? 'articles' : 'items'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#7A4019] mt-0.5">
+                        {lang === 'FR'
+                          ? 'Conservation longue durée (1 à 3 ans) • Épices moulues, herbes séchées, sels gourmets & arômes'
+                          : 'Long shelf-life essentials (1-3 yrs) • Ground spices, whole seeds, dried herbs & gourmet salts'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenAddModal('SPICE_RACK')}
+                    className="self-start sm:self-auto px-3.5 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{lang === 'FR' ? '+ Ajouter une épice' : '+ Add Spice'}</span>
+                  </button>
+                </div>
+
+                {/* Subcategory Filter Pills within Spices */}
+                <div className="pt-2 border-t border-orange-200/70">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-orange-900 mb-1.5">
+                    <span>{lang === 'FR' ? 'Sous-catégories d’épices :' : 'Spice Subcategories:'}</span>
+                    {selectedSubCategory !== 'ALL' && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSubCategory('ALL')}
+                        className="text-orange-700 hover:underline font-semibold text-[10px]"
+                      >
+                        {lang === 'FR' ? 'Toutes' : 'All'}
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { key: 'ALL', labelEn: 'All Spices', labelFr: 'Toutes les épices', icon: '🧂' },
+                      { key: 'Ground Spices', labelEn: 'Ground Spices', labelFr: 'Épices Moulues', icon: '🏺' },
+                      { key: 'Whole Spices', labelEn: 'Whole Spices', labelFr: 'Épices Entières', icon: '✨' },
+                      { key: 'Dried Herbs', labelEn: 'Dried Herbs', labelFr: 'Herbes Séchées', icon: '🌿' },
+                      { key: 'Seasoning Blends & Salts', labelEn: 'Blends & Salts', labelFr: 'Mélanges & Sels', icon: '🧂' },
+                      { key: 'Extracts & Baking Aromatics', labelEn: 'Extracts', labelFr: 'Extraits & Arômes', icon: '🪵' },
+                    ].map((sub) => {
+                      const isSelected = selectedSubCategory === sub.key || (sub.key === 'ALL' && selectedSubCategory === 'ALL');
+                      return (
+                        <button
+                          key={sub.key}
+                          type="button"
+                          onClick={() => setSelectedSubCategory(sub.key)}
+                          className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border ${
+                            isSelected
+                              ? 'bg-orange-600 text-white border-orange-600 shadow-2xs'
+                              : 'bg-white border-orange-200 text-orange-950 hover:bg-orange-100/60'
+                          }`}
+                        >
+                          <span>{sub.icon}</span>
+                          <span>{lang === 'FR' ? sub.labelFr : sub.labelEn}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 1-Tap Quick-Add Spice Essentials Bar */}
+                <div className="pt-2 border-t border-orange-200/70">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-orange-900 mb-1.5">
+                    <span className="flex items-center gap-1">
+                      <span>{lang === 'FR' ? 'Ranger un indispensable en 1 clic :' : 'Quick-stock kitchen essentials:'}</span>
+                      <span className="text-[10px] text-orange-600 font-normal">
+                        ({lang === 'FR' ? 'Conservation 2 ans garantie' : '2-year shelf-life'})
+                      </span>
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { en: 'Fine Sea Salt', fr: 'Sel de mer fin', icon: '🧂' },
+                      { en: 'Black Pepper', fr: 'Poivre noir moulu', icon: '🌶️' },
+                      { en: 'Smoked Paprika', fr: 'Paprika fumé', icon: '🏺' },
+                      { en: 'Ground Cumin', fr: 'Cumin moulu', icon: '🍂' },
+                      { en: 'Dried Oregano', fr: 'Origan séché', icon: '🌿' },
+                      { en: 'Garlic Powder', fr: 'Ail en poudre', icon: '🧄' },
+                      { en: 'Ground Cinnamon', fr: 'Cannelle moulue', icon: '🪵' },
+                      { en: 'Curry Powder', fr: 'Poudre de curry', icon: '🍛' },
+                      { en: 'Herbes de Provence', fr: 'Herbes de Provence', icon: '🌱' },
+                      { en: 'Onion Powder', fr: 'Oignon en poudre', icon: '🧅' },
+                    ].map((sp) => (
+                      <button
+                        key={sp.en}
+                        type="button"
+                        onClick={() => handleQuickAddSpiceToInventory(sp.en, sp.fr)}
+                        className="px-2.5 py-1 rounded-xl text-xs font-bold bg-white/90 hover:bg-white border border-orange-200 hover:border-orange-400 text-orange-950 flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer"
+                        title={lang === 'FR' ? `Ajouter ${sp.fr} à l'inventaire` : `Add ${sp.en} to inventory`}
+                      >
+                        <span>{sp.icon}</span>
+                        <span>{lang === 'FR' ? sp.fr : sp.en}</span>
+                        <Plus className="w-3 h-3 text-orange-600 ml-0.5" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* CFIA / MAPAQ Food Safety Recommendation Card */}
+                <div className="p-2.5 rounded-2xl bg-amber-100/60 border border-amber-200/80 text-[11px] text-amber-950 flex items-start gap-2">
+                  <span className="text-sm">💡</span>
+                  <div>
+                    <span className="font-bold">
+                      {lang === 'FR' ? 'Norme ACIA / MAPAQ & EFSA :' : 'CFIA / MAPAQ & EFSA Standard:'}{' '}
+                    </span>
+                    <span>
+                      {lang === 'FR'
+                        ? 'Les épices moulues conservent toute leur puissance aromatique pendant 1 à 2 ans, et les épices entières 3 à 4 ans au sec et à l’obscurité. Évitez de saupoudrer au-dessus des casseroles fumantes.'
+                        : 'Ground spices retain optimal aromatic flavor for 1-2 years, and whole spices for 3-4 years in a cool, dark, dry spice rack. Avoid shaking jars directly over steaming pots.'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Inventory Items Grid or List */}
             {isLoading ? (
               <div className="py-12 flex flex-col items-center justify-center text-[#556D58]">
@@ -1797,10 +2075,20 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               <div className="py-12 text-center text-[#5D7360] bg-white rounded-3xl border border-[#D5E1D2] p-6 space-y-2">
                 <Box className="w-8 h-8 mx-auto text-slate-300" />
                 <p className="text-sm font-bold text-[#233527]">
-                  {lang === 'FR' ? 'Aucun article ne correspond à ce filtre' : 'No items match this filter'}
+                  {filterLocation === 'SPICE_RACK'
+                    ? lang === 'FR'
+                      ? 'Votre armoire à épices est vide'
+                      : 'Your spice rack is empty'
+                    : lang === 'FR'
+                    ? 'Aucun article ne correspond à ce filtre'
+                    : 'No items match this filter'}
                 </p>
                 <p className="text-xs">
-                  {lang === 'FR'
+                  {filterLocation === 'SPICE_RACK'
+                    ? lang === 'FR'
+                      ? 'Cliquez sur l’un des indispensables ci-dessus pour ranger du sel, poivre ou paprika en 1 clic !'
+                      : 'Click any of the kitchen essentials above to stock salt, pepper, or paprika in 1-tap!'
+                    : lang === 'FR'
                     ? "Essayez de sélectionner 'Tout' ou utilisez le bouton 'SCANNER & AJOUTER !' ci-dessous pour scanner avec l'IA Gemini !"
                     : "Try selecting 'All' or use the SNAP & ADD button below to scan groceries with Gemini Flash Vision!"}
                 </p>
@@ -1828,7 +2116,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                       <div
                         onClick={() => handleOpenEditModal(item)}
                         className="relative w-full h-24 rounded-2xl overflow-hidden bg-slate-100 mb-2 border border-[#E7EFE6] cursor-pointer"
-                        title="Click to edit item"
+                        title={lang === 'FR' ? "Cliquer pour modifier l'aliment" : "Click to edit item"}
                       >
                         {/* Multi-selection Checkbox button */}
                         <button
@@ -1860,12 +2148,21 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                             }`}
                           />
                         </button>
-                        <img
-                          src={item.imageUrl || visual.defaultImage}
-                          alt={getItemDisplayName(item, lang)}
-                          referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
+                        {item.imageUrl && !item.imageUrl.includes('unsplash.com') ? (
+                          <img
+                            src={item.imageUrl}
+                            alt={getItemDisplayName(item, lang)}
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                        ) : (
+                          <div className={`w-full h-full flex flex-col items-center justify-center ${visual.bgColor} ${visual.textColor} transition-colors select-none`}>
+                            <CategoryIcon className="w-10 h-10 stroke-[1.6]" />
+                            <span className="text-[10px] font-bold mt-1.5 opacity-80 max-w-[90%] truncate text-center">
+                              {getCategoryLocalizedName(item.categoryName, lang)}
+                            </span>
+                          </div>
+                        )}
                         {/* Top-left Category Icon Pill (offset right from checkbox) */}
                         <div
                           className={`absolute top-1.5 left-9 px-1.5 py-0.5 rounded-lg text-[9px] font-extrabold flex items-center gap-1 backdrop-blur-md shadow-2xs border ${visual.bgColor} ${visual.textColor} ${visual.borderColor}`}
@@ -1973,7 +2270,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                             className="w-4 h-4 rounded-full object-cover shrink-0"
                           />
                           <span className="text-[10px] font-bold text-[#556D58] truncate max-w-[36px]">
-                            {item.addedByName || 'Yan'}
+                            {item.addedByName || (lang === 'FR' ? 'Membre' : 'Member')}
                           </span>
                         </div>
 
@@ -2136,7 +2433,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         {/* VIEW: MEAL PLANNER & CALENDAR */}
         {activeNav === 'meals' && (
           <MealPlannerView
-            householdId="hh_yan_kriz_01"
+            householdId="hh_pantryo_main"
             items={items}
             plannedMeals={plannedMeals}
             onAddMeal={handleAddMeal}
@@ -2218,7 +2515,8 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             isInstalled={isInstalledEffective}
             kitchenName={kitchenName}
             onDeleteMember={handleDeleteUser}
-            onOpenAdmin={() => {
+            onOpenAdmin={(tab = 'backup') => {
+              setAdminModalInitialTab(tab);
               if (currentUser.role === 'ADMIN') {
                 setIsAdminModalOpen(true);
               } else {
@@ -2563,9 +2861,11 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         onClose={() => {
           setIsAddEditModalOpen(false);
           setItemToEdit(null);
+          setModalDefaultLocation(undefined);
         }}
         itemToEdit={itemToEdit}
         currentUser={currentUser}
+        defaultLocationType={modalDefaultLocation}
         onSaved={handleItemSaved}
         onDeleted={(itemId) => {
           setItems((prev) => prev.filter((i) => i.id !== itemId));
@@ -2605,8 +2905,16 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
       {/* Admin App & Database Management Modal */}
       <AdminManagementModal
         isOpen={isAdminModalOpen}
+        initialTab={adminModalInitialTab}
         onClose={() => {
           setIsAdminModalOpen(false);
+          setAdminModalInitialTab('backup');
+          fetchInventory();
+        }}
+        onNavigateToAppTab={(tab) => {
+          setIsAdminModalOpen(false);
+          setAdminModalInitialTab('backup');
+          setActiveNav(tab);
           fetchInventory();
         }}
         currentUser={currentUser}
@@ -2621,6 +2929,14 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         }}
         onDatabaseRestored={async () => {
           await fetchInventory();
+          try {
+            const pubRes = await fetch('/api/v1/auth/public-members');
+            if (pubRes.ok) {
+              const members = await pubRes.json();
+              setHouseholdMembers(members);
+              localStorage.setItem('kitchen_komrade_household_members', JSON.stringify(members));
+            }
+          } catch (_) {}
           setBannerNotice(
             lang === 'FR'
               ? 'Base de données restaurée et synchronisée avec succès !'

@@ -14,11 +14,11 @@ services:
       - PORT=3000
       - DATABASE_URL=postgresql://pantryo_admin:pantryo_secure_pass@db:5432/pantryo?schema=public
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - APP_URL=${APP_URL:-https://pantryo.yknet.org}
+      - APP_URL=${APP_URL:-http://localhost:3000}
       - PANTRYO_ADMIN_NAME=${PANTRYO_ADMIN_NAME:-admin}
       - PANTRYO_ADMIN_USERNAME=${PANTRYO_ADMIN_USERNAME:-admin}
-      - PANTRYO_ADMIN_PASSWORD=${PANTRYO_ADMIN_PASSWORD:-PantryoSecure2026!}
-      - KITCHEN_NAME=${KITCHEN_NAME:-}
+      - PANTRYO_ADMIN_PASSWORD=${PANTRYO_ADMIN_PASSWORD:-YourSecurePassword2026!}
+      - KITCHEN_NAME=${KITCHEN_NAME:-Your Kitchen}
       - DB_ENCRYPTION_KEY=${DB_ENCRYPTION_KEY:-}
       - SESSION_SECRET=${SESSION_SECRET:-}
     depends_on:

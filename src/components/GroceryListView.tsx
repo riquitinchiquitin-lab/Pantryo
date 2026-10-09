@@ -10,6 +10,9 @@ import {
   Sparkles,
   ArrowRight,
   RotateCcw,
+  Flame,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { InventoryItem, SavedGroceryListItem, StorageType } from '../types';
 import { FoodVisualBadge } from './FoodVisualBadge';
@@ -52,8 +55,34 @@ interface GroceryListViewProps {
 }
 
 // Smart automatic location assignment for background kitchen stocking
-function inferLocation(name: string, category?: string): 'FRIDGE' | 'FREEZER' | 'PANTRY' {
+function inferLocation(name: string, category?: string): StorageType {
   const n = (name + ' ' + (category || '')).toLowerCase();
+  if (
+    n.includes('épice') ||
+    n.includes('epice') ||
+    n.includes('spice') ||
+    n.includes('poivre') ||
+    n.includes('pepper') ||
+    n.includes('paprika') ||
+    n.includes('curry') ||
+    n.includes('cumin') ||
+    n.includes('cinnamon') ||
+    n.includes('cannelle') ||
+    n.includes('oregano') ||
+    n.includes('origan') ||
+    n.includes('thym') ||
+    n.includes('thyme') ||
+    n.includes('muscade') ||
+    n.includes('nutmeg') ||
+    n.includes('assaisonnement') ||
+    n.includes('seasoning') ||
+    n.includes('sel') ||
+    n.includes('salt') ||
+    n.includes('curcuma') ||
+    n.includes('turmeric')
+  ) {
+    return 'SPICE_RACK';
+  }
   if (
     n.includes('frozen') ||
     n.includes('surgel') ||
@@ -74,8 +103,6 @@ function inferLocation(name: string, category?: string): 'FRIDGE' | 'FREEZER' | 
     n.includes('pasta') ||
     n.includes('conserve') ||
     n.includes('canned') ||
-    n.includes('épice') ||
-    n.includes('spice') ||
     n.includes('sucre') ||
     n.includes('sugar') ||
     n.includes('café') ||
@@ -88,10 +115,7 @@ function inferLocation(name: string, category?: string): 'FRIDGE' | 'FREEZER' | 
     n.includes('chips') ||
     n.includes('pain') ||
     n.includes('bread') ||
-    n.includes('sauce') ||
-    n.includes('sel') ||
-    n.includes('salt') ||
-    n.includes('poivre')
+    n.includes('sauce')
   ) {
     return 'PANTRY';
   }
@@ -114,6 +138,35 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
   const [stockSuccessMessage, setStockSuccessMessage] = useState<string | null>(null);
   const [isSavedListsOpen, setIsSavedListsOpen] = useState(false);
   const [savedListsInitialTab, setSavedListsInitialTab] = useState<'saved' | 'saveCurrent'>('saved');
+  const [isSpicesSectionOpen, setIsSpicesSectionOpen] = useState(false);
+
+  // Quick-add popular spices to grocery list
+  const handleQuickAddSpiceToGrocery = (spiceNameEn: string, spiceNameFr: string) => {
+    const chosenName = lang === 'FR' ? spiceNameFr : spiceNameEn;
+    const existingIdx = groceryItems.findIndex(
+      (i) => i.name.toLowerCase() === chosenName.toLowerCase() ||
+             i.name.toLowerCase() === spiceNameEn.toLowerCase() ||
+             i.name.toLowerCase() === spiceNameFr.toLowerCase()
+    );
+    if (existingIdx >= 0) {
+      onUpdateGroceryItems((prev) =>
+        prev.map((item, idx) =>
+          idx === existingIdx ? { ...item, quantity: item.quantity + 1 } : item
+        )
+      );
+    } else {
+      const newItem: GroceryCartItem = {
+        id: `g_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        name: chosenName,
+        category: 'Spices & Seasonings',
+        quantity: 1,
+        unit: 'pot',
+        locationType: 'SPICE_RACK',
+        inCart: false,
+      };
+      onUpdateGroceryItems((prev) => [newItem, ...prev]);
+    }
+  };
 
   // Add items from saved template/list to active grocery run
   const handleAddItemsToCurrentGrocery = (
@@ -244,7 +297,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
           unit: item.unit,
           locationType: item.locationType || inferLocation(item.name, item.category),
           categoryName: item.category || visual.badgeLabel,
-          imageUrl: item.imageUrl || visual.defaultImage,
+          imageUrl: item.imageUrl && !item.imageUrl.includes('unsplash.com') ? item.imageUrl : undefined,
           notes: lang === 'FR' ? `Acheté en magasin par ${currentUser.name}` : `Purchased in-store by ${currentUser.name}`,
         };
       });
@@ -311,7 +364,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
               {lang === 'FR' ? "Liste d'Épicerie" : 'Grocery Shopping List'}
             </h2>
             <p className="text-xs text-[#527470] truncate">
-              {lang === 'FR' ? 'Synchronisée en direct entre Yan & Kriz' : 'Synced in real time between Yan & Kriz'}
+              {lang === 'FR' ? 'Synchronisée en direct entre les membres' : 'Synced in real time across household members'}
             </p>
           </div>
 
@@ -378,6 +431,72 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
         </button>
       </div>
 
+      {/* DEDICATED SPICES & SEASONINGS SECTION IN GROCERY RUN */}
+      <div className="rounded-2xl bg-gradient-to-r from-orange-50 via-[#FFF8ED] to-amber-50 border border-[#FED7AA] overflow-hidden shadow-2xs">
+        <button
+          type="button"
+          onClick={() => setIsSpicesSectionOpen(!isSpicesSectionOpen)}
+          className="w-full p-2.5 sm:p-3 flex items-center justify-between gap-2 text-left cursor-pointer hover:bg-orange-100/40 transition-colors"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-7 h-7 rounded-xl bg-orange-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Flame className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-orange-950">
+                  {lang === 'FR' ? '🧂 Rayon Épices & Assaisonnements' : '🧂 Spices & Seasonings Aisle'}
+                </span>
+                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-orange-200 text-orange-800">
+                  {lang === 'FR' ? 'Raccourcis 1-clic' : '1-Tap Restock'}
+                </span>
+              </div>
+              <p className="text-[10px] text-orange-800/80 truncate">
+                {lang === 'FR'
+                  ? 'Ajoutez facilement sels, poivres, herbes séchées et épices à votre panier'
+                  : 'Quickly restock whole spices, ground seasonings, herbs & salts'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0 text-orange-800">
+            {isSpicesSectionOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </div>
+        </button>
+
+        {isSpicesSectionOpen && (
+          <div className="p-3 pt-1 border-t border-orange-200/80 space-y-2 bg-white/70 backdrop-blur-xs">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-900/70">
+              {lang === 'FR' ? 'Indispensables de cuisine :' : 'Kitchen Spice Essentials:'}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { en: 'Sea Salt', fr: 'Sel de mer', icon: '🧂' },
+                { en: 'Black Pepper', fr: 'Poivre noir moulu', icon: '🌶️' },
+                { en: 'Smoked Paprika', fr: 'Paprika fumé', icon: '🏺' },
+                { en: 'Ground Cumin', fr: 'Cumin moulu', icon: '🍂' },
+                { en: 'Dried Oregano', fr: 'Origan séché', icon: '🌿' },
+                { en: 'Garlic Powder', fr: 'Ail en poudre', icon: '🧄' },
+                { en: 'Ground Cinnamon', fr: 'Cannelle moulue', icon: '🪵' },
+                { en: 'Curry Powder', fr: 'Poudre de curry', icon: '🍛' },
+                { en: 'Herbes de Provence', fr: 'Herbes de Provence', icon: '🌱' },
+                { en: 'Chili Flakes', fr: 'Flocons de piment', icon: '🔥' },
+              ].map((sp) => (
+                <button
+                  key={sp.en}
+                  type="button"
+                  onClick={() => handleQuickAddSpiceToGrocery(sp.en, sp.fr)}
+                  className="px-2.5 py-1 rounded-xl text-xs font-bold bg-white hover:bg-orange-50 border border-orange-200 text-orange-950 flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer"
+                >
+                  <span>{sp.icon}</span>
+                  <span>{lang === 'FR' ? sp.fr : sp.en}</span>
+                  <Plus className="w-3 h-3 text-orange-600 ml-0.5" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Auto-Restock Suggestion from Expiring Kitchen Items */}
       {expiringItems.length > 0 && (
         <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-900 text-xs flex items-center justify-between gap-2">
@@ -399,7 +518,14 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                   category: item.categoryName,
                   quantity: 1,
                   unit: item.unit,
-                  locationType: item.locationType === 'FREEZER' ? 'FREEZER' : item.locationType === 'PANTRY' ? 'PANTRY' : 'FRIDGE',
+                  locationType:
+                    item.locationType === 'FREEZER'
+                      ? 'FREEZER'
+                      : item.locationType === 'PANTRY'
+                      ? 'PANTRY'
+                      : item.locationType === 'SPICE_RACK'
+                      ? 'SPICE_RACK'
+                      : 'FRIDGE',
                   inCart: false,
                   autoSuggested: true,
                 },

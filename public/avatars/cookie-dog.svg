@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgDog" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FEF3C7" />
+      <stop offset="100%" stop-color="#D97706" />
+    </linearGradient>
+    <filter id="shDog" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#78350F" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+  <circle cx="100" cy="100" r="98" fill="url(#bgDog)" stroke="#B45309" stroke-width="4"/>
+  <!-- Floppy Dog Ears -->
+  <g filter="url(#shDog)">
+    <ellipse cx="55" cy="95" rx="16" ry="30" fill="#78350F" transform="rotate(15 55 95)"/>
+    <ellipse cx="145" cy="95" rx="16" ry="30" fill="#78350F" transform="rotate(-15 145 95)"/>
+    <!-- Head & Body -->
+    <path d="M54 185 C54 125 62 72 100 72 C138 72 146 125 146 185 Z" fill="#FBBF24"/>
+    <circle cx="100" cy="112" r="42" fill="#FDE68A"/>
+    <!-- White Muzzle -->
+    <ellipse cx="100" cy="124" rx="24" ry="18" fill="#FFFFFF"/>
+  </g>
+  <!-- Eyes -->
+  <circle cx="84" cy="104" r="5.5" fill="#0F172A"/>
+  <circle cx="116" cy="104" r="5.5" fill="#0F172A"/>
+  <circle cx="82" cy="102" r="2" fill="#FFFFFF"/>
+  <circle cx="114" cy="102" r="2" fill="#FFFFFF"/>
+  <!-- Cute Black Nose & Tongue -->
+  <ellipse cx="100" cy="118" rx="6" ry="4.5" fill="#0F172A"/>
+  <path d="M95 124 Q100 128 105 124" stroke="#0F172A" stroke-width="2" fill="none"/>
+  <path d="M98 126 Q100 134 104 126 Z" fill="#F43F5E"/>
+  <!-- Chocolate Chip Cookie in Mouth -->
+  <g filter="url(#shDog)">
+    <circle cx="100" cy="155" r="22" fill="#D97706" stroke="#B45309" stroke-width="2"/>
+    <!-- Choc Chips -->
+    <circle cx="92" cy="148" r="3.5" fill="#451A03"/>
+    <circle cx="108" cy="150" r="3.5" fill="#451A03"/>
+    <circle cx="98" cy="162" r="3.5" fill="#451A03"/>
+    <circle cx="112" cy="164" r="2.5" fill="#451A03"/>
+    <circle cx="88" cy="160" r="2" fill="#451A03"/>
+  </g>
+</svg>

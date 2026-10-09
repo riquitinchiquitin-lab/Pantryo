@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Upload, Check, X, RefreshCw, Sparkles, Image as ImageIcon } from 'lucide-react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Camera, Upload, Check, X, RefreshCw, Sparkles, Image as ImageIcon, Search } from 'lucide-react';
 import { User } from '../types';
 import { useLanguage } from '../utils/i18n';
 
@@ -18,9 +18,11 @@ export interface AvatarOption {
   tagEn?: string;
   tagFr?: string;
   badgeColor?: string;
+  category?: 'chef' | 'savory' | 'bakery' | 'treats';
 }
 
 export const CARTOON_AVATARS: AvatarOption[] = [
+  // Chefs & Critics (5)
   {
     id: 'chef_cat',
     labelEn: 'Chef Cat',
@@ -29,33 +31,7 @@ export const CARTOON_AVATARS: AvatarOption[] = [
     tagEn: 'Master Chef',
     tagFr: 'Grand Chef',
     badgeColor: 'bg-orange-100 text-orange-800 border-orange-200',
-  },
-  {
-    id: 'happy_avocado',
-    labelEn: 'Happy Avo',
-    labelFr: 'Guaca-Cool',
-    url: '/avatars/happy-avocado.svg',
-    tagEn: 'Fresh & Green',
-    tagFr: 'Frais & Bio',
-    badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  },
-  {
-    id: 'baker_bear',
-    labelEn: 'Baker Bear',
-    labelFr: 'Ours Boulanger',
-    url: '/avatars/baker-bear.svg',
-    tagEn: 'Croissant Master',
-    tagFr: 'Maître Boulanger',
-    badgeColor: 'bg-amber-100 text-amber-800 border-amber-200',
-  },
-  {
-    id: 'veggie_bunny',
-    labelEn: 'Veggie Bunny',
-    labelFr: 'Lapin Maraîcher',
-    url: '/avatars/veggie-bunny.svg',
-    tagEn: 'Garden Fresh',
-    tagFr: 'Potager Bio',
-    badgeColor: 'bg-green-100 text-green-800 border-green-200',
+    category: 'chef',
   },
   {
     id: 'gourmet_fox',
@@ -65,6 +41,7 @@ export const CARTOON_AVATARS: AvatarOption[] = [
     tagEn: 'Food Critic',
     tagFr: 'Critique Gastronome',
     badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+    category: 'chef',
   },
   {
     id: 'chef_penguin',
@@ -74,33 +51,7 @@ export const CARTOON_AVATARS: AvatarOption[] = [
     tagEn: 'Pastry Chef',
     tagFr: 'Chef Pâtissier',
     badgeColor: 'bg-sky-100 text-sky-800 border-sky-200',
-  },
-  {
-    id: 'sunny_egg',
-    labelEn: 'Sunny Egg',
-    labelFr: 'Œuf Solaire',
-    url: '/avatars/sunny-egg.svg',
-    tagEn: 'Breakfast Champ',
-    tagFr: 'Brunch Gourmand',
-    badgeColor: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  },
-  {
-    id: 'ninja_broccoli',
-    labelEn: 'Ninja Broccoli',
-    labelFr: 'Ninja Brocoli',
-    url: '/avatars/ninja-broccoli.svg',
-    tagEn: 'Kitchen Defender',
-    tagFr: 'Héros Cuistot',
-    badgeColor: 'bg-teal-100 text-teal-800 border-teal-200',
-  },
-  {
-    id: 'boba_panda',
-    labelEn: 'Boba Panda',
-    labelFr: 'Panda Tablier',
-    url: '/avatars/boba-panda.svg',
-    tagEn: 'Sweet Delights',
-    tagFr: 'Gourmandises',
-    badgeColor: 'bg-pink-100 text-pink-800 border-pink-200',
+    category: 'chef',
   },
   {
     id: 'chef_hamster',
@@ -110,61 +61,277 @@ export const CARTOON_AVATARS: AvatarOption[] = [
     tagEn: 'Cheese Lover',
     tagFr: 'Amateur Fromage',
     badgeColor: 'bg-rose-100 text-rose-800 border-rose-200',
+    category: 'chef',
+  },
+  {
+    id: 'ninja_broccoli',
+    labelEn: 'Ninja Broccoli',
+    labelFr: 'Ninja Brocoli',
+    url: '/avatars/ninja-broccoli.svg',
+    tagEn: 'Kitchen Defender',
+    tagFr: 'Héros Cuistot',
+    badgeColor: 'bg-teal-100 text-teal-800 border-teal-200',
+    category: 'chef',
+  },
+
+  // Savory & Main Dishes (10)
+  {
+    id: 'sunny_egg',
+    labelEn: 'Sunny Egg',
+    labelFr: 'Œuf Solaire',
+    url: '/avatars/sunny-egg.svg',
+    tagEn: 'Breakfast Champ',
+    tagFr: 'Brunch Gourmand',
+    badgeColor: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    category: 'savory',
+  },
+  {
+    id: 'taco_turtle',
+    labelEn: 'Taco Turtle',
+    labelFr: 'Tortue Taco',
+    url: '/avatars/taco-turtle.svg',
+    tagEn: 'Fiesta Chef',
+    tagFr: 'Chef Fiesta',
+    badgeColor: 'bg-amber-100 text-amber-800 border-amber-200',
+    category: 'savory',
+  },
+  {
+    id: 'pizza_raccoon',
+    labelEn: 'Pizza Raccoon',
+    labelFr: 'Raton Pizza',
+    url: '/avatars/pizza-raccoon.svg',
+    tagEn: 'Slice Lover',
+    tagFr: 'Fan de Pizza',
+    badgeColor: 'bg-red-100 text-red-800 border-red-200',
+    category: 'savory',
+  },
+  {
+    id: 'ramen_otter',
+    labelEn: 'Ramen Otter',
+    labelFr: 'Loutre Ramen',
+    url: '/avatars/ramen-otter.svg',
+    tagEn: 'Noodle Master',
+    tagFr: 'Maître Nouilles',
+    badgeColor: 'bg-orange-100 text-orange-800 border-orange-200',
+    category: 'savory',
+  },
+  {
+    id: 'sushi_seal',
+    labelEn: 'Sushi Seal',
+    labelFr: 'Phoque Sushi',
+    url: '/avatars/sushi-seal.svg',
+    tagEn: 'Maki Artist',
+    tagFr: 'Artiste Maki',
+    badgeColor: 'bg-cyan-100 text-cyan-800 border-cyan-200',
+    category: 'savory',
+  },
+  {
+    id: 'soup_duck',
+    labelEn: 'Soup Duck',
+    labelFr: 'Canard Marmite',
+    url: '/avatars/soup-duck.svg',
+    tagEn: 'Broth Specialist',
+    tagFr: 'Mijoteur Gourmand',
+    badgeColor: 'bg-lime-100 text-lime-800 border-lime-200',
+    category: 'savory',
+  },
+  {
+    id: 'spicy_dragon',
+    labelEn: 'Spicy Dragon',
+    labelFr: 'Dragon Pimenté',
+    url: '/avatars/spicy-dragon.svg',
+    tagEn: 'Chili Champion',
+    tagFr: 'Roi du Piment',
+    badgeColor: 'bg-rose-100 text-rose-800 border-rose-200',
+    category: 'savory',
+  },
+  {
+    id: 'cheesy_mouse',
+    labelEn: 'Cheesy Mouse',
+    labelFr: 'Souris Fromagère',
+    url: '/avatars/cheesy-mouse.svg',
+    tagEn: 'Fondue Master',
+    tagFr: 'Expert Fondue',
+    badgeColor: 'bg-amber-100 text-amber-800 border-amber-200',
+    category: 'savory',
+  },
+  {
+    id: 'dimsum_piggy',
+    labelEn: 'Dim Sum Piggy',
+    labelFr: 'Cochonnet Bao',
+    url: '/avatars/dimsum-piggy.svg',
+    tagEn: 'Dumpling King',
+    tagFr: 'Roi du Bao',
+    badgeColor: 'bg-pink-100 text-pink-800 border-pink-200',
+    category: 'savory',
+  },
+  {
+    id: 'pasta_lion',
+    labelEn: 'Pasta Lion',
+    labelFr: 'Lion Pasta',
+    url: '/avatars/pasta-lion.svg',
+    tagEn: 'Al Dente Hero',
+    tagFr: 'Héros Al Dente',
+    badgeColor: 'bg-amber-100 text-amber-800 border-amber-200',
+    category: 'savory',
+  },
+
+  // Bakery & Dough (5)
+  {
+    id: 'baker_bear',
+    labelEn: 'Baker Bear',
+    labelFr: 'Ours Boulanger',
+    url: '/avatars/baker-bear.svg',
+    tagEn: 'Croissant Master',
+    tagFr: 'Maître Boulanger',
+    badgeColor: 'bg-amber-100 text-amber-800 border-amber-200',
+    category: 'bakery',
+  },
+  {
+    id: 'cookie_dog',
+    labelEn: 'Cookie Dog',
+    labelFr: 'Toutou Biscuit',
+    url: '/avatars/cookie-dog.svg',
+    tagEn: 'Sweet Baker',
+    tagFr: 'Pâtissier Croquant',
+    badgeColor: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    category: 'bakery',
+  },
+  {
+    id: 'pancake_sloth',
+    labelEn: 'Pancake Sloth',
+    labelFr: 'Paresseux Pancake',
+    url: '/avatars/pancake-sloth.svg',
+    tagEn: 'Maple Syrup Fan',
+    tagFr: 'Sirop d’Érable',
+    badgeColor: 'bg-orange-100 text-orange-800 border-orange-200',
+    category: 'bakery',
+  },
+  {
+    id: 'waffle_hedgehog',
+    labelEn: 'Waffle Hedgehog',
+    labelFr: 'Hérisson Gaufre',
+    url: '/avatars/waffle-hedgehog.svg',
+    tagEn: 'Crispy Crunch',
+    tagFr: 'Crousti Doré',
+    badgeColor: 'bg-orange-100 text-orange-800 border-orange-200',
+    category: 'bakery',
+  },
+  {
+    id: 'pretzel_squirrel',
+    labelEn: 'Pretzel Squirrel',
+    labelFr: 'Écureuil Bretzel',
+    url: '/avatars/pretzel-squirrel.svg',
+    tagEn: 'Salt & Dough',
+    tagFr: 'Doré & Croquant',
+    badgeColor: 'bg-stone-100 text-stone-800 border-stone-200',
+    category: 'bakery',
+  },
+
+  // Sweets, Drinks & Veggie (10)
+  {
+    id: 'happy_avocado',
+    labelEn: 'Happy Avo',
+    labelFr: 'Guaca-Cool',
+    url: '/avatars/happy-avocado.svg',
+    tagEn: 'Fresh & Green',
+    tagFr: 'Frais & Bio',
+    badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    category: 'treats',
+  },
+  {
+    id: 'veggie_bunny',
+    labelEn: 'Veggie Bunny',
+    labelFr: 'Lapin Maraîcher',
+    url: '/avatars/veggie-bunny.svg',
+    tagEn: 'Garden Fresh',
+    tagFr: 'Potager Bio',
+    badgeColor: 'bg-green-100 text-green-800 border-green-200',
+    category: 'treats',
+  },
+  {
+    id: 'boba_panda',
+    labelEn: 'Boba Panda',
+    labelFr: 'Panda Tablier',
+    url: '/avatars/boba-panda.svg',
+    tagEn: 'Sweet Delights',
+    tagFr: 'Gourmandises',
+    badgeColor: 'bg-pink-100 text-pink-800 border-pink-200',
+    category: 'treats',
+  },
+  {
+    id: 'barista_koala',
+    labelEn: 'Barista Koala',
+    labelFr: 'Koala Barista',
+    url: '/avatars/barista-koala.svg',
+    tagEn: 'Coffee Artisan',
+    tagFr: 'Artisan Café',
+    badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+    category: 'treats',
+  },
+  {
+    id: 'berry_deer',
+    labelEn: 'Berry Deer',
+    labelFr: 'Cerf Myrtille',
+    url: '/avatars/berry-deer.svg',
+    tagEn: 'Forest Berries',
+    tagFr: 'Fruits des Bois',
+    badgeColor: 'bg-purple-100 text-purple-800 border-purple-200',
+    category: 'treats',
+  },
+  {
+    id: 'honey_badger',
+    labelEn: 'Honey Badger',
+    labelFr: 'Blaireau Miel',
+    url: '/avatars/honey-badger.svg',
+    tagEn: 'Golden Nectar',
+    tagFr: 'Nectar Sucré',
+    badgeColor: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    category: 'treats',
+  },
+  {
+    id: 'cupcake_kitty',
+    labelEn: 'Cupcake Kitty',
+    labelFr: 'Minette Cupcake',
+    url: '/avatars/cupcake-kitty.svg',
+    tagEn: 'Frosting Star',
+    tagFr: 'Étoile Glaçage',
+    badgeColor: 'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200',
+    category: 'treats',
+  },
+  {
+    id: 'mango_monkey',
+    labelEn: 'Mango Monkey',
+    labelFr: 'Singe Mangue',
+    url: '/avatars/mango-monkey.svg',
+    tagEn: 'Tropical Smoothie',
+    tagFr: 'Délices Exotiques',
+    badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    category: 'treats',
+  },
+  {
+    id: 'matcha_frog',
+    labelEn: 'Matcha Frog',
+    labelFr: 'Grenouille Matcha',
+    url: '/avatars/matcha-frog.svg',
+    tagEn: 'Zen Tea Master',
+    tagFr: 'Maître Zen Thé',
+    badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    category: 'treats',
+  },
+  {
+    id: 'donut_elephant',
+    labelEn: 'Donut Elephant',
+    labelFr: 'Éléphanteau Donut',
+    url: '/avatars/donut-elephant.svg',
+    tagEn: 'Sprinkles Magic',
+    tagFr: 'Magie Glacée',
+    badgeColor: 'bg-violet-100 text-violet-800 border-violet-200',
+    category: 'treats',
   },
 ];
 
-export const REALISTIC_AVATARS: AvatarOption[] = [
-  {
-    id: 'chef_1',
-    labelEn: 'Executive Chef',
-    labelFr: 'Chef Cuisinier',
-    url: 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?auto=format&fit=crop&w=250&q=80',
-  },
-  {
-    id: 'baker_1',
-    labelEn: 'Master Baker',
-    labelFr: 'Boulanger Gourmet',
-    url: 'https://images.unsplash.com/photo-1583394838336-acd977736f90?auto=format&fit=crop&w=250&q=80',
-  },
-  {
-    id: 'smile_man',
-    labelEn: 'Casual Foodie',
-    labelFr: 'Amateur Gourmand',
-    url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=250&q=80',
-  },
-  {
-    id: 'smile_woman',
-    labelEn: 'Market Shopper',
-    labelFr: 'Passionnée Marché',
-    url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=250&q=80',
-  },
-  {
-    id: 'friendly_culinary',
-    labelEn: 'Home Cook',
-    labelFr: 'Cuisinier Maison',
-    url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
-  },
-  {
-    id: 'organic_gardener',
-    labelEn: 'Urban Gardener',
-    labelFr: 'Jardinier Urbain',
-    url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=250&q=80',
-  },
-  {
-    id: 'modern_host',
-    labelEn: 'Brunch Host',
-    labelFr: 'Hôte Convivial',
-    url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=250&q=80',
-  },
-  {
-    id: 'eco_chef',
-    labelEn: 'Zero-Waste Cook',
-    labelFr: 'Passionné Anti-Gaspi',
-    url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=250&q=80',
-  },
-];
-
-const PRESET_AVATARS = [...CARTOON_AVATARS, ...REALISTIC_AVATARS];
+const PRESET_AVATARS = CARTOON_AVATARS;
 
 export const ChangeAvatarModal: React.FC<ChangeAvatarModalProps> = ({
   isOpen,
@@ -173,11 +340,13 @@ export const ChangeAvatarModal: React.FC<ChangeAvatarModalProps> = ({
   onSaveAvatar,
 }) => {
   const { lang } = useLanguage();
-  const [activeCategory, setActiveCategory] = useState<'cartoon' | 'realistic'>('cartoon');
   const [selectedAvatar, setSelectedAvatar] = useState<string>(user.avatarUrl || CARTOON_AVATARS[0].url);
   const [customUrlInput, setCustomUrlInput] = useState<string>('');
   const [isCapturingCamera, setIsCapturingCamera] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'chef' | 'savory' | 'bakery' | 'treats'>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -188,6 +357,23 @@ export const ChangeAvatarModal: React.FC<ChangeAvatarModalProps> = ({
     }
   }, [user.avatarUrl, isOpen]);
 
+  const filteredAvatars = useMemo(() => {
+    return CARTOON_AVATARS.filter((avatar) => {
+      if (selectedCategory !== 'all' && avatar.category !== selectedCategory) {
+        return false;
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const en = (avatar.labelEn || '').toLowerCase();
+        const fr = (avatar.labelFr || '').toLowerCase();
+        const tagEn = (avatar.tagEn || '').toLowerCase();
+        const tagFr = (avatar.tagFr || '').toLowerCase();
+        return en.includes(q) || fr.includes(q) || tagEn.includes(q) || tagFr.includes(q);
+      }
+      return true;
+    });
+  }, [selectedCategory, searchQuery]);
+
   if (!isOpen) return null;
 
   // Handle local file upload (converts & compresses to 256x256 base64 Data URL)
@@ -195,8 +381,9 @@ export const ChangeAvatarModal: React.FC<ChangeAvatarModalProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setUploadError(null);
     if (!file.type.startsWith('image/')) {
-      alert(lang === 'FR' ? 'Veuillez sélectionner un fichier image valide' : 'Please select a valid image file');
+      setUploadError(lang === 'FR' ? 'Veuillez sélectionner un fichier image valide' : 'Please select a valid image file');
       return;
     }
 
@@ -420,7 +607,7 @@ export const ChangeAvatarModal: React.FC<ChangeAvatarModalProps> = ({
                 type="url"
                 value={customUrlInput}
                 onChange={(e) => setCustomUrlInput(e.target.value)}
-                placeholder="https://images.unsplash.com/..."
+                placeholder="https://example.com/avatar.png"
                 className="flex-1 px-3 py-2 text-xs rounded-xl border border-[#D5E1D2] focus:outline-emerald-600 focus:bg-white bg-[#F9FAF8]"
               />
               <button
@@ -434,57 +621,103 @@ export const ChangeAvatarModal: React.FC<ChangeAvatarModalProps> = ({
             </div>
           </div>
 
+          {/* Upload Error feedback */}
+          {uploadError && (
+            <p className="text-xs text-rose-600 font-semibold bg-rose-50 p-2.5 rounded-xl border border-rose-200">
+              {uploadError}
+            </p>
+          )}
+
           {/* Preset Avatar Gallery */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#556D58] flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                 {lang === 'FR' ? 'Choisir un avatar de cuisine' : 'Select a Kitchen Avatar'}
               </span>
-              <span className="text-[10px] font-bold text-[#557559] bg-[#E8F3E5] px-2 py-0.5 rounded-full">
-                {activeCategory === 'cartoon' ? CARTOON_AVATARS.length : REALISTIC_AVATARS.length} {lang === 'FR' ? 'choix' : 'choices'}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold text-[#557559] bg-[#E8F3E5] px-2 py-0.5 rounded-full">
+                  {filteredAvatars.length} / {CARTOON_AVATARS.length} {lang === 'FR' ? 'personnages' : 'avatars'}
+                </span>
+              </div>
             </div>
 
-            {/* Category Selector Tabs */}
-            <div className="flex items-center gap-1.5 p-1 bg-[#EEF5EB] rounded-2xl border border-[#D5E4D2]">
-              <button
-                type="button"
-                onClick={() => setActiveCategory('cartoon')}
-                className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  activeCategory === 'cartoon'
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'text-[#4A644D] hover:text-[#1F3323] hover:bg-white/60'
-                }`}
-              >
-                <span>🎨</span>
-                <span>{lang === 'FR' ? 'Avatars Cartoon' : 'Cartoon Avatars'}</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${activeCategory === 'cartoon' ? 'bg-white/20' : 'bg-emerald-100 text-emerald-800'}`}>
-                  {CARTOON_AVATARS.length}
-                </span>
-              </button>
+            {/* Category tabs & Search filter */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                {(
+                  [
+                    { key: 'all', labelEn: 'All (30)', labelFr: 'Tous (30)' },
+                    { key: 'chef', labelEn: 'Chefs', labelFr: 'Chefs & Cuistots' },
+                    { key: 'savory', labelEn: 'Savory', labelFr: 'Plats & Saveurs' },
+                    { key: 'bakery', labelEn: 'Bakery', labelFr: 'Boulangerie' },
+                    { key: 'treats', labelEn: 'Sweets & Drinks', labelFr: 'Douceurs & Boissons' },
+                  ] as const
+                ).map((cat) => {
+                  const isActive = selectedCategory === cat.key;
+                  return (
+                    <button
+                      key={cat.key}
+                      type="button"
+                      onClick={() => setSelectedCategory(cat.key)}
+                      className={`px-2.5 py-1 rounded-lg font-bold text-[11px] whitespace-nowrap transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-emerald-600 text-white shadow-2xs'
+                          : 'bg-[#F2F7F0] text-[#47654B] hover:bg-[#E5EFE2]'
+                      }`}
+                    >
+                      {lang === 'FR' ? cat.labelFr : cat.labelEn}
+                    </button>
+                  );
+                })}
+              </div>
 
-              <button
-                type="button"
-                onClick={() => setActiveCategory('realistic')}
-                className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  activeCategory === 'realistic'
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'text-[#4A644D] hover:text-[#1F3323] hover:bg-white/60'
-                }`}
-              >
-                <span>📷</span>
-                <span>{lang === 'FR' ? 'Photos Réalistes' : 'Photos'}</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${activeCategory === 'realistic' ? 'bg-white/20' : 'bg-slate-200 text-slate-700'}`}>
-                  {REALISTIC_AVATARS.length}
-                </span>
-              </button>
+              {/* Quick Search */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={
+                    lang === 'FR'
+                      ? 'Rechercher un personnage (ex: chat, pizza, dragon, cookie)...'
+                      : 'Search character (e.g. cat, pizza, dragon, cookie)...'
+                  }
+                  className="w-full pl-8 pr-8 py-1.5 rounded-xl border border-[#D5E1D2] bg-white text-xs text-[#1F3323] focus:outline-emerald-600"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Avatars Grid */}
-            {activeCategory === 'cartoon' ? (
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-2.5">
-                {CARTOON_AVATARS.map((avatar) => {
+            {filteredAvatars.length === 0 ? (
+              <div className="text-center py-8 bg-[#FAFBF9] rounded-2xl border border-dashed border-[#DFE7DD]">
+                <p className="text-xs text-[#527470] font-medium">
+                  {lang === 'FR' ? 'Aucun avatar correspondant trouvé.' : 'No matching avatars found.'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCategory('all');
+                    setSearchQuery('');
+                  }}
+                  className="mt-2 text-xs font-bold text-emerald-700 underline cursor-pointer"
+                >
+                  {lang === 'FR' ? 'Afficher tous les 30 avatars' : 'Show all 30 avatars'}
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-2.5 max-h-[380px] overflow-y-auto pr-1">
+                {filteredAvatars.map((avatar) => {
                   const isChosen = selectedAvatar === avatar.url;
                   return (
                     <button
@@ -497,7 +730,7 @@ export const ChangeAvatarModal: React.FC<ChangeAvatarModalProps> = ({
                           : 'border-[#E0EBDD] bg-white hover:border-emerald-300 hover:bg-[#F7FAF6] hover:shadow-xs'
                       }`}
                     >
-                      <div className="relative w-14 h-14 rounded-full overflow-hidden shrink-0 border-2 border-white shadow-xs group-hover:scale-105 transition-transform">
+                      <div className="relative w-14 h-14 rounded-full overflow-hidden shrink-0 border-2 border-white shadow-xs group-hover:scale-105 transition-transform bg-[#F9FAF8]">
                         <img
                           src={avatar.url}
                           alt={lang === 'FR' ? avatar.labelFr : avatar.labelEn}
@@ -519,39 +752,6 @@ export const ChangeAvatarModal: React.FC<ChangeAvatarModalProps> = ({
                         )}
                       </div>
 
-                      {isChosen && (
-                        <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-xs">
-                          <Check className="w-2.5 h-2.5 stroke-[3]" />
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="grid grid-cols-4 gap-2.5">
-                {REALISTIC_AVATARS.map((avatar) => {
-                  const isChosen = selectedAvatar === avatar.url;
-                  return (
-                    <button
-                      key={avatar.id}
-                      type="button"
-                      onClick={() => setSelectedAvatar(avatar.url)}
-                      className={`relative p-1 rounded-2xl border transition-all flex flex-col items-center gap-1 cursor-pointer ${
-                        isChosen
-                          ? 'border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-500/20 shadow-xs'
-                          : 'border-[#E0EBDD] hover:border-slate-300 hover:bg-slate-50'
-                      }`}
-                    >
-                      <img
-                        src={avatar.url}
-                        alt={lang === 'FR' ? avatar.labelFr : avatar.labelEn}
-                        referrerPolicy="no-referrer"
-                        className="w-12 h-12 rounded-full object-cover"
-                      />
-                      <span className="text-[9px] font-bold text-[#354C38] truncate w-full text-center px-0.5">
-                        {lang === 'FR' ? avatar.labelFr : avatar.labelEn}
-                      </span>
                       {isChosen && (
                         <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-xs">
                           <Check className="w-2.5 h-2.5 stroke-[3]" />

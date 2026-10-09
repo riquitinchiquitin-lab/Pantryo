@@ -71,7 +71,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_meat',
     name: 'Beef Steaks & Prime Cuts',
     keywords: ['steak', 'ribeye', 'sirloin', 't-bone', 'filet mignon', 'tenderloin', 'beef roast', 'flank steak', 'beef chuck'],
-    imageUrl: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Beef,
     badgeLabel: 'Prime Beef',
     bgColor: 'bg-red-50',
@@ -84,7 +84,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_meat',
     name: 'Ground Beef & Minced Meat',
     keywords: ['ground beef', 'minced beef', 'minced meat', 'ground chuck', 'ground meat', 'bolognese meat', 'hamburger meat'],
-    imageUrl: 'https://images.unsplash.com/photo-1588168333986-5078d3ae3976?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Beef,
     badgeLabel: 'Ground Beef',
     bgColor: 'bg-rose-50',
@@ -97,7 +97,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_meat',
     name: 'Chicken Breasts & Cutlets',
     keywords: ['chicken breast', 'chicken cutlet', 'chicken tender', 'boneless chicken', 'chicken fillet'],
-    imageUrl: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Drumstick,
     badgeLabel: 'Chicken Breast',
     bgColor: 'bg-amber-50',
@@ -110,7 +110,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_meat',
     name: 'Chicken Thighs & Wings',
     keywords: ['chicken thigh', 'chicken wing', 'drumstick', 'chicken leg', 'chicken thighs', 'chicken wings'],
-    imageUrl: 'https://images.unsplash.com/photo-1587593810167-a84920ea0781?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Drumstick,
     badgeLabel: 'Chicken Cuts',
     bgColor: 'bg-amber-50',
@@ -123,7 +123,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_meat',
     name: 'Whole Roast Chicken',
     keywords: ['whole chicken', 'rotisserie chicken', 'roast chicken', 'cornish hen'],
-    imageUrl: 'https://images.unsplash.com/photo-1598103442097-8b74394b95c6?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Drumstick,
     badgeLabel: 'Whole Bird',
     bgColor: 'bg-amber-50',
@@ -136,7 +136,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_meat',
     name: 'Pork Chops & Loins',
     keywords: ['pork chop', 'pork loin', 'pork tenderloin', 'pork roast', 'pork cutlet'],
-    imageUrl: 'https://images.unsplash.com/photo-1432139555190-58524dae6a55?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Beef,
     badgeLabel: 'Pork Cuts',
     bgColor: 'bg-rose-50',
@@ -149,7 +149,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_meat',
     name: 'Bacon & Pancetta',
     keywords: ['bacon', 'pancetta', 'lardons', 'pork belly', 'smoked bacon'],
-    imageUrl: 'https://images.unsplash.com/photo-1528607929212-2636ec44253e?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Flame,
     badgeLabel: 'Crispy Bacon',
     bgColor: 'bg-red-50',
@@ -162,7 +162,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_meat',
     name: 'Pork Ribs & BBQ Cuts',
     keywords: ['ribs', 'baby back ribs', 'spareribs', 'pork ribs', 'st louis ribs'],
-    imageUrl: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Beef,
     badgeLabel: 'Pork Ribs',
     bgColor: 'bg-rose-50',
@@ -175,7 +175,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_meat',
     name: 'Lamb & Mutton',
     keywords: ['lamb', 'lamb chop', 'lamb shank', 'mutton', 'rack of lamb', 'leg of lamb'],
-    imageUrl: 'https://images.unsplash.com/photo-1551024601-bec78aea704b?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Beef,
     badgeLabel: 'Lamb & Mutton',
     bgColor: 'bg-rose-50',
@@ -188,7 +188,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_meat',
     name: 'Turkey & Game Birds',
     keywords: ['turkey', 'turkey breast', 'ground turkey', 'turkey drumstick'],
-    imageUrl: 'https://images.unsplash.com/photo-1574672280600-4accfa5b6f98?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Drumstick,
     badgeLabel: 'Turkey',
     bgColor: 'bg-amber-50',
@@ -201,7 +201,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_meat',
     name: 'Duck & Confit',
     keywords: ['duck', 'duck breast', 'confit', 'duck leg'],
-    imageUrl: 'https://images.unsplash.com/photo-1514944298352-7b83321589d8?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Drumstick,
     badgeLabel: 'Duck',
     bgColor: 'bg-amber-50',
@@ -214,7 +214,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_meat',
     name: 'Sausages & Bratwurst',
     keywords: ['sausage', 'sausages', 'bratwurst', 'chorizo', 'hot dog', 'frankfurter', 'italian sausage', 'kielbasa'],
-    imageUrl: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Utensils,
     badgeLabel: 'Sausages',
     bgColor: 'bg-orange-50',
@@ -227,7 +227,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_meat',
     name: 'Charcuterie & Deli Meats',
     keywords: ['prosciutto', 'salami', 'jamon', 'pastrami', 'ham', 'cured meat', 'pepperoni', 'deli meat', 'mortadella'],
-    imageUrl: 'https://images.unsplash.com/photo-1541544741938-0af808871cc0?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Sandwich,
     badgeLabel: 'Charcuterie',
     bgColor: 'bg-amber-50',
@@ -242,7 +242,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_meat',
     name: 'Fresh Salmon Fillets',
     keywords: ['salmon', 'salmon fillet', 'salmon steak', 'atlantic salmon', 'sockeye salmon'],
-    imageUrl: 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Fish,
     badgeLabel: 'Fresh Salmon',
     bgColor: 'bg-rose-50',
@@ -255,7 +255,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_meat',
     name: 'Smoked Salmon & Lox',
     keywords: ['smoked salmon', 'lox', 'gravlax', 'smoked trout'],
-    imageUrl: 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Fish,
     badgeLabel: 'Smoked Lox',
     bgColor: 'bg-rose-50',
@@ -268,7 +268,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_meat',
     name: 'White Fish Fillets (Cod, Halibut, Tilapia)',
     keywords: ['cod', 'halibut', 'tilapia', 'sea bass', 'bass', 'haddock', 'sole', 'flounder', 'white fish', 'snapper', 'trout', 'pollock'],
-    imageUrl: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Fish,
     badgeLabel: 'White Fish',
     bgColor: 'bg-cyan-50',
@@ -281,7 +281,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_meat',
     name: 'Ahi Tuna & Steaks',
     keywords: ['tuna steak', 'ahi tuna', 'yellowfin', 'bluefin tuna', 'fresh tuna'],
-    imageUrl: 'https://images.unsplash.com/photo-1501595091296-3aa970afb3ff?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Fish,
     badgeLabel: 'Ahi Tuna',
     bgColor: 'bg-red-50',
@@ -294,7 +294,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_meat',
     name: 'Shrimp & Prawns',
     keywords: ['shrimp', 'prawn', 'prawns', 'scampi', 'tiger shrimp', 'jumbo shrimp'],
-    imageUrl: 'https://images.unsplash.com/photo-1565680018434-b513d5e5fd47?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Fish,
     badgeLabel: 'Shrimp & Prawns',
     bgColor: 'bg-orange-50',
@@ -307,7 +307,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_meat',
     name: 'Lobster & Crab',
     keywords: ['lobster', 'crab', 'crab meat', 'lobster tail', 'king crab', 'snow crab'],
-    imageUrl: 'https://images.unsplash.com/photo-1559737558-2f5a35f4523b?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Fish,
     badgeLabel: 'Lobster & Crab',
     bgColor: 'bg-red-50',
@@ -320,7 +320,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_meat',
     name: 'Sea Scallops',
     keywords: ['scallop', 'scallops', 'sea scallops', 'bay scallops'],
-    imageUrl: 'https://images.unsplash.com/photo-1532550907401-a500c9a57435?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Fish,
     badgeLabel: 'Scallops',
     bgColor: 'bg-amber-50',
@@ -333,7 +333,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_meat',
     name: 'Mussels, Clams & Oysters',
     keywords: ['mussel', 'mussels', 'clam', 'clams', 'oyster', 'oysters'],
-    imageUrl: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Fish,
     badgeLabel: 'Mussels & Clams',
     bgColor: 'bg-slate-50',
@@ -346,7 +346,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_meat',
     name: 'Calamari, Squid & Octopus',
     keywords: ['squid', 'calamari', 'octopus', 'cuttlefish'],
-    imageUrl: 'https://images.unsplash.com/photo-1608897013039-887f21d8c804?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Fish,
     badgeLabel: 'Calamari & Squid',
     bgColor: 'bg-indigo-50',
@@ -359,7 +359,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_meat',
     name: 'Canned Tuna & Sardines',
     keywords: ['canned tuna', 'sardine', 'sardines', 'anchovy', 'anchovies', 'tuna can'],
-    imageUrl: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Package,
     badgeLabel: 'Canned Seafood',
     bgColor: 'bg-cyan-50',
@@ -374,7 +374,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_produce',
     name: 'Berries & Small Fruits',
     keywords: ['strawberry', 'strawberries', 'blueberry', 'blueberries', 'raspberry', 'raspberries', 'blackberry', 'blackberries'],
-    imageUrl: 'https://images.unsplash.com/photo-1464965911861-746a04b4bca6?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Cherry,
     badgeLabel: 'Berries',
     bgColor: 'bg-rose-50',
@@ -387,7 +387,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_produce',
     name: 'Citrus Fruits',
     keywords: ['lemon', 'lime', 'orange', 'grapefruit', 'mandarin', 'clementine', 'citrus'],
-    imageUrl: 'https://images.unsplash.com/photo-1582979512210-99b6a53386f9?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Citrus,
     badgeLabel: 'Citrus',
     bgColor: 'bg-yellow-50',
@@ -400,7 +400,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_produce',
     name: 'Salad Greens & Herbs',
     keywords: ['spinach', 'kale', 'lettuce', 'arugula', 'salad', 'basil', 'parsley', 'coriander', 'cilantro', 'mint'],
-    imageUrl: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Salad,
     badgeLabel: 'Greens & Herbs',
     bgColor: 'bg-emerald-50',
@@ -413,7 +413,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_produce',
     name: 'Root Vegetables',
     keywords: ['carrot', 'potato', 'potatoes', 'sweet potato', 'onion', 'garlic', 'ginger', 'beet'],
-    imageUrl: 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Carrot,
     badgeLabel: 'Root Vegetables',
     bgColor: 'bg-amber-50',
@@ -426,7 +426,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_dairy',
     name: 'Cheeses & Curds',
     keywords: ['cheese', 'cheddar', 'mozzarella', 'parmesan', 'feta', 'brie', 'gouda', 'ricotta'],
-    imageUrl: 'https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Milk,
     badgeLabel: 'Artisan Cheese',
     bgColor: 'bg-amber-50',
@@ -439,7 +439,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_dairy',
     name: 'Farm Eggs',
     keywords: ['egg', 'eggs', 'egg whites', 'yolk', 'brown eggs'],
-    imageUrl: 'https://images.unsplash.com/photo-1516467508483-a7212febe31a?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Egg,
     badgeLabel: 'Farm Eggs',
     bgColor: 'bg-amber-50',
@@ -452,7 +452,7 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_pantry',
     name: 'Pasta & Noodles',
     keywords: ['pasta', 'spaghetti', 'penne', 'noodles', 'ramen', 'linguine', 'macaroni', 'fusilli'],
-    imageUrl: 'https://images.unsplash.com/photo-1551462147-ff29053bfc14?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Utensils,
     badgeLabel: 'Pasta & Noodles',
     bgColor: 'bg-amber-50',
@@ -465,13 +465,79 @@ export const ALL_SUB_CATEGORIES: FoodSubcategoryMeta[] = [
     parentCategoryId: 'cat_bakery',
     name: 'Artisanal Bread & Sourdough',
     keywords: ['bread', 'sourdough', 'baguette', 'croissant', 'bagel', 'bun', 'brioche', 'loaf'],
-    imageUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Wheat,
     badgeLabel: 'Fresh Bakery',
     bgColor: 'bg-amber-50',
     textColor: 'text-amber-800',
     borderColor: 'border-amber-200',
     description: 'Rustic naturally leavened sourdough boules and french baguettes',
+  },
+  // Spices & Seasonings Subcategories
+  {
+    id: 'sub_ground_spices',
+    parentCategoryId: 'cat_spices',
+    name: 'Ground Spices',
+    keywords: ['paprika', 'cumin', 'turmeric', 'curcuma', 'curry', 'cinnamon', 'cannelle', 'ginger', 'gingembre', 'chili powder', 'cayenne', 'nutmeg', 'muscade'],
+    imageUrl: '',
+    icon: Flame,
+    badgeLabel: 'Ground Spices',
+    bgColor: 'bg-orange-50',
+    textColor: 'text-orange-700',
+    borderColor: 'border-orange-200',
+    description: 'Smoked paprika, ground cumin, turmeric, curry powder & cinnamon',
+  },
+  {
+    id: 'sub_whole_spices',
+    parentCategoryId: 'cat_spices',
+    name: 'Whole Spices',
+    keywords: ['peppercorn', 'poivre', 'cinnamon stick', 'clove', 'girofle', 'cardamom', 'cardamome', 'star anise', 'anis étoilé', 'coriander seeds', 'mustard seeds'],
+    imageUrl: '',
+    icon: Sparkles,
+    badgeLabel: 'Whole Spices',
+    bgColor: 'bg-amber-50',
+    textColor: 'text-amber-800',
+    borderColor: 'border-amber-200',
+    description: 'Tellicherry peppercorns, cinnamon quills, cloves & star anise',
+  },
+  {
+    id: 'sub_dried_herbs',
+    parentCategoryId: 'cat_spices',
+    name: 'Dried Herbs',
+    keywords: ['oregano', 'origan', 'basil', 'basilic', 'thyme', 'thym', 'rosemary', 'romarin', 'bay leaf', 'laurier', 'herbes de provence', 'dill', 'aneth'],
+    imageUrl: '',
+    icon: Salad,
+    badgeLabel: 'Dried Herbs',
+    bgColor: 'bg-emerald-50',
+    textColor: 'text-emerald-700',
+    borderColor: 'border-emerald-200',
+    description: 'Herbes de Provence, Mediterranean oregano, thyme & rosemary',
+  },
+  {
+    id: 'sub_seasoning_blends',
+    parentCategoryId: 'cat_spices',
+    name: 'Seasoning Blends & Salts',
+    keywords: ['steak spice', 'montreal', 'garlic salt', 'sea salt', 'sel', 'kosher salt', 'everything bagel', 'taco seasoning', 'cajun', 'rub', 'assaisonnement'],
+    imageUrl: '',
+    icon: Flame,
+    badgeLabel: 'Blends & Salts',
+    bgColor: 'bg-rose-50',
+    textColor: 'text-rose-700',
+    borderColor: 'border-rose-200',
+    description: 'Montreal steak spice, fleur de sel, garlic seasonings & BBQ rubs',
+  },
+  {
+    id: 'sub_extracts_vanilla',
+    parentCategoryId: 'cat_spices',
+    name: 'Extracts & Baking Aromatics',
+    keywords: ['vanilla', 'vanille', 'extract', 'extrait', 'almond extract', 'orange blossom', 'fève tonka', 'tonka'],
+    imageUrl: '',
+    icon: Sparkles,
+    badgeLabel: 'Extracts',
+    bgColor: 'bg-amber-50',
+    textColor: 'text-amber-800',
+    borderColor: 'border-amber-200',
+    description: 'Pure Madagascar vanilla extract, almond essences & baking aromatics',
   },
 ];
 
@@ -481,7 +547,7 @@ export const ALL_FOOD_CATEGORIES: FoodCategoryMeta[] = [
     id: 'cat_produce',
     name: 'Produce',
     filterKey: 'Produce',
-    imageUrl: 'https://images.unsplash.com/photo-1610832958506-aa56368176cf?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Apple,
     badgeLabel: 'Produce',
     bgColor: 'bg-emerald-50',
@@ -493,7 +559,7 @@ export const ALL_FOOD_CATEGORIES: FoodCategoryMeta[] = [
     id: 'cat_dairy',
     name: 'Dairy & Eggs',
     filterKey: 'Dairy',
-    imageUrl: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Milk,
     badgeLabel: 'Dairy & Eggs',
     bgColor: 'bg-sky-50',
@@ -505,7 +571,7 @@ export const ALL_FOOD_CATEGORIES: FoodCategoryMeta[] = [
     id: 'cat_meat',
     name: 'Meat & Seafood',
     filterKey: 'Meat',
-    imageUrl: 'https://images.unsplash.com/photo-1603048588665-791ca8aea617?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Beef,
     badgeLabel: 'Meat & Seafood',
     bgColor: 'bg-rose-50',
@@ -517,7 +583,7 @@ export const ALL_FOOD_CATEGORIES: FoodCategoryMeta[] = [
     id: 'cat_bakery',
     name: 'Bakery',
     filterKey: 'Bakery',
-    imageUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Wheat,
     badgeLabel: 'Bakery',
     bgColor: 'bg-amber-50',
@@ -529,7 +595,7 @@ export const ALL_FOOD_CATEGORIES: FoodCategoryMeta[] = [
     id: 'cat_pantry',
     name: 'Pantry Staples',
     filterKey: 'Pantry',
-    imageUrl: 'https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Package,
     badgeLabel: 'Pantry Staples',
     bgColor: 'bg-purple-50',
@@ -541,7 +607,7 @@ export const ALL_FOOD_CATEGORIES: FoodCategoryMeta[] = [
     id: 'cat_frozen',
     name: 'Frozen Meals',
     filterKey: 'Frozen',
-    imageUrl: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Snowflake,
     badgeLabel: 'Frozen Meals',
     bgColor: 'bg-indigo-50',
@@ -553,7 +619,7 @@ export const ALL_FOOD_CATEGORIES: FoodCategoryMeta[] = [
     id: 'cat_beverages',
     name: 'Beverages',
     filterKey: 'Beverages',
-    imageUrl: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Coffee,
     badgeLabel: 'Beverages',
     bgColor: 'bg-teal-50',
@@ -565,7 +631,7 @@ export const ALL_FOOD_CATEGORIES: FoodCategoryMeta[] = [
     id: 'cat_snacks',
     name: 'Snacks',
     filterKey: 'Snacks',
-    imageUrl: 'https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Cookie,
     badgeLabel: 'Snacks',
     bgColor: 'bg-orange-50',
@@ -577,7 +643,7 @@ export const ALL_FOOD_CATEGORIES: FoodCategoryMeta[] = [
     id: 'cat_condiments',
     name: 'Condiments',
     filterKey: 'Condiments',
-    imageUrl: 'https://images.unsplash.com/photo-1472476443507-c7a5948772fc?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Soup,
     badgeLabel: 'Condiments',
     bgColor: 'bg-yellow-50',
@@ -589,7 +655,7 @@ export const ALL_FOOD_CATEGORIES: FoodCategoryMeta[] = [
     id: 'cat_deli',
     name: 'Deli & Prepared',
     filterKey: 'Deli',
-    imageUrl: 'https://images.unsplash.com/photo-1541544741938-0af808871cc0?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Sandwich,
     badgeLabel: 'Deli & Prepared',
     bgColor: 'bg-amber-50',
@@ -601,7 +667,7 @@ export const ALL_FOOD_CATEGORIES: FoodCategoryMeta[] = [
     id: 'cat_canned',
     name: 'Canned Goods',
     filterKey: 'Canned',
-    imageUrl: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: Package,
     badgeLabel: 'Canned Goods',
     bgColor: 'bg-rose-50',
@@ -613,7 +679,7 @@ export const ALL_FOOD_CATEGORIES: FoodCategoryMeta[] = [
     id: 'cat_sweets',
     name: 'Sweets & Desserts',
     filterKey: 'Sweet',
-    imageUrl: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '',
     icon: IceCream,
     badgeLabel: 'Sweets & Desserts',
     bgColor: 'bg-pink-50',
@@ -621,16 +687,68 @@ export const ALL_FOOD_CATEGORIES: FoodCategoryMeta[] = [
     borderColor: 'border-pink-200',
     description: 'Fine chocolates, gourmet pastries, honey & desserts',
   },
+  {
+    id: 'cat_spices',
+    name: 'Spices & Seasonings',
+    filterKey: 'Spices',
+    imageUrl: '',
+    icon: Flame,
+    badgeLabel: 'Spices & Seasonings',
+    bgColor: 'bg-orange-50',
+    textColor: 'text-orange-700',
+    borderColor: 'border-orange-200',
+    description: 'Whole spices, ground seasonings, dried herbs, peppers & salts',
+  },
 ];
 
 // Category mapping with theme colors, Lucide icons, and curated high-resolution food photos
 export const FOOD_CATEGORY_VISUALS: Record<string, FoodTypeVisual> = {
+  'Spices & Seasonings': {
+    icon: Flame,
+    bgColor: 'bg-orange-50',
+    textColor: 'text-orange-700',
+    borderColor: 'border-orange-200',
+    defaultImage: '',
+    badgeLabel: 'Spices & Seasonings',
+  },
+  Spices: {
+    icon: Flame,
+    bgColor: 'bg-orange-50',
+    textColor: 'text-orange-700',
+    borderColor: 'border-orange-200',
+    defaultImage: '',
+    badgeLabel: 'Spices',
+  },
+  'Épices & Assaisonnements': {
+    icon: Flame,
+    bgColor: 'bg-orange-50',
+    textColor: 'text-orange-700',
+    borderColor: 'border-orange-200',
+    defaultImage: '',
+    badgeLabel: 'Épices',
+  },
+  Épices: {
+    icon: Flame,
+    bgColor: 'bg-orange-50',
+    textColor: 'text-orange-700',
+    borderColor: 'border-orange-200',
+    defaultImage: '',
+    badgeLabel: 'Épices',
+  },
+  'Spice Rack': {
+    icon: Flame,
+    bgColor: 'bg-orange-50',
+    textColor: 'text-orange-700',
+    borderColor: 'border-orange-200',
+    defaultImage: '',
+    badgeLabel: 'Spice Rack',
+  },
   'Dairy & Eggs': {
     icon: Milk,
     bgColor: 'bg-sky-50',
     textColor: 'text-sky-700',
     borderColor: 'border-sky-200',
-    defaultImage: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=600&q=80',
+    defaultImage: '',
     badgeLabel: 'Dairy & Eggs',
   },
   Dairy: {
@@ -638,7 +756,7 @@ export const FOOD_CATEGORY_VISUALS: Record<string, FoodTypeVisual> = {
     bgColor: 'bg-sky-50',
     textColor: 'text-sky-700',
     borderColor: 'border-sky-200',
-    defaultImage: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=600&q=80',
+    defaultImage: '',
     badgeLabel: 'Dairy',
   },
   Produce: {
@@ -646,7 +764,7 @@ export const FOOD_CATEGORY_VISUALS: Record<string, FoodTypeVisual> = {
     bgColor: 'bg-emerald-50',
     textColor: 'text-emerald-700',
     borderColor: 'border-emerald-200',
-    defaultImage: 'https://images.unsplash.com/photo-1610832958506-aa56368176cf?auto=format&fit=crop&w=600&q=80',
+    defaultImage: '',
     badgeLabel: 'Produce',
   },
   'Fruits & Vegetables': {
@@ -654,7 +772,7 @@ export const FOOD_CATEGORY_VISUALS: Record<string, FoodTypeVisual> = {
     bgColor: 'bg-emerald-50',
     textColor: 'text-emerald-700',
     borderColor: 'border-emerald-200',
-    defaultImage: 'https://images.unsplash.com/photo-1610832958506-aa56368176cf?auto=format&fit=crop&w=600&q=80',
+    defaultImage: '',
     badgeLabel: 'Produce',
   },
   'Meat & Seafood': {
@@ -662,7 +780,7 @@ export const FOOD_CATEGORY_VISUALS: Record<string, FoodTypeVisual> = {
     bgColor: 'bg-rose-50',
     textColor: 'text-rose-700',
     borderColor: 'border-rose-200',
-    defaultImage: 'https://images.unsplash.com/photo-1603048588665-791ca8aea617?auto=format&fit=crop&w=600&q=80',
+    defaultImage: '',
     badgeLabel: 'Meat & Seafood',
   },
   Meat: {
@@ -670,7 +788,7 @@ export const FOOD_CATEGORY_VISUALS: Record<string, FoodTypeVisual> = {
     bgColor: 'bg-rose-50',
     textColor: 'text-rose-700',
     borderColor: 'border-rose-200',
-    defaultImage: 'https://images.unsplash.com/photo-1603048588665-791ca8aea617?auto=format&fit=crop&w=600&q=80',
+    defaultImage: '',
     badgeLabel: 'Meat',
   },
   Bakery: {
@@ -678,7 +796,7 @@ export const FOOD_CATEGORY_VISUALS: Record<string, FoodTypeVisual> = {
     bgColor: 'bg-amber-50',
     textColor: 'text-amber-800',
     borderColor: 'border-amber-200',
-    defaultImage: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80',
+    defaultImage: '',
     badgeLabel: 'Bakery',
   },
   'Pantry Staples': {
@@ -686,7 +804,7 @@ export const FOOD_CATEGORY_VISUALS: Record<string, FoodTypeVisual> = {
     bgColor: 'bg-purple-50',
     textColor: 'text-purple-700',
     borderColor: 'border-purple-200',
-    defaultImage: 'https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?auto=format&fit=crop&w=600&q=80',
+    defaultImage: '',
     badgeLabel: 'Pantry Staples',
   },
   Pantry: {
@@ -694,7 +812,7 @@ export const FOOD_CATEGORY_VISUALS: Record<string, FoodTypeVisual> = {
     bgColor: 'bg-purple-50',
     textColor: 'text-purple-700',
     borderColor: 'border-purple-200',
-    defaultImage: 'https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?auto=format&fit=crop&w=600&q=80',
+    defaultImage: '',
     badgeLabel: 'Pantry',
   },
   'Frozen Meals': {
@@ -702,7 +820,7 @@ export const FOOD_CATEGORY_VISUALS: Record<string, FoodTypeVisual> = {
     bgColor: 'bg-indigo-50',
     textColor: 'text-indigo-700',
     borderColor: 'border-indigo-200',
-    defaultImage: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=80',
+    defaultImage: '',
     badgeLabel: 'Frozen Meals',
   },
   'Frozen Foods': {
@@ -710,7 +828,7 @@ export const FOOD_CATEGORY_VISUALS: Record<string, FoodTypeVisual> = {
     bgColor: 'bg-indigo-50',
     textColor: 'text-indigo-700',
     borderColor: 'border-indigo-200',
-    defaultImage: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=80',
+    defaultImage: '',
     badgeLabel: 'Frozen Foods',
   },
   Beverages: {
@@ -718,7 +836,7 @@ export const FOOD_CATEGORY_VISUALS: Record<string, FoodTypeVisual> = {
     bgColor: 'bg-teal-50',
     textColor: 'text-teal-700',
     borderColor: 'border-teal-200',
-    defaultImage: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=600&q=80',
+    defaultImage: '',
     badgeLabel: 'Beverages',
   },
   Drinks: {
@@ -726,7 +844,7 @@ export const FOOD_CATEGORY_VISUALS: Record<string, FoodTypeVisual> = {
     bgColor: 'bg-teal-50',
     textColor: 'text-teal-700',
     borderColor: 'border-teal-200',
-    defaultImage: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=600&q=80',
+    defaultImage: '',
     badgeLabel: 'Beverages',
   },
   Snacks: {
@@ -734,7 +852,7 @@ export const FOOD_CATEGORY_VISUALS: Record<string, FoodTypeVisual> = {
     bgColor: 'bg-orange-50',
     textColor: 'text-orange-700',
     borderColor: 'border-orange-200',
-    defaultImage: 'https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?auto=format&fit=crop&w=600&q=80',
+    defaultImage: '',
     badgeLabel: 'Snacks',
   },
   Condiments: {
@@ -742,7 +860,7 @@ export const FOOD_CATEGORY_VISUALS: Record<string, FoodTypeVisual> = {
     bgColor: 'bg-yellow-50',
     textColor: 'text-yellow-800',
     borderColor: 'border-yellow-200',
-    defaultImage: 'https://images.unsplash.com/photo-1472476443507-c7a5948772fc?auto=format&fit=crop&w=600&q=80',
+    defaultImage: '',
     badgeLabel: 'Condiments',
   },
   'Condiments & Sauces': {
@@ -750,7 +868,7 @@ export const FOOD_CATEGORY_VISUALS: Record<string, FoodTypeVisual> = {
     bgColor: 'bg-yellow-50',
     textColor: 'text-yellow-800',
     borderColor: 'border-yellow-200',
-    defaultImage: 'https://images.unsplash.com/photo-1472476443507-c7a5948772fc?auto=format&fit=crop&w=600&q=80',
+    defaultImage: '',
     badgeLabel: 'Condiments',
   },
   'Deli & Prepared': {
@@ -758,7 +876,7 @@ export const FOOD_CATEGORY_VISUALS: Record<string, FoodTypeVisual> = {
     bgColor: 'bg-amber-50',
     textColor: 'text-amber-800',
     borderColor: 'border-amber-200',
-    defaultImage: 'https://images.unsplash.com/photo-1541544741938-0af808871cc0?auto=format&fit=crop&w=600&q=80',
+    defaultImage: '',
     badgeLabel: 'Deli & Prepared',
   },
   'Canned Goods': {
@@ -766,7 +884,7 @@ export const FOOD_CATEGORY_VISUALS: Record<string, FoodTypeVisual> = {
     bgColor: 'bg-rose-50',
     textColor: 'text-rose-700',
     borderColor: 'border-rose-200',
-    defaultImage: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=600&q=80',
+    defaultImage: '',
     badgeLabel: 'Canned Goods',
   },
   'Sweets & Desserts': {
@@ -774,7 +892,7 @@ export const FOOD_CATEGORY_VISUALS: Record<string, FoodTypeVisual> = {
     bgColor: 'bg-pink-50',
     textColor: 'text-pink-700',
     borderColor: 'border-pink-200',
-    defaultImage: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=600&q=80',
+    defaultImage: '',
     badgeLabel: 'Sweets',
   },
 };
@@ -808,7 +926,7 @@ export function getFoodVisual(itemName: string = '', categoryName: string = ''):
       bgColor: 'bg-sky-50',
       textColor: 'text-sky-700',
       borderColor: 'border-sky-200',
-      defaultImage: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=300&q=80',
+      defaultImage: '',
       badgeLabel: 'Dairy & Milk',
     };
   }
@@ -818,7 +936,7 @@ export function getFoodVisual(itemName: string = '', categoryName: string = ''):
       bgColor: 'bg-rose-50',
       textColor: 'text-rose-700',
       borderColor: 'border-rose-200',
-      defaultImage: 'https://images.unsplash.com/photo-1464965911861-746a04b4bca6?auto=format&fit=crop&w=300&q=80',
+      defaultImage: '',
       badgeLabel: 'Berries',
     };
   }
@@ -828,8 +946,43 @@ export function getFoodVisual(itemName: string = '', categoryName: string = ''):
       bgColor: 'bg-cyan-50',
       textColor: 'text-cyan-700',
       borderColor: 'border-cyan-200',
-      defaultImage: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=300&q=80',
+      defaultImage: '',
       badgeLabel: 'Seafood',
+    };
+  }
+  if (
+    lowerName.includes('paprika') ||
+    lowerName.includes('cumin') ||
+    lowerName.includes('peppercorn') ||
+    lowerName.includes('poivre') ||
+    lowerName.includes('oregano') ||
+    lowerName.includes('origan') ||
+    lowerName.includes('thyme') ||
+    lowerName.includes('thym') ||
+    lowerName.includes('cinnamon') ||
+    lowerName.includes('cannelle') ||
+    lowerName.includes('turmeric') ||
+    lowerName.includes('curcuma') ||
+    lowerName.includes('curry') ||
+    lowerName.includes('chili') ||
+    lowerName.includes('spice') ||
+    lowerName.includes('épice') ||
+    lowerName.includes('seasoning') ||
+    lowerName.includes('assaisonnement') ||
+    lowerName.includes('rosemary') ||
+    lowerName.includes('romarin') ||
+    lowerName.includes('vanilla') ||
+    lowerName.includes('vanille') ||
+    categoryName.toLowerCase().includes('spice') ||
+    categoryName.toLowerCase().includes('épice')
+  ) {
+    return {
+      icon: Flame,
+      bgColor: 'bg-orange-50',
+      textColor: 'text-orange-700',
+      borderColor: 'border-orange-200',
+      defaultImage: '',
+      badgeLabel: 'Spices',
     };
   }
   if (lowerName.includes('beef') || lowerName.includes('steak') || lowerName.includes('meat')) {
@@ -838,7 +991,7 @@ export function getFoodVisual(itemName: string = '', categoryName: string = ''):
       bgColor: 'bg-red-50',
       textColor: 'text-red-700',
       borderColor: 'border-red-200',
-      defaultImage: 'https://images.unsplash.com/photo-1603048588665-791ca8aea617?auto=format&fit=crop&w=300&q=80',
+      defaultImage: '',
       badgeLabel: 'Red Meat',
     };
   }
@@ -848,7 +1001,7 @@ export function getFoodVisual(itemName: string = '', categoryName: string = ''):
       bgColor: 'bg-amber-50',
       textColor: 'text-amber-800',
       borderColor: 'border-amber-200',
-      defaultImage: 'https://images.unsplash.com/photo-1587593810167-a84920ea0781?auto=format&fit=crop&w=300&q=80',
+      defaultImage: '',
       badgeLabel: 'Poultry',
     };
   }
@@ -858,7 +1011,7 @@ export function getFoodVisual(itemName: string = '', categoryName: string = ''):
       bgColor: 'bg-amber-50',
       textColor: 'text-amber-800',
       borderColor: 'border-amber-200',
-      defaultImage: 'https://images.unsplash.com/photo-1516467508483-a7212febe31a?auto=format&fit=crop&w=300&q=80',
+      defaultImage: '',
       badgeLabel: 'Fresh Eggs',
     };
   }
@@ -868,7 +1021,7 @@ export function getFoodVisual(itemName: string = '', categoryName: string = ''):
       bgColor: 'bg-blue-50',
       textColor: 'text-blue-700',
       borderColor: 'border-blue-200',
-      defaultImage: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=300&q=80',
+      defaultImage: '',
       badgeLabel: 'Yogurt',
     };
   }
@@ -878,7 +1031,7 @@ export function getFoodVisual(itemName: string = '', categoryName: string = ''):
       bgColor: 'bg-rose-50',
       textColor: 'text-rose-700',
       borderColor: 'border-rose-200',
-      defaultImage: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=300&q=80',
+      defaultImage: '',
       badgeLabel: 'Canned Goods',
     };
   }
@@ -888,7 +1041,7 @@ export function getFoodVisual(itemName: string = '', categoryName: string = ''):
       bgColor: 'bg-amber-50',
       textColor: 'text-amber-800',
       borderColor: 'border-amber-200',
-      defaultImage: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=300&q=80',
+      defaultImage: '',
       badgeLabel: 'Bakery',
     };
   }
@@ -898,7 +1051,7 @@ export function getFoodVisual(itemName: string = '', categoryName: string = ''):
       bgColor: 'bg-emerald-50',
       textColor: 'text-emerald-800',
       borderColor: 'border-emerald-200',
-      defaultImage: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?auto=format&fit=crop&w=300&q=80',
+      defaultImage: '',
       badgeLabel: 'Greens',
     };
   }
@@ -908,7 +1061,7 @@ export function getFoodVisual(itemName: string = '', categoryName: string = ''):
       bgColor: 'bg-amber-50',
       textColor: 'text-amber-800',
       borderColor: 'border-amber-200',
-      defaultImage: 'https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?auto=format&fit=crop&w=300&q=80',
+      defaultImage: '',
       badgeLabel: 'Cheese',
     };
   }
@@ -931,7 +1084,7 @@ export function getFoodVisual(itemName: string = '', categoryName: string = ''):
     bgColor: 'bg-slate-50',
     textColor: 'text-slate-700',
     borderColor: 'border-slate-200',
-    defaultImage: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80',
+    defaultImage: '',
     badgeLabel: categoryName || 'Kitchen Item',
   };
 }
@@ -941,7 +1094,7 @@ export function getFoodVisual(itemName: string = '', categoryName: string = ''):
  */
 export function getCategoryImageUrl(categoryName: string = ''): string {
   if (!categoryName) {
-    return 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80';
+    return '';
   }
   const clean = categoryName.trim().toLowerCase();
 
@@ -964,7 +1117,7 @@ export function getCategoryImageUrl(categoryName: string = ''): string {
   if (FOOD_CATEGORY_VISUALS[categoryName]?.defaultImage) {
     return FOOD_CATEGORY_VISUALS[categoryName].defaultImage;
   }
-  return 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80';
+  return '';
 }
 
 /**

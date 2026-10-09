@@ -18,14 +18,15 @@ const router = express.Router();
  * Household Storage with AES-256-GCM Encrypted Disk Persistence
  */
 
-// Multi-User Household (Yan & Kriz)
-const SEED_HOUSEHOLD_ID = "hh_yan_kriz_01";
+// Multi-User Household
+const SEED_HOUSEHOLD_ID = "hh_pantryo_main";
 const USERS = dbStore.users;
 
 const LOCATIONS = [
   { id: "loc_fridge", name: "Fridge", type: "FRIDGE", householdId: SEED_HOUSEHOLD_ID },
   { id: "loc_pantry", name: "Pantry", type: "PANTRY", householdId: SEED_HOUSEHOLD_ID },
   { id: "loc_freezer", name: "Freezer", type: "FREEZER", householdId: SEED_HOUSEHOLD_ID },
+  { id: "loc_spice_rack", name: "Spice Rack", type: "SPICE_RACK", householdId: SEED_HOUSEHOLD_ID },
 ];
 
 const CATEGORIES = [
@@ -35,7 +36,7 @@ const CATEGORIES = [
     icon: "Apple",
     color: "#DCFCE7",
     householdId: SEED_HOUSEHOLD_ID,
-    imageUrl: "https://images.unsplash.com/photo-1610832958506-aa56368176cf?auto=format&fit=crop&w=600&q=80",
+    imageUrl: "",
     description: "Fresh vegetables, fruits, salad greens & herbs",
   },
   {
@@ -44,7 +45,7 @@ const CATEGORIES = [
     icon: "Milk",
     color: "#E0F2FE",
     householdId: SEED_HOUSEHOLD_ID,
-    imageUrl: "https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=600&q=80",
+    imageUrl: "",
     description: "Milk, butter, cheeses, yogurt & farm eggs",
   },
   {
@@ -53,7 +54,7 @@ const CATEGORIES = [
     icon: "Beef",
     color: "#FEE2E2",
     householdId: SEED_HOUSEHOLD_ID,
-    imageUrl: "https://images.unsplash.com/photo-1603048588665-791ca8aea617?auto=format&fit=crop&w=600&q=80",
+    imageUrl: "",
     description: "Beef, poultry, pork, salmon & fresh seafood",
   },
   {
@@ -62,7 +63,7 @@ const CATEGORIES = [
     icon: "Wheat",
     color: "#FEF3C7",
     householdId: SEED_HOUSEHOLD_ID,
-    imageUrl: "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80",
+    imageUrl: "",
     description: "Artisanal sourdough, baguettes, bread & pastries",
   },
   {
@@ -71,7 +72,7 @@ const CATEGORIES = [
     icon: "Package",
     color: "#F3E8FF",
     householdId: SEED_HOUSEHOLD_ID,
-    imageUrl: "https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?auto=format&fit=crop&w=600&q=80",
+    imageUrl: "",
     description: "Pasta, grains, legumes, rice, flour & spices",
   },
   {
@@ -80,7 +81,7 @@ const CATEGORIES = [
     icon: "Snowflake",
     color: "#E0E7FF",
     householdId: SEED_HOUSEHOLD_ID,
-    imageUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=80",
+    imageUrl: "",
     description: "Frozen pizzas, dumplings, waffles & frozen veggies",
   },
   {
@@ -89,7 +90,7 @@ const CATEGORIES = [
     icon: "Coffee",
     color: "#CCFBF1",
     householdId: SEED_HOUSEHOLD_ID,
-    imageUrl: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=600&q=80",
+    imageUrl: "",
     description: "Coffee, tea, matcha, natural juices & sparkling drinks",
   },
   {
@@ -98,7 +99,7 @@ const CATEGORIES = [
     icon: "Cookie",
     color: "#FFEDD5",
     householdId: SEED_HOUSEHOLD_ID,
-    imageUrl: "https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?auto=format&fit=crop&w=600&q=80",
+    imageUrl: "",
     description: "Mixed roasted nuts, crisps, dried fruits & crackers",
   },
   {
@@ -107,7 +108,7 @@ const CATEGORIES = [
     icon: "Soup",
     color: "#FEF9C3",
     householdId: SEED_HOUSEHOLD_ID,
-    imageUrl: "https://images.unsplash.com/photo-1472476443507-c7a5948772fc?auto=format&fit=crop&w=600&q=80",
+    imageUrl: "",
     description: "Olive oil, balsamic vinegar, hot sauces & dressings",
   },
   {
@@ -116,7 +117,7 @@ const CATEGORIES = [
     icon: "Sandwich",
     color: "#FEF3C7",
     householdId: SEED_HOUSEHOLD_ID,
-    imageUrl: "https://images.unsplash.com/photo-1541544741938-0af808871cc0?auto=format&fit=crop&w=600&q=80",
+    imageUrl: "",
     description: "Charcuterie, cured meats, prepared salads & dips",
   },
   {
@@ -125,7 +126,7 @@ const CATEGORIES = [
     icon: "Package",
     color: "#FFE4E6",
     householdId: SEED_HOUSEHOLD_ID,
-    imageUrl: "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=600&q=80",
+    imageUrl: "",
     description: "Canned tomatoes, soups, broths & preserved beans",
   },
   {
@@ -134,8 +135,17 @@ const CATEGORIES = [
     icon: "IceCream",
     color: "#FCE7F3",
     householdId: SEED_HOUSEHOLD_ID,
-    imageUrl: "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=600&q=80",
+    imageUrl: "",
     description: "Fine chocolates, gourmet pastries, honey & desserts",
+  },
+  {
+    id: "cat_spices",
+    name: "Spices & Seasonings",
+    icon: "Flame",
+    color: "#FFEDD5",
+    householdId: SEED_HOUSEHOLD_ID,
+    imageUrl: "",
+    description: "Whole spices, ground seasonings, dried herbs, peppers & salts",
   },
 ];
 
@@ -1576,14 +1586,14 @@ router.get("/household/:id", (req, res) => {
 
     // Enrich items with live status, computed days, and member attribution
     const enrichedItems = itemsStore
-      .filter((item) => item.householdId === householdId && item.status === "ACTIVE" && !isNoiseItemName(item.name))
+      .filter((item) => (item.householdId === householdId || !item.householdId || householdId === "hh_pantryo_main") && item.status === "ACTIVE" && !isNoiseItemName(item.name))
       .map((item) => {
         const location = LOCATIONS.find((l) => l.id === item.locationId) || { name: "Fridge", type: "FRIDGE" };
         const category = CATEGORIES.find((c) => c.id === item.categoryId) || {
           name: "Pantry Staples",
           icon: "Package",
           color: "#F3E8FF",
-          imageUrl: "https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?auto=format&fit=crop&w=600&q=80",
+          imageUrl: "",
         };
         const addedBy = (dbStore.users || []).find((u) => u.id === item.addedById) || { name: "Household Member", avatarUrl: null };
 
@@ -1647,6 +1657,7 @@ router.get("/household/:id", (req, res) => {
     const fridge = enrichedItems.filter((i) => i.locationType === "FRIDGE");
     const pantry = enrichedItems.filter((i) => i.locationType === "PANTRY");
     const freezer = enrichedItems.filter((i) => i.locationType === "FREEZER");
+    const spiceRack = enrichedItems.filter((i) => i.locationType === "SPICE_RACK");
 
     // Urgent / Expiring Soon priority list (sorted by least days remaining)
     const expiringSoon = enrichedItems
@@ -1659,6 +1670,7 @@ router.get("/household/:id", (req, res) => {
       fridgeCount: fridge.length,
       pantryCount: pantry.length,
       freezerCount: freezer.length,
+      spiceCount: spiceRack.length,
       expiringSoonCount: expiringSoon.length,
       freezerWarningCount: freezer.filter((i) => i.isFreezerWarning).length,
     };
@@ -1667,7 +1679,7 @@ router.get("/household/:id", (req, res) => {
       success: true,
       household: {
         id: householdId,
-        name: dbStore.household?.name || "The Yan & Kriz Kitchen",
+        name: dbStore.household?.name || "Your Kitchen",
         members: (dbStore.users || []).map((u) => ({
           id: u.id,
           name: u.name,
@@ -1714,7 +1726,7 @@ router.post("/item", (req, res) => {
       locationName,
       categoryId,
       categoryName,
-      addedById = "usr_yan",
+      addedById = "usr_admin",
       expirationDate,
       monthsFrozenShelfLife = 6,
       notes = "",
@@ -1754,9 +1766,10 @@ router.post("/item", (req, res) => {
 
     // Resolve location ID
     let resolvedLocationId = locationId;
-    if (!resolvedLocationId && locationName) {
+    const reqLocHint = locationName || req.body.locationType;
+    if (!resolvedLocationId && reqLocHint) {
       const match = LOCATIONS.find(
-        (l) => l.name.toLowerCase() === locationName.toLowerCase() || l.type.toLowerCase() === locationName.toLowerCase()
+        (l) => l.name.toLowerCase() === reqLocHint.toLowerCase() || l.type.toLowerCase() === reqLocHint.toLowerCase()
       );
       resolvedLocationId = match ? match.id : "loc_fridge";
     }
@@ -1839,7 +1852,7 @@ router.post("/item", (req, res) => {
       details: {
         itemName: newItem.name,
         location: loc ? loc.name : "Fridge",
-        addedBy: user ? user.name : "Yan",
+        addedBy: user ? user.name : "Admin",
       },
       itemId: newItem.id,
       userId: addedById,
@@ -1849,7 +1862,7 @@ router.post("/item", (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: `"${newItem.name}" added to ${loc ? loc.name : "Fridge"} by ${user ? user.name : "Yan"}`,
+      message: `"${newItem.name}" added to ${loc ? loc.name : "Fridge"} by ${user ? user.name : "Admin"}`,
       item: newItem,
     });
   } catch (error) {
@@ -1869,7 +1882,7 @@ router.post("/item", (req, res) => {
 router.put("/item/:id/defrost", (req, res) => {
   try {
     const { id } = req.params;
-    const { userId = "usr_yan" } = req.body;
+    const { userId = "usr_admin" } = req.body;
 
     const itemIndex = itemsStore.findIndex((i) => i.id === id);
     if (itemIndex === -1) {
@@ -1910,7 +1923,7 @@ router.put("/item/:id/defrost", (req, res) => {
         fromLocation: "Freezer",
         toLocation: "Fridge",
         newExpiration: "3 days",
-        defrostedBy: user ? user.name : "Yan",
+        defrostedBy: user ? user.name : "Admin",
       },
       itemId: updatedItem.id,
       userId,
@@ -1979,7 +1992,7 @@ router.put("/item/:id", (req, res) => {
       storageTip,
       freezerTip,
       storageReason,
-      userId = "usr_yan",
+      userId = "usr_admin",
     } = req.body;
 
     // Resolve location
@@ -2050,7 +2063,7 @@ router.put("/item/:id", (req, res) => {
       details: {
         itemName: updatedItem.name,
         location: loc ? loc.name : "Fridge",
-        updatedBy: user ? user.name : "Yan",
+        updatedBy: user ? user.name : "Admin",
       },
       itemId: updatedItem.id,
       userId,
@@ -2095,7 +2108,7 @@ router.delete("/item/:id", (req, res) => {
  */
 router.post("/bulk-delete", (req, res) => {
   try {
-    const { itemIds = [], userId = "usr_yan" } = req.body;
+    const { itemIds = [], userId = "usr_admin" } = req.body;
     if (!Array.isArray(itemIds) || itemIds.length === 0) {
       return res.status(400).json({ success: false, error: "No item IDs provided for deletion" });
     }
@@ -2137,7 +2150,7 @@ router.post("/bulk-delete", (req, res) => {
  */
 router.post("/bulk-consume", (req, res) => {
   try {
-    const { itemIds = [], userId = "usr_yan" } = req.body;
+    const { itemIds = [], userId = "usr_admin" } = req.body;
     if (!Array.isArray(itemIds) || itemIds.length === 0) {
       return res.status(400).json({ success: false, error: "No item IDs provided for consumption" });
     }
@@ -2199,7 +2212,7 @@ router.put("/household-name", requireAdmin, (req, res) => {
  */
 router.post("/bulk-items", (req, res) => {
   try {
-    const { items = [], userId = "usr_yan", householdId = SEED_HOUSEHOLD_ID } = req.body;
+    const { items = [], userId = "usr_admin", householdId = SEED_HOUSEHOLD_ID } = req.body;
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ success: false, error: "Items array is required" });
     }
@@ -2210,9 +2223,9 @@ router.post("/bulk-items", (req, res) => {
     for (const raw of items) {
       if (!raw.name || !raw.name.trim()) continue;
 
-      // Determine target location: FRIDGE, FREEZER, or PANTRY
+      // Determine target location: FRIDGE, FREEZER, PANTRY, or SPICE_RACK
       let targetLocType = (raw.locationType || "FRIDGE").toUpperCase();
-      if (!["FRIDGE", "FREEZER", "PANTRY"].includes(targetLocType)) {
+      if (!["FRIDGE", "FREEZER", "PANTRY", "SPICE_RACK"].includes(targetLocType)) {
         targetLocType = "FRIDGE";
       }
 
@@ -2230,7 +2243,8 @@ router.post("/bulk-items", (req, res) => {
 
       // Default shelf life based on location
       let days = 7;
-      if (targetLocType === "PANTRY") days = 90;
+      if (targetLocType === "SPICE_RACK") days = 730;
+      else if (targetLocType === "PANTRY") days = 90;
       else if (targetLocType === "FREEZER") days = 180;
       else if (raw.categoryName?.toLowerCase().includes("dairy")) days = 10;
       else if (raw.categoryName?.toLowerCase().includes("produce")) days = 6;

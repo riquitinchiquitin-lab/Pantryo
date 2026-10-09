@@ -30,10 +30,11 @@ import {
   Moon,
   Apple,
   Layers,
+  Utensils,
 } from 'lucide-react';
 import { InventoryItem, MealType, SmartMealSuggestion, PlannedMealIngredient } from '../types';
 import { RicardoRecipe, RICARDO_RECIPES, inferRecipeMealTypes, formatRecipeIngredientAmount } from '../data/ricardoRecipes';
-import { useLanguage } from '../utils/i18n';
+import { useLanguage, getMealTypeLocalizedName, getDifficultyLocalizedName } from '../utils/i18n';
 import {
   RecipeWebsiteSource,
   getStoredRecipeWebsites,
@@ -1072,13 +1073,20 @@ export const SmartMealSuggestionsModal: React.FC<SmartMealSuggestionsModalProps>
                 >
                   <div className="p-4 sm:p-5 flex flex-col sm:flex-row gap-4">
                     {/* Thumbnail Image */}
-                    <div className="relative w-full sm:w-44 h-40 rounded-2xl overflow-hidden shrink-0 border border-[#E5DFD0] bg-slate-100">
-                      <img
-                        src={recipe.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80'}
-                        alt={recipe.title}
-                        referrerPolicy="no-referrer"
-                        className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
-                      />
+                    <div className="relative w-full sm:w-44 h-40 rounded-2xl overflow-hidden shrink-0 border border-[#E5DFD0] bg-[#FAF8F5] flex items-center justify-center">
+                      {recipe.imageUrl && !recipe.imageUrl.includes('unsplash.com') ? (
+                        <img
+                          src={recipe.imageUrl}
+                          alt={recipe.title}
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-teal-50/70 flex flex-col items-center justify-center text-teal-800 p-3 text-center">
+                          <Utensils className="w-10 h-10 stroke-[1.5] text-teal-700 opacity-80" />
+                          <span className="text-[10px] font-bold mt-1 text-teal-900 line-clamp-1">{recipe.source || 'Recette'}</span>
+                        </div>
+                      )}
                       {/* Source Badge */}
                       <span className="absolute top-2 left-2 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-xs text-white text-[10px] font-bold flex items-center gap-1 shadow-sm">
                         {recipe.isWebSearch ? <Globe className="w-3 h-3 text-teal-300" /> : <BookOpen className="w-3 h-3 text-amber-300" />}
@@ -1108,7 +1116,7 @@ export const SmartMealSuggestionsModal: React.FC<SmartMealSuggestionsModalProps>
                           {/* Meal Slot, Time & Servings Meta */}
                           <div className="flex flex-wrap items-center gap-2 text-xs text-[#527470] mt-1">
                             <span className="px-2 py-0.5 rounded-md bg-teal-50 border border-teal-200 text-teal-800 text-[10px] font-bold uppercase tracking-wider">
-                              {recipe.mealType || selectedMealType}
+                              {getMealTypeLocalizedName(recipe.mealType || selectedMealType, lang)}
                             </span>
                             <span>•</span>
                             <span className="flex items-center gap-1">
@@ -1116,9 +1124,9 @@ export const SmartMealSuggestionsModal: React.FC<SmartMealSuggestionsModalProps>
                               {recipe.prepTime || recipe.totalTime || '25 min'}
                             </span>
                             <span>•</span>
-                            <span>{recipe.servings || '4 servings'}</span>
+                            <span>{recipe.servings || (lang === 'FR' ? '4 portions' : '4 servings')}</span>
                             <span>•</span>
-                            <span className="capitalize">{lang === 'FR' && recipe.difficultyFr ? recipe.difficultyFr : recipe.difficulty || 'Easy'}</span>
+                            <span className="capitalize">{getDifficultyLocalizedName(recipe.difficultyFr || recipe.difficulty, lang)}</span>
                           </div>
                         </div>
 

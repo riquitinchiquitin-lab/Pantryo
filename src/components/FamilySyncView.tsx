@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Copy, Check, Shield, Clock, Plus, UserCheck, ArrowRightLeft, Key, ShieldAlert, ShieldCheck, Camera, LogOut, Download, Smartphone, CheckCircle2, Edit3, Trash2, X, AlertTriangle, ChefHat } from 'lucide-react';
+import { Users, Shield, Clock, Plus, UserCheck, ArrowRightLeft, Key, ShieldAlert, ShieldCheck, Camera, LogOut, Download, Smartphone, CheckCircle2, Edit3, Trash2, X, AlertTriangle, ChefHat } from 'lucide-react';
 import { User, ActivityLogItem } from '../types';
 import { useLanguage, getLocationLocalizedName } from '../utils/i18n';
 import { Fido2AuthModal } from './Fido2AuthModal';
@@ -9,7 +9,7 @@ interface FamilySyncViewProps {
   currentUser: User;
   onSwitchUser: (user: User) => void;
   members: User[];
-  onOpenAdmin?: () => void;
+  onOpenAdmin?: (tab?: 'backup' | 'users' | 'security' | 'settings') => void;
   onUpdateMember?: (user: User) => void;
   onLogout?: () => void;
   onInstall?: () => void;
@@ -27,11 +27,10 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
   onLogout,
   onInstall,
   isInstalled = false,
-  kitchenName = 'The Yan & Kriz Kitchen',
+  kitchenName = 'Your Kitchen',
   onDeleteMember,
 }) => {
   const { t, lang } = useLanguage();
-  const [copied, setCopied] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [isDeletingUser, setIsDeletingUser] = useState(false);
   const [authModal, setAuthModal] = useState<{
@@ -44,13 +43,6 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
     mode: 'VERIFY',
   });
   const [avatarModalUser, setAvatarModalUser] = useState<User | null>(null);
-  const inviteCode = 'KOMRADE-7729';
-
-  const copyInvite = () => {
-    navigator.clipboard.writeText(inviteCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   const handleMemberClick = (member: User) => {
     if (member.id === currentUser.id) return;
@@ -71,32 +63,15 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
     }
   };
 
-  const activityAudit: ActivityLogItem[] = [
-    {
-      id: 'log_3',
-      action: 'ITEM_DEFROSTED',
-      details: { itemName: lang === 'FR' ? 'Bœuf haché bio' : 'Grass-Fed Ground Beef', fromLocation: 'Freezer', toLocation: 'Fridge', newExpiration: '3 days', defrostedBy: 'Yan' },
-      userId: 'usr_yan',
-      householdId: 'hh_01',
-      createdAt: lang === 'FR' ? 'Il y a 12 min' : '12 minutes ago',
-    },
-    {
-      id: 'log_2',
-      action: 'ITEM_CREATED',
-      details: { itemName: lang === 'FR' ? 'Fraises bio' : 'Organic Strawberries', location: 'Fridge', addedBy: 'Kriz' },
-      userId: 'usr_kriz',
-      householdId: 'hh_01',
-      createdAt: lang === 'FR' ? 'Il y a 3 heures' : '3 hours ago',
-    },
-    {
-      id: 'log_1',
-      action: 'ITEM_CREATED',
-      details: { itemName: lang === 'FR' ? 'Lait d\'avoine barista' : 'Oat Milk (Barista Blend)', location: 'Fridge', addedBy: 'Yan' },
-      userId: 'usr_yan',
-      householdId: 'hh_01',
-      createdAt: lang === 'FR' ? 'Hier' : 'Yesterday',
-    },
-  ];
+  // Fresh install starts with a clean audit journal
+  const activityAudit: ActivityLogItem[] = [];
+
+  const displayKitchenName =
+    !kitchenName || kitchenName.includes('Yan') || kitchenName.includes('Kriz')
+      ? lang === 'FR'
+        ? 'Votre Cuisine'
+        : 'Your Kitchen'
+      : kitchenName;
 
   return (
     <div className="space-y-5 pb-32 animate-fade-in">
@@ -107,9 +82,10 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
             {lang === 'FR' ? 'Synchronisation Familiale & Foyer' : 'Family Sync & Household'}
           </h2>
           <p className="text-xs text-[#5D7060]">
+            {displayKitchenName ? `${displayKitchenName} • ` : ''}
             {lang === 'FR'
-              ? 'Accès partagé pour colocataires et familles'
-              : 'Multi-tenant access for roommates and families'}
+              ? 'Accès partagé et gestion des membres'
+              : 'Shared access & household members'}
           </p>
         </div>
 
@@ -126,76 +102,45 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
         )}
       </div>
 
-      {/* Household Invite Box */}
-      <div className="p-4 rounded-3xl bg-gradient-to-br from-[#EBF3E8] to-[#DEF0DC] border border-[#BFDEBA] shadow-sm space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-emerald-950 font-bold text-sm min-w-0">
-            <Users className="w-4 h-4 text-emerald-700 shrink-0" />
-            <span className="truncate">{kitchenName || 'The Yan & Kriz Kitchen'}</span>
-          </div>
-          <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-600 text-white font-semibold shrink-0">
-            {lang === 'FR' ? 'Foyer Actif' : 'Active Household'}
-          </span>
-        </div>
-
-        <p className="text-xs text-[#425E45] leading-relaxed">
-          {lang === 'FR'
-            ? 'Partagez ce code d\'invitation avec les membres de votre foyer pour scanner des articles, recevoir les alertes de péremption et gérer les courses ensemble.'
-            : 'Share this invite code with family members or roommates so they can scan items, receive expiration alerts, and manage fridge items together.'}
-        </p>
-
-        <div className="flex items-center gap-2 p-2 bg-white/90 backdrop-blur rounded-2xl border border-emerald-200">
-          <div className="flex-1 font-mono font-bold text-center tracking-wider text-emerald-900 text-sm">
-            {inviteCode}
-          </div>
-          <button
-            onClick={copyInvite}
-            className="py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 transition-all"
-          >
-            {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-            {copied ? (lang === 'FR' ? 'Copié' : 'Copied') : (lang === 'FR' ? 'Copier' : 'Copy')}
-          </button>
-        </div>
-      </div>
-
-      {/* Admin Management Quick Card */}
+      {/* Household & Access Admin Quick Card */}
       {onOpenAdmin && (
         <div className="p-4 rounded-3xl bg-white border border-[#D5E1D2] shadow-2xs flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-2xl bg-teal-800 text-white flex items-center justify-center shrink-0">
               <Shield className="w-5 h-5" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h4 className="font-bold text-sm text-[#233527]">
-                  {lang === 'FR' ? 'Console d’Administration Pantryo' : 'Pantryo Admin Console'}
+                <h4 className="font-bold text-sm text-[#233527] truncate">
+                  {lang === 'FR' ? 'Gestion du Foyer & Accès' : 'Household & Access Pane'}
                 </h4>
               </div>
-              <p className="text-xs text-[#5D7060]">
+              <p className="text-xs text-[#5D7060] truncate">
                 {lang === 'FR'
-                  ? 'Sauvegardes chiffrées, restauration complète et gestion des accès'
-                  : 'Encrypted backups, disaster recovery & household permissions'}
+                  ? 'Gérer les membres, ajouter des comptes et configurer les accès FIDO2'
+                  : 'Manage household members, add accounts, and configure FIDO2 keys'}
               </p>
             </div>
           </div>
 
           <button
-            onClick={onOpenAdmin}
+            onClick={() => onOpenAdmin('users')}
             className="px-3.5 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center gap-1.5 transition-transform active:scale-95 shadow-sm shrink-0 cursor-pointer"
           >
-            <span>{lang === 'FR' ? 'Gérer' : 'Manage'}</span>
+            <Shield className="w-3.5 h-3.5" />
+            <span>{lang === 'FR' ? 'Gérer les Accès' : 'Household & Access'}</span>
           </button>
         </div>
       )}
 
       {/* Switch Active User / Simulator Switcher */}
       <div className="space-y-2.5">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <h3 className="text-xs font-bold uppercase tracking-wider text-[#5D7060]">
             {lang === 'FR' ? `Membres du Foyer (${members.length})` : `Household Members (${members.length})`}
           </h3>
           <span className="text-[11px] text-[#69856C]">
-            {lang === 'FR' ? 'Touchez pour changer de profil actif' : 'Tap to switch active profile'}
+            {lang === 'FR' ? 'Touchez un profil pour changer d’utilisateur actif' : 'Tap to switch active profile'}
           </span>
         </div>
 
@@ -217,7 +162,7 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
             </div>
           </div>
           <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-teal-100 text-teal-800 border border-teal-300 shrink-0">
-            ENFORCED
+            {lang === 'FR' ? 'ACTIF / APPLIQUÉ' : 'ENFORCED'}
           </span>
         </div>
 
@@ -409,34 +354,40 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
         </div>
 
         <div className="space-y-2.5">
-          {activityAudit.map((log) => (
-            <div
-              key={log.id}
-              className="p-3.5 rounded-2xl bg-white border border-[#D5E1D2] text-xs space-y-1 shadow-xs"
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-[#233527]">
-                  {log.details.itemName}
-                </span>
-                <span className="text-[11px] text-[#7B947E]">{log.createdAt}</span>
-              </div>
-              <p className="text-[#59725C]">
-                {log.action === 'ITEM_DEFROSTED' ? (
-                  lang === 'FR' ? (
-                    <>Décongelé par <strong>{log.details.defrostedBy}</strong> (déplacé du Congélateur ➡️ Réfrigérateur avec 3 jours de conservation)</>
-                  ) : (
-                    <>Defrosted by <strong>{log.details.defrostedBy}</strong> (moved from Freezer ➡️ Fridge with 3 days shelf-life)</>
-                  )
-                ) : (
-                  lang === 'FR' ? (
-                    <>Ajouté dans {getLocationLocalizedName(log.details.location || '', lang)} par <strong>{log.details.addedBy}</strong></>
-                  ) : (
-                    <>Added to {log.details.location} by <strong>{log.details.addedBy}</strong></>
-                  )
-                )}
-              </p>
+          {activityAudit.length === 0 ? (
+            <div className="p-4 rounded-2xl bg-white border border-[#D5E1D2] text-xs text-center text-[#7B947E] shadow-2xs">
+              {lang === 'FR' ? 'Aucune activité récente dans le journal' : 'No recent activity in the audit log yet'}
             </div>
-          ))}
+          ) : (
+            activityAudit.map((log) => (
+              <div
+                key={log.id}
+                className="p-3.5 rounded-2xl bg-white border border-[#D5E1D2] text-xs space-y-1 shadow-xs"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-[#233527]">
+                    {log.details.itemName}
+                  </span>
+                  <span className="text-[11px] text-[#7B947E]">{log.createdAt}</span>
+                </div>
+                <p className="text-[#59725C]">
+                  {log.action === 'ITEM_DEFROSTED' ? (
+                    lang === 'FR' ? (
+                      <>Décongelé par <strong>{log.details.defrostedBy}</strong> (déplacé du Congélateur ➡️ Réfrigérateur avec 3 jours de conservation)</>
+                    ) : (
+                      <>Defrosted by <strong>{log.details.defrostedBy}</strong> (moved from Freezer ➡️ Fridge with 3 days shelf-life)</>
+                    )
+                  ) : (
+                    lang === 'FR' ? (
+                      <>Ajouté dans {getLocationLocalizedName(log.details.location || '', lang)} par <strong>{log.details.addedBy}</strong></>
+                    ) : (
+                      <>Added to {log.details.location} by <strong>{log.details.addedBy}</strong></>
+                    )
+                  )}
+                </p>
+              </div>
+            ))
+          )}
         </div>
       </div>
 

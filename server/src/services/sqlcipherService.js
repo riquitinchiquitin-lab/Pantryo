@@ -581,7 +581,7 @@ export class SqlcipherService {
 
       // 10. Policy & timestamps & system settings
       const rawPolicy = this.getMetadata("fido2_policy");
-      const fido2Policy = rawPolicy ? JSON.parse(rawPolicy) : { allUsersRequired: true, enforced: true };
+      const fido2Policy = rawPolicy ? JSON.parse(rawPolicy) : { allUsersRequired: false, enforced: false };
 
       const rawSettings = this.getMetadata("system_settings");
       const systemSettings = rawSettings ? JSON.parse(rawSettings) : null;

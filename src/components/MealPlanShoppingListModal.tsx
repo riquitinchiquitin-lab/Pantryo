@@ -442,7 +442,7 @@ export const MealPlanShoppingListModal: React.FC<MealPlanShoppingListModalProps>
       categoryTag: 'Meal Prep',
       itemCount: selected.length,
       createdAt: new Date().toISOString(),
-      lastModifiedBy: 'Yan',
+      lastModifiedBy: 'Admin',
       items: selected.map((item) => ({
         name: item.name,
         quantity: item.quantity,
@@ -896,15 +896,15 @@ export const MealPlanShoppingListModal: React.FC<MealPlanShoppingListModalProps>
               value={extraQty}
               onChange={(e) => setExtraQty(e.target.value)}
               className="w-12 px-1 py-1.5 text-xs text-center font-bold bg-white border border-[#D5CDBC] rounded-xl text-slate-800"
-              title="Quantity"
+              title={lang === 'FR' ? 'Quantité' : 'Quantity'}
             />
             <input
               type="text"
               value={extraUnit}
               onChange={(e) => setExtraUnit(e.target.value)}
-              placeholder="unit"
+              placeholder={lang === 'FR' ? 'unité' : 'unit'}
               className="w-14 px-1 py-1.5 text-xs text-center bg-white border border-[#D5CDBC] rounded-xl text-slate-700"
-              title="Unit"
+              title={lang === 'FR' ? 'Unité' : 'Unit'}
             />
             <button
               type="submit"

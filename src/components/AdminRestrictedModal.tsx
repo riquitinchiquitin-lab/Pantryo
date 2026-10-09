@@ -45,7 +45,7 @@ export const AdminRestrictedModal: React.FC<AdminRestrictedModalProps> = ({
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [fido2Status, setFido2Status] = useState<Fido2Status | null>(null);
 
-  const targetAdminId = adminUser?.id || 'usr_yan';
+  const targetAdminId = adminUser?.id || 'usr_admin';
 
   useEffect(() => {
     if (isOpen) {
@@ -170,7 +170,7 @@ export const AdminRestrictedModal: React.FC<AdminRestrictedModalProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          username: adminUser?.email || 'yan@example.com',
+          username: adminUser?.email || 'admin@example.com',
           password: adminPassword,
         }),
       });
@@ -271,7 +271,7 @@ export const AdminRestrictedModal: React.FC<AdminRestrictedModalProps> = ({
               <div>
                 <div className="flex items-center gap-1.5">
                   <span className="font-bold text-xs text-[#0D3B37]">
-                    {adminUser?.name || 'Yan'}
+                    {adminUser?.name || 'Admin'}
                   </span>
                   <Crown className="w-3 h-3 text-amber-600" />
                 </div>

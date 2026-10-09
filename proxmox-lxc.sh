@@ -94,7 +94,7 @@ echo -e "${YW}       App URL, Gemini API Key, Cloudflare Tunnel Token, and Mobil
 echo -e "${YW}       (Remember: all of these values can also be updated anytime inside the web Admin Pane!)${CL}\n"
 pct exec "$CTID" -- bash -c "apt-get update && apt-get install -y git curl ca-certificates"
 pct exec "$CTID" -- bash -c "mkdir -p /opt/pantryo && cd /opt"
-pct exec "$CTID" -- bash -c "git clone https://github.com/yjsboily/pantryo.git /opt/pantryo || true"
+pct exec "$CTID" -- bash -c "git clone https://github.com/pantryo/pantryo.git /opt/pantryo || true"
 pct exec "$CTID" -- bash -c "cd /opt/pantryo && chmod +x install-proxmox.sh && ./install-proxmox.sh"
 
 echo -e "\n${GN}========================================================================${CL}"

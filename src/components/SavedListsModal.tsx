@@ -21,7 +21,7 @@ import { SavedGroceryList, SavedGroceryListItem } from '../types';
 import { GroceryCartItem } from './GroceryListView';
 import { FoodVisualBadge } from './FoodVisualBadge';
 import { getFoodVisual } from '../utils/foodVisuals';
-import { useLanguage } from '../utils/i18n';
+import { useLanguage, getSavedListLocalizedMetadata } from '../utils/i18n';
 import { getItemDisplayName, formatLocalizedQuantityUnit } from '../utils/foodTranslator';
 
 const STORAGE_KEY = 'kitchen_komrade_saved_grocery_lists_v1';
@@ -30,11 +30,11 @@ export const DEFAULT_SAVED_LISTS: SavedGroceryList[] = [
   {
     id: 'list_weekly_staples',
     name: 'Weekly Household Staples',
-    description: 'Everyday recurring essentials for Yan & Kriz',
+    description: 'Everyday recurring essentials for the household',
     categoryTag: 'Weekly Routine',
     itemCount: 6,
     createdAt: new Date(Date.now() - 7 * 86400000).toISOString(),
-    lastModifiedBy: 'Yan',
+    lastModifiedBy: 'Admin',
     items: [
       { name: 'Organic Whole Milk', quantity: 1, unit: 'gal', locationType: 'FRIDGE', category: 'Dairy & Eggs' },
       { name: 'Free-Range Eggs', quantity: 1, unit: 'dozen', locationType: 'FRIDGE', category: 'Dairy & Eggs' },
@@ -51,7 +51,7 @@ export const DEFAULT_SAVED_LISTS: SavedGroceryList[] = [
     categoryTag: 'Freezer Bulk',
     itemCount: 4,
     createdAt: new Date(Date.now() - 14 * 86400000).toISOString(),
-    lastModifiedBy: 'Kriz',
+    lastModifiedBy: 'Admin',
     items: [
       { name: 'Wild Salmon Fillets', quantity: 2, unit: 'lbs', locationType: 'FREEZER', category: 'Seafood' },
       { name: 'Frozen Wild Blueberries', quantity: 1, unit: 'bag', locationType: 'FREEZER', category: 'Frozen Foods' },
@@ -66,7 +66,7 @@ export const DEFAULT_SAVED_LISTS: SavedGroceryList[] = [
     categoryTag: 'Meal Theme',
     itemCount: 5,
     createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
-    lastModifiedBy: 'Yan',
+    lastModifiedBy: 'Admin',
     items: [
       { name: 'Corn Tortillas', quantity: 1, unit: 'pack', locationType: 'PANTRY', category: 'Pantry' },
       { name: 'Fresh Cilantro', quantity: 1, unit: 'bunch', locationType: 'FRIDGE', category: 'Produce' },
@@ -143,7 +143,7 @@ export const SavedListsModal: React.FC<SavedListsModalProps> = ({
   onAddItemsToCurrentGrocery,
   onSaveCurrentAsList,
   initialTab = 'saved',
-  currentUser = { id: 'u_1', name: 'Yan' },
+  currentUser = { id: 'u_1', name: 'Admin' },
 }) => {
   const { lang } = useLanguage();
   const [savedLists, setSavedLists] = useState<SavedGroceryList[]>(() => {
@@ -980,37 +980,40 @@ export const SavedListsModal: React.FC<SavedListsModalProps> = ({
                         </div>
                       ) : (
                         /* Standard List Header */
-                        <div className="p-3.5 space-y-2">
-                          <div className="flex items-start justify-between gap-2">
-                            <div
-                              className="cursor-pointer flex-1 min-w-0"
-                              onClick={() =>
-                                setExpandedListId(isExpanded ? null : list.id)
-                              }
-                            >
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <h4 className="text-xs font-black text-[#1E3022] truncate">
-                                  {list.name}
-                                </h4>
-                                {list.categoryTag && (
-                                  <span className="px-1.5 py-0.2 rounded-md bg-emerald-100 text-emerald-800 text-[9px] font-black uppercase tracking-wider shrink-0">
-                                    {list.categoryTag}
-                                  </span>
-                                )}
-                              </div>
-                              {list.description && (
-                                <p className="text-[11px] text-[#556D58] mt-0.5 line-clamp-1">
-                                  {list.description}
-                                </p>
-                              )}
-                              {list.lastModifiedBy && (
-                                <p className="text-[10px] text-[#69826D] mt-0.5 flex items-center gap-1">
-                                  <span>
-                                    {lang === 'FR' ? 'Modifié par' : 'Edited by'} <strong>{list.lastModifiedBy}</strong>
-                                  </span>
-                                </p>
-                              )}
-                            </div>
+                        (() => {
+                          const listMeta = getSavedListLocalizedMetadata(list, lang);
+                          return (
+                            <div className="p-3.5 space-y-2">
+                              <div className="flex items-start justify-between gap-2">
+                                <div
+                                  className="cursor-pointer flex-1 min-w-0"
+                                  onClick={() =>
+                                    setExpandedListId(isExpanded ? null : list.id)
+                                  }
+                                >
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <h4 className="text-xs font-black text-[#1E3022] truncate">
+                                      {listMeta.name}
+                                    </h4>
+                                    {listMeta.categoryTag && (
+                                      <span className="px-1.5 py-0.2 rounded-md bg-emerald-100 text-emerald-800 text-[9px] font-black uppercase tracking-wider shrink-0">
+                                        {listMeta.categoryTag}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {listMeta.description && (
+                                    <p className="text-[11px] text-[#556D58] mt-0.5 line-clamp-1">
+                                      {listMeta.description}
+                                    </p>
+                                  )}
+                                  {list.lastModifiedBy && (
+                                    <p className="text-[10px] text-[#69826D] mt-0.5 flex items-center gap-1">
+                                      <span>
+                                        {lang === 'FR' ? 'Modifié par' : 'Edited by'} <strong>{list.lastModifiedBy}</strong>
+                                      </span>
+                                    </p>
+                                  )}
+                                </div>
 
                             {/* Actions for any household member: Edit, Delete, Expand */}
                             <div className="flex items-center gap-1 shrink-0">
@@ -1066,6 +1069,8 @@ export const SavedListsModal: React.FC<SavedListsModalProps> = ({
                             </span>
                           </div>
                         </div>
+                          );
+                        })()
                       )}
 
                       {/* Expanded Items & Add Actions */}
@@ -1206,8 +1211,8 @@ export const SavedListsModal: React.FC<SavedListsModalProps> = ({
         {/* Footer info note */}
         <div className="p-3 bg-[#F5F8F4] border-t border-[#E1EDE0] text-center text-[10px] text-[#69826D] shrink-0">
           {lang === 'FR'
-            ? '💡 N’importe quel membre du foyer (Yan, Kriz) peut modifier les articles, les quantités ou supprimer un modèle.'
-            : '💡 Any household member (Yan, Kriz) can edit items, change quantities, or delete any list template.'}
+            ? '💡 N’importe quel membre du foyer peut modifier les articles, les quantités ou supprimer un modèle.'
+            : '💡 Any household member can edit items, change quantities, or delete any list template.'}
         </div>
       </div>
     </div>

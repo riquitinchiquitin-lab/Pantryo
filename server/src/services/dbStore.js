@@ -11,6 +11,7 @@ import {
 } from "./cryptoService.js";
 import { validatePasswordNist, normalizeUnicode } from "./nistPasswordValidator.js";
 import { sqlcipherService, getOrCreateInstallationId } from "./sqlcipherService.js";
+import { normalizePublicKeyString } from "./fido2Service.js";
 
 const DATA_DIR = path.join(process.cwd(), "server", "data");
 const ENCRYPTED_DB_FILE = path.join(DATA_DIR, "pantryo_database.enc");
@@ -121,11 +122,11 @@ const SEED_HOUSEHOLD_ID = "hh_pantryo_main";
 
 const DEFAULT_USERS = [
   {
-    id: "usr_yan",
-    name: (process.env.PANTRYO_ADMIN_NAME || "Yan").trim(),
-    email: (process.env.PANTRYO_ADMIN_EMAIL || process.env.PANTRYO_ADMIN_USERNAME || "admin").toLowerCase().trim(),
+    id: "usr_admin",
+    name: (process.env.PANTRYO_ADMIN_NAME || "Admin").trim(),
+    email: (process.env.PANTRYO_ADMIN_EMAIL || process.env.PANTRYO_ADMIN_USERNAME || "admin@example.com").toLowerCase().trim(),
     role: "ADMIN",
-    passwordHash: hashPassword(process.env.PANTRYO_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD || "PantryoSecure2026!"),
+    passwordHash: hashPassword(process.env.PANTRYO_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD || "YourSecurePassword2026!"),
     avatarUrl: process.env.PANTRYO_ADMIN_AVATAR || "/avatars/chef-cat.svg",
     fido2Enforced: false,
     fido2Enabled: false,
@@ -146,6 +147,7 @@ const DEFAULT_LOCATIONS = [
   { id: "loc_fridge", name: "Fridge", type: "FRIDGE", householdId: SEED_HOUSEHOLD_ID },
   { id: "loc_pantry", name: "Pantry", type: "PANTRY", householdId: SEED_HOUSEHOLD_ID },
   { id: "loc_freezer", name: "Freezer", type: "FREEZER", householdId: SEED_HOUSEHOLD_ID },
+  { id: "loc_spice_rack", name: "Spice Rack", type: "SPICE_RACK", householdId: SEED_HOUSEHOLD_ID },
 ];
 
 const DEFAULT_CATEGORIES = [
@@ -155,7 +157,7 @@ const DEFAULT_CATEGORIES = [
     icon: "Apple",
     color: "#DCFCE7",
     householdId: SEED_HOUSEHOLD_ID,
-    imageUrl: "https://images.unsplash.com/photo-1610832958506-aa56368176cf?auto=format&fit=crop&w=600&q=80",
+    imageUrl: "",
     description: "Fresh vegetables, fruits, salad greens & herbs",
   },
   {
@@ -164,7 +166,7 @@ const DEFAULT_CATEGORIES = [
     icon: "Milk",
     color: "#E0F2FE",
     householdId: SEED_HOUSEHOLD_ID,
-    imageUrl: "https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=600&q=80",
+    imageUrl: "",
     description: "Milk, butter, cheeses, yogurt & farm eggs",
   },
   {
@@ -173,7 +175,7 @@ const DEFAULT_CATEGORIES = [
     icon: "Beef",
     color: "#FEE2E2",
     householdId: SEED_HOUSEHOLD_ID,
-    imageUrl: "https://images.unsplash.com/photo-1603048588665-791ca8aea617?auto=format&fit=crop&w=600&q=80",
+    imageUrl: "",
     description: "Beef, poultry, pork, salmon & fresh seafood",
   },
   {
@@ -182,7 +184,7 @@ const DEFAULT_CATEGORIES = [
     icon: "Wheat",
     color: "#FEF3C7",
     householdId: SEED_HOUSEHOLD_ID,
-    imageUrl: "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80",
+    imageUrl: "",
     description: "Artisanal sourdough, baguettes, bread & pastries",
   },
   {
@@ -191,7 +193,7 @@ const DEFAULT_CATEGORIES = [
     icon: "Package",
     color: "#F3E8FF",
     householdId: SEED_HOUSEHOLD_ID,
-    imageUrl: "https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?auto=format&fit=crop&w=600&q=80",
+    imageUrl: "",
     description: "Pasta, grains, legumes, rice, flour & spices",
   },
   {
@@ -200,7 +202,7 @@ const DEFAULT_CATEGORIES = [
     icon: "Snowflake",
     color: "#E0E7FF",
     householdId: SEED_HOUSEHOLD_ID,
-    imageUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=80",
+    imageUrl: "",
     description: "Frozen pizzas, dumplings, waffles & frozen veggies",
   },
   {
@@ -209,7 +211,7 @@ const DEFAULT_CATEGORIES = [
     icon: "Coffee",
     color: "#CCFBF1",
     householdId: SEED_HOUSEHOLD_ID,
-    imageUrl: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=600&q=80",
+    imageUrl: "",
     description: "Coffee, tea, matcha, natural juices & sparkling drinks",
   },
   {
@@ -218,7 +220,7 @@ const DEFAULT_CATEGORIES = [
     icon: "Cookie",
     color: "#FFEDD5",
     householdId: SEED_HOUSEHOLD_ID,
-    imageUrl: "https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?auto=format&fit=crop&w=600&q=80",
+    imageUrl: "",
     description: "Mixed roasted nuts, crisps, dried fruits & crackers",
   },
   {
@@ -227,7 +229,7 @@ const DEFAULT_CATEGORIES = [
     icon: "Soup",
     color: "#FEF9C3",
     householdId: SEED_HOUSEHOLD_ID,
-    imageUrl: "https://images.unsplash.com/photo-1472476443507-c7a5948772fc?auto=format&fit=crop&w=600&q=80",
+    imageUrl: "",
     description: "Olive oil, balsamic vinegar, hot sauces & dressings",
   },
   {
@@ -236,8 +238,17 @@ const DEFAULT_CATEGORIES = [
     icon: "Sandwich",
     color: "#FEF3C7",
     householdId: SEED_HOUSEHOLD_ID,
-    imageUrl: "https://images.unsplash.com/photo-1541544741938-0af808871cc0?auto=format&fit=crop&w=600&q=80",
+    imageUrl: "",
     description: "Charcuterie, cured meats, prepared salads & dips",
+  },
+  {
+    id: "cat_spices",
+    name: "Spices & Seasonings",
+    icon: "Flame",
+    color: "#FFEDD5",
+    householdId: SEED_HOUSEHOLD_ID,
+    imageUrl: "",
+    description: "Whole spices, ground seasonings, dried herbs, peppers & salts",
   },
 ];
 
@@ -262,13 +273,13 @@ const DEFAULT_ITEMS = [
     householdId: SEED_HOUSEHOLD_ID,
     locationId: "loc_fridge",
     categoryId: "cat_dairy",
-    addedById: "usr_yan",
+    addedById: "usr_admin",
     status: "ACTIVE",
     expirationDate: getRelativeDate(2),
     frozenAt: null,
     monthsFrozenShelfLife: 3,
     defrostedAt: null,
-    imageUrl: "https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=300&q=80",
+    imageUrl: "",
     notes: "Opened Sunday, keep cold on top shelf",
     createdAt: getRelativeDate(-3),
     updatedAt: getRelativeDate(-1),
@@ -281,13 +292,13 @@ const DEFAULT_ITEMS = [
     householdId: SEED_HOUSEHOLD_ID,
     locationId: "loc_fridge",
     categoryId: "cat_produce",
-    addedById: "usr_kriz",
+    addedById: "usr_admin",
     status: "ACTIVE",
     expirationDate: getRelativeDate(1),
     frozenAt: null,
     monthsFrozenShelfLife: 8,
     defrostedAt: null,
-    imageUrl: "https://images.unsplash.com/photo-1464965911861-746a04b4bca6?auto=format&fit=crop&w=300&q=80",
+    imageUrl: "",
     notes: "Wash before eating",
     createdAt: getRelativeDate(-4),
     updatedAt: getRelativeDate(-1),
@@ -300,13 +311,13 @@ const DEFAULT_ITEMS = [
     householdId: SEED_HOUSEHOLD_ID,
     locationId: "loc_freezer",
     categoryId: "cat_meat",
-    addedById: "usr_yan",
+    addedById: "usr_admin",
     status: "ACTIVE",
     expirationDate: getRelativeDate(120),
     frozenAt: getMonthsAgoDate(2.5),
     monthsFrozenShelfLife: 6,
     defrostedAt: null,
-    imageUrl: "https://images.unsplash.com/photo-1603048588665-791ca8aea617?auto=format&fit=crop&w=300&q=80",
+    imageUrl: "",
     notes: "Vacuum sealed portion packs",
     createdAt: getMonthsAgoDate(2.5),
     updatedAt: getMonthsAgoDate(2.5),
@@ -319,13 +330,13 @@ const DEFAULT_ITEMS = [
     householdId: SEED_HOUSEHOLD_ID,
     locationId: "loc_freezer",
     categoryId: "cat_meat",
-    addedById: "usr_kriz",
+    addedById: "usr_admin",
     status: "ACTIVE",
     expirationDate: getRelativeDate(90),
     frozenAt: getMonthsAgoDate(4.2),
     monthsFrozenShelfLife: 5,
     defrostedAt: null,
-    imageUrl: "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=300&q=80",
+    imageUrl: "",
     notes: "Individually wrapped",
     createdAt: getMonthsAgoDate(4.2),
     updatedAt: getMonthsAgoDate(4.2),
@@ -338,13 +349,13 @@ const DEFAULT_ITEMS = [
     householdId: SEED_HOUSEHOLD_ID,
     locationId: "loc_fridge",
     categoryId: "cat_dairy",
-    addedById: "usr_kriz",
+    addedById: "usr_admin",
     status: "ACTIVE",
     expirationDate: getRelativeDate(14),
     frozenAt: null,
     monthsFrozenShelfLife: 2,
     defrostedAt: null,
-    imageUrl: "https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=300&q=80",
+    imageUrl: "",
     notes: "Breakfast & cooking sauces",
     createdAt: getRelativeDate(-2),
     updatedAt: getRelativeDate(-2),
@@ -357,13 +368,13 @@ const DEFAULT_ITEMS = [
     householdId: SEED_HOUSEHOLD_ID,
     locationId: "loc_fridge",
     categoryId: "cat_produce",
-    addedById: "usr_yan",
+    addedById: "usr_admin",
     status: "ACTIVE",
     expirationDate: getRelativeDate(3),
     frozenAt: null,
     monthsFrozenShelfLife: 6,
     defrostedAt: null,
-    imageUrl: "https://images.unsplash.com/photo-1576045057995-568f588f82fb?auto=format&fit=crop&w=300&q=80",
+    imageUrl: "",
     notes: "For salads and breakfast eggs",
     createdAt: getRelativeDate(-1),
     updatedAt: getRelativeDate(-1),
@@ -376,13 +387,13 @@ const DEFAULT_ITEMS = [
     householdId: SEED_HOUSEHOLD_ID,
     locationId: "loc_pantry",
     categoryId: "cat_condiments",
-    addedById: "usr_yan",
+    addedById: "usr_admin",
     status: "ACTIVE",
     expirationDate: getRelativeDate(240),
     frozenAt: null,
     monthsFrozenShelfLife: 12,
     defrostedAt: null,
-    imageUrl: "https://images.unsplash.com/photo-1472476443507-c7a5948772fc?auto=format&fit=crop&w=300&q=80",
+    imageUrl: "",
     notes: "Cold pressed, single origin",
     createdAt: getRelativeDate(-10),
     updatedAt: getRelativeDate(-10),
@@ -395,16 +406,111 @@ const DEFAULT_ITEMS = [
     householdId: SEED_HOUSEHOLD_ID,
     locationId: "loc_pantry",
     categoryId: "cat_bakery",
-    addedById: "usr_kriz",
+    addedById: "usr_admin",
     status: "ACTIVE",
     expirationDate: getRelativeDate(4),
     frozenAt: null,
     monthsFrozenShelfLife: 3,
     defrostedAt: null,
-    imageUrl: "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=300&q=80",
+    imageUrl: "",
     notes: "Local bakery loaf",
     createdAt: getRelativeDate(-1),
     updatedAt: getRelativeDate(-1),
+  },
+  {
+    id: "item_spice_001",
+    name: "Smoked Paprika (Pimentón de la Vera)",
+    quantity: 1,
+    unit: "jar (75g)",
+    householdId: SEED_HOUSEHOLD_ID,
+    locationId: "loc_spice_rack",
+    categoryId: "cat_spices",
+    addedById: "usr_admin",
+    status: "ACTIVE",
+    expirationDate: getRelativeDate(540),
+    frozenAt: null,
+    monthsFrozenShelfLife: null,
+    defrostedAt: null,
+    imageUrl: "",
+    notes: "Sweet & smoky Spanish paprika for rubs & stews",
+    createdAt: getRelativeDate(-20),
+    updatedAt: getRelativeDate(-5),
+  },
+  {
+    id: "item_spice_002",
+    name: "Organic Whole Black Peppercorns",
+    quantity: 1,
+    unit: "grinder (100g)",
+    householdId: SEED_HOUSEHOLD_ID,
+    locationId: "loc_spice_rack",
+    categoryId: "cat_spices",
+    addedById: "usr_admin",
+    status: "ACTIVE",
+    expirationDate: getRelativeDate(720),
+    frozenAt: null,
+    monthsFrozenShelfLife: null,
+    defrostedAt: null,
+    imageUrl: "",
+    notes: "Tellicherry grade, refillable ceramic grinder",
+    createdAt: getRelativeDate(-30),
+    updatedAt: getRelativeDate(-10),
+  },
+  {
+    id: "item_spice_003",
+    name: "Ground Cumin (Cumin moulu)",
+    quantity: 1,
+    unit: "jar (50g)",
+    householdId: SEED_HOUSEHOLD_ID,
+    locationId: "loc_spice_rack",
+    categoryId: "cat_spices",
+    addedById: "usr_admin",
+    status: "ACTIVE",
+    expirationDate: getRelativeDate(480),
+    frozenAt: null,
+    monthsFrozenShelfLife: null,
+    defrostedAt: null,
+    imageUrl: "",
+    notes: "Fragrant warm spice for chilis, curries & tacos",
+    createdAt: getRelativeDate(-15),
+    updatedAt: getRelativeDate(-3),
+  },
+  {
+    id: "item_spice_004",
+    name: "Herbes de Provence (Dried Thyme & Rosemary)",
+    quantity: 1,
+    unit: "jar (45g)",
+    householdId: SEED_HOUSEHOLD_ID,
+    locationId: "loc_spice_rack",
+    categoryId: "cat_spices",
+    addedById: "usr_admin",
+    status: "ACTIVE",
+    expirationDate: getRelativeDate(600),
+    frozenAt: null,
+    monthsFrozenShelfLife: null,
+    defrostedAt: null,
+    imageUrl: "",
+    notes: "Aromatic blend of thyme, savory, basil & rosemary",
+    createdAt: getRelativeDate(-12),
+    updatedAt: getRelativeDate(-2),
+  },
+  {
+    id: "item_spice_005",
+    name: "Montreal Steak Spice Seasoning",
+    quantity: 1,
+    unit: "jar (160g)",
+    householdId: SEED_HOUSEHOLD_ID,
+    locationId: "loc_spice_rack",
+    categoryId: "cat_spices",
+    addedById: "usr_admin",
+    status: "ACTIVE",
+    expirationDate: getRelativeDate(650),
+    frozenAt: null,
+    monthsFrozenShelfLife: null,
+    defrostedAt: null,
+    imageUrl: "",
+    notes: "Coarse sea salt, black pepper, garlic, onion & dill seeds",
+    createdAt: getRelativeDate(-18),
+    updatedAt: getRelativeDate(-4),
   },
 ];
 
@@ -417,7 +523,7 @@ const DEFAULT_PLANNED_MEALS = [
     mealType: "DINNER",
     recipeName: "Crispy Garlic Butter Steak Bites",
     recipeUrl: "https://www.youtube.com/watch?v=17XjG6x5g2I",
-    imageUrl: "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=600&q=80",
+    imageUrl: "",
     servings: 2,
     prepTimeMinutes: 25,
     notes: "Uses ground beef from freezer and pantry herbs",
@@ -442,7 +548,7 @@ const DEFAULT_RECIPES = [
     ricardoUrlFr: "https://www.youtube.com/watch?v=17XjG6x5g2I",
     youtubeUrl: "https://www.youtube.com/watch?v=17XjG6x5g2I",
     youtubeVideoId: "17XjG6x5g2I",
-    imageUrl: "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=600&q=80",
+    imageUrl: "",
     time: "25 mins",
     prepTime: "10 mins",
     cookTime: "15 mins",
@@ -500,7 +606,7 @@ const isNoiseItemName = (name) => {
 
 class EncryptedDatabaseStore {
   constructor() {
-    const defaultKitchenName = (process.env.KITCHEN_NAME || process.env.PANTRYO_KITCHEN_NAME || "The Yan & Kriz Kitchen").trim();
+    const defaultKitchenName = (process.env.KITCHEN_NAME || process.env.PANTRYO_KITCHEN_NAME || "Your Kitchen").trim();
     this.household = {
       id: SEED_HOUSEHOLD_ID,
       name: defaultKitchenName,
@@ -553,7 +659,13 @@ class EncryptedDatabaseStore {
       const sqliteSnapshot = sqlcipherService.loadSnapshot();
       if (sqliteSnapshot && Array.isArray(sqliteSnapshot.users) && sqliteSnapshot.users.length > 0) {
         this.household = sqliteSnapshot.household || this.household;
-        if (process.env.KITCHEN_NAME && process.env.KITCHEN_NAME.trim()) {
+        const fallbackKitchen = (process.env.KITCHEN_NAME || "Your Kitchen").trim();
+        if (!this.household?.name || this.household.name.includes("Yan") || this.household.name.includes("Kriz")) {
+          this.household = {
+            id: SEED_HOUSEHOLD_ID,
+            name: fallbackKitchen,
+          };
+        } else if (process.env.KITCHEN_NAME && process.env.KITCHEN_NAME.trim()) {
           this.household.name = process.env.KITCHEN_NAME.trim();
         }
         this.users = sqliteSnapshot.users;
@@ -570,21 +682,21 @@ class EncryptedDatabaseStore {
         this.lastRestoreAt = sqliteSnapshot.lastRestoreAt || null;
         this.fido2Policy = sqliteSnapshot.fido2Policy || { allUsersRequired: false, enforced: false };
         this.systemSettings = sqliteSnapshot.systemSettings || null;
-        this.users = (this.users || []).filter((u) => u.id !== "usr_kriz");
+        this.users = (this.users || []).filter((u) => u && u.id);
 
-        const hasAdmin = this.users.some((u) => u.role === "ADMIN" || u.id === "usr_yan" || u.email === "yjsboily@gmail.com");
+        const hasAdmin = this.users.some((u) => u.role === "ADMIN" || u.id === "usr_admin");
         if (!hasAdmin || this.users.length === 0) {
           this.seedAdminFromEnvOrInstall();
         }
 
         // Guarantee that the admin user always has a valid passwordHash initialized
-        const adminUser = this.users.find((u) => u.role === "ADMIN" || u.id === "usr_yan");
+        const adminUser = this.users.find((u) => u.role === "ADMIN" || u.id === "usr_admin");
         if (adminUser) {
           const envPass = (process.env.PANTRYO_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD || "").trim();
           if (envPass && !adminUser.passwordHash) {
             adminUser.passwordHash = hashPassword(envPass);
           } else if (!adminUser.passwordHash) {
-            adminUser.passwordHash = hashPassword("PantryoSecure2026!");
+            adminUser.passwordHash = hashPassword("YourSecurePassword2026!");
           }
         }
 
@@ -612,6 +724,15 @@ class EncryptedDatabaseStore {
 
         if (decrypted && Array.isArray(decrypted.users)) {
           this.household = decrypted.household || this.household;
+          const fallbackKitchen = (process.env.KITCHEN_NAME || "Your Kitchen").trim();
+          if (!this.household?.name || this.household.name.includes("Yan") || this.household.name.includes("Kriz")) {
+            this.household = {
+              id: SEED_HOUSEHOLD_ID,
+              name: fallbackKitchen,
+            };
+          } else if (process.env.KITCHEN_NAME && process.env.KITCHEN_NAME.trim()) {
+            this.household.name = process.env.KITCHEN_NAME.trim();
+          }
           this.users = decrypted.users;
           this.locations = decrypted.locations || this.locations;
           this.categories = decrypted.categories || this.categories;
@@ -632,9 +753,9 @@ class EncryptedDatabaseStore {
           this.systemSettings = decrypted.systemSettings || null;
 
           // Policy enforcement: all users must use FIDO2
-          this.users = this.users.filter((u) => !u.isDefaultAdmin && u.id !== "usr_admin");
-          const hasYan = this.users.some((u) => u.id === "usr_yan" || u.email === "yjsboily@gmail.com");
-          if (!hasYan || this.users.length === 0) {
+          this.users = (this.users || []).filter((u) => u && !u.isDefaultAdmin);
+          const hasAdmin = this.users.some((u) => u.role === "ADMIN" || u.id === "usr_admin");
+          if (!hasAdmin || this.users.length === 0) {
             this.seedAdminFromEnvOrInstall();
           }
 
@@ -673,14 +794,14 @@ class EncryptedDatabaseStore {
   }
 
   seedAdminFromEnvOrInstall() {
-    const hasYan = this.users && this.users.some((u) => u.id === "usr_yan" || u.email === "yjsboily@gmail.com");
-    if (!hasYan) {
+    const hasAdmin = this.users && this.users.some((u) => u.role === "ADMIN" || u.id === "usr_admin");
+    if (!hasAdmin) {
       const adminUser = {
-        id: "usr_yan",
-        name: (process.env.PANTRYO_ADMIN_NAME || "Yan").trim(),
-        email: (process.env.PANTRYO_ADMIN_EMAIL || "yjsboily@gmail.com").trim().toLowerCase(),
+        id: "usr_admin",
+        name: (process.env.PANTRYO_ADMIN_NAME || "Admin").trim(),
+        email: (process.env.PANTRYO_ADMIN_EMAIL || process.env.PANTRYO_ADMIN_USERNAME || "admin@example.com").trim().toLowerCase(),
         role: "ADMIN",
-        passwordHash: hashPassword(process.env.PANTRYO_ADMIN_PASSWORD || "PantryoSecure2026!"),
+        passwordHash: hashPassword(process.env.PANTRYO_ADMIN_PASSWORD || "YourSecurePassword2026!"),
         avatarUrl: "/avatars/chef-cat.svg",
         fido2Enforced: false,
         fido2Enabled: false,
@@ -696,7 +817,7 @@ class EncryptedDatabaseStore {
         recoveryCodesRemaining: 5,
       };
 
-      this.users = [adminUser, ...(this.users || []).filter((u) => u.id !== "usr_kriz")];
+      this.users = [adminUser, ...(this.users || []).filter((u) => u && u.id !== adminUser.id)];
       this.persistToEncryptedDisk();
       console.log(`[Pantryo DB] Initialized administrator account '${adminUser.name}'.`);
     }
@@ -811,7 +932,7 @@ class EncryptedDatabaseStore {
       : "";
 
     return {
-      kitchenName: this.household?.name || process.env.KITCHEN_NAME || "The Yan & Kriz Kitchen",
+      kitchenName: this.household?.name || process.env.KITCHEN_NAME || "Your Kitchen",
       appUrl: this.systemSettings?.appUrl || process.env.APP_URL || "http://localhost:3000",
       geminiApiKey: includeSensitiveKeys
         ? (process.env.GEMINI_API_KEY || this.systemSettings?.geminiApiKey || "")
@@ -918,8 +1039,22 @@ class EncryptedDatabaseStore {
       exportedAt: new Date().toISOString(),
       household: this.household,
       users: this.users.map((u) => {
-        // Exclude password hash from exports for security or preserve if needed for full restore
-        return { ...u };
+        const cleanCredentials = (u.fido2Credentials || []).map((c) => ({
+          ...c,
+          id: typeof c.id === "string" ? c.id.trim() : c.id,
+          publicKey: normalizePublicKeyString(c.publicKey),
+          counter: typeof c.counter === "number" ? c.counter : 0,
+          deviceType: c.deviceType || "security-key",
+          transports: Array.isArray(c.transports) ? c.transports : ["internal", "usb", "nfc"],
+          friendlyName: c.friendlyName || "FIDO2 Security Key",
+          createdAt: c.createdAt || new Date().toISOString(),
+        }));
+        return {
+          ...u,
+          fido2Credentials: cleanCredentials,
+          fido2Enabled: cleanCredentials.length > 0 ? true : Boolean(u.fido2Enabled),
+          fido2Enforced: Boolean(u.fido2Enforced),
+        };
       }),
       locations: this.locations,
       categories: this.categories,
@@ -928,6 +1063,8 @@ class EncryptedDatabaseStore {
       customRecipes: this.customRecipes,
       groceryItems: this.groceryItems,
       savedLists: this.savedLists,
+      fido2Policy: this.fido2Policy || { allUsersRequired: false, enforced: false },
+      systemSettings: this.systemSettings || null,
     };
 
     const checksum = computeChecksum(rawData);
@@ -1009,6 +1146,29 @@ class EncryptedDatabaseStore {
       }
     }
 
+    // Helper to sanitize and normalize restored user records
+    const sanitizeUser = (u) => {
+      const cleanCredentials = (u.fido2Credentials || []).map((c) => ({
+        ...c,
+        id: typeof c.id === "string" ? c.id.trim() : c.id,
+        publicKey: normalizePublicKeyString(c.publicKey),
+        counter: typeof c.counter === "number" ? c.counter : 0,
+        deviceType: c.deviceType || "security-key",
+        transports: Array.isArray(c.transports) ? c.transports : ["internal", "usb", "nfc"],
+        friendlyName: c.friendlyName || "FIDO2 Security Key",
+        createdAt: c.createdAt || new Date().toISOString(),
+      }));
+
+      const hasCreds = cleanCredentials.length > 0;
+      return {
+        ...u,
+        fido2Enabled: hasCreds ? true : Boolean(u.fido2Enabled),
+        fido2Enforced: Boolean(u.fido2Enforced),
+        fido2Credentials: cleanCredentials,
+        recoveryCodes: Array.isArray(u.recoveryCodes) ? u.recoveryCodes : [],
+      };
+    };
+
     // Apply restore
     if (mode === "replace") {
       if (Array.isArray(restoredData.items)) this.items = restoredData.items;
@@ -1016,8 +1176,20 @@ class EncryptedDatabaseStore {
       if (Array.isArray(restoredData.customRecipes)) this.customRecipes = restoredData.customRecipes;
       if (Array.isArray(restoredData.groceryItems)) this.groceryItems = restoredData.groceryItems;
       if (Array.isArray(restoredData.savedLists)) this.savedLists = restoredData.savedLists;
-      if (Array.isArray(restoredData.users)) this.users = restoredData.users;
+      if (Array.isArray(restoredData.locations)) this.locations = restoredData.locations;
+      if (Array.isArray(restoredData.categories)) this.categories = restoredData.categories;
+      if (Array.isArray(restoredData.users)) {
+        this.users = restoredData.users.map(sanitizeUser);
+      }
       if (restoredData.household) this.household = restoredData.household;
+      if (restoredData.fido2Policy) {
+        this.fido2Policy = {
+          allUsersRequired: Boolean(restoredData.fido2Policy.allUsersRequired),
+          enforced: Boolean(restoredData.fido2Policy.enforced),
+          updatedAt: restoredData.fido2Policy.updatedAt || new Date().toISOString(),
+        };
+      }
+      if (restoredData.systemSettings) this.systemSettings = restoredData.systemSettings;
     } else {
       // Merge mode
       if (Array.isArray(restoredData.items)) {
@@ -1039,6 +1211,44 @@ class EncryptedDatabaseStore {
         const map = new Map(this.savedLists.map((l) => [l.id, l]));
         restoredData.savedLists.forEach((l) => map.set(l.id, l));
         this.savedLists = Array.from(map.values());
+      }
+      if (Array.isArray(restoredData.locations)) {
+        const locMap = new Map(this.locations.map((loc) => [loc.id, loc]));
+        restoredData.locations.forEach((loc) => locMap.set(loc.id, loc));
+        this.locations = Array.from(locMap.values());
+      }
+      if (Array.isArray(restoredData.categories)) {
+        const catMap = new Map(this.categories.map((cat) => [cat.id, cat]));
+        restoredData.categories.forEach((cat) => catMap.set(cat.id, cat));
+        this.categories = Array.from(catMap.values());
+      }
+      if (Array.isArray(restoredData.users)) {
+        const userMap = new Map(this.users.map((u) => [u.id, u]));
+        restoredData.users.forEach((u) => {
+          const sanitized = sanitizeUser(u);
+          const existing = userMap.get(sanitized.id);
+          if (existing) {
+            const credMap = new Map((existing.fido2Credentials || []).map((c) => [c.id, c]));
+            (sanitized.fido2Credentials || []).forEach((c) => credMap.set(c.id, c));
+            const mergedCreds = Array.from(credMap.values());
+            userMap.set(sanitized.id, {
+              ...existing,
+              ...sanitized,
+              fido2Credentials: mergedCreds,
+              fido2Enabled: mergedCreds.length > 0,
+            });
+          } else {
+            userMap.set(sanitized.id, sanitized);
+          }
+        });
+        this.users = Array.from(userMap.values());
+      }
+      if (restoredData.fido2Policy) {
+        this.fido2Policy = {
+          allUsersRequired: Boolean(restoredData.fido2Policy.allUsersRequired),
+          enforced: Boolean(restoredData.fido2Policy.enforced),
+          updatedAt: restoredData.fido2Policy.updatedAt || new Date().toISOString(),
+        };
       }
     }
 
@@ -1110,7 +1320,6 @@ class EncryptedDatabaseStore {
       search === "admin" ||
       search === "administrator" ||
       search === "root" ||
-      search === "yan" ||
       search === envAdminUser ||
       search === envAdminName;
 
@@ -1142,7 +1351,7 @@ class EncryptedDatabaseStore {
     if (!isValid && user.role === "ADMIN") {
       if (envAdminPass && cleanPassword === envAdminPass) {
         isValid = true;
-      } else if (cleanPassword === "PantryoSecure2026!") {
+      } else if (cleanPassword === "YourSecurePassword2026!") {
         isValid = true;
       }
       if (isValid) {

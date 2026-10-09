@@ -8,6 +8,7 @@ import {
   Refrigerator,
   Snowflake,
   Boxes,
+  Flame,
   Check,
   CheckCircle2,
   Tag,
@@ -17,6 +18,9 @@ import {
   Scale,
   Sparkles,
   ShieldCheck,
+  Camera,
+  Upload,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { InventoryItem, User, StorageType } from '../types';
 import { ALL_FOOD_CATEGORIES, ALL_SUB_CATEGORIES, ALL_MEAT_SEAFOOD_SUBCATEGORIES } from '../utils/foodVisuals';
@@ -32,6 +36,7 @@ interface AddEditItemModalProps {
   currentUser: User;
   onSaved: (item: InventoryItem, isNew: boolean) => void;
   onDeleted?: (itemId: string) => void;
+  defaultLocationType?: 'FRIDGE' | 'FREEZER' | 'PANTRY' | 'SPICE_RACK';
 }
 
 export type UnitCategory = 'metric' | 'imperial' | 'container' | 'composite';
@@ -133,6 +138,7 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
   currentUser,
   onSaved,
   onDeleted,
+  defaultLocationType,
 }) => {
   const { t, lang } = useLanguage();
   const isEditing = Boolean(itemToEdit);
@@ -149,16 +155,18 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
     }
   };
 
-  const getDefaultExpiration = (location: 'FRIDGE' | 'FREEZER' | 'PANTRY') => {
-    const days = location === 'PANTRY' ? 60 : location === 'FREEZER' ? 180 : 7;
+  const getDefaultExpiration = (location: 'FRIDGE' | 'FREEZER' | 'PANTRY' | 'SPICE_RACK') => {
+    const days = location === 'SPICE_RACK' ? 730 : location === 'PANTRY' ? 60 : location === 'FREEZER' ? 180 : 7;
     const target = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
     return target.toISOString().split('T')[0];
   };
 
+  const initialLocType = defaultLocationType || 'FRIDGE';
   const [name, setName] = useState('');
   const [imageUrl, setImageUrl] = useState('');
-  const [locationType, setLocationType] = useState<'FRIDGE' | 'FREEZER' | 'PANTRY'>('FRIDGE');
-  const [categoryName, setCategoryName] = useState('Produce');
+  const [imageMeta, setImageMeta] = useState<{ width: number; height: number; sizeKb: number } | null>(null);
+  const [locationType, setLocationType] = useState<'FRIDGE' | 'FREEZER' | 'PANTRY' | 'SPICE_RACK'>(initialLocType);
+  const [categoryName, setCategoryName] = useState(initialLocType === 'SPICE_RACK' ? 'Spices & Seasonings' : 'Produce');
   const [quantity, setQuantity] = useState<number | string>(1);
   const [unit, setUnit] = useState('pcs');
   const [unitCategory, setUnitCategory] = useState<UnitCategory>('metric');
@@ -166,6 +174,72 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const cameraInputRef = React.useRef<HTMLInputElement>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Compress photo client-side via canvas (Standard: max 1600px width/height, JPEG 0.88 quality)
+  const compressItemPhoto = (file: File, maxDim = 1600): Promise<{ dataUrl: string; width: number; height: number; sizeBytes: number }> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        const img = new Image();
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressed = canvas.toDataURL('image/jpeg', 0.88);
+            const head = 'data:image/jpeg;base64,';
+            const base64Len = compressed.length - (compressed.startsWith(head) ? head.length : 0);
+            const sizeBytes = Math.round((base64Len * 3) / 4);
+            resolve({ dataUrl: compressed, width, height, sizeBytes });
+          } else {
+            resolve({ dataUrl, width: img.width, height: img.height, sizeBytes: file.size });
+          }
+        };
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = dataUrl;
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handlePhotoFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    try {
+      const result = await compressItemPhoto(file, 1600);
+      setImageUrl(result.dataUrl);
+      setImageMeta({
+        width: result.width,
+        height: result.height,
+        sizeKb: Math.round(result.sizeBytes / 1024),
+      });
+    } catch (err) {
+      console.warn('Could not compress photo:', err);
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    setImageUrl('');
+    setImageMeta(null);
+  };
 
   // Smart food safety expiration recommendation (CFIA/MAPAQ/EFSA standards)
   const smartRecommendation = React.useMemo(() => {
@@ -177,9 +251,26 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
   useEffect(() => {
     if (itemToEdit) {
       setName(itemToEdit.name || '');
-      setImageUrl(itemToEdit.imageUrl || '');
-      const loc = (itemToEdit.locationType as 'FRIDGE' | 'FREEZER' | 'PANTRY') || 'FRIDGE';
-      setLocationType(loc === 'FREEZER' || loc === 'PANTRY' ? loc : 'FRIDGE');
+      // Strip any unsplash stock photo URLs; only keep real user photos
+      const cleanImg = itemToEdit.imageUrl && !itemToEdit.imageUrl.includes('unsplash.com') ? itemToEdit.imageUrl : '';
+      setImageUrl(cleanImg);
+      setImageMeta(null);
+      if (cleanImg) {
+        const img = new Image();
+        img.onload = () => {
+          const head = 'data:image/jpeg;base64,';
+          const base64Len = cleanImg.length - (cleanImg.startsWith(head) ? head.length : 0);
+          const sizeBytes = Math.round((base64Len * 3) / 4);
+          setImageMeta({
+            width: img.width,
+            height: img.height,
+            sizeKb: Math.max(1, Math.round(sizeBytes / 1024)),
+          });
+        };
+        img.src = cleanImg;
+      }
+      const loc = (itemToEdit.locationType as 'FRIDGE' | 'FREEZER' | 'PANTRY' | 'SPICE_RACK') || 'FRIDGE';
+      setLocationType(loc === 'FREEZER' || loc === 'PANTRY' || loc === 'SPICE_RACK' ? loc : 'FRIDGE');
       setCategoryName(itemToEdit.categoryName || 'Produce');
       setQuantity(itemToEdit.quantity || 1);
       setUnit(itemToEdit.unit || 'pcs');
@@ -188,15 +279,17 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
     } else {
       setName('');
       setImageUrl('');
-      setLocationType('FRIDGE');
-      setCategoryName('Produce');
+      setImageMeta(null);
+      const initialLoc = defaultLocationType || 'FRIDGE';
+      setLocationType(initialLoc);
+      setCategoryName(initialLoc === 'SPICE_RACK' ? 'Spices & Seasonings' : 'Produce');
       setQuantity(1);
       setUnit('pcs');
-      setExpirationDate(getDefaultExpiration('FRIDGE'));
+      setExpirationDate(getDefaultExpiration(initialLoc));
       setNotes('');
     }
     setErrorMessage(null);
-  }, [itemToEdit, isOpen]);
+  }, [itemToEdit, isOpen, defaultLocationType]);
 
   // Quick preset dates
   const handleQuickDate = (days: number) => {
@@ -217,7 +310,7 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
     }
   };
 
-  const handleLocationChange = (newLoc: 'FRIDGE' | 'FREEZER' | 'PANTRY') => {
+  const handleLocationChange = (newLoc: 'FRIDGE' | 'FREEZER' | 'PANTRY' | 'SPICE_RACK') => {
     setLocationType(newLoc);
     // If setting a new item and user hasn't typed custom date, auto-adjust default date or smart suggestion
     if (!isEditing) {
@@ -242,7 +335,14 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
 
     const parsedQty = parseFloat(String(quantity));
     const safeQty = isNaN(parsedQty) || parsedQty <= 0 ? 1 : Number(parsedQty.toFixed(3));
-    const locationName = locationType === 'FREEZER' ? 'Freezer' : locationType === 'PANTRY' ? 'Pantry' : 'Fridge';
+    const locationName =
+      locationType === 'FREEZER'
+        ? 'Freezer'
+        : locationType === 'PANTRY'
+        ? 'Pantry'
+        : locationType === 'SPICE_RACK'
+        ? 'Spice Rack'
+        : 'Fridge';
 
     const biling = getBilingualNames(name.trim(), lang);
     const resolvedNameFr = (itemToEdit?.nameFr && itemToEdit.name === name.trim()) ? itemToEdit.nameFr : (biling.nameFr || name.trim());
@@ -435,7 +535,7 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
             <label className="block text-xs font-bold text-[#0D3B37] mb-1.5">
               {lang === 'FR' ? 'Compartiment de stockage' : 'Storage Compartment'}
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <button
                 type="button"
                 onClick={() => handleLocationChange('FRIDGE')}
@@ -474,6 +574,19 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
                 <Boxes className="w-4 h-4" />
                 <span>{lang === 'FR' ? 'Garde-manger' : 'Pantry'}</span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => handleLocationChange('SPICE_RACK')}
+                className={`py-2.5 px-3 rounded-2xl border text-xs font-bold flex flex-col items-center justify-center gap-1 transition-all ${
+                  locationType === 'SPICE_RACK'
+                    ? 'bg-orange-600 text-white border-orange-600 shadow-xs ring-2 ring-orange-400/20'
+                    : 'bg-white border-[#D5E1D2] text-[#63381B] hover:bg-orange-50/50'
+                }`}
+              >
+                <Flame className="w-4 h-4" />
+                <span>{lang === 'FR' ? 'Épices' : 'Spice Rack'}</span>
+              </button>
             </div>
           </div>
 
@@ -499,13 +612,8 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
                       : 'bg-[#F2ECE0] border-[#E0D9C8] text-[#334D37] hover:bg-[#E5DDD0]'
                   }`}
                 >
-                  <div className="w-5 h-5 rounded-full overflow-hidden shrink-0 border border-black/10">
-                    <img
-                      src={cat.imageUrl}
-                      alt={cat.name}
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover"
-                    />
+                  <div className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 ${cat.bgColor} ${cat.textColor}`}>
+                    <cat.icon className="w-3.5 h-3.5" />
                   </div>
                   <span>{getCategoryLocalizedName(cat.name, lang)}</span>
                 </button>
@@ -520,56 +628,56 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
                 {lang === 'FR' ? 'Coupe ou sous-catégorie spécifique' : 'Specific Cut or Subcategory'}
               </label>
               <span className="text-[11px] text-teal-800 font-medium">
-                {lang === 'FR' ? 'Cliquer pour remplir photo et coupe' : 'Click to auto-fill photo & cut'}
+                {lang === 'FR' ? 'Cliquer pour définir la coupe' : 'Click to select cut'}
               </span>
             </div>
             <ScrollableRow className="gap-2 pb-1.5 pt-0.5" gradientFrom="from-white" showChevrons={true}>
               {(categoryName.includes('Meat') || categoryName.includes('Seafood')
                 ? ALL_MEAT_SEAFOOD_SUBCATEGORIES
                 : ALL_SUB_CATEGORIES
-              ).map((sub) => (
-                <button
-                  key={sub.id}
-                  type="button"
-                  onClick={() => {
-                    if (!name.trim()) setName(sub.name);
-                    setImageUrl(sub.imageUrl);
-                    if (sub.parentCategoryId === 'cat_meat') {
-                      setCategoryName('Meat & Seafood');
-                    } else if (sub.parentCategoryId === 'cat_dairy') {
-                      setCategoryName('Dairy & Eggs');
-                    } else if (sub.parentCategoryId === 'cat_produce') {
-                      setCategoryName('Produce');
-                    } else if (sub.parentCategoryId === 'cat_bakery') {
-                      setCategoryName('Bakery');
-                    } else if (sub.parentCategoryId === 'cat_pantry') {
-                      setCategoryName('Pantry Staples');
-                    }
-                  }}
-                  className={`px-2.5 py-1.5 rounded-xl border flex items-center gap-2 shrink-0 transition-all text-left ${
-                    imageUrl === sub.imageUrl
-                      ? 'bg-teal-700 text-white border-teal-800 shadow-xs'
-                      : 'bg-white border-[#E0D9C8] hover:border-teal-500 text-[#133E3B] shadow-2xs'
-                  }`}
-                >
-                  <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 border border-black/10 bg-slate-100">
-                    <img
-                      src={sub.imageUrl}
-                      alt={sub.name}
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div>
-                    <span className="block text-[11px] font-bold leading-tight truncate max-w-[130px]">
-                      {getSubcategoryLocalizedName(sub.name, lang)}
-                    </span>
-                    <span className={`block text-[9px] ${imageUrl === sub.imageUrl ? 'text-teal-200' : 'text-[#627C65]'}`}>
-                      {getSubcategoryLocalizedName(sub.badgeLabel || sub.name, lang)}
-                    </span>
-                  </div>
-                </button>
-              ))}
+              ).map((sub) => {
+                const isMatching = name.toLowerCase().includes(sub.name.toLowerCase());
+                return (
+                  <button
+                    key={sub.id}
+                    type="button"
+                    onClick={() => {
+                      if (!name.trim()) setName(sub.name);
+                      if (sub.parentCategoryId === 'cat_meat') {
+                        setCategoryName('Meat & Seafood');
+                      } else if (sub.parentCategoryId === 'cat_dairy') {
+                        setCategoryName('Dairy & Eggs');
+                      } else if (sub.parentCategoryId === 'cat_produce') {
+                        setCategoryName('Produce');
+                      } else if (sub.parentCategoryId === 'cat_bakery') {
+                        setCategoryName('Bakery');
+                      } else if (sub.parentCategoryId === 'cat_pantry') {
+                        setCategoryName('Pantry Staples');
+                      } else if (sub.parentCategoryId === 'cat_spices') {
+                        setCategoryName('Spices & Seasonings');
+                        handleLocationChange('SPICE_RACK');
+                      }
+                    }}
+                    className={`px-2.5 py-1.5 rounded-xl border flex items-center gap-2 shrink-0 transition-all text-left ${
+                      isMatching
+                        ? 'bg-teal-700 text-white border-teal-800 shadow-xs'
+                        : 'bg-white border-[#E0D9C8] hover:border-teal-500 text-[#133E3B] shadow-2xs'
+                    }`}
+                  >
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${sub.bgColor} ${sub.textColor}`}>
+                      <sub.icon className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="block text-[11px] font-bold leading-tight truncate max-w-[130px]">
+                        {getSubcategoryLocalizedName(sub.name, lang)}
+                      </span>
+                      <span className={`block text-[9px] ${isMatching ? 'text-teal-200' : 'text-[#627C65]'}`}>
+                        {getSubcategoryLocalizedName(sub.badgeLabel || sub.name, lang)}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </ScrollableRow>
           </div>
 
@@ -794,6 +902,88 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
                     </span>
                   </button>
                 </div>
+              </div>
+            )}
+          </div>
+
+          {/* Item Photo (Optional, Client-side compressed) */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-[#0D3B37] flex items-center gap-1.5">
+                <Camera className="w-3.5 h-3.5 text-teal-700" />
+                <span>{lang === 'FR' ? 'Photo de l’aliment (Optionnel)' : 'Item Photo (Optional)'}</span>
+              </label>
+              {imageUrl && !imageUrl.includes('unsplash.com') && (
+                <button
+                  type="button"
+                  onClick={handleRemovePhoto}
+                  className="text-[11px] font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 transition-colors"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>{lang === 'FR' ? 'Retirer la photo' : 'Remove photo'}</span>
+                </button>
+              )}
+            </div>
+
+            <input
+              type="file"
+              ref={cameraInputRef}
+              onChange={handlePhotoFileSelected}
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+            />
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handlePhotoFileSelected}
+              accept="image/*"
+              className="hidden"
+            />
+
+            {imageUrl && !imageUrl.includes('unsplash.com') ? (
+              <div className="p-2.5 rounded-2xl bg-white border border-[#D5E1D2] flex items-center gap-3 shadow-2xs animate-fade-in">
+                <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 border border-slate-200 bg-slate-100 relative shadow-2xs">
+                  <img
+                    src={imageUrl}
+                    alt={name || 'Item'}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs font-bold text-[#133E3B]">
+                      {lang === 'FR' ? 'Photo enregistrée' : 'Photo attached'}
+                    </span>
+                    <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-teal-50 text-teal-800 border border-teal-200">
+                      JPEG 1600px max
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[#556D58] mt-0.5">
+                    {imageMeta
+                      ? `${imageMeta.width}×${imageMeta.height} px • ${imageMeta.sizeKb} KB`
+                      : lang === 'FR' ? 'Image compressée et chiffrée' : 'Compressed & encrypted image'}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="py-2 px-3 rounded-2xl bg-white hover:bg-teal-50/70 border border-[#D5E1D2] hover:border-teal-500 text-xs font-bold text-[#133E3B] flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs active:scale-98"
+                >
+                  <Camera className="w-4 h-4 text-teal-700 shrink-0" />
+                  <span>{lang === 'FR' ? 'Prendre photo' : 'Take Photo'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="py-2 px-3 rounded-2xl bg-white hover:bg-teal-50/70 border border-[#D5E1D2] hover:border-teal-500 text-xs font-bold text-[#133E3B] flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs active:scale-98"
+                >
+                  <Upload className="w-4 h-4 text-teal-700 shrink-0" />
+                  <span>{lang === 'FR' ? 'Importer fichier' : 'Upload File'}</span>
+                </button>
               </div>
             )}
           </div>

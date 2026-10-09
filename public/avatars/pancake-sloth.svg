@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgSloth" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FED7AA" />
+      <stop offset="100%" stop-color="#F97316" />
+    </linearGradient>
+    <filter id="shSloth" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#7C2D12" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+  <circle cx="100" cy="100" r="98" fill="url(#bgSloth)" stroke="#EA580C" stroke-width="4"/>
+  <!-- Head & Body -->
+  <g filter="url(#shSloth)">
+    <path d="M50 185 C50 120 60 70 100 70 C140 70 150 120 150 185 Z" fill="#A16207"/>
+    <circle cx="100" cy="105" r="40" fill="#CA8A04"/>
+    <ellipse cx="100" cy="112" rx="30" ry="24" fill="#FEF08A"/>
+  </g>
+  <!-- Sloth Eye Stripes -->
+  <ellipse cx="80" cy="106" rx="14" ry="8" fill="#78350F" transform="rotate(15 80 106)"/>
+  <ellipse cx="120" cy="106" rx="14" ry="8" fill="#78350F" transform="rotate(-15 120 106)"/>
+  <!-- Happy Sleepy Eyes -->
+  <path d="M74 106 Q80 110 86 106" stroke="#FFFFFF" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M114 106 Q120 110 126 106" stroke="#FFFFFF" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <!-- Nose & Smile -->
+  <ellipse cx="100" cy="118" rx="5" ry="3.5" fill="#0F172A"/>
+  <path d="M95 123 Q100 128 105 123" stroke="#0F172A" stroke-width="2" fill="none"/>
+  <!-- Pancake Stack on Head -->
+  <g filter="url(#shSloth)">
+    <ellipse cx="100" cy="68" rx="32" ry="8" fill="#F59E0B" stroke="#B45309" stroke-width="1.5"/>
+    <ellipse cx="100" cy="62" rx="28" ry="7" fill="#FBBF24" stroke="#B45309" stroke-width="1.5"/>
+    <ellipse cx="100" cy="56" rx="24" ry="6" fill="#FDE047" stroke="#B45309" stroke-width="1.5"/>
+    <!-- Butter cube on top -->
+    <rect x="95" y="46" width="10" height="8" rx="1" fill="#FEF08A" stroke="#EAB308" stroke-width="1"/>
+  </g>
+</svg>

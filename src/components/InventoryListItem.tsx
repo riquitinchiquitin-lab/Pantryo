@@ -198,6 +198,8 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
               className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full shrink-0 flex items-center gap-1 ${
                 isFreezer
                   ? 'bg-[#EBF5FF] text-[#1E40AF] border border-[#BFDBFE]'
+                  : item.locationType === 'SPICE_RACK'
+                  ? 'bg-[#FFF7ED] text-[#9A3412] border border-[#FED7AA]'
                   : item.locationType === 'PANTRY'
                   ? 'bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A]'
                   : 'bg-[#ECFDF5] text-[#065F46] border border-[#A7F3D0]'
@@ -205,6 +207,8 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
             >
               {isFreezer ? (
                 <Snowflake className="w-2.5 h-2.5" />
+              ) : item.locationType === 'SPICE_RACK' ? (
+                <Flame className="w-2.5 h-2.5 text-orange-600" />
               ) : item.locationType === 'PANTRY' ? (
                 <Boxes className="w-2.5 h-2.5" />
               ) : (
@@ -426,7 +430,7 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
         </div>
       )}
 
-      {/* Bottom Row: Household Attribution Badge ("by Yan") & Actions */}
+      {/* Bottom Row: Household Attribution Badge & Actions */}
       <div
         onClick={(e) => e.stopPropagation()}
         className="pt-2 border-t border-[#EEF4ED] flex items-center justify-between gap-1 flex-wrap"
@@ -434,12 +438,12 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
         {/* Attribution Badge */}
         <div className="flex items-center gap-1.5 shrink-0">
           <img
-            src={item.addedByAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80'}
+            src={item.addedByAvatar || '/avatars/chef-cat.svg'}
             alt={item.addedByName}
             className="w-4 h-4 rounded-full object-cover"
           />
           <span className="text-[11px] font-bold text-[#556D58]">
-            {lang === 'FR' ? 'par' : 'by'} {item.addedByName || 'Yan'}
+            {lang === 'FR' ? 'par' : 'by'} {item.addedByName || (lang === 'FR' ? 'Membre' : 'Member')}
           </span>
         </div>
 

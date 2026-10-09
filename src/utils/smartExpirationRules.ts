@@ -240,6 +240,23 @@ export const SMART_SHELF_LIFE_RULES: FoodShelfLifeRule[] = [
     foodSafetyAgency: 'CFIA/MAPAQ & EFSA',
     storageRecommendationEn: 'After opening cans, transfer contents to glass or airtight plastic container.',
     storageRecommendationFr: 'Après ouverture, toujours transvaser les conserves dans un contenant hermétique.',
+  },
+
+  // 14. Spices, Herbs & Seasonings
+  {
+    categoryId: 'spices_seasonings',
+    categoryNames: ['Spices & Seasonings', 'Spices', 'Épices', 'Épices & Assaisonnements', 'Pantry Staples', 'Garde-manger'],
+    itemKeywords: ['spice', 'épice', 'pepper', 'poivre', 'cinnamon', 'cannelle', 'cumin', 'paprika', 'oregano', 'origan', 'thyme', 'thym', 'basil', 'basilic', 'curry', 'turmeric', 'curcuma', 'salt', 'sel', 'rosemary', 'romarin', 'clove', 'girofle', 'nutmeg', 'muscade', 'vanilla', 'vanille', 'seasoning', 'assaisonnement'],
+    fridgeDays: 365,
+    pantryDays: 730,
+    freezerMonths: 36,
+    cfiaStandardFr: 'ACIA/MAPAQ : Les épices moulues se conservent 1 à 2 ans, et les épices entières 3 à 4 ans au sec et à l\'obscurité.',
+    cfiaStandardEn: 'CFIA/MAPAQ: Ground spices keep 1-2 years, and whole spices 3-4 years in a cool, dry, dark spice rack.',
+    efsaStandardFr: 'EFSA : Conserver dans un contenant hermétique opaque à l\'abri de la lumière, de la chaleur et des vapeurs de cuisson.',
+    efsaStandardEn: 'EFSA: Keep in an airtight container away from direct sunlight, stove steam, and heat.',
+    foodSafetyAgency: 'CFIA/MAPAQ & EFSA',
+    storageRecommendationEn: 'Store in a dedicated spice rack away from cooking steam and stove heat.',
+    storageRecommendationFr: 'Conserver dans une armoire à épices dédiée à l\'abri de la vapeur et de la chaleur des plaques.',
   }
 ];
 
@@ -249,7 +266,7 @@ export const SMART_SHELF_LIFE_RULES: FoodShelfLifeRule[] = [
 export function estimateSmartShelfLife(
   itemName: string,
   categoryName: string,
-  locationType: 'FRIDGE' | 'FREEZER' | 'PANTRY'
+  locationType: 'FRIDGE' | 'FREEZER' | 'PANTRY' | 'SPICE_RACK'
 ): {
   days: number;
   monthsFrozen: number;
@@ -273,14 +290,20 @@ export function estimateSmartShelfLife(
 
   // 3. Fallback to general default
   if (!matched) {
-    matched = locationType === 'PANTRY' 
-      ? SMART_SHELF_LIFE_RULES.find((r) => r.categoryId === 'pantry_staples')! 
-      : SMART_SHELF_LIFE_RULES.find((r) => r.categoryId === 'cooked_leftovers')!;
+    if (locationType === 'SPICE_RACK') {
+      matched = SMART_SHELF_LIFE_RULES.find((r) => r.categoryId === 'spices_seasonings')!;
+    } else if (locationType === 'PANTRY') {
+      matched = SMART_SHELF_LIFE_RULES.find((r) => r.categoryId === 'pantry_staples')!;
+    } else {
+      matched = SMART_SHELF_LIFE_RULES.find((r) => r.categoryId === 'cooked_leftovers')!;
+    }
   }
 
   let days = matched.fridgeDays;
   if (locationType === 'FREEZER') {
     days = matched.freezerMonths * 30;
+  } else if (locationType === 'SPICE_RACK') {
+    days = matched.pantryDays || 730;
   } else if (locationType === 'PANTRY') {
     days = matched.pantryDays || matched.fridgeDays;
   }

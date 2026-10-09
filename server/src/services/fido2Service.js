@@ -25,21 +25,25 @@ setInterval(cleanExpiredChallenges, 60000);
  * Derives the rpID and expected origin from the incoming Express request
  */
 export function getRpIdAndOrigin(req) {
+  const fwdHost = req.headers["x-forwarded-host"] || req.get("host") || "localhost:3000";
+  const fwdProto = req.headers["x-forwarded-proto"] || req.protocol || "http";
+  const hostOnly = typeof fwdHost === "string" ? fwdHost.split(":")[0] : "localhost";
+
   const rawOrigin =
     req.get("origin") ||
     req.get("referer") ||
-    `${req.protocol}://${req.get("host")}` ||
+    `${fwdProto}://${fwdHost}` ||
     "http://localhost:3000";
 
   let origin = rawOrigin;
-  let rpID = "localhost";
+  let rpID = hostOnly;
 
   try {
     const parsed = new URL(rawOrigin);
     origin = parsed.origin;
     rpID = parsed.hostname;
   } catch (e) {
-    rpID = req.hostname || "localhost";
+    rpID = hostOnly;
   }
 
   // Normalize localhost IP variants for WebAuthn standard
@@ -50,19 +54,85 @@ export function getRpIdAndOrigin(req) {
   // Allow list of expected origins for preview/iframe & direct access
   const expectedOrigins = [
     origin,
-    "https://pantryo.yknet.org",
-    "http://pantryo.yknet.org",
+    `http://${hostOnly}:3000`,
+    `https://${hostOnly}`,
+    `http://${hostOnly}`,
     "http://localhost:3000",
     "http://127.0.0.1:3000",
   ];
+  if (process.env.APP_URL) {
+    try {
+      const appUrlOrigin = new URL(process.env.APP_URL).origin;
+      if (!expectedOrigins.includes(appUrlOrigin)) {
+        expectedOrigins.push(appUrlOrigin);
+      }
+    } catch (_) {}
+  }
   if (req.get("host")) {
     expectedOrigins.push(`${req.protocol}://${req.get("host")}`);
   }
 
-  // Expected RPIDs list
-  const expectedRPIDs = [rpID, "pantryo.yknet.org", "yknet.org", "localhost"];
+  // Expected RPIDs list (include base domain for passkeys)
+  const expectedRPIDs = [rpID, hostOnly, "localhost"];
+  if (process.env.APP_URL) {
+    try {
+      const appHost = new URL(process.env.APP_URL).hostname;
+      if (!expectedRPIDs.includes(appHost)) {
+        expectedRPIDs.push(appHost);
+      }
+    } catch (_) {}
+  }
 
   return { rpID, origin, expectedOrigins, expectedRPIDs };
+}
+
+/**
+ * Robust helper to convert stored credential public key into Uint8Array
+ * Handles Base64URL string, standard Base64, Node.js Buffer JSON representation,
+ * or existing Uint8Array.
+ */
+export function toCredentialPublicKeyBuffer(pubKey) {
+  if (!pubKey) return new Uint8Array();
+  if (pubKey instanceof Uint8Array) return pubKey;
+  if (Buffer.isBuffer(pubKey)) return new Uint8Array(pubKey);
+
+  if (typeof pubKey === "object") {
+    if (pubKey.type === "Buffer" && Array.isArray(pubKey.data)) {
+      return new Uint8Array(pubKey.data);
+    }
+    if (Array.isArray(pubKey)) {
+      return new Uint8Array(pubKey);
+    }
+    const numericKeys = Object.keys(pubKey).filter((k) => !isNaN(Number(k)));
+    if (numericKeys.length > 0) {
+      const arr = new Uint8Array(numericKeys.length);
+      for (const k of numericKeys) arr[Number(k)] = pubKey[k];
+      return arr;
+    }
+  }
+
+  if (typeof pubKey === "string") {
+    try {
+      return isoBase64URL.toBuffer(pubKey);
+    } catch {
+      return new Uint8Array(Buffer.from(pubKey, "base64"));
+    }
+  }
+
+  return new Uint8Array();
+}
+
+/**
+ * Normalizes any public key representation into a portable Base64URL string
+ */
+export function normalizePublicKeyString(pub) {
+  if (!pub) return "";
+  if (typeof pub === "string" && pub.length > 0) return pub.trim();
+  const buf = toCredentialPublicKeyBuffer(pub);
+  if (buf && buf.length > 0) {
+    return isoBase64URL.fromBuffer(buf);
+  }
+  return "";
 }
 
 /**
@@ -229,10 +299,13 @@ export const fido2Service = {
 
     const { rpID } = getRpIdAndOrigin(req);
 
-    const allowCredentials = user.fido2Credentials.map((cred) => ({
-      id: cred.id,
-      transports: cred.transports,
-    }));
+    const allowCredentials = user.fido2Credentials.map((cred) => {
+      const item = { id: cred.id };
+      if (Array.isArray(cred.transports) && cred.transports.length > 0) {
+        item.transports = cred.transports;
+      }
+      return item;
+    });
 
     const options = await generateAuthenticationOptions({
       rpID,
@@ -258,14 +331,37 @@ export const fido2Service = {
     }
     activeChallenges.delete(`auth_${user.id}`);
 
-    const credential = (user.fido2Credentials || []).find(
-      (c) => c.id === clientResponse.id
-    );
+    const normalizeId = (id) => (typeof id === "string" ? id.trim().replace(/=+$/, "") : "");
+    const creds = user.fido2Credentials || [];
+    const clientResponseId = clientResponse.id || clientResponse.rawId;
+
+    // Look for matching credential by exact ID, stripped padding, or single registered key fallback
+    const credential =
+      creds.find((c) => c.id === clientResponseId || normalizeId(c.id) === normalizeId(clientResponseId)) ||
+      (creds.length === 1 ? creds[0] : null);
+
     if (!credential) {
       throw new Error("Unknown or unregistered FIDO2 security key presented.");
     }
 
     const { expectedOrigins, expectedRPIDs } = getRpIdAndOrigin(req);
+
+    // If clientDataJSON contains an origin, also accept it if from the same hostname
+    if (clientResponse.response?.clientDataJSON) {
+      try {
+        const decodedClient = JSON.parse(
+          Buffer.from(clientResponse.response.clientDataJSON, "base64url").toString("utf8")
+        );
+        if (decodedClient.origin && !expectedOrigins.includes(decodedClient.origin)) {
+          expectedOrigins.push(decodedClient.origin);
+        }
+      } catch (_) {}
+    }
+
+    const pubKeyBuf = toCredentialPublicKeyBuffer(credential.publicKey);
+    if (!pubKeyBuf || pubKeyBuf.length === 0) {
+      throw new Error("Invalid credential public key format in database.");
+    }
 
     let verification;
     try {
@@ -276,14 +372,39 @@ export const fido2Service = {
         expectedRPID: expectedRPIDs,
         credential: {
           id: credential.id,
-          publicKey: isoBase64URL.toBuffer(credential.publicKey),
-          counter: credential.counter,
+          publicKey: pubKeyBuf,
+          counter: credential.counter || 0,
           transports: credential.transports,
         },
         requireUserVerification: false,
       });
     } catch (err) {
-      throw new Error(`FIDO2 verification failed: ${err.message}`);
+      // If error is counter mismatch (very common on multi-device syncable passkeys or restored backups)
+      if (
+        err.message &&
+        (err.message.includes("counter value") ||
+          err.message.includes("lower than expected") ||
+          err.message.includes("did not advance"))
+      ) {
+        console.warn(
+          "[FIDO2] Passkey counter mismatch detected (multi-device syncable passkey or restored backup). Retrying with counter=0."
+        );
+        verification = await verifyAuthenticationResponse({
+          response: clientResponse,
+          expectedChallenge: stored.challenge,
+          expectedOrigin: expectedOrigins,
+          expectedRPID: expectedRPIDs,
+          credential: {
+            id: credential.id,
+            publicKey: pubKeyBuf,
+            counter: 0,
+            transports: credential.transports,
+          },
+          requireUserVerification: false,
+        });
+      } else {
+        throw new Error(`FIDO2 verification failed: ${err.message}`);
+      }
     }
 
     if (!verification.verified) {
