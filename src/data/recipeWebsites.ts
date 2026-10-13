@@ -16,6 +16,46 @@ export const DEFAULT_RECIPE_WEBSITES: RecipeWebsiteSource[] = [
     descriptionFr: 'Référence culinaire québécoise et canadienne aux recettes équilibrées.',
   },
   {
+    id: 'site_panlasangpinoy',
+    name: 'Panlasang Pinoy',
+    url: 'https://panlasangpinoy.com',
+    domain: 'panlasangpinoy.com',
+    language: 'EN',
+    enabled: true,
+    description: 'The premier hub for authentic Filipino recipes, hearty stews, and regional specialties.',
+    descriptionFr: 'La référence incontournable de la cuisine philippine authentique (Sinigang, Adobo, Pancit).',
+  },
+  {
+    id: 'site_kawalingpinoy',
+    name: 'Kawaling Pinoy',
+    url: 'https://www.kawalingpinoy.com',
+    domain: 'kawalingpinoy.com',
+    language: 'EN',
+    enabled: true,
+    description: 'Trusted Filipino comfort dishes, tested traditional cooking methods, and modern twists.',
+    descriptionFr: 'Plats réconfortants philippins traditionnels aux étapes claires et détaillées.',
+  },
+  {
+    id: 'site_yummyph',
+    name: 'Yummy.ph',
+    url: 'https://www.yummy.ph',
+    domain: 'yummy.ph',
+    language: 'EN',
+    enabled: true,
+    description: 'Popular Filipino food magazine featuring quick weeknight dinners and dessert recipes.',
+    descriptionFr: 'Magazine culinaire philippin populaire : soupers rapides et desserts gourmands.',
+  },
+  {
+    id: 'site_foxyfolksy',
+    name: 'Foxy Folksy',
+    url: 'https://www.foxyfolksy.com',
+    domain: 'foxyfolksy.com',
+    language: 'EN',
+    enabled: true,
+    description: 'Delicious Filipino and Asian fusion recipes with step-by-step cooking tutorials.',
+    descriptionFr: 'Délicieuses recettes philippines et fusion asiatique avec instructions pas à pas.',
+  },
+  {
     id: 'site_marmiton',
     name: 'Marmiton',
     url: 'https://www.marmiton.org',
@@ -123,6 +163,15 @@ export function getStoredRecipeWebsites(): RecipeWebsiteSource[] {
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) {
+        const existingIds = new Set(parsed.map((s: any) => s.id));
+        const missingDefaults = DEFAULT_RECIPE_WEBSITES.filter((d) => !existingIds.has(d.id));
+        if (missingDefaults.length > 0) {
+          const merged = [...parsed, ...missingDefaults];
+          try {
+            localStorage.setItem(LOCAL_STORAGE_RECIPE_WEBSITES, JSON.stringify(merged));
+          } catch {}
+          return merged;
+        }
         return parsed;
       }
     }

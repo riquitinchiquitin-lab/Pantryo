@@ -151,3 +151,86 @@ model ActivityLog {
   @@index([itemId])
   @@index([userId])
 }
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+}
+
+enum NutritionMethod {
+  AI_ESTIMATED
+  DYNAMIC_AGGREGATED
+  MANUAL_OVERRIDE
+}
+
+model PlannedMeal {
+  id                 String           @id @default(uuid())
+  householdId        String
+  household          Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  title              String
+  date               String           // YYYY-MM-DD
+  mealType           MealType         @default(DINNER)
+  recipeName         String?
+  recipeUrl          String?
+  imageUrl           String?
+  servings           Int              @default(2)
+  prepTimeMinutes    Int              @default(30)
+  notes              String?
+  isCooked           Boolean          @default(false)
+  ingredients        Json             // Array of { name, quantity, unit, inStock, estimatedKcal, proteinGrams, carbsGrams, fatGrams }
+  
+  // Nutritional Engine Fields
+  calories           Int?
+  caloriesPerServing Int?
+  totalCalories      Int?
+  proteinGrams       Float?
+  carbsGrams         Float?
+  fatGrams           Float?
+  calculationMethod  NutritionMethod? @default(AI_ESTIMATED)
+  nutritionDetails   Json?            // Complete structured nutrition breakdown
+
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([householdId, date])
+  @@index([date, mealType])
+}
+
+model Recipe {
+  id                 String           @id @default(uuid())
+  householdId        String?
+  title              String
+  titleFr            String?
+  descriptionEn      String?
+  descriptionFr      String?
+  servings           Int              @default(4)
+  prepTime           String?
+  cookTime           String?
+  totalTime          String?
+  difficulty         String?          @default("Easy")
+  difficultyFr       String?          @default("Facile")
+  imageUrl           String?
+  source             String?          @default("Personal")
+  sourceUrl          String?
+  youtubeUrl         String?
+  ingredients        Json             // Array of ingredients with units, amounts, and estimatedKcal
+  instructionsEn     Json?            // Array of instruction strings
+  instructionsFr     Json?
+
+  // Nutritional Engine Tier Fields
+  caloriesPerServing Int?
+  totalCalories      Int?
+  proteinGrams       Float?
+  carbsGrams         Float?
+  fatGrams           Float?
+  calculationMethod  NutritionMethod? @default(AI_ESTIMATED)
+  nutritionDetails   Json?
+
+  isCustom           Boolean          @default(true)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([householdId])
+}

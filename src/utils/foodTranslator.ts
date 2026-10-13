@@ -11,21 +11,47 @@ import {
   getBilingualNames,
   translateRecipeIngredients,
   isTextFrench,
-} from '../../server/src/services/foodTranslator.js';
+  TAGALOG_TO_EN_DICTIONARY,
+  TAGALOG_TO_FR_DICTIONARY,
+  isTextTagalog,
+  translateTagalogToEnglish,
+  translateTagalogToFrench,
+  translateCookingStepToFrench,
+  translateCookingStepToEnglish,
+  cleanDuplicatedNotes,
+  translateRecipeTitleToEnglish,
+  translateRecipeTitleToFrench,
+  translateRecipeDescriptionToEnglish,
+  translateRecipeDescriptionToFrench,
+} from './foodTranslatorCore.js';
 
 export {
   EN_TO_FR_DICTIONARY,
   FR_TO_EN_DICTIONARY,
+  TAGALOG_TO_EN_DICTIONARY,
+  TAGALOG_TO_FR_DICTIONARY,
   translateFoodItem,
   getBilingualNames,
   translateRecipeIngredients,
   isTextFrench,
+  isTextTagalog,
+  translateTagalogToEnglish,
+  translateTagalogToFrench,
+  translateCookingStepToFrench,
+  translateCookingStepToEnglish,
+  cleanDuplicatedNotes,
+  translateRecipeTitleToEnglish,
+  translateRecipeTitleToFrench,
+  translateRecipeDescriptionToEnglish,
+  translateRecipeDescriptionToFrench,
 };
 
 /**
  * Returns the localized item display name according to the active language.
- * Guarantees that in English mode, French text is never displayed, and in French mode,
- * English text is translated to French.
+ * LOGIC:
+ * 1. If it's French: translate to English ONLY for the English app version (preserve French for French app version).
+ * 2. If it's English: translate to French for the French app version (preserve English for English app version).
+ * 3. If it's Tagalog: translate to BOTH English and French!
  */
 export function getItemDisplayName(
   item: { name?: string | null; nameFr?: string | null; nameEn?: string | null } | null | undefined,
@@ -36,7 +62,18 @@ export function getItemDisplayName(
   const fr = (item.nameFr || '').trim();
   const en = (item.nameEn || '').trim();
 
+  // If item is Tagalog, translate to English or French based on app version
+  if (isTextTagalog(raw) || isTextTagalog(en) || isTextTagalog(fr)) {
+    const candidate = raw || en || fr;
+    if (lang === 'FR') {
+      return (fr && !isTextTagalog(fr)) ? fr : translateTagalogToFrench(candidate);
+    } else {
+      return (en && !isTextTagalog(en)) ? en : translateTagalogToEnglish(candidate);
+    }
+  }
+
   if (lang === 'FR') {
+    // French app mode:
     // 1. If explicit French name exists and is French
     if (fr && isTextFrench(fr)) return fr;
     // 2. If raw is French
@@ -49,7 +86,7 @@ export function getItemDisplayName(
     return '';
   }
 
-  // English mode
+  // English app mode:
   // 1. If explicit English name exists and is NOT French
   if (en && en.length > 0 && !isTextFrench(en)) return en;
   // 2. If raw name is NOT French
@@ -70,6 +107,276 @@ export function getItemDisplayName(
     if (tr && tr.length > 0) return tr;
   }
   return en || raw || fr || '';
+}
+
+/**
+ * Resolves the display title of a recipe based on active app language.
+ *
+ * SPECIFIED LOGIC:
+ * 1. If it's French: translate to English ONLY for the English app version (preserve French for French app version).
+ * 2. If it's English: translate to French for the French app version (preserve English for English app version).
+ * 3. If it's Tagalog: translate to BOTH English and French!
+ */
+export function getRecipeDisplayTitle(
+  recipe: { title?: string | null; titleFr?: string | null; titleEn?: string | null; name?: string | null; tags?: string[] } | null | undefined,
+  lang: 'EN' | 'FR'
+): string {
+  if (!recipe) return '';
+  const rawTitle = (recipe.title || recipe.name || '').trim();
+  const frTitle = (recipe.titleFr || '').trim();
+  const enTitle = (recipe.titleEn || '').trim();
+
+  // 1. Tagalog check
+  const isTagalog =
+    isTextTagalog(rawTitle) ||
+    isTextTagalog(frTitle) ||
+    isTextTagalog(enTitle) ||
+    (Array.isArray(recipe.tags) && recipe.tags.some((t) => isTextTagalog(t)));
+
+  if (isTagalog) {
+    const candidate = rawTitle || frTitle || enTitle;
+    if (lang === 'FR') {
+      return frTitle && !isTextTagalog(frTitle) && isTextFrench(frTitle)
+        ? frTitle
+        : cleanDuplicatedNotes(translateTagalogToFrench(candidate));
+    } else {
+      return enTitle && !isTextTagalog(enTitle)
+        ? enTitle
+        : cleanDuplicatedNotes(translateTagalogToEnglish(candidate));
+    }
+  }
+
+  // 2. French app version
+  if (lang === 'FR') {
+    // If an explicit French title exists and has French characteristics
+    if (frTitle && isTextFrench(frTitle)) return frTitle;
+    // If raw title is French
+    if (rawTitle && isTextFrench(rawTitle)) return rawTitle;
+    // If explicit French title exists and differs from English raw
+    if (frTitle && frTitle.length > 0 && frTitle.toLowerCase() !== rawTitle.toLowerCase()) return frTitle;
+    // Source is English -> Translate to French!
+    const candidate = enTitle || rawTitle || frTitle;
+    if (candidate) {
+      const translated = cleanDuplicatedNotes(translateFoodItem(candidate, 'FR'));
+      if (translated) return translated;
+    }
+    return frTitle || rawTitle || '';
+  }
+
+  // 3. English app version
+  // Source is French -> Translate to English only!
+  if (rawTitle && isTextFrench(rawTitle)) {
+    if (enTitle && enTitle.length > 0 && !isTextFrench(enTitle)) return enTitle;
+    const translated = cleanDuplicatedNotes(translateRecipeTitleToEnglish(rawTitle) || translateFoodItem(rawTitle, 'EN'));
+    if (translated) return translated;
+  }
+  if (frTitle && isTextFrench(frTitle)) {
+    if (enTitle && enTitle.length > 0 && !isTextFrench(enTitle)) return enTitle;
+    if (rawTitle && !isTextFrench(rawTitle)) return rawTitle;
+    const translated = cleanDuplicatedNotes(translateRecipeTitleToEnglish(frTitle) || translateFoodItem(frTitle, 'EN'));
+    if (translated) return translated;
+  }
+
+  return enTitle || rawTitle || frTitle || '';
+}
+
+/**
+ * Resolves the display description of a recipe based on active app language.
+ */
+export function getRecipeDisplayDescription(
+  recipe: { description?: string | null; descriptionEn?: string | null; descriptionFr?: string | null; zeroWasteReason?: string | null } | null | undefined,
+  lang: 'EN' | 'FR'
+): string {
+  if (!recipe) return '';
+  const descFr = (recipe.descriptionFr || '').trim();
+  const descEn = (recipe.descriptionEn || recipe.description || recipe.zeroWasteReason || '').trim();
+
+  if (isTextTagalog(descFr) || isTextTagalog(descEn)) {
+    const candidate = descEn || descFr;
+    return lang === 'FR'
+      ? cleanDuplicatedNotes(translateTagalogToFrench(candidate))
+      : cleanDuplicatedNotes(translateTagalogToEnglish(candidate));
+  }
+
+  if (lang === 'FR') {
+    if (descFr && isTextFrench(descFr)) return descFr;
+    if (descFr && descFr.length > 0) return descFr;
+    if (descEn) return cleanDuplicatedNotes(translateRecipeDescriptionToFrench(descEn) || translateFoodItem(descEn, 'FR'));
+    return '';
+  } else {
+    if (descEn && !isTextFrench(descEn)) return descEn;
+    if (descFr) return cleanDuplicatedNotes(translateRecipeDescriptionToEnglish(descFr));
+    return descEn || '';
+  }
+}
+
+/**
+ * Resolves the display instructions of a recipe based on active app language.
+ */
+export function getRecipeDisplayInstructions(
+  recipe: { instructions?: string[] | null; instructionsEn?: string[] | null; instructionsFr?: string[] | null } | null | undefined,
+  lang: 'EN' | 'FR'
+): string[] {
+  if (!recipe) return [];
+  const stepsFr = Array.isArray(recipe.instructionsFr) && recipe.instructionsFr.length > 0 ? recipe.instructionsFr : [];
+  const stepsEn = Array.isArray(recipe.instructionsEn) && recipe.instructionsEn.length > 0
+    ? recipe.instructionsEn
+    : (Array.isArray(recipe.instructions) ? recipe.instructions : []);
+
+  if (lang === 'FR') {
+    if (stepsFr.length > 0 && stepsFr.some((s) => isTextFrench(s))) return stepsFr;
+    if (stepsEn.length > 0) {
+      return stepsEn.map((s) => translateCookingStepToFrench(s) || s);
+    }
+    return stepsFr;
+  } else {
+    if (stepsEn.length > 0 && stepsEn.some((s) => !isTextFrench(s))) return stepsEn;
+    if (stepsFr.length > 0) {
+      return stepsFr.map((s) => translateCookingStepToEnglish(s) || s);
+    }
+    return stepsEn;
+  }
+}
+
+/**
+ * Normalizes and guarantees that all bilingual fields of a recipe are populated
+ * strictly following the 3 core rules:
+ * - If French: translate to English ONLY for the English app version (preserve French for French app version).
+ * - If English: translate to French for the French app version (preserve English for English app version).
+ * - If Tagalog: translate to BOTH English and French!
+ */
+export function ensureBilingualRecipe<T extends Record<string, any>>(recipe: T, activeLang: 'EN' | 'FR' = 'FR'): T {
+  if (!recipe) return recipe;
+  const rawTitle = (recipe.title || recipe.name || '').trim();
+  const rawTitleFr = (recipe.titleFr || '').trim();
+  const rawTitleEn = (recipe.titleEn || '').trim();
+
+  const isTagalog =
+    isTextTagalog(rawTitle) ||
+    isTextTagalog(rawTitleFr) ||
+    (Array.isArray(recipe.tags) && recipe.tags.some((t: string) => isTextTagalog(t)));
+  const isFrench = !isTagalog && isTextFrench(rawTitleFr || rawTitle);
+
+  let titleEn = rawTitleEn || rawTitle;
+  let titleFr = rawTitleFr;
+
+  if (isTagalog) {
+    const candidate = rawTitle || rawTitleFr || rawTitleEn;
+    titleEn = cleanDuplicatedNotes(translateRecipeTitleToEnglish(candidate) || translateTagalogToEnglish(candidate) || candidate);
+    titleFr = cleanDuplicatedNotes(translateRecipeTitleToFrench(candidate) || translateTagalogToFrench(candidate) || candidate);
+  } else if (isFrench) {
+    titleFr = rawTitleFr || rawTitle;
+    if (!titleEn || (isTextFrench(titleEn) && titleEn.toLowerCase() === titleFr.toLowerCase())) {
+      titleEn = cleanDuplicatedNotes(translateRecipeTitleToEnglish(titleFr) || translateFoodItem(titleFr, 'EN') || titleFr);
+    }
+  } else {
+    // English
+    titleEn = rawTitle || rawTitleEn;
+    if (!titleFr || (!isTextFrench(titleFr) && titleFr.toLowerCase() === titleEn.toLowerCase())) {
+      titleFr = cleanDuplicatedNotes(translateRecipeTitleToFrench(titleEn) || translateFoodItem(titleEn, 'FR') || titleEn);
+    }
+  }
+
+  // Ensure ingredients
+  const ingredients = (recipe.ingredients || []).map((ing: any, idx: number) => {
+    const ingName = (ing.name || ing.nameFr || '').trim();
+    const ingFr = (ing.nameFr || '').trim();
+    const ingEn = (ing.nameEn || ing.name || '').trim();
+
+    let resolvedEn = ingEn;
+    let resolvedFr = ingFr;
+
+    if (resolvedEn && resolvedFr && resolvedEn.toLowerCase() !== resolvedFr.toLowerCase()) {
+      // Both distinct and valid, preserve both
+    } else if (isTextTagalog(ingName) || isTextTagalog(ingFr)) {
+      const c = ingName || ingFr;
+      resolvedEn = cleanDuplicatedNotes(translateTagalogToEnglish(c) || c);
+      resolvedFr = cleanDuplicatedNotes(translateTagalogToFrench(c) || translateFoodItem(resolvedEn, 'FR') || c);
+    } else if (isFrench) {
+      if (!resolvedFr) resolvedFr = ingFr || ingName;
+      if (!resolvedEn || resolvedEn.toLowerCase() === resolvedFr.toLowerCase()) {
+        resolvedEn = cleanDuplicatedNotes(translateFoodItem(resolvedFr, 'EN') || resolvedFr);
+      }
+    } else {
+      if (!resolvedEn) resolvedEn = ingEn || ingName;
+      if (!resolvedFr || resolvedFr.toLowerCase() === resolvedEn.toLowerCase()) {
+        resolvedFr = cleanDuplicatedNotes(translateFoodItem(resolvedEn, 'FR') || resolvedEn);
+      }
+    }
+
+    const displayName = activeLang === 'FR' ? (resolvedFr || resolvedEn) : (resolvedEn || resolvedFr);
+
+    return {
+      ...ing,
+      id: ing.id || `ing-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
+      name: displayName,
+      nameFr: resolvedFr,
+      nameEn: resolvedEn,
+    };
+  });
+
+  // Ensure instructions
+  const rawStepsEn = Array.isArray(recipe.instructionsEn)
+    ? recipe.instructionsEn
+    : (Array.isArray(recipe.instructions) ? recipe.instructions : []);
+  const rawStepsFr = Array.isArray(recipe.instructionsFr) ? recipe.instructionsFr : [];
+
+  let instructionsEn = [...rawStepsEn];
+  let instructionsFr = [...rawStepsFr];
+
+  if (isTagalog) {
+    const src = rawStepsEn.length > 0 ? rawStepsEn : rawStepsFr;
+    instructionsEn = rawStepsEn.length > 0 && !rawStepsEn.every((s: string) => isTextTagalog(s))
+      ? rawStepsEn
+      : src.map((s: string) => translateCookingStepToEnglish(s) || s);
+    instructionsFr = rawStepsFr.length > 0 && !rawStepsFr.every((s: string) => isTextTagalog(s))
+      ? rawStepsFr
+      : src.map((s: string) => translateCookingStepToFrench(s) || s);
+  } else if (isFrench) {
+    if (instructionsFr.length === 0 && instructionsEn.length > 0) instructionsFr = [...instructionsEn];
+    if (instructionsEn.length > 0 && !instructionsEn.every((s: string) => isTextFrench(s))) {
+      // Valid English instructions already present, preserve them!
+    } else {
+      instructionsEn = instructionsFr.map((s: string) => translateCookingStepToEnglish(s) || s);
+    }
+  } else {
+    if (instructionsEn.length === 0 && instructionsFr.length > 0) instructionsEn = [...instructionsFr];
+    if (instructionsFr.length > 0 && instructionsFr.some((s: string) => isTextFrench(s))) {
+      // Valid French instructions already present, preserve them!
+    } else {
+      instructionsFr = instructionsEn.map((s: string) => translateCookingStepToFrench(s) || s);
+    }
+  }
+
+  // Ensure descriptions
+  let descEn = recipe.descriptionEn || recipe.description || '';
+  let descFr = recipe.descriptionFr || '';
+  if (isTagalog) {
+    const c = descEn || descFr;
+    descEn = cleanDuplicatedNotes(translateRecipeDescriptionToEnglish(c) || translateTagalogToEnglish(c));
+    descFr = cleanDuplicatedNotes(translateRecipeDescriptionToFrench(c) || translateTagalogToFrench(c));
+  } else if (isFrench) {
+    descFr = descFr || descEn;
+    if (!descEn || isTextFrench(descEn)) descEn = cleanDuplicatedNotes(translateRecipeDescriptionToEnglish(descFr));
+  } else {
+    descEn = descEn || descFr;
+    if (!descFr || !isTextFrench(descFr)) descFr = cleanDuplicatedNotes(translateRecipeDescriptionToFrench(descEn));
+  }
+
+  return {
+    ...recipe,
+    title: activeLang === 'FR' ? (titleFr || titleEn) : (titleEn || titleFr),
+    titleEn,
+    titleFr,
+    descriptionEn: descEn,
+    descriptionFr: descFr,
+    ingredients,
+    instructionsEn,
+    instructionsFr,
+    difficultyFr:
+      recipe.difficultyFr ||
+      (recipe.difficulty === 'Advanced' ? 'Avancé' : recipe.difficulty === 'Medium' ? 'Moyen' : 'Facile'),
+  };
 }
 
 /**

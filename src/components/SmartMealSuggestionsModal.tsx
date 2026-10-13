@@ -40,6 +40,8 @@ import {
   getStoredRecipeWebsites,
   saveStoredRecipeWebsites,
 } from '../data/recipeWebsites';
+import { getCuratedMealPhoto, getFoodSvgFallback } from '../utils/curatedFoodImages';
+import { getRecipeDisplayTitle } from '../utils/foodTranslator';
 
 interface SmartMealSuggestionsModalProps {
   isOpen: boolean;
@@ -49,6 +51,8 @@ interface SmartMealSuggestionsModalProps {
   initialMealType?: MealType;
   onPlanMeal: (params: {
     title: string;
+    titleFr?: string;
+    titleEn?: string;
     mealType: MealType;
     date: string;
     prepTimeMinutes: number;
@@ -523,7 +527,9 @@ export const SmartMealSuggestionsModal: React.FC<SmartMealSuggestionsModalProps>
       });
 
       await onPlanMeal({
-        title: lang === 'FR' && recipe.titleFr ? recipe.titleFr : recipe.title,
+        title: getRecipeDisplayTitle(recipe, lang),
+        titleFr: recipe.titleFr || getRecipeDisplayTitle(recipe, 'FR'),
+        titleEn: recipe.title || getRecipeDisplayTitle(recipe, 'EN'),
         mealType: selectedMealType,
         date: selectedDate,
         prepTimeMinutes: parsedPrepMinutes,
@@ -1074,19 +1080,28 @@ export const SmartMealSuggestionsModal: React.FC<SmartMealSuggestionsModalProps>
                   <div className="p-4 sm:p-5 flex flex-col sm:flex-row gap-4">
                     {/* Thumbnail Image */}
                     <div className="relative w-full sm:w-44 h-40 rounded-2xl overflow-hidden shrink-0 border border-[#E5DFD0] bg-[#FAF8F5] flex items-center justify-center">
-                      {recipe.imageUrl && !recipe.imageUrl.includes('unsplash.com') ? (
-                        <img
-                          src={recipe.imageUrl}
-                          alt={recipe.title}
-                          referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-teal-50/70 flex flex-col items-center justify-center text-teal-800 p-3 text-center">
-                          <Utensils className="w-10 h-10 stroke-[1.5] text-teal-700 opacity-80" />
-                          <span className="text-[10px] font-bold mt-1 text-teal-900 line-clamp-1">{recipe.source || 'Recette'}</span>
-                        </div>
-                      )}
+                      {(() => {
+                        const photo = recipe.imageUrl?.trim()
+                          ? recipe.imageUrl
+                          : getCuratedMealPhoto(recipe.title);
+                        return (
+                          <img
+                            src={photo}
+                            alt={recipe.title}
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                            onError={(e) => {
+                              const target = e.currentTarget as HTMLImageElement;
+                              const curated = getCuratedMealPhoto(recipe.title);
+                              if (target.src !== curated) {
+                                target.src = curated;
+                              } else {
+                                target.src = getFoodSvgFallback(recipe.title);
+                              }
+                            }}
+                          />
+                        );
+                      })()}
                       {/* Source Badge */}
                       <span className="absolute top-2 left-2 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-xs text-white text-[10px] font-bold flex items-center gap-1 shadow-sm">
                         {recipe.isWebSearch ? <Globe className="w-3 h-3 text-teal-300" /> : <BookOpen className="w-3 h-3 text-amber-300" />}
@@ -1110,7 +1125,7 @@ export const SmartMealSuggestionsModal: React.FC<SmartMealSuggestionsModalProps>
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <h3 className="text-base sm:text-lg font-black tracking-tight text-[#0D3B37] leading-snug">
-                            {lang === 'FR' && recipe.titleFr ? recipe.titleFr : recipe.title}
+                            {getRecipeDisplayTitle(recipe, lang)}
                           </h3>
 
                           {/* Meal Slot, Time & Servings Meta */}

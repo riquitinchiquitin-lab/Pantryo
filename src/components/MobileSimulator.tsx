@@ -1076,12 +1076,12 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   }
 
   return (
-    <div className="relative w-full max-w-7xl mx-auto text-[#133E3B] flex flex-col min-h-screen sm:min-h-[850px] sm:rounded-3xl border-0 sm:border sm:border-[#E5DFD0] sm:shadow-lg bg-[#FAF7EE] overflow-hidden">
-      {/* App Top Bar - Ultra-compact, spacious on tablet and desktop, zero overlapping or text-wrapping */}
-      <div className="px-3 sm:px-5 py-1.5 sm:py-2.5 pt-[max(0.5rem,env(safe-area-inset-top,0px))] bg-[#FAF7EE] border-b border-[#E8E2D5] shrink-0">
+    <div className="relative w-full max-w-7xl mx-auto text-[#133E3B] flex flex-col min-h-screen sm:min-h-[850px] sm:rounded-3xl border-0 sm:border border-[#E5DFD0] shadow-sm bg-[#FAF7EE] overflow-hidden">
+      {/* App Top Bar */}
+      <header className="sticky top-0 z-30 px-3 sm:px-5 py-2.5 pt-[max(0.6rem,env(safe-area-inset-top,0px))] bg-white/95 backdrop-blur-md border-b border-[#E8E2D5] shadow-2xs shrink-0">
         <div className="flex items-center justify-between gap-2 lg:gap-4 max-w-7xl mx-auto w-full">
-          {/* 1. Left: Logo (Admin Console Trigger) & Kitchen Name Customizer */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* 1. Left: Bold Wordmark & Admin Console Trigger */}
+          <div className="flex items-center gap-2 shrink-0">
             <button
               id="btn-pantryo-admin-management"
               onClick={() => {
@@ -1091,96 +1091,103 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                   setIsAdminRestrictedOpen(true);
                 }
               }}
-              className="flex items-center gap-1.5 sm:gap-2 shrink-0 hover:opacity-90 active:scale-98 transition-all cursor-pointer p-1 -m-1 rounded-2xl hover:bg-[#F2ECE0]/60 group text-left"
+              className="flex items-center gap-2 shrink-0 hover:bg-teal-50/60 p-1.5 -m-1 rounded-2xl transition-all cursor-pointer group text-left"
               title={
                 currentUser.role === 'ADMIN'
                   ? lang === 'FR'
-                    ? 'Ouvrir la Console d’Administration & Sauvegarde (Admin)'
-                    : 'Open App & Database Administration (Admin)'
+                    ? 'Ouvrir la Console d’Administration (Admin)'
+                    : 'Open App Administration (Admin)'
                   : lang === 'FR'
-                  ? 'Console Pantryo (Accès Administrateur requis)'
-                  : 'Pantryo Console (Admin Access Required)'
+                  ? 'Console Pantryo (Accès Administrateur)'
+                  : 'Pantryo Console (Admin Access)'
               }
             >
-              <div className="shrink-0 flex items-center justify-center transition-transform group-hover:scale-105">
+              <div className="shrink-0 flex items-center justify-center">
                 <PantryoLogo size={28} />
               </div>
-              <div className="shrink-0">
-                <div className="flex items-center gap-1">
-                  <h1 className="text-sm sm:text-base font-black tracking-tight text-[#0D3B37] leading-none whitespace-nowrap">
-                    Pantryo
-                  </h1>
-                  {currentUser.role === 'ADMIN' ? (
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-teal-100 text-teal-800 border border-teal-200">
-                      <ShieldCheck className="w-2.5 h-2.5" />
-                      <span className="hidden xs:inline">Admin</span>
-                    </span>
-                  ) : (
-                    <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse shrink-0" />
-                  )}
-                </div>
+              <div className="shrink-0 flex flex-col items-start justify-center">
+                <h1 className="text-base sm:text-lg font-black tracking-tight text-[#0D3B37] leading-tight whitespace-nowrap">
+                  Pantryo
+                </h1>
+                {currentUser.role === 'ADMIN' ? (
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[9px] font-black uppercase bg-amber-100 text-amber-900 border border-amber-200 mt-0.5 leading-tight">
+                    <ShieldCheck className="w-2 h-2" />
+                    <span>Admin</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-bold text-teal-800 bg-teal-50 border border-teal-200/60 mt-0.5 leading-tight">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                    <span>{currentUser.role === 'GUEST' ? (lang === 'FR' ? 'Invité' : 'Guest') : (lang === 'FR' ? 'Membre' : 'Member')}</span>
+                  </span>
+                )}
               </div>
             </button>
           </div>
 
-          {/* 2. Center: Navigation Bar (shown on md+ screens, centered, zero wrapping, responsive labels) */}
-          <nav aria-label="Main Navigation" className="hidden md:flex items-center gap-0.5 lg:gap-1 p-1 bg-white/95 rounded-2xl border border-[#E0D9C8] shadow-2xs shrink-0">
+          {/* 2. Center: Segmented Main Navigation Bar (Visible on Desktop) */}
+          <nav aria-label="Main Navigation" className="hidden xl:flex items-center p-0.5 lg:p-1 bg-[#F0ECE1] rounded-2xl border border-[#E5DFD0] shrink min-w-0 gap-0.5 lg:gap-1 shadow-2xs">
             {/* Inventory */}
             <button
               onClick={() => setActiveNav('home')}
               title={t('nav_inventory')}
-              className={`px-2.5 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
+              className={`px-2 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 lg:gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
                 activeNav === 'home'
                   ? 'bg-teal-700 text-white shadow-2xs'
-                  : 'text-[#527470] hover:text-[#0D3B37] hover:bg-[#F2ECE0]'
+                  : 'text-[#527470] hover:text-[#0D3B37] hover:bg-white/50'
               }`}
             >
               <Home className="w-3.5 h-3.5 shrink-0" />
-              <span className={activeNav === 'home' ? 'inline' : 'hidden lg:inline'}>
-                {t('nav_inventory')}
-              </span>
+              <span>{t('nav_inventory')}</span>
             </button>
 
             {/* Meals */}
             <button
               onClick={() => setActiveNav('meals')}
               title={t('nav_meals')}
-              className={`px-2.5 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
+              className={`px-2 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 lg:gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
                 activeNav === 'meals'
                   ? 'bg-teal-700 text-white shadow-2xs'
-                  : 'text-[#527470] hover:text-[#0D3B37] hover:bg-[#F2ECE0]'
+                  : 'text-[#527470] hover:text-[#0D3B37] hover:bg-white/50'
               }`}
             >
-              <CalendarDays className={`w-3.5 h-3.5 shrink-0 ${activeNav === 'meals' ? 'text-white' : 'text-indigo-500'}`} />
-              <span className={activeNav === 'meals' ? 'inline' : 'hidden lg:inline'}>
-                {lang === 'FR' ? 'Repas' : 'Meals'}
-              </span>
+              <CalendarDays className="w-3.5 h-3.5 shrink-0" />
+              <span>{lang === 'FR' ? 'Repas' : 'Meals'}</span>
               {plannedMeals.length > 0 && (
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black shrink-0 ${
-                  activeNav === 'meals' ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-800'
+                <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full shrink-0 ${
+                  activeNav === 'meals' ? 'bg-white/20 text-white' : 'bg-teal-100 text-teal-800'
                 }`}>
                   {plannedMeals.length}
                 </span>
               )}
             </button>
 
+            {/* Center: Mobile-Style Add Button (Functions like mobile phone on desktop) */}
+            <button
+              type="button"
+              id="top-nav-center-add-btn"
+              onClick={() => setIsAddMenuOpen((prev) => !prev)}
+              className="px-2.5 lg:px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1 lg:gap-1.5 shrink-0 whitespace-nowrap cursor-pointer bg-teal-700 hover:bg-teal-800 text-white shadow-2xs active:scale-95 group"
+              title={lang === 'FR' ? 'Ajouter (Menu Mobile Rapide)' : 'Add (Mobile Quick Menu)'}
+            >
+              <Plus className="w-3.5 h-3.5 lg:w-4 lg:h-4 stroke-[3] group-hover:rotate-90 transition-transform" />
+              <span>{lang === 'FR' ? 'Ajouter' : 'Add'}</span>
+            </button>
+
             {/* Grocery */}
             <button
               onClick={() => setActiveNav('grocery')}
               title={t('nav_grocery')}
-              className={`px-2.5 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
+              className={`px-2 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 lg:gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
                 activeNav === 'grocery'
                   ? 'bg-teal-700 text-white shadow-2xs'
-                  : 'text-[#527470] hover:text-[#0D3B37] hover:bg-[#F2ECE0]'
+                  : 'text-[#527470] hover:text-[#0D3B37] hover:bg-white/50'
               }`}
             >
               <ShoppingCart className="w-3.5 h-3.5 shrink-0" />
-              <span className={activeNav === 'grocery' ? 'inline' : 'hidden lg:inline'}>
-                {lang === 'FR' ? 'Épicerie' : 'Grocery'}
-              </span>
+              <span>{lang === 'FR' ? 'Épicerie' : 'Grocery'}</span>
               {groceryItems.filter((i) => i.inCart).length > 0 && (
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black shrink-0 ${
-                  activeNav === 'grocery' ? 'bg-white/20 text-white' : 'bg-teal-100 text-teal-900'
+                <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full shrink-0 ${
+                  activeNav === 'grocery' ? 'bg-white/20 text-white' : 'bg-teal-100 text-teal-800'
                 }`}>
                   {groceryItems.filter((i) => i.inCart).length}
                 </span>
@@ -1191,469 +1198,207 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             <button
               onClick={() => setActiveNav('cooking')}
               title={t('nav_cooking')}
-              className={`px-2.5 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
+              className={`px-2 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 lg:gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
                 activeNav === 'cooking'
                   ? 'bg-teal-700 text-white shadow-2xs'
-                  : 'text-[#527470] hover:text-[#0D3B37] hover:bg-[#F2ECE0]'
+                  : 'text-[#527470] hover:text-[#0D3B37] hover:bg-white/50'
               }`}
             >
               <ChefHat className="w-3.5 h-3.5 shrink-0" />
-              <span className={activeNav === 'cooking' ? 'inline' : 'hidden lg:inline'}>
-                {t('nav_cooking')}
-              </span>
+              <span>{t('nav_cooking')}</span>
             </button>
 
             {/* Family */}
             <button
               onClick={() => setActiveNav('sync')}
               title={t('nav_family')}
-              className={`px-2.5 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
+              className={`px-2 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 lg:gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
                 activeNav === 'sync'
                   ? 'bg-teal-700 text-white shadow-2xs'
-                  : 'text-[#527470] hover:text-[#0D3B37] hover:bg-[#F2ECE0]'
+                  : 'text-[#527470] hover:text-[#0D3B37] hover:bg-white/50'
               }`}
             >
               <Users className="w-3.5 h-3.5 shrink-0" />
-              <span className={activeNav === 'sync' ? 'inline' : 'hidden lg:inline'}>
-                {t('nav_family')}
-              </span>
+              <span>{t('nav_family')}</span>
             </button>
           </nav>
 
-          {/* 3. Right: Top Actions (Quick Add + Language + Install + User, strictly shrink-0) */}
-          <div className="flex items-center gap-1.5 lg:gap-2 shrink-0">
-            {/* Quick Add Button on tablet and desktop */}
-            <button
-              type="button"
-              onClick={() => setIsAddMenuOpen(true)}
-              className="hidden md:flex items-center gap-1 p-1.5 lg:px-2.5 lg:py-1.5 rounded-xl bg-gradient-to-r from-[#0D3B37] to-[#0E766E] hover:from-[#092926] hover:to-[#0B5C56] text-white text-xs font-bold shadow-2xs transition-all active:scale-95 shrink-0 cursor-pointer"
-              title={lang === 'FR' ? 'Ajouter un aliment' : 'Add food item'}
-            >
-              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span className="hidden lg:inline">{lang === 'FR' ? 'Ajout' : 'Add'}</span>
-            </button>
+          {/* 3. Right: Action Bar & User Profile (Guaranteed never cut off) */}
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0 ml-auto">
+            {/* Unified Single Language Toggle */}
+            <div className="shrink-0">
+              <LanguageSwitcher />
+            </div>
 
-            {/* Unified Single Language Toggle (e.g. FR when in English, EN when in French) */}
-            <LanguageSwitcher />
-
-            {/* Install Button */}
+            {/* Install Button (Compact icon on small screens, expanded on wider screens) */}
             {!isInstalledEffective && onInstall && (
               <button
                 type="button"
                 onClick={onInstall}
-                className="px-2.5 py-1.5 rounded-xl bg-[#0E766E] hover:bg-[#0B5C56] text-white text-xs font-bold shadow-2xs transition-all active:scale-95 flex items-center gap-1.5 shrink-0 cursor-pointer"
+                className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-bold transition-all active:scale-95 flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs"
                 title={t('install_tooltip')}
               >
-                <Download className="w-3.5 h-3.5 text-teal-200" />
-                <span className="font-bold text-[11px] sm:text-xs">{t('install_btn')}</span>
+                <Download className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+                <span className="font-bold text-[11px] sm:text-xs hidden md:inline">{t('install_btn')}</span>
               </button>
             )}
 
-            {/* User Pill: Clicking opens Family & Profile */}
-            <div className={`flex items-center gap-1 border rounded-xl p-1 lg:px-2 lg:py-1 shadow-2xs shrink-0 transition-colors ${
-              activeNav === 'sync' ? 'bg-teal-700 border-teal-800 text-white' : 'bg-white/95 border-[#E0D9C8] text-[#0D3B37]'
-            }`}>
-              <button
-                type="button"
-                onClick={() => setActiveNav(activeNav === 'sync' ? 'home' : 'sync')}
-                className="relative group/avatar cursor-pointer shrink-0"
-                title={lang === 'FR' ? 'Famille & Profil' : 'Family & Profile'}
-              >
+            {/* Family & Profile User Button - Just a circle on mobile mode so it never goes off screen */}
+            <button
+              type="button"
+              id="header-family-profile-btn"
+              onClick={() => setActiveNav(activeNav === 'sync' ? 'home' : 'sync')}
+              className={`flex items-center gap-1.5 rounded-full sm:rounded-2xl p-0.5 sm:px-2.5 sm:py-1 shrink-0 transition-all border shadow-2xs cursor-pointer ${
+                activeNav === 'sync'
+                  ? 'bg-teal-700 text-white border-teal-800 ring-2 ring-teal-400/50 shadow-2xs'
+                  : 'bg-white border-[#E5DFD0] text-[#0D3B37] hover:bg-[#FAF7EE]'
+              }`}
+              title={lang === 'FR' ? `Famille & Profil (${currentUser.name})` : `Family & Profile (${currentUser.name})`}
+              aria-label={lang === 'FR' ? `Profil de ${currentUser.name}` : `${currentUser.name}'s Profile`}
+            >
+              <div className="relative shrink-0 w-7 h-7 sm:w-6 sm:h-6 rounded-full overflow-hidden">
                 <img
                   src={currentUser.avatarUrl || '/avatars/chef-cat.svg'}
                   alt={currentUser.name}
                   referrerPolicy="no-referrer"
-                  className="w-6 h-6 rounded-full object-cover shrink-0 border border-teal-600/30 group-hover/avatar:opacity-80 transition-opacity"
+                  className="w-full h-full rounded-full object-cover border border-black/10"
                 />
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveNav(activeNav === 'sync' ? 'home' : 'sync')}
-                className={`text-xs font-bold transition-colors cursor-pointer px-1 flex items-center gap-1 ${
-                  activeNav === 'sync' ? 'text-white' : 'text-[#0D3B37] hover:text-teal-800'
-                }`}
-                title={currentUser.name}
-              >
-                <span className="truncate max-w-[70px] sm:max-w-[110px]">{currentUser.name}</span>
-                <Users className="w-3 h-3 opacity-70 hidden sm:inline" />
-              </button>
-            </div>
+                <span className={`sm:hidden absolute bottom-0 right-0 w-2 h-2 rounded-full border border-white ${
+                  activeNav === 'sync' ? 'bg-teal-300' : 'bg-emerald-500'
+                }`} />
+              </div>
+              <Users className={`hidden sm:inline w-3.5 h-3.5 shrink-0 ${activeNav === 'sync' ? 'text-teal-200' : 'text-teal-700'}`} />
+              <span className={`hidden sm:inline text-xs font-bold transition-colors truncate max-w-[85px] md:max-w-[105px] lg:max-w-[130px] ${
+                activeNav === 'sync' ? 'text-white' : 'text-[#0D3B37]'
+              }`}>
+                {currentUser.name}
+              </span>
+            </button>
 
-            {/* Logout Button */}
+            {/* Logout Button (Guaranteed visible in mobile & desktop) */}
             <button
+              type="button"
+              id="header-logout-btn"
               onClick={handleLogout}
-              className="p-1.5 rounded-xl border border-[#E0D9C8] bg-white/80 hover:bg-red-50 hover:text-red-700 hover:border-red-200 text-[#527470] shadow-2xs transition-colors shrink-0 cursor-pointer"
+              className="w-8 h-8 rounded-full sm:rounded-xl border border-[#E5DFD0] bg-white hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 text-slate-500 transition-colors flex items-center justify-center shrink-0 cursor-pointer shadow-2xs active:scale-95"
               title={lang === 'FR' ? 'Déconnexion' : 'Log out'}
+              aria-label={lang === 'FR' ? 'Déconnexion' : 'Log out'}
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-4 h-4 shrink-0" />
             </button>
           </div>
         </div>
 
-        {/* Global Notice Toast */}
+        {/* Global Notice */}
         {bannerNotice && (
-          <div className="mt-2 py-2 px-3 rounded-2xl bg-teal-700 text-white text-xs font-semibold shadow-md flex items-center gap-2 animate-fade-in">
-            <Check className="w-4 h-4 shrink-0" />
+          <div className="mt-2 py-1.5 px-3 rounded-xl bg-teal-50 text-teal-900 border border-teal-200 text-xs font-bold flex items-center gap-2 shadow-2xs animate-fade-in">
+            <Check className="w-4 h-4 text-teal-600 shrink-0 stroke-[3]" />
             <span className="truncate">{bannerNotice}</span>
           </div>
         )}
-      </div>
+      </header>
 
       {/* Main Scrollable View */}
-      <div className="flex-1 overflow-y-auto px-3 sm:px-5 pt-1.5 pb-32 md:pb-12 space-y-2.5 sm:space-y-3.5">
+      <div className="flex-1 overflow-y-auto px-3 sm:px-5 pt-1.5 pb-28 xl:pb-16 space-y-2.5 sm:space-y-3.5">
         {/* VIEW: HOME INVENTORY */}
         {activeNav === 'home' && (
           <>
-            {/* HERO BENTO BOX DASHBOARD - Space maximized for mobile & tablet */}
-            {isBentoCompact ? (
-              <div className="p-2.5 sm:p-3 rounded-2xl bg-white border border-[#E5DFD0] shadow-2xs space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-7 h-7 rounded-xl bg-teal-50 text-teal-800 border border-teal-100 flex items-center justify-center shrink-0">
-                      <Leaf className="w-3.5 h-3.5 text-teal-700" />
-                    </div>
-                    <div className="flex items-center gap-2 truncate">
-                      <span className="text-xs font-black text-[#0D3B37] truncate">
-                        {lang === 'FR' ? '96% Zéro-Gaspillage' : '96% Zero-Waste'}
-                      </span>
-                      <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-teal-50 text-teal-800 border border-teal-200/80">
-                        <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-ping" />
-                        {t('live_sync')}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Toggle to view detailed tiles */}
-                  <button
-                    type="button"
-                    onClick={() => setIsBentoCompact(false)}
-                    className="px-2.5 py-1 rounded-xl bg-[#F7FAF9] border border-[#D5E1D2] hover:bg-[#EBF3F1] text-[11px] font-bold text-[#0D3B37] flex items-center gap-1 transition-all cursor-pointer shrink-0 shadow-2xs active:scale-95"
-                    title={lang === 'FR' ? 'Afficher les cartes détaillées' : 'Show detailed bento cards'}
-                  >
-                    <span>{lang === 'FR' ? 'Détails' : 'Details'}</span>
-                    <ChevronDown className="w-3.5 h-3.5" />
-                  </button>
+            {/* 4 EQUAL METRIC BOXES AT THE TOP */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              {/* Box 1: Fridge */}
+              <button
+                type="button"
+                onClick={() => setFilterLocation(filterLocation === 'FRIDGE' ? 'ALL' : 'FRIDGE')}
+                className={`p-3 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs ${
+                  filterLocation === 'FRIDGE'
+                    ? 'bg-teal-700 text-white border-teal-800 shadow-xs'
+                    : 'bg-white border-[#E5DFD0] hover:border-teal-300 text-[#0D3B37]'
+                }`}
+              >
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span>{lang === 'FR' ? 'Frigo' : 'Fridge'}</span>
+                  <Refrigerator className={`w-4 h-4 shrink-0 ${filterLocation === 'FRIDGE' ? 'text-teal-200' : 'text-teal-600'}`} />
                 </div>
-
-                {/* Compact Location Quick Pills */}
-                <div className="grid grid-cols-5 gap-1 sm:gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setFilterLocation(filterLocation === 'FRIDGE' ? 'ALL' : 'FRIDGE')}
-                    className={`py-1.5 px-1 rounded-xl text-center border transition-all cursor-pointer ${
-                      filterLocation === 'FRIDGE'
-                        ? 'bg-teal-700 text-white border-teal-700 shadow-xs'
-                        : 'bg-[#F7FAF9] border-[#E0ECE8] text-[#244E49] hover:bg-[#EBF3F1]'
-                    }`}
-                  >
-                    <span className="text-[10px] font-semibold block opacity-85 truncate">
-                      {lang === 'FR' ? 'Frigo' : 'Fridge'}
-                    </span>
-                    <span className="text-xs font-black block leading-tight">{fridgeCount}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setFilterLocation(filterLocation === 'FREEZER' ? 'ALL' : 'FREEZER')}
-                    className={`py-1.5 px-1 rounded-xl text-center border transition-all cursor-pointer ${
-                      filterLocation === 'FREEZER'
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                        : 'bg-[#F0F6FA] border-[#D7E6F2] text-[#244563] hover:bg-[#E4F0F9]'
-                    }`}
-                  >
-                    <span className="text-[10px] font-semibold block opacity-85 truncate">
-                      {lang === 'FR' ? 'Congélo' : 'Freezer'}
-                    </span>
-                    <span className="text-xs font-black block leading-tight">{freezerCount}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setFilterLocation(filterLocation === 'PANTRY' ? 'ALL' : 'PANTRY')}
-                    className={`py-1.5 px-1 rounded-xl text-center border transition-all cursor-pointer ${
-                      filterLocation === 'PANTRY'
-                        ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
-                        : 'bg-[#FAF6EE] border-[#EFE5D0] text-[#544122] hover:bg-[#F5EDDC]'
-                    }`}
-                  >
-                    <span className="text-[10px] font-semibold block opacity-85 truncate">
-                      {lang === 'FR' ? 'Garde-m.' : 'Pantry'}
-                    </span>
-                    <span className="text-xs font-black block leading-tight">{pantryCount}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setFilterLocation(filterLocation === 'SPICE_RACK' ? 'ALL' : 'SPICE_RACK')}
-                    className={`py-1.5 px-1 rounded-xl text-center border transition-all cursor-pointer ${
-                      filterLocation === 'SPICE_RACK'
-                        ? 'bg-orange-600 text-white border-orange-600 shadow-xs'
-                        : 'bg-[#FFF7ED] border-[#FED7AA] text-[#9A3412] hover:bg-[#FFEDD5]'
-                    }`}
-                  >
-                    <span className="text-[10px] font-semibold block opacity-85 truncate">
-                      {lang === 'FR' ? 'Épices' : 'Spices'}
-                    </span>
-                    <span className="text-xs font-black block leading-tight">{spiceCount}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setFilterLocation(filterLocation === 'EXPIRING' ? 'ALL' : 'EXPIRING')}
-                    className={`py-1.5 px-1 rounded-xl text-center border transition-all cursor-pointer ${
-                      filterLocation === 'EXPIRING'
-                        ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
-                        : expiringItems.length > 0
-                        ? 'bg-rose-50 border-rose-200 text-rose-800 hover:bg-rose-100'
-                        : 'bg-white border-[#E0D9C8] text-[#527470]'
-                    }`}
-                  >
-                    <span className="text-[10px] font-semibold block opacity-85 truncate">
-                      {lang === 'FR' ? 'Bientôt' : 'Soon'}
-                    </span>
-                    <span className="text-xs font-black block leading-tight">{expiringItems.length}</span>
-                  </button>
-                </div>
-
-                {/* 1-Line Urgent Rescue strip if items expiring */}
-                {expiringItems.length > 0 && (
-                  <div
-                    onClick={() => setFilterLocation('EXPIRING')}
-                    className="p-1.5 px-2.5 rounded-xl bg-rose-50 border border-rose-200/80 text-rose-900 flex items-center justify-between text-[11px] font-medium cursor-pointer hover:bg-rose-100/70 transition-colors"
-                  >
-                    <div className="flex items-center gap-1.5 min-w-0 truncate">
-                      <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                      <span className="font-bold text-rose-800 shrink-0">
-                        {expiringItems.length} {lang === 'FR' ? 'à sauver :' : 'to rescue:'}
-                      </span>
-                      <span className="truncate">{getItemDisplayName(expiringItems[0], lang)}</span>
-                      <span className="text-[10px] text-rose-700 font-bold shrink-0">
-                        ({expiringItems[0]?.daysUntilExpiration} {lang === 'FR' ? 'j' : 'd'})
-                      </span>
-                    </div>
-                    <span className="text-[10px] font-bold text-rose-700 shrink-0 ml-1">→</span>
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* DETAILED BENTO BOX DASHBOARD (EXPANDED VIEW) */
-              <div className="space-y-2">
-                <div className="flex items-center justify-between px-1">
-                  <span className="text-[10px] uppercase font-black tracking-wider text-[#527470]">
-                    {t('bento_pulse_title')}
+                <div className="mt-1 flex items-baseline justify-between">
+                  <span className="text-2xl font-black">{fridgeCount}</span>
+                  <span className={`text-[10px] font-bold ${filterLocation === 'FRIDGE' ? 'text-teal-200' : 'text-[#527470]'}`}>
+                    {lang === 'FR' ? 'articles' : 'items'}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => setIsBentoCompact(true)}
-                    className="px-2.5 py-1 rounded-xl bg-white border border-[#D5E1D2] hover:bg-[#F2ECE0] text-[11px] font-bold text-[#0D3B37] flex items-center gap-1 transition-all cursor-pointer shadow-2xs active:scale-95"
-                    title={lang === 'FR' ? 'Mode compact pour maximiser l’espace' : 'Compact mode to maximize space'}
-                  >
-                    <span>{lang === 'FR' ? 'Réduire' : 'Compact'}</span>
-                    <ChevronUp className="w-3.5 h-3.5" />
-                  </button>
                 </div>
+              </button>
 
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-                  {/* Bento Tile 1 (Span 2): Kitchen Bento Pulse & Zone Breakdown */}
-                  <div className="col-span-2 lg:col-span-2 p-3 rounded-2xl bg-white border border-[#E5DFD0] shadow-2xs">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-xl bg-teal-50 text-teal-800 border border-teal-100 flex items-center justify-center shadow-xs">
-                          <Leaf className="w-3.5 h-3.5 text-teal-700" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] uppercase font-black tracking-wider text-[#527470]">
-                              {t('bento_pulse_title')}
-                            </span>
-                            <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-ping" />
-                          </div>
-                          <h3 className="text-xs font-black text-[#0D3B37]">
-                            {lang === 'FR' ? '96% Efficacité Zéro-Gaspillage' : '96% Zero-Waste Efficiency'}
-                          </h3>
-                        </div>
-                      </div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-50 text-teal-800 border border-teal-200/80">
-                        {t('live_sync')}
-                      </span>
-                    </div>
-
-                    {/* Storage Compartment Bento Pills */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mt-2.5 pt-2 border-t border-[#F2ECE0]">
-                      <button
-                        type="button"
-                        onClick={() => setFilterLocation(filterLocation === 'FRIDGE' ? 'ALL' : 'FRIDGE')}
-                        className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${
-                          filterLocation === 'FRIDGE'
-                            ? 'bg-teal-700 text-white border-teal-700 shadow-xs'
-                            : 'bg-[#F7FAF9] border-[#E0ECE8] text-[#244E49] hover:bg-[#EBF3F1]'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="font-bold">{t('fridge_label')}</span>
-                          <Refrigerator className="w-3.5 h-3.5 opacity-90" />
-                        </div>
-                        <p className="text-xs font-extrabold mt-0.5">
-                          {fridgeCount} {lang === 'FR' ? 'articles' : 'items'}
-                        </p>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setFilterLocation(filterLocation === 'FREEZER' ? 'ALL' : 'FREEZER')}
-                        className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${
-                          filterLocation === 'FREEZER'
-                            ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                            : 'bg-[#F0F6FA] border-[#D7E6F2] text-[#244563] hover:bg-[#E4F0F9]'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="font-bold">{t('freezer_label')}</span>
-                          <Snowflake className="w-3.5 h-3.5 opacity-90" />
-                        </div>
-                        <p className="text-xs font-extrabold mt-0.5">
-                          {freezerCount} {lang === 'FR' ? 'articles' : 'items'}
-                        </p>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setFilterLocation(filterLocation === 'PANTRY' ? 'ALL' : 'PANTRY')}
-                        className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${
-                          filterLocation === 'PANTRY'
-                            ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
-                            : 'bg-[#FAF6EE] border-[#EFE5D0] text-[#544122] hover:bg-[#F5EDDC]'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="font-bold">{t('pantry_label')}</span>
-                          <Boxes className="w-3.5 h-3.5 opacity-90" />
-                        </div>
-                        <p className="text-xs font-extrabold mt-0.5">
-                          {pantryCount} {lang === 'FR' ? 'articles' : 'items'}
-                        </p>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setFilterLocation(filterLocation === 'SPICE_RACK' ? 'ALL' : 'SPICE_RACK')}
-                        className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${
-                          filterLocation === 'SPICE_RACK'
-                            ? 'bg-orange-600 text-white border-orange-600 shadow-xs'
-                            : 'bg-[#FFF7ED] border-[#FED7AA] text-[#9A3412] hover:bg-[#FFEDD5]'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="font-bold">{t('spice_rack_label')}</span>
-                          <Flame className="w-3.5 h-3.5 opacity-90 text-orange-500" />
-                        </div>
-                        <p className="text-xs font-extrabold mt-0.5">
-                          {spiceCount} {lang === 'FR' ? 'articles' : 'items'}
-                        </p>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Bento Tile 2 (1 Col): Urgent Rescue Compartment */}
-                  <div
-                    onClick={() => setFilterLocation('EXPIRING')}
-                    className={`p-3 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
-                      expiringItems.length > 0
-                        ? 'bg-gradient-to-b from-rose-50 to-amber-50/40 border-rose-200 hover:border-rose-300 shadow-2xs'
-                        : 'bg-white border-[#D5E1D2] shadow-2xs'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-6 h-6 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center">
-                          <AlertTriangle className="w-3.5 h-3.5" />
-                        </div>
-                        <span className="text-[10px] font-bold text-rose-950">{t('rescue_label')}</span>
-                      </div>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-rose-200/70 text-rose-800">
-                        {expiringItems.length} {lang === 'FR' ? 'bientôt' : 'soon'}
-                      </span>
-                    </div>
-                    {expiringItems.length > 0 ? (
-                      <div className="mt-2 space-y-1">
-                        <p className="text-xs font-bold text-[#203222] truncate">{getItemDisplayName(expiringItems[0], lang)}</p>
-                        <p className="text-[10px] text-rose-700 font-semibold flex items-center gap-1">
-                          <Clock className="w-2.5 h-2.5" /> {expiringItems[0]?.daysUntilExpiration}{' '}
-                          {lang === 'FR' ? 'j restant' : 'day left'}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="mt-2 text-[10px] text-emerald-700 font-medium flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" />{' '}
-                        {lang === 'FR' ? 'Tout est frais & sain' : 'All fresh & safe'}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Bento Tile 3 (1 Col): Sub-Zero Deep Freeze Compartment */}
-                  <div
-                    onClick={() => setFilterLocation(filterLocation === 'FREEZER' ? 'ALL' : 'FREEZER')}
-                    className="p-3 rounded-2xl bg-gradient-to-b from-blue-50/70 to-white border border-blue-200/80 hover:border-blue-300 transition-all cursor-pointer flex flex-col justify-between shadow-2xs"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-6 h-6 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
-                          <Snowflake className="w-3.5 h-3.5" />
-                        </div>
-                        <span className="text-[10px] font-bold text-blue-950">{t('deep_freeze_label')}</span>
-                      </div>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-800">
-                        -18°C
-                      </span>
-                    </div>
-                    <div className="mt-2 space-y-1">
-                      <p className="text-xs font-bold text-[#1F3323]">
-                        {freezerCount} {lang === 'FR' ? 'articles stockés' : 'items stored'}
-                      </p>
-                      <p className="text-[10px] text-blue-700 font-semibold flex items-center gap-1">
-                        <Flame className="w-3 h-3 text-amber-500" />{' '}
-                        {lang === 'FR' ? 'Prêt à décongeler' : 'Defrost ready'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Bento Tile 4 (1 Col): Dedicated Spice Rack Compartment */}
-                  <div
-                    onClick={() => setFilterLocation(filterLocation === 'SPICE_RACK' ? 'ALL' : 'SPICE_RACK')}
-                    className={`p-3 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between shadow-2xs ${
-                      filterLocation === 'SPICE_RACK'
-                        ? 'bg-gradient-to-b from-orange-100 to-amber-50/80 border-orange-400 ring-2 ring-orange-500/30'
-                        : 'bg-gradient-to-b from-orange-50/70 to-white border-orange-200/80 hover:border-orange-300'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-6 h-6 rounded-lg bg-orange-100 text-orange-700 flex items-center justify-center">
-                          <Flame className="w-3.5 h-3.5 text-orange-600" />
-                        </div>
-                        <span className="text-[10px] font-bold text-orange-950">
-                          {lang === 'FR' ? 'Armoire à Épices' : 'Spice Rack'}
-                        </span>
-                      </div>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-orange-100 text-orange-800">
-                        {spiceCount} {lang === 'FR' ? 'pots' : 'jars'}
-                      </span>
-                    </div>
-                    <div className="mt-2 space-y-1">
-                      <p className="text-xs font-bold text-[#1F3323]">
-                        {spiceCount} {lang === 'FR' ? 'épices & herbes' : 'spices & seasonings'}
-                      </p>
-                      <p className="text-[10px] text-orange-700 font-semibold flex items-center gap-1">
-                        <Sparkles className="w-2.5 h-2.5 text-orange-500" />
-                        {lang === 'FR' ? 'Arômes & sels' : 'Flavors & aromatics'}
-                      </p>
-                    </div>
-                  </div>
+              {/* Box 2: Freezer */}
+              <button
+                type="button"
+                onClick={() => setFilterLocation(filterLocation === 'FREEZER' ? 'ALL' : 'FREEZER')}
+                className={`p-3 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs ${
+                  filterLocation === 'FREEZER'
+                    ? 'bg-blue-700 text-white border-blue-800 shadow-xs'
+                    : 'bg-white border-[#E5DFD0] hover:border-blue-300 text-[#0D3B37]'
+                }`}
+              >
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span>{lang === 'FR' ? 'Congélateur' : 'Freezer'}</span>
+                  <Snowflake className={`w-4 h-4 shrink-0 ${filterLocation === 'FREEZER' ? 'text-blue-200' : 'text-blue-600'}`} />
                 </div>
-              </div>
-            )}
+                <div className="mt-1 flex items-baseline justify-between">
+                  <span className="text-2xl font-black">{freezerCount}</span>
+                  <span className={`text-[10px] font-bold ${filterLocation === 'FREEZER' ? 'text-blue-200' : 'text-[#527470]'}`}>
+                    {lang === 'FR' ? 'articles' : 'items'}
+                  </span>
+                </div>
+              </button>
 
-            {/* Search Input & Quick Add Item Button */}
+              {/* Box 3: Pantry */}
+              <button
+                type="button"
+                onClick={() => setFilterLocation(filterLocation === 'PANTRY' ? 'ALL' : 'PANTRY')}
+                className={`p-3 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs ${
+                  filterLocation === 'PANTRY'
+                    ? 'bg-amber-700 text-white border-amber-800 shadow-xs'
+                    : 'bg-white border-[#E5DFD0] hover:border-amber-300 text-[#0D3B37]'
+                }`}
+              >
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span>{lang === 'FR' ? 'Garde-manger' : 'Pantry'}</span>
+                  <Boxes className={`w-4 h-4 shrink-0 ${filterLocation === 'PANTRY' ? 'text-amber-200' : 'text-amber-600'}`} />
+                </div>
+                <div className="mt-1 flex items-baseline justify-between">
+                  <span className="text-2xl font-black">{pantryCount}</span>
+                  <span className={`text-[10px] font-bold ${filterLocation === 'PANTRY' ? 'text-amber-200' : 'text-[#527470]'}`}>
+                    {lang === 'FR' ? 'articles' : 'items'}
+                  </span>
+                </div>
+              </button>
+
+              {/* Box 4: Urgent / Bientôt expiré */}
+              <button
+                type="button"
+                onClick={() => setFilterLocation(filterLocation === 'EXPIRING' ? 'ALL' : 'EXPIRING')}
+                className={`p-3 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs ${
+                  filterLocation === 'EXPIRING'
+                    ? 'bg-rose-700 text-white border-rose-800 shadow-xs'
+                    : expiringItems.length > 0
+                    ? 'bg-rose-50/70 border-rose-200 hover:border-rose-400 text-rose-950'
+                    : 'bg-white border-[#E5DFD0] hover:border-slate-300 text-[#0D3B37]'
+                }`}
+              >
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span>{lang === 'FR' ? 'Bientôt expiré' : 'Expiring Soon'}</span>
+                  <AlertTriangle className={`w-4 h-4 shrink-0 ${filterLocation === 'EXPIRING' ? 'text-rose-200' : 'text-rose-600'}`} />
+                </div>
+                <div className="mt-1 flex items-baseline justify-between">
+                  <span className="text-2xl font-black">{expiringItems.length}</span>
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                    expiringItems.length > 0 ? 'bg-rose-200/80 text-rose-900' : 'bg-slate-100 text-[#527470]'
+                  }`}>
+                    {expiringItems.length > 0 ? (lang === 'FR' ? 'Alerte' : 'Alert') : (lang === 'FR' ? 'Sûr' : 'Safe')}
+                  </span>
+                </div>
+              </button>
+            </div>
+
+            {/* Search Bar & Quick Add Button */}
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -1662,38 +1407,169 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                   placeholder={t('search_placeholder')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 text-xs font-medium bg-white border border-[#D5E1D2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-teal-600/30 text-slate-800 placeholder-slate-400 shadow-2xs"
+                  className="w-full pl-10 pr-4 py-2 text-xs font-semibold bg-white border border-[#E5DFD0] rounded-2xl focus:outline-none focus:ring-2 focus:ring-teal-600/30 focus:border-teal-600 text-[#0D3B37] placeholder-[#7C9A92] shadow-2xs"
                 />
               </div>
               <button
                 id="quick-add-item-btn"
                 onClick={handleOpenAddModal}
-                className="py-2 px-3 rounded-2xl bg-[#0E766E] hover:bg-[#0B5C56] text-white font-bold text-xs flex items-center gap-1 shadow-2xs shrink-0 transition-all active:scale-95"
+                className="py-2 px-3.5 rounded-2xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-2xs shrink-0 transition-all active:scale-95 cursor-pointer"
                 title={t('quick_add_tooltip')}
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Plus className="w-3.5 h-3.5 stroke-[3]" />
                 <span>{lang === 'FR' ? '+ Ajouter' : '+ Add'}</span>
               </button>
             </div>
 
-            {/* Food Type Category Quick Chips (Pictures from the Web) */}
+            {/* Storage Zones Quick Filter Bar */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs font-bold text-[#0D3B37]">
+                <span className="flex items-center gap-2">
+                  <span className="uppercase tracking-wider text-[11px] text-[#527470]">{lang === 'FR' ? 'Zones de stockage :' : 'Storage Zones:'}</span>
+                  {filterLocation !== 'ALL' && (
+                    <button
+                      onClick={() => setFilterLocation('ALL')}
+                      className="text-xs font-bold underline cursor-pointer text-teal-700"
+                    >
+                      {lang === 'FR' ? 'Afficher tout' : 'Show All'}
+                    </button>
+                  )}
+                </span>
+                {/* Multi-selection toggle & View Switcher */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleSelectAll}
+                    className={`px-2.5 py-1 rounded-xl border text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs ${
+                      selectedItemIds.size > 0
+                        ? 'bg-teal-700 text-white border-teal-800'
+                        : 'bg-white hover:bg-[#F5F2E8] border-[#E5DFD0] text-[#527470]'
+                    }`}
+                  >
+                    <CheckCheck className="w-3.5 h-3.5" />
+                    <span className="hidden xs:inline">
+                      {selectedItemIds.size > 0
+                        ? `(${selectedItemIds.size})`
+                        : lang === 'FR'
+                        ? 'Sélectionner'
+                        : 'Select'}
+                    </span>
+                  </button>
+
+                  <div className="flex items-center p-0.5 bg-white border border-[#E5DFD0] rounded-xl shadow-2xs">
+                    <button
+                      onClick={() => setBentoViewMode('list')}
+                      title={lang === 'FR' ? 'Mode Liste' : 'List Mode'}
+                      className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                        bentoViewMode === 'list'
+                          ? 'bg-teal-700 text-white shadow-2xs'
+                          : 'text-slate-400 hover:text-slate-700'
+                      }`}
+                    >
+                      <List className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setBentoViewMode('grid')}
+                      title={lang === 'FR' ? 'Mode Grille' : 'Grid Mode'}
+                      className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                        bentoViewMode === 'grid'
+                          ? 'bg-teal-700 text-white shadow-2xs'
+                          : 'text-slate-400 hover:text-slate-700'
+                      }`}
+                    >
+                      <LayoutGrid className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Horizontal Strip for Storage Locations */}
+              <ScrollableRow containerClassName="w-full" className="pb-1 gap-1.5">
+                <button
+                  onClick={() => setFilterLocation('ALL')}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all shrink-0 cursor-pointer shadow-2xs ${
+                    filterLocation === 'ALL'
+                      ? 'bg-teal-700 text-white shadow-xs'
+                      : 'bg-white border border-[#E5DFD0] text-[#527470] hover:text-[#0D3B37] hover:bg-[#F5F2E8]'
+                  }`}
+                >
+                  {lang === 'FR' ? `Tous (${items.length})` : `All (${items.length})`}
+                </button>
+                <button
+                  onClick={() => setFilterLocation('FRIDGE')}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-all shrink-0 cursor-pointer shadow-2xs ${
+                    filterLocation === 'FRIDGE'
+                      ? 'bg-teal-700 text-white shadow-xs'
+                      : 'bg-white border border-[#E5DFD0] text-[#527470] hover:text-[#0D3B37] hover:bg-[#F5F2E8]'
+                  }`}
+                >
+                  <Refrigerator className="w-3 h-3" />
+                  {lang === 'FR' ? `Frigo (${fridgeCount})` : `Fridge (${fridgeCount})`}
+                </button>
+                <button
+                  onClick={() => setFilterLocation('PANTRY')}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-all shrink-0 cursor-pointer shadow-2xs ${
+                    filterLocation === 'PANTRY'
+                      ? 'bg-amber-700 text-white shadow-xs'
+                      : 'bg-white border border-[#E5DFD0] text-[#527470] hover:text-[#0D3B37] hover:bg-[#F5F2E8]'
+                  }`}
+                >
+                  <Boxes className="w-3 h-3" />
+                  {lang === 'FR' ? `Garde-manger (${pantryCount})` : `Pantry (${pantryCount})`}
+                </button>
+                <button
+                  onClick={() => setFilterLocation('FREEZER')}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-all shrink-0 cursor-pointer shadow-2xs ${
+                    filterLocation === 'FREEZER'
+                      ? 'bg-blue-700 text-white shadow-xs'
+                      : 'bg-white border border-[#E5DFD0] text-[#527470] hover:text-[#0D3B37] hover:bg-[#F5F2E8]'
+                  }`}
+                >
+                  <Snowflake className="w-3 h-3" />
+                  {lang === 'FR' ? `Congélateur (${freezerCount})` : `Freezer (${freezerCount})`}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterLocation(filterLocation === 'SPICE_RACK' ? 'ALL' : 'SPICE_RACK')}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-all shrink-0 cursor-pointer shadow-2xs ${
+                    filterLocation === 'SPICE_RACK'
+                      ? 'bg-orange-600 text-white shadow-xs'
+                      : 'bg-white border border-[#E5DFD0] text-[#527470] hover:text-[#0D3B37] hover:bg-[#F5F2E8]'
+                  }`}
+                >
+                  <Flame className="w-3 h-3" />
+                  {lang === 'FR' ? `Épices (${spiceCount})` : `Spices (${spiceCount})`}
+                </button>
+                <button
+                  onClick={() => setFilterLocation('EXPIRING')}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-all shrink-0 cursor-pointer shadow-2xs ${
+                    filterLocation === 'EXPIRING'
+                      ? 'bg-rose-700 text-white shadow-xs'
+                      : expiringItems.length > 0
+                      ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                      : 'bg-white border border-[#E5DFD0] text-[#527470] hover:text-[#0D3B37] hover:bg-[#F5F2E8]'
+                  }`}
+                >
+                  <AlertTriangle className="w-3 h-3" />
+                  {lang === 'FR' ? `Bientôt (${expiringItems.length})` : `Expiring (${expiringItems.length})`}
+                </button>
+              </ScrollableRow>
+            </div>
+
+            {/* Food Type Category Quick Chips */}
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between px-1 text-[11px] font-bold text-[#556D58]">
+              <div className="flex items-center justify-between text-xs font-bold text-[#0D3B37]">
                 <span className="flex items-center gap-2 flex-wrap">
-                  <span>{t('browse_by_category')}</span>
-                  <span className="text-[10px] text-slate-400 font-normal">
-                    ({ALL_FOOD_CATEGORIES.length} {lang === 'FR' ? 'types' : 'types'})
-                  </span>
+                  <span className="uppercase tracking-wider text-[11px] text-[#527470]">{t('browse_by_category')}</span>
                   {leftoversCount > 0 && (
                     <button
                       type="button"
                       onClick={() => setFilterLeftoversOnly(!filterLeftoversOnly)}
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition-all border flex items-center gap-1 cursor-pointer ${
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 cursor-pointer transition-all ${
                         filterLeftoversOnly
-                          ? 'bg-amber-500 text-white border-amber-600 shadow-2xs'
-                          : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                          ? 'bg-amber-700 text-white border-amber-800'
+                          : 'bg-amber-100 text-amber-900 border-amber-200 hover:bg-amber-200'
                       }`}
-                      title={lang === 'FR' ? 'Filtrer uniquement les restes' : 'Filter leftovers only'}
                     >
                       <span>🍲</span>
                       <span>{lang === 'FR' ? 'Restes' : 'Leftovers'} ({leftoversCount})</span>
@@ -1707,20 +1583,20 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                       setSelectedFoodType('ALL');
                       setFilterLeftoversOnly(false);
                     }}
-                    className="text-emerald-700 hover:underline font-semibold text-[11px]"
+                    className="text-rose-600 hover:underline font-bold text-xs"
                   >
                     {t('clear_filter')}
                   </button>
                 )}
               </div>
 
-              <ScrollableRow className="pb-1.5">
+              <ScrollableRow className="pb-1 gap-1.5">
                 <button
                   onClick={() => setSelectedFoodType('ALL')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-all shrink-0 ${
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-all shrink-0 cursor-pointer shadow-2xs ${
                     selectedFoodType === 'ALL'
-                      ? 'bg-[#233527] text-white shadow-xs'
-                      : 'bg-white border border-[#D5E1D2] text-[#4F6553] hover:bg-[#EAF1E8]'
+                      ? 'bg-teal-700 text-white'
+                      : 'bg-white border border-[#E5DFD0] text-[#527470] hover:text-[#0D3B37] hover:bg-[#F5F2E8]'
                   }`}
                 >
                   <Layers className="w-3.5 h-3.5" />
@@ -1732,202 +1608,18 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                     <button
                       key={cat.id}
                       onClick={() => setSelectedFoodType(isSelected ? 'ALL' : cat.filterKey)}
-                      className={`pl-1 pr-2.5 py-1 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-all shrink-0 border ${
+                      className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-all shrink-0 cursor-pointer shadow-2xs ${
                         isSelected
-                          ? `${cat.bgColor} ${cat.textColor} ${cat.borderColor} ring-2 ring-emerald-600/30 shadow-xs scale-102`
-                          : 'bg-white border-[#D5E1D2] text-[#334D37] hover:bg-[#F2F7F1]'
+                          ? 'bg-teal-700 text-white'
+                          : 'bg-white border border-[#E5DFD0] text-[#527470] hover:text-[#0D3B37] hover:bg-[#F5F2E8]'
                       }`}
                     >
-                      <div className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 ${cat.bgColor} ${cat.textColor}`}>
-                        <cat.icon className="w-3.5 h-3.5" />
-                      </div>
+                      <cat.icon className="w-3.5 h-3.5 shrink-0" />
                       <span>{getCategoryLocalizedName(cat.name, lang)}</span>
                     </button>
                   );
                 })}
               </ScrollableRow>
-            </div>
-
-            {/* Specific Cuts & Subcategories */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between px-1 text-[11px] font-bold text-[#556D58]">
-                <span className="flex items-center gap-1.5">
-                  <span className="text-xs">
-                    {lang === 'FR' ? '🥩 Découpes, Poissons & Sous-catégories' : '🥩 Meat Cuts, Seafood & Subcategories'}
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-normal">
-                    ({ALL_SUB_CATEGORIES.length} {lang === 'FR' ? 'découpes' : 'visual cuts'})
-                  </span>
-                </span>
-                {selectedSubCategory !== 'ALL' && (
-                  <button
-                    onClick={() => setSelectedSubCategory('ALL')}
-                    className="text-emerald-700 hover:underline font-semibold text-[11px]"
-                  >
-                    {lang === 'FR' ? 'Réinitialiser découpe' : 'Reset Cut Filter'}
-                  </button>
-                )}
-              </div>
-
-              <ScrollableRow className="pb-1.5">
-                <button
-                  onClick={() => setSelectedSubCategory('ALL')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
-                    selectedSubCategory === 'ALL'
-                      ? 'bg-[#0D3B37] text-white shadow-xs'
-                      : 'bg-white border border-[#D5E1D2] text-[#4F6553] hover:bg-[#EAF1E8]'
-                  }`}
-                >
-                  {lang === 'FR' ? 'Toutes découpes' : 'All Cuts'}
-                </button>
-                {ALL_SUB_CATEGORIES.map((sub) => {
-                  const isSelected =
-                    selectedSubCategory.toLowerCase() === sub.name.toLowerCase() ||
-                    selectedSubCategory.toLowerCase() === sub.badgeLabel.toLowerCase();
-                  return (
-                    <button
-                      key={sub.id}
-                      onClick={() => setSelectedSubCategory(isSelected ? 'ALL' : sub.name)}
-                      className={`pl-1.5 pr-3 py-1 rounded-2xl text-xs font-bold whitespace-nowrap flex items-center gap-2 transition-all shrink-0 border ${
-                        isSelected
-                          ? `${sub.bgColor} ${sub.textColor} ${sub.borderColor} ring-2 ring-emerald-600/40 shadow-xs scale-102`
-                          : 'bg-white border-[#D5E1D2] text-[#334D37] hover:bg-[#F2F7F1]'
-                      }`}
-                    >
-                      <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${sub.bgColor} ${sub.textColor}`}>
-                        <sub.icon className="w-3.5 h-3.5" />
-                      </div>
-                      <span className="leading-tight text-[11px]">
-                        {getSubcategoryLocalizedName(sub.badgeLabel || sub.name, lang)}
-                      </span>
-                    </button>
-                  );
-                })}
-              </ScrollableRow>
-            </div>
-
-            {/* Storage Location Pills & Bento View Switcher */}
-            <div className="flex items-center justify-between gap-2">
-              <ScrollableRow containerClassName="flex-1 min-w-0" className="pb-1">
-                <button
-                  onClick={() => setFilterLocation('ALL')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
-                    filterLocation === 'ALL'
-                      ? 'bg-[#233527] text-white shadow-xs'
-                      : 'bg-white border border-[#D5E1D2] text-[#4F6553] hover:bg-[#EAF1E8]'
-                  }`}
-                >
-                  {lang === 'FR' ? `Toutes zones (${items.length})` : `All Zones (${items.length})`}
-                </button>
-                <button
-                  onClick={() => setFilterLocation('FRIDGE')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1 transition-all shrink-0 ${
-                    filterLocation === 'FRIDGE'
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'bg-white border border-[#D5E1D2] text-[#4F6553] hover:bg-[#EAF1E8]'
-                  }`}
-                >
-                  <Refrigerator className="w-3 h-3" />
-                  {lang === 'FR' ? `Frigo (${fridgeCount})` : `Fridge (${fridgeCount})`}
-                </button>
-                <button
-                  onClick={() => setFilterLocation('PANTRY')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1 transition-all shrink-0 ${
-                    filterLocation === 'PANTRY'
-                      ? 'bg-amber-600 text-white shadow-xs'
-                      : 'bg-white border border-[#D5E1D2] text-[#4F6553] hover:bg-[#EAF1E8]'
-                  }`}
-                >
-                  <Boxes className="w-3 h-3" />
-                  {lang === 'FR' ? `Garde-manger (${pantryCount})` : `Pantry (${pantryCount})`}
-                </button>
-                <button
-                  onClick={() => setFilterLocation('FREEZER')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1 transition-all shrink-0 ${
-                    filterLocation === 'FREEZER'
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'bg-white border border-[#D5E1D2] text-[#4F6553] hover:bg-[#EAF1E8]'
-                  }`}
-                >
-                  <Snowflake className="w-3 h-3" />
-                  {lang === 'FR' ? `Congélateur (${freezerCount})` : `Freezer (${freezerCount})`}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFilterLocation(filterLocation === 'SPICE_RACK' ? 'ALL' : 'SPICE_RACK')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1 transition-all shrink-0 cursor-pointer ${
-                    filterLocation === 'SPICE_RACK'
-                      ? 'bg-orange-600 text-white shadow-xs'
-                      : 'bg-white border border-[#D5E1D2] text-[#4F6553] hover:bg-[#EAF1E8]'
-                  }`}
-                >
-                  <Flame className="w-3 h-3 text-orange-500" />
-                  {lang === 'FR' ? `Épices (${spiceCount})` : `Spices (${spiceCount})`}
-                </button>
-                <button
-                  onClick={() => setFilterLocation('EXPIRING')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1 transition-all shrink-0 ${
-                    filterLocation === 'EXPIRING'
-                      ? 'bg-rose-600 text-white shadow-xs'
-                      : 'bg-white border border-rose-200 text-rose-700 hover:bg-rose-50'
-                  }`}
-                >
-                  <AlertTriangle className="w-3 h-3" />
-                  {lang === 'FR' ? `Bientôt (${expiringItems.length})` : `Soon (${expiringItems.length})`}
-                </button>
-              </ScrollableRow>
-
-              {/* Multi-selection toggle & Bento Layout Switcher */}
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={handleSelectAll}
-                  className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs ${
-                    selectedItemIds.size > 0
-                      ? 'bg-teal-700 text-white border-teal-700'
-                      : 'bg-white border-[#D5E1D2] text-[#4F6553] hover:bg-[#EAF1E8]'
-                  }`}
-                  title={
-                    filteredItems.length > 0 && filteredItems.every((i) => selectedItemIds.has(i.id))
-                      ? (lang === 'FR' ? 'Tout désélectionner' : 'Deselect All')
-                      : (lang === 'FR' ? 'Tout sélectionner' : 'Select All')
-                  }
-                >
-                  <CheckCheck className="w-3.5 h-3.5" />
-                  <span className="hidden xs:inline">
-                    {selectedItemIds.size > 0
-                      ? `(${selectedItemIds.size})`
-                      : lang === 'FR'
-                      ? 'Sélectionner'
-                      : 'Select'}
-                  </span>
-                </button>
-
-                <div className="flex items-center gap-0.5 p-1 bg-white border border-[#D5E1D2] rounded-xl shadow-2xs">
-                  <button
-                    onClick={() => setBentoViewMode('grid')}
-                    title={lang === 'FR' ? 'Mode Grille Bento' : 'Bento Grid Mode'}
-                    className={`p-1.5 rounded-lg transition-all ${
-                      bentoViewMode === 'grid'
-                        ? 'bg-[#233527] text-white shadow-xs'
-                        : 'text-[#5C715F] hover:text-[#233527]'
-                    }`}
-                  >
-                    <LayoutGrid className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => setBentoViewMode('list')}
-                    title={lang === 'FR' ? 'Mode Liste Bento' : 'Bento List Mode'}
-                    className={`p-1.5 rounded-lg transition-all ${
-                      bentoViewMode === 'list'
-                        ? 'bg-[#233527] text-white shadow-xs'
-                        : 'text-[#5C715F] hover:text-[#233527]'
-                    }`}
-                  >
-                    <List className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
             </div>
 
             {/* DEDICATED SPICES & SEASONINGS SECTION BANNER & CONTROLS */}
@@ -2527,205 +2219,237 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         )}
       </div>
 
-      {/* Quick Add Action Menu (Full Screen with Exit Button) */}
+      {/* Quick Add Action Menu (Functions like mobile phone on desktop, tablet & mobile) */}
       {isAddMenuOpen && (
-        <div className="fixed inset-0 z-50 bg-[#FAF7EE] flex flex-col w-full h-full overflow-hidden text-[#133E3B] animate-fade-in">
-          {/* Header */}
-          <div className="px-5 py-3.5 border-b border-[#E8E2D5] flex items-center justify-between bg-white/90 backdrop-blur-xs shrink-0">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-teal-800 text-white flex items-center justify-center shadow-xs">
-                <Plus className="w-4 h-4 stroke-[3]" />
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4 md:p-6 animate-fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsAddMenuOpen(false);
+          }}
+        >
+          <div className="w-full sm:max-w-lg bg-[#FAF7EE] h-full sm:h-auto sm:max-h-[92vh] sm:rounded-3xl shadow-2xl border-0 sm:border border-[#E5DFD0] flex flex-col overflow-hidden text-[#133E3B]">
+            {/* Header */}
+            <div className="px-5 py-3.5 border-b border-[#E8E2D5] flex items-center justify-between bg-white/95 backdrop-blur-xs shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-teal-800 text-white flex items-center justify-center shadow-xs">
+                  <Plus className="w-4 h-4 stroke-[3]" />
+                </div>
+                <div>
+                  <h2 className="text-sm sm:text-base font-black text-[#0D3B37] leading-tight">
+                    {lang === 'FR' ? 'Ajouter à la cuisine' : 'Add to Kitchen'}
+                  </h2>
+                  <p className="text-[11px] text-[#527470]">
+                    {lang === 'FR' ? 'Choisissez le mode d’ajout souhaité' : 'Choose how you want to add items'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-sm sm:text-base font-black text-[#0D3B37] leading-tight">
-                  {lang === 'FR' ? 'Ajouter à la cuisine' : 'Add to Kitchen'}
-                </h2>
-                <p className="text-[11px] text-[#527470]">
-                  {lang === 'FR' ? 'Choisissez le mode d’ajout souhaité' : 'Choose how you want to add items'}
-                </p>
-              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsAddMenuOpen(false)}
+                className="px-3.5 py-1.5 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
+                title={lang === 'FR' ? 'Quitter' : 'Exit'}
+              >
+                <X className="w-4 h-4" />
+                <span>{lang === 'FR' ? 'Quitter' : 'Exit'}</span>
+              </button>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setIsAddMenuOpen(false)}
-              className="px-3.5 py-1.5 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs"
-              title={lang === 'FR' ? 'Quitter' : 'Exit'}
-            >
-              <X className="w-4 h-4" />
-              <span>{lang === 'FR' ? 'Quitter' : 'Exit'}</span>
-            </button>
-          </div>
-
-          {/* Options in Full-Screen View */}
-          <div className="flex-1 overflow-y-auto p-5 sm:p-6 max-w-lg mx-auto w-full flex flex-col justify-center space-y-4">
-            {/* Option 1: Manual Add */}
-            <button
-              type="button"
-              onClick={() => {
-                setIsAddMenuOpen(false);
-                handleOpenAddModal();
-              }}
-              className="w-full p-4 rounded-3xl bg-white hover:bg-[#F6F2E8] border-2 border-[#E5DFD0] hover:border-teal-400 flex items-center gap-4 text-left transition-all active:scale-[0.98] shadow-xs group"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-teal-700 group-hover:bg-teal-800 text-white flex items-center justify-center shadow-xs shrink-0 transition-colors">
-                <Plus className="w-6 h-6 stroke-[2.5]" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-extrabold text-[#0D3B37]">
-                  {lang === 'FR' ? 'Saisie manuelle' : 'Manual Add'}
-                </p>
-                <p className="text-xs text-[#527470]">
-                  {lang === 'FR' ? 'Entrez le nom, la quantité, le lieu de stockage et la date' : 'Name, quantity, compartment, and expiry date'}
-                </p>
-              </div>
-            </button>
-
-            {/* Option 2: Smart Unified Camera Photo Scan (Produce, Grocery, Receipt) */}
-            <button
-              type="button"
-              id="add-smart-camera-scan-btn"
-              onClick={() => {
-                setIsAddMenuOpen(false);
-                setScannerInitialMode('snap');
-                setIsScannerOpen(true);
-              }}
-              className="w-full p-4 rounded-3xl bg-white hover:bg-teal-50/70 border-2 border-teal-600/30 hover:border-teal-500 flex items-center gap-4 text-left transition-all active:scale-[0.98] shadow-xs group"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#0D3B37] via-[#0E766E] to-teal-500 text-white flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition-transform">
-                <Camera className="w-6 h-6 text-teal-100" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-extrabold text-[#0D3B37]">
-                    {lang === 'FR' ? 'Photographier (Scanner Intelligent)' : 'Snap Photo (Smart Scanner)'}
-                  </p>
-                  <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-950 border border-emerald-300">
-                    Auto-IA
-                  </span>
+            {/* Options in Responsive Modal View */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 max-w-lg mx-auto w-full flex flex-col justify-center space-y-3.5">
+              {/* Option 1: Manual Add */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddMenuOpen(false);
+                  handleOpenAddModal();
+                }}
+                className="w-full p-3.5 sm:p-4 rounded-3xl bg-white hover:bg-[#F6F2E8] border-2 border-[#E5DFD0] hover:border-teal-400 flex items-center gap-3.5 sm:gap-4 text-left transition-all active:scale-[0.98] shadow-xs group cursor-pointer"
+              >
+                <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-teal-700 group-hover:bg-teal-800 text-white flex items-center justify-center shadow-xs shrink-0 transition-colors">
+                  <Plus className="w-6 h-6 stroke-[2.5]" />
                 </div>
-                <p className="text-xs text-[#527470]">
-                  {lang === 'FR'
-                    ? 'Détecte automatiquement fruits, légumes, emballages, reçus et codes-barres'
-                    : 'Auto-detects fresh produce, packaged foods, receipts, and barcodes'}
-                </p>
-              </div>
-            </button>
-
-            {/* Option 4: Scan Written Recipe (Camera / OCR) */}
-            <button
-              type="button"
-              onClick={handleOpenRecipeCameraScan}
-              className="w-full p-4 rounded-3xl bg-white hover:bg-[#F6F2E8] border-2 border-[#E5DFD0] hover:border-emerald-500 flex items-center gap-4 text-left transition-all active:scale-[0.98] shadow-xs group"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-emerald-700 group-hover:bg-emerald-800 text-white flex items-center justify-center shadow-xs shrink-0 transition-colors">
-                <ChefHat className="w-6 h-6 text-emerald-100" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-extrabold text-[#0D3B37]">
-                  {lang === 'FR' ? 'Scanner une recette écrite' : 'Scan Written Recipe'}
-                </p>
-                <p className="text-xs text-[#527470]">
-                  {lang === 'FR'
-                    ? 'Prenez en photo une fiche manuscrite ou un livre de cuisine'
-                    : 'Photograph a handwritten card or cookbook page'}
-                </p>
-              </div>
-            </button>
-
-            {/* Option 4: Leftovers & Prepared Foods (Health Canada & European Standards) */}
-            <button
-              type="button"
-              id="add-kitchen-leftovers-option"
-              onClick={() => {
-                setIsAddMenuOpen(false);
-                setSelectedMealForLeftover(null);
-                setIsImportLeftoverOpen(true);
-              }}
-              className="w-full p-4 rounded-3xl bg-white hover:bg-[#FDF7ED] border-2 border-[#E5DFD0] hover:border-amber-500 flex items-center gap-4 text-left transition-all active:scale-[0.98] shadow-xs group"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-[#C25E00] group-hover:bg-[#A34E00] text-white flex items-center justify-center shadow-xs shrink-0 transition-colors">
-                <Utensils className="w-6 h-6 text-amber-100" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="min-w-0 flex-1">
                   <p className="text-sm font-extrabold text-[#0D3B37]">
-                    {lang === 'FR' ? 'Restes & Plats préparés' : 'Leftovers & Prepared Foods'}
+                    {lang === 'FR' ? 'Saisie manuelle' : 'Manual Add'}
                   </p>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-200">
-                    {lang === 'FR' ? '🇨🇦 Canada & 🇪🇺 UE' : '🇨🇦 Canada & 🇪🇺 EU'}
-                  </span>
+                  <p className="text-xs text-[#527470]">
+                    {lang === 'FR' ? 'Entrez le nom, la quantité, le lieu de stockage et la date' : 'Name, quantity, compartment, and expiry date'}
+                  </p>
                 </div>
-                <p className="text-xs text-[#527470] mt-0.5">
-                  {lang === 'FR'
-                    ? 'Souper de ce soir, fête philippine (lechon, riz...), ou plats enregistrés'
-                    : 'Tonight’s dinner, Filipino party (lechon, rice...), or saved items'}
-                </p>
-              </div>
-            </button>
+              </button>
 
-            {/* Option 5: Canadian Grocery Flyers (Maxi, Super C, No Frills, Metro, IGA, Walmart) */}
-            <button
-              type="button"
-              id="add-canadian-flyers-option"
-              onClick={() => {
-                setIsAddMenuOpen(false);
-                setScannerInitialMode('flyer');
-                setIsScannerOpen(true);
-              }}
-              className="w-full p-4 rounded-3xl bg-white hover:bg-rose-50/70 border-2 border-rose-600/30 hover:border-rose-500 flex items-center gap-4 text-left transition-all active:scale-[0.98] shadow-xs group cursor-pointer"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-rose-700 via-rose-600 to-amber-500 text-white flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition-transform">
-                <ShoppingBag className="w-6 h-6 text-rose-100" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
+              {/* Option 2: Smart Unified Camera Photo Scan (Produce, Grocery, Receipt) */}
+              <button
+                type="button"
+                id="add-smart-camera-scan-btn"
+                onClick={() => {
+                  setIsAddMenuOpen(false);
+                  setScannerInitialMode('snap');
+                  setIsScannerOpen(true);
+                }}
+                className="w-full p-3.5 sm:p-4 rounded-3xl bg-white hover:bg-teal-50/70 border-2 border-teal-600/30 hover:border-teal-500 flex items-center gap-3.5 sm:gap-4 text-left transition-all active:scale-[0.98] shadow-xs group cursor-pointer"
+              >
+                <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-tr from-[#0D3B37] via-[#0E766E] to-teal-500 text-white flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition-transform">
+                  <Camera className="w-6 h-6 text-teal-100" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-extrabold text-[#0D3B37]">
+                      {lang === 'FR' ? 'Photographier (Scanner Intelligent)' : 'Snap Photo (Smart Scanner)'}
+                    </p>
+                    <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-950 border border-emerald-300">
+                      Auto-IA
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#527470]">
+                    {lang === 'FR'
+                      ? 'Détecte automatiquement fruits, légumes, emballages, reçus et codes-barres'
+                      : 'Auto-detects fresh produce, packaged foods, receipts, and barcodes'}
+                  </p>
+                </div>
+              </button>
+
+              {/* Option 3: Plan a Meal in Calendar (Planifier un repas) */}
+              <button
+                type="button"
+                id="add-plan-meal-calendar-option"
+                onClick={() => {
+                  setIsAddMenuOpen(false);
+                  setActiveNav('meals');
+                }}
+                className="w-full p-3.5 sm:p-4 rounded-3xl bg-white hover:bg-teal-50/70 border-2 border-[#E5DFD0] hover:border-teal-500 flex items-center gap-3.5 sm:gap-4 text-left transition-all active:scale-[0.98] shadow-xs group cursor-pointer"
+              >
+                <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-teal-800 group-hover:bg-teal-900 text-white flex items-center justify-center shadow-xs shrink-0 transition-colors">
+                  <CalendarDays className="w-6 h-6 text-teal-100" />
+                </div>
+                <div className="min-w-0 flex-1">
                   <p className="text-sm font-extrabold text-[#0D3B37]">
-                    {lang === 'FR' ? 'Circulaires d’épicerie canadiennes' : 'Canadian Grocery Flyers'}
+                    {lang === 'FR' ? 'Planifier un repas dans l\'agenda' : 'Plan a Meal in Calendar'}
                   </p>
-                  <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-rose-100 text-rose-900 border border-rose-300">
-                    🇨🇦 Photos & IA
-                  </span>
+                  <p className="text-xs text-[#527470]">
+                    {lang === 'FR'
+                      ? 'Déjeuner, dîner, souper ou collation avec photos HD Ricardo'
+                      : 'Breakfast, lunch, dinner, or snack with Ricardo HD pictures'}
+                  </p>
                 </div>
-                <p className="text-xs text-[#527470]">
-                  {lang === 'FR'
-                    ? 'Maxi, Super C, No Frills, Metro, IGA, Walmart : photos de circulaires, yogourts et rabais $/lb'
-                    : 'Maxi, Super C, No Frills, Metro, IGA, Walmart: flyer pictures, yogurts & $/lb deals'}
-                </p>
-              </div>
-            </button>
+              </button>
 
-            {/* Option 5: Family & Profile Settings */}
-            <button
-              type="button"
-              onClick={() => {
-                setIsAddMenuOpen(false);
-                setActiveNav('sync');
-              }}
-              className="w-full p-4 rounded-3xl bg-white hover:bg-[#F2ECE0] border-2 border-[#E5DFD0] hover:border-teal-500 flex items-center gap-4 text-left transition-all active:scale-[0.98] shadow-xs group cursor-pointer"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-teal-800 group-hover:bg-teal-900 text-white flex items-center justify-center shadow-xs shrink-0 transition-colors">
-                <Users className="w-6 h-6 text-teal-200" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-extrabold text-[#0D3B37]">
-                  {lang === 'FR' ? 'Famille, Profil & Rôles' : 'Family, Profile & Roles'}
-                </p>
-                <p className="text-xs text-[#527470]">
-                  {lang === 'FR' ? 'Changer d\'utilisateur, journal d\'audit et sécurité' : 'Switch household members, audit log & security'}
-                </p>
-              </div>
-            </button>
+              {/* Option 4: Scan Written Recipe (Camera / OCR) */}
+              <button
+                type="button"
+                onClick={handleOpenRecipeCameraScan}
+                className="w-full p-3.5 sm:p-4 rounded-3xl bg-white hover:bg-[#F6F2E8] border-2 border-[#E5DFD0] hover:border-emerald-500 flex items-center gap-3.5 sm:gap-4 text-left transition-all active:scale-[0.98] shadow-xs group cursor-pointer"
+              >
+                <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-emerald-700 group-hover:bg-emerald-800 text-white flex items-center justify-center shadow-xs shrink-0 transition-colors">
+                  <ChefHat className="w-6 h-6 text-emerald-100" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-extrabold text-[#0D3B37]">
+                    {lang === 'FR' ? 'Scanner une recette écrite' : 'Scan Written Recipe'}
+                  </p>
+                  <p className="text-xs text-[#527470]">
+                    {lang === 'FR'
+                      ? 'Prenez en photo une fiche manuscrite ou un livre de cuisine'
+                      : 'Photograph a handwritten card or cookbook page'}
+                  </p>
+                </div>
+              </button>
+
+              {/* Option 5: Leftovers & Prepared Foods (Health Canada & European Standards) */}
+              <button
+                type="button"
+                id="add-kitchen-leftovers-option"
+                onClick={() => {
+                  setIsAddMenuOpen(false);
+                  setSelectedMealForLeftover(null);
+                  setIsImportLeftoverOpen(true);
+                }}
+                className="w-full p-3.5 sm:p-4 rounded-3xl bg-white hover:bg-[#FDF7ED] border-2 border-[#E5DFD0] hover:border-amber-500 flex items-center gap-3.5 sm:gap-4 text-left transition-all active:scale-[0.98] shadow-xs group cursor-pointer"
+              >
+                <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-[#C25E00] group-hover:bg-[#A34E00] text-white flex items-center justify-center shadow-xs shrink-0 transition-colors">
+                  <Utensils className="w-6 h-6 text-amber-100" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="text-sm font-extrabold text-[#0D3B37]">
+                      {lang === 'FR' ? 'Restes & Plats préparés' : 'Leftovers & Prepared Foods'}
+                    </p>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-200">
+                      {lang === 'FR' ? '🇨🇦 Canada & 🇪🇺 UE' : '🇨🇦 Canada & 🇪🇺 EU'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#527470] mt-0.5">
+                    {lang === 'FR'
+                      ? 'Souper de ce soir, fête philippine (lechon, riz...), ou plats enregistrés'
+                      : 'Tonight’s dinner, Filipino party (lechon, rice...), or saved items'}
+                  </p>
+                </div>
+              </button>
+
+              {/* Option 6: Canadian Grocery Flyers (Maxi, Super C, No Frills, Metro, IGA, Walmart) */}
+              <button
+                type="button"
+                id="add-canadian-flyers-option"
+                onClick={() => {
+                  setIsAddMenuOpen(false);
+                  setScannerInitialMode('flyer');
+                  setIsScannerOpen(true);
+                }}
+                className="w-full p-3.5 sm:p-4 rounded-3xl bg-white hover:bg-rose-50/70 border-2 border-rose-600/30 hover:border-rose-500 flex items-center gap-3.5 sm:gap-4 text-left transition-all active:scale-[0.98] shadow-xs group cursor-pointer"
+              >
+                <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-tr from-rose-700 via-rose-600 to-amber-500 text-white flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition-transform">
+                  <ShoppingBag className="w-6 h-6 text-rose-100" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-extrabold text-[#0D3B37]">
+                      {lang === 'FR' ? 'Circulaires d’épicerie canadiennes' : 'Canadian Grocery Flyers'}
+                    </p>
+                    <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-rose-100 text-rose-900 border border-rose-300">
+                      🇨🇦 Photos & IA
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#527470]">
+                    {lang === 'FR'
+                      ? 'Maxi, Super C, No Frills, Metro, IGA, Walmart : photos de circulaires, yogourts et rabais $/lb'
+                      : 'Maxi, Super C, No Frills, Metro, IGA, Walmart: flyer pictures, yogurts & $/lb deals'}
+                  </p>
+                </div>
+              </button>
+
+              {/* Option 7: Family & Profile Settings */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddMenuOpen(false);
+                  setActiveNav('sync');
+                }}
+                className="w-full p-3.5 sm:p-4 rounded-3xl bg-white hover:bg-[#F2ECE0] border-2 border-[#E5DFD0] hover:border-teal-500 flex items-center gap-3.5 sm:gap-4 text-left transition-all active:scale-[0.98] shadow-xs group cursor-pointer"
+              >
+                <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-teal-800 group-hover:bg-teal-900 text-white flex items-center justify-center shadow-xs shrink-0 transition-colors">
+                  <Users className="w-6 h-6 text-teal-200" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-extrabold text-[#0D3B37]">
+                    {lang === 'FR' ? 'Famille, Profil & Rôles' : 'Family, Profile & Roles'}
+                  </p>
+                  <p className="text-xs text-[#527470]">
+                    {lang === 'FR' ? 'Changer d\'utilisateur, journal d\'audit et sécurité' : 'Switch household members, audit log & security'}
+                  </p>
+                </div>
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Bottom Navigation Bar with Perfectly Centered Raised Add Button (2 tabs left, 2 tabs right) */}
+      {/* Bottom Navigation Bar (Visible on Mobile & Tablet Mode) */}
       <nav
         aria-label="Bottom Navigation"
-        className="md:hidden fixed bottom-0 inset-x-0 bg-[#FAF7EE]/95 backdrop-blur-md border-t border-[#E5DFD0] pt-1.5 pb-[max(0.75rem,env(safe-area-inset-bottom,0.75rem))] px-2 z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]"
+        className="xl:hidden fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-[#E8E2D5] shadow-lg pt-1.5 pb-[max(0.75rem,env(safe-area-inset-bottom,0.75rem))] px-2 z-30"
       >
-        <div className="w-full max-w-lg mx-auto flex items-end justify-between">
+        <div className="w-full max-w-lg md:max-w-2xl mx-auto flex items-end justify-between">
           {/* Tab 1: Inventory (Left 1) */}
           <button
             type="button"
@@ -2733,15 +2457,15 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               setIsAddMenuOpen(false);
               setActiveNav('home');
             }}
-            className={`min-w-0 flex-1 flex flex-col items-center justify-center py-1 rounded-xl transition-all cursor-pointer active:scale-95 ${
-              activeNav === 'home' ? 'text-[#0D3B37]' : 'text-slate-400 hover:text-slate-600'
+            className={`min-w-0 flex-1 flex flex-col items-center justify-center py-1 rounded-2xl transition-all cursor-pointer active:scale-95 ${
+              activeNav === 'home' ? 'text-teal-700' : 'text-[#7C9A92] hover:text-[#0D3B37]'
             }`}
           >
-            <div className={`p-1 rounded-xl transition-colors ${activeNav === 'home' ? 'bg-teal-100/80 text-[#0D3B37]' : ''}`}>
+            <div className={`p-1 rounded-xl transition-colors ${activeNav === 'home' ? 'bg-teal-50' : ''}`}>
               <Home className="w-5 h-5 shrink-0" />
             </div>
             <span className={`text-[10px] tracking-tight leading-tight mt-0.5 truncate max-w-full text-center ${
-              activeNav === 'home' ? 'font-black text-[#0D3B37]' : 'font-semibold text-slate-400'
+              activeNav === 'home' ? 'font-bold text-teal-900' : 'font-medium'
             }`}>
               {t('bottom_home')}
             </span>
@@ -2754,42 +2478,42 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               setIsAddMenuOpen(false);
               setActiveNav('meals');
             }}
-            className={`min-w-0 flex-1 flex flex-col items-center justify-center py-1 rounded-xl transition-all cursor-pointer active:scale-95 ${
-              activeNav === 'meals' ? 'text-[#0D3B37]' : 'text-slate-400 hover:text-slate-600'
+            className={`min-w-0 flex-1 flex flex-col items-center justify-center py-1 rounded-2xl transition-all cursor-pointer active:scale-95 ${
+              activeNav === 'meals' ? 'text-teal-700' : 'text-[#7C9A92] hover:text-[#0D3B37]'
             }`}
           >
             <div className="relative">
-              <div className={`p-1 rounded-xl transition-colors ${activeNav === 'meals' ? 'bg-teal-100/80 text-[#0D3B37]' : ''}`}>
+              <div className={`p-1 rounded-xl transition-colors ${activeNav === 'meals' ? 'bg-teal-50' : ''}`}>
                 <CalendarDays className="w-5 h-5 shrink-0" />
               </div>
               {plannedMeals.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-indigo-600 text-white rounded-full text-[9px] font-black flex items-center justify-center shadow-xs">
+                <span className="absolute -top-1 -right-1.5 w-4 h-4 bg-teal-600 text-white rounded-full text-[9px] font-bold flex items-center justify-center">
                   {plannedMeals.length}
                 </span>
               )}
             </div>
             <span className={`text-[10px] tracking-tight leading-tight mt-0.5 truncate max-w-full text-center ${
-              activeNav === 'meals' ? 'font-black text-[#0D3B37]' : 'font-semibold text-slate-400'
+              activeNav === 'meals' ? 'font-bold text-teal-900' : 'font-medium'
             }`}>
               {t('bottom_meals')}
             </span>
           </button>
 
-          {/* EXACT CENTER: Integrated Raised Add Button with + icon */}
+          {/* EXACT CENTER: Raised Add Button (Functions like Mobile Phone) */}
           <div className="flex flex-col items-center justify-center px-2 shrink-0 relative">
             <button
               id="bottom-center-add-btn"
               type="button"
               onClick={() => setIsAddMenuOpen((prev) => !prev)}
-              className={`w-12 h-12 -mt-5 rounded-full bg-gradient-to-tr from-[#0D3B37] via-[#0E766E] to-teal-500 text-white flex items-center justify-center shadow-lg border-[3.5px] border-[#FAF7EE] active:scale-90 transition-all duration-300 hover:scale-105 cursor-pointer ${
-                isAddMenuOpen ? 'rotate-45 scale-105 ring-4 ring-teal-500/40' : ''
+              className={`w-12 h-12 -mt-5 rounded-full bg-teal-700 hover:bg-teal-800 text-white flex items-center justify-center shadow-lg active:scale-90 transition-all cursor-pointer ${
+                isAddMenuOpen ? 'rotate-45 bg-rose-600' : ''
               }`}
               aria-label={lang === 'FR' ? 'Ajouter un aliment' : 'Add Item'}
               title={lang === 'FR' ? 'Ajouter un aliment' : 'Add Item'}
             >
-              <Plus className="w-6 h-6 stroke-[3]" />
+              <Plus className="w-6 h-6 stroke-[2.5]" />
             </button>
-            <span className="text-[10px] font-black text-[#0D3B37] mt-0.5 tracking-tight leading-tight">
+            <span className="text-[10px] font-bold text-[#0D3B37] mt-0.5 tracking-tight leading-tight">
               {lang === 'FR' ? 'Ajout' : 'Add'}
             </span>
           </div>
@@ -2801,22 +2525,22 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               setIsAddMenuOpen(false);
               setActiveNav('grocery');
             }}
-            className={`min-w-0 flex-1 flex flex-col items-center justify-center py-1 rounded-xl transition-all cursor-pointer active:scale-95 ${
-              activeNav === 'grocery' ? 'text-[#0D3B37]' : 'text-slate-400 hover:text-slate-600'
+            className={`min-w-0 flex-1 flex flex-col items-center justify-center py-1 rounded-2xl transition-all cursor-pointer active:scale-95 ${
+              activeNav === 'grocery' ? 'text-teal-700' : 'text-[#7C9A92] hover:text-[#0D3B37]'
             }`}
           >
             <div className="relative">
-              <div className={`p-1 rounded-xl transition-colors ${activeNav === 'grocery' ? 'bg-teal-100/80 text-[#0D3B37]' : ''}`}>
+              <div className={`p-1 rounded-xl transition-colors ${activeNav === 'grocery' ? 'bg-teal-50' : ''}`}>
                 <ShoppingCart className="w-5 h-5 shrink-0" />
               </div>
               {groceryItems.filter((i) => i.inCart).length > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-teal-700 text-white rounded-full text-[9px] font-black flex items-center justify-center shadow-xs">
+                <span className="absolute -top-1 -right-1.5 w-4 h-4 bg-teal-600 text-white rounded-full text-[9px] font-bold flex items-center justify-center">
                   {groceryItems.filter((i) => i.inCart).length}
                 </span>
               )}
             </div>
             <span className={`text-[10px] tracking-tight leading-tight mt-0.5 truncate max-w-full text-center ${
-              activeNav === 'grocery' ? 'font-black text-[#0D3B37]' : 'font-semibold text-slate-400'
+              activeNav === 'grocery' ? 'font-bold text-teal-900' : 'font-medium'
             }`}>
               {t('bottom_grocery')}
             </span>
@@ -2829,21 +2553,40 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               setIsAddMenuOpen(false);
               setActiveNav('cooking');
             }}
-            className={`min-w-0 flex-1 flex flex-col items-center justify-center py-1 rounded-xl transition-all cursor-pointer active:scale-95 ${
-              activeNav === 'cooking' ? 'text-[#0D3B37]' : 'text-slate-400 hover:text-slate-600'
+            className={`min-w-0 flex-1 flex flex-col items-center justify-center py-1 rounded-2xl transition-all cursor-pointer active:scale-95 ${
+              activeNav === 'cooking' ? 'text-teal-700' : 'text-[#7C9A92] hover:text-[#0D3B37]'
             }`}
           >
-            <div className={`p-1 rounded-xl transition-colors ${activeNav === 'cooking' ? 'bg-teal-100/80 text-[#0D3B37]' : ''}`}>
+            <div className={`p-1 rounded-xl transition-colors ${activeNav === 'cooking' ? 'bg-teal-50' : ''}`}>
               <ChefHat className="w-5 h-5 shrink-0" />
             </div>
             <span className={`text-[10px] tracking-tight leading-tight mt-0.5 truncate max-w-full text-center ${
-              activeNav === 'cooking' ? 'font-black text-[#0D3B37]' : 'font-semibold text-slate-400'
+              activeNav === 'cooking' ? 'font-bold text-teal-900' : 'font-medium'
             }`}>
               {t('bottom_cooking')}
             </span>
           </button>
         </div>
       </nav>
+
+      {/* Desktop Floating Mobile-Style Add Button (Functions like Mobile Phone on Desktop) */}
+      <div className="hidden xl:flex fixed bottom-8 right-8 z-40 items-center gap-2 group animate-fade-in">
+        <button
+          type="button"
+          id="desktop-floating-mobile-add-btn"
+          onClick={() => setIsAddMenuOpen((prev) => !prev)}
+          className={`w-14 h-14 rounded-full bg-teal-700 hover:bg-teal-800 text-white flex items-center justify-center shadow-xl hover:shadow-2xl active:scale-95 transition-all cursor-pointer border-2 border-white group-hover:scale-105 ${
+            isAddMenuOpen ? 'rotate-45 bg-rose-600' : ''
+          }`}
+          aria-label={lang === 'FR' ? 'Ajouter (Menu Mobile)' : 'Add (Mobile Menu)'}
+          title={lang === 'FR' ? 'Ajouter comme sur mobile' : 'Add like on mobile'}
+        >
+          <Plus className="w-7 h-7 stroke-[2.5]" />
+        </button>
+        <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-[#0D3B37] text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-lg pointer-events-none whitespace-nowrap">
+          {lang === 'FR' ? 'Ajouter comme sur mobile' : 'Add like on mobile'}
+        </div>
+      </div>
 
       {/* Vision Scanner Modal */}
       <CameraScannerModal

@@ -9,8 +9,34 @@ import {
   lookThroughWebsiteContent,
 } from "../services/geminiRecipeParser.js";
 import { dbStore } from "../services/dbStore.js";
+import { estimateRecipeNutrition } from "../services/nutritionEngine.js";
 
 const router = express.Router();
+
+/**
+ * POST /api/v1/recipes/estimate-nutrition
+ * Method A: Nutritional Extraction & Ingredient Aggregation
+ */
+router.post("/estimate-nutrition", (req, res) => {
+  try {
+    const { title = "Recipe", ingredients = [], servings = 4 } = req.body;
+    const nutrition = estimateRecipeNutrition(title, ingredients, servings);
+    return res.status(200).json({
+      success: true,
+      title: nutrition.title,
+      servings: nutrition.servings,
+      caloriesPerServing: nutrition.caloriesPerServing,
+      totalCalories: nutrition.totalCalories,
+      macrosPerServing: nutrition.macrosPerServing,
+      ingredients: nutrition.ingredients,
+      calculationMethod: "AI_ESTIMATED",
+      nutrition,
+    });
+  } catch (error) {
+    console.error("[Recipes Route] /estimate-nutrition error:", error);
+    return res.status(400).json({ success: false, error: error.message });
+  }
+});
 
 /**
  * Custom recipe store initialized empty for clean install

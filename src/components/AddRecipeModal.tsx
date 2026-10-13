@@ -30,14 +30,30 @@ import {
   ChevronUp,
   ChevronDown,
   Image as ImageIcon,
+  Lock,
+  Unlock,
+  Zap,
 } from 'lucide-react';
 import { RicardoRecipe } from '../data/ricardoRecipes';
 import { useLanguage } from '../utils/i18n';
+import {
+  ensureBilingualRecipe,
+  getRecipeDisplayTitle,
+  getRecipeDisplayDescription,
+  getRecipeDisplayInstructions,
+  getItemDisplayName,
+  translateFoodItem,
+} from '../utils/foodTranslator';
 import {
   RecipeWebsiteSource,
   getStoredRecipeWebsites,
   saveStoredRecipeWebsites,
 } from '../data/recipeWebsites';
+import {
+  estimateRecipeNutrition,
+  recalculateDynamicNutrition,
+  estimateIngredientNutrition,
+} from '../services/nutritionEngine';
 
 export interface RecipeIngredient {
   id: string;
@@ -46,9 +62,14 @@ export interface RecipeIngredient {
   name: string; // e.g. "Huile d'olive"
   storage: string; // e.g. "pantry", "fridge", "freezer", "spices"
   nameFr?: string;
+  nameEn?: string;
   category?: string;
   locationType?: 'FRIDGE' | 'FREEZER' | 'PANTRY' | 'SPICE_RACK';
   inKitchenItemName?: string;
+  estimatedKcal?: number;
+  proteinGrams?: number;
+  carbsGrams?: number;
+  fatGrams?: number;
 }
 
 export function parseAmountAndUnit(rawAmount: string = ''): { amount: string; unit: string } {
@@ -125,6 +146,15 @@ export function parseAmountAndUnit(rawAmount: string = ''): { amount: string; un
   if (/^(bo[îi]te(?:s)?|conserve(?:s)?|can(?:s)?|tin(?:s)?)/i.test(rest)) {
     return { amount: detectedAmount, unit: 'can' };
   }
+  if (/^(botte(?:s)?|bunch(?:es)?|bundle(?:s)?)/i.test(rest)) {
+    return { amount: detectedAmount, unit: 'bunch' };
+  }
+  if (/^(sachet(?:s)?|paquet(?:s)?|packet(?:s)?|pouch(?:es)?)/i.test(rest)) {
+    return { amount: detectedAmount, unit: 'packet' };
+  }
+  if (/^(pi[èe]ce(?:s)?|piece(?:s)?|morceau(?:x)?|pcs?\.?)/i.test(rest)) {
+    return { amount: detectedAmount, unit: 'piece' };
+  }
 
   return { amount: detectedAmount, unit: 'unit' };
 }
@@ -149,7 +179,7 @@ export function normalizeStorage(
   }
   const n = (name || '').toLowerCase();
   if (
-    /sel|poivre|paprika|curry|cumin|origan|thym|cannelle|épice|muscade|spices|pepper|salt|cinnamon|oregano|thyme|chili|clove/i.test(
+    /sel|poivre|paprika|curry|cumin|origan|thym|cannelle|épice|muscade|spices|pepper|salt|cinnamon|oregano|thyme|chili|clove|paminta|laurel/i.test(
       n
     )
   ) {
@@ -164,24 +194,44 @@ export function normalizeRecipeIngredient(ing: any, idx: number = 0): RecipeIngr
   const amount = unit === 'to_taste' ? '' : (ing.amount && ing.unit ? ing.amount : parsed.amount || '1');
   const { storage, locationType } = normalizeStorage(ing.storage, ing.locationType, ing.name || ing.nameFr);
 
+  let rawName = (ing.name || ing.nameEn || ing.nameFr || '').trim();
+  let rawNameFr = (ing.nameFr || '').trim();
+  let rawNameEn = (ing.nameEn || ing.name || '').trim();
+
+  // Strip accidental duplicated leading amounts or units if present in name string
+  const leadingNoiseRegex = /^(\d+\s*[\/\-]\s*\d+|\d+(?:\.\d+)?|\d+)\s*(?:tbsp|tsp|cup|g|kg|ml|l|lb|oz|clove|slice|can|bunch|packet|piece|c\.?\s*à\s*s|c\.?\s*à\s*t|tasse|gousse|bo[îi]te|morceau|pincée)?\s*(?:of\s+|de\s+|d['’]\s*)?/i;
+  rawName = rawName.replace(leadingNoiseRegex, '').trim();
+  rawNameFr = rawNameFr.replace(leadingNoiseRegex, '').trim();
+  rawNameEn = rawNameEn.replace(leadingNoiseRegex, '').trim();
+
+  if (!rawNameFr && rawNameEn) {
+    rawNameFr = translateFoodItem(rawNameEn, 'FR');
+  }
+
   return {
     id: ing.id || `ing-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
     amount,
     unit,
-    name: ing.name || ing.nameFr || '',
-    nameFr: ing.nameFr || ing.name || '',
+    name: rawName || rawNameEn || ing.name || '',
+    nameFr: rawNameFr || ing.nameFr || '',
+    nameEn: rawNameEn || ing.nameEn || '',
     storage,
     locationType,
     category: ing.category || 'Pantry Staples',
     inKitchenItemName: ing.inKitchenItemName,
+    estimatedKcal: ing.estimatedKcal,
+    proteinGrams: ing.proteinGrams,
+    carbsGrams: ing.carbsGrams,
+    fatGrams: ing.fatGrams,
   };
 }
 
-export function normalizeRecipe(recipe: any): RicardoRecipe | null {
+export function normalizeRecipe(recipe: any, activeLang: 'EN' | 'FR' = 'FR'): RicardoRecipe | null {
   if (!recipe) return null;
+  const bilingual = ensureBilingualRecipe(recipe, activeLang);
   return {
-    ...recipe,
-    ingredients: (recipe.ingredients || []).map((ing: any, idx: number) =>
+    ...bilingual,
+    ingredients: (bilingual.ingredients || []).map((ing: any, idx: number) =>
       normalizeRecipeIngredient(ing, idx)
     ),
   };
@@ -252,17 +302,19 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
 
-  // Review & Edit state after AI has parsed
-  const [parsedRecipe, setParsedRecipe] = useState<RicardoRecipe | null>(null);
+  // Review & Edit state after AI has parsed or when editing existing recipe
+  const [parsedRecipe, setParsedRecipe] = useState<RicardoRecipe | null>(() => {
+    return recipeToEdit ? normalizeRecipe(recipeToEdit, lang) : null;
+  });
 
   // Synchronize when editing an existing recipe
   useEffect(() => {
     if (recipeToEdit && isOpen) {
-      setParsedRecipe(normalizeRecipe(recipeToEdit));
+      setParsedRecipe(normalizeRecipe(recipeToEdit, lang));
     } else if (!isOpen && !recipeToEdit) {
       setParsedRecipe(null);
     }
-  }, [recipeToEdit, isOpen]);
+  }, [recipeToEdit, isOpen, lang]);
 
   // Helper methods for editing ingredients
   const handleAddIngredient = () => {
@@ -277,10 +329,33 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
         storage: 'pantry',
         locationType: 'PANTRY',
         category: 'Pantry Staples',
+        estimatedKcal: 80,
       };
+      const copy = [...(prev.ingredients || []), newIng];
+      let nextCal = prev.calories;
+      let nextPerServing = prev.caloriesPerServing;
+      let nextTotalCal = prev.totalCalories;
+      let nextMacros = prev.macrosPerServing;
+      let nextMethod = prev.calculationMethod || 'DYNAMIC_AGGREGATED';
+
+      if (prev.calculationMethod !== 'MANUAL_OVERRIDE') {
+        const servingsNum = parseInt(prev.servings?.replace(/\D/g, '') || '4', 10) || 4;
+        const dyn = recalculateDynamicNutrition(copy, servingsNum);
+        nextCal = `${dyn.caloriesPerServing} kcal`;
+        nextPerServing = dyn.caloriesPerServing;
+        nextTotalCal = dyn.totalCalories;
+        nextMacros = dyn.macrosPerServing;
+        nextMethod = 'DYNAMIC_AGGREGATED';
+      }
+
       return {
         ...prev,
-        ingredients: [...(prev.ingredients || []), newIng],
+        ingredients: copy,
+        calories: nextCal,
+        caloriesPerServing: nextPerServing,
+        totalCalories: nextTotalCal,
+        macrosPerServing: nextMacros,
+        calculationMethod: nextMethod,
       };
     });
   };
@@ -290,17 +365,70 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
       if (!prev) return null;
       const copy = [...(prev.ingredients || [])];
       if (!copy[index]) return prev;
-      copy[index] = { ...copy[index], ...updates };
-      return { ...prev, ingredients: copy };
+      const merged = { ...copy[index], ...updates };
+      const nut = estimateIngredientNutrition(merged.name, merged.amount || 1, merged.unit || 'g');
+      merged.estimatedKcal = nut.estimatedKcal;
+      merged.proteinGrams = nut.proteinGrams;
+      merged.carbsGrams = nut.carbsGrams;
+      merged.fatGrams = nut.fatGrams;
+      copy[index] = merged;
+
+      let nextCal = prev.calories;
+      let nextPerServing = prev.caloriesPerServing;
+      let nextTotalCal = prev.totalCalories;
+      let nextMacros = prev.macrosPerServing;
+      let nextMethod = prev.calculationMethod || 'DYNAMIC_AGGREGATED';
+
+      if (prev.calculationMethod !== 'MANUAL_OVERRIDE') {
+        const servingsNum = parseInt(prev.servings?.replace(/\D/g, '') || '4', 10) || 4;
+        const dyn = recalculateDynamicNutrition(copy, servingsNum);
+        nextCal = `${dyn.caloriesPerServing} kcal`;
+        nextPerServing = dyn.caloriesPerServing;
+        nextTotalCal = dyn.totalCalories;
+        nextMacros = dyn.macrosPerServing;
+        nextMethod = 'DYNAMIC_AGGREGATED';
+      }
+
+      return {
+        ...prev,
+        ingredients: copy,
+        calories: nextCal,
+        caloriesPerServing: nextPerServing,
+        totalCalories: nextTotalCal,
+        macrosPerServing: nextMacros,
+        calculationMethod: nextMethod,
+      };
     });
   };
 
   const handleRemoveIngredient = (index: number) => {
     setParsedRecipe((prev) => {
       if (!prev) return null;
+      const copy = (prev.ingredients || []).filter((_, i) => i !== index);
+      let nextCal = prev.calories;
+      let nextPerServing = prev.caloriesPerServing;
+      let nextTotalCal = prev.totalCalories;
+      let nextMacros = prev.macrosPerServing;
+      let nextMethod = prev.calculationMethod || 'DYNAMIC_AGGREGATED';
+
+      if (prev.calculationMethod !== 'MANUAL_OVERRIDE') {
+        const servingsNum = parseInt(prev.servings?.replace(/\D/g, '') || '4', 10) || 4;
+        const dyn = recalculateDynamicNutrition(copy, servingsNum);
+        nextCal = `${dyn.caloriesPerServing} kcal`;
+        nextPerServing = dyn.caloriesPerServing;
+        nextTotalCal = dyn.totalCalories;
+        nextMacros = dyn.macrosPerServing;
+        nextMethod = 'DYNAMIC_AGGREGATED';
+      }
+
       return {
         ...prev,
-        ingredients: (prev.ingredients || []).filter((_, i) => i !== index),
+        ingredients: copy,
+        calories: nextCal,
+        caloriesPerServing: nextPerServing,
+        totalCalories: nextTotalCal,
+        macrosPerServing: nextMacros,
+        calculationMethod: nextMethod,
       };
     });
   };
@@ -525,16 +653,18 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setStoredWebsites(getStoredRecipeWebsites());
-      if (initialPhotoBase64) {
+      if (recipeToEdit) {
+        setParsedRecipe(normalizeRecipe(recipeToEdit, lang));
+        setPhotoBase64(null);
+        setErrorMsg(null);
+      } else if (initialPhotoBase64) {
         setPhotoBase64(initialPhotoBase64);
         setActiveTab('photo');
         setParsedRecipe(null);
         triggerPhotoImport(initialPhotoBase64);
       } else if (initialTab) {
         setActiveTab(initialTab);
-        if (initialTab !== 'photo') {
-          setParsedRecipe(null);
-        }
+        setParsedRecipe(null);
       }
     } else {
       setParsedRecipe(null);
@@ -543,7 +673,7 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
       setParsingStep('');
       setIsParsing(false);
     }
-  }, [isOpen, initialTab, initialPhotoBase64]);
+  }, [isOpen, initialTab, initialPhotoBase64, recipeToEdit, lang]);
 
   // If autoOpenCam is enabled and no photo has been provided yet, open camera shutter
   useEffect(() => {
@@ -670,7 +800,7 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
       ricardoUrlEn: recipe.sourceUrl || '',
       ricardoUrlFr: recipe.sourceUrl || '',
       imageUrl:
-        recipe.imageUrl && !recipe.imageUrl.includes('unsplash.com') ? recipe.imageUrl : '',
+        recipe.imageUrl?.trim() ? recipe.imageUrl.trim() : '',
       time: recipe.totalTime || recipe.cookTime || '30 mins',
       prepTime: recipe.prepTime || '15 mins',
       cookTime: recipe.cookTime || '20 mins',
@@ -846,7 +976,7 @@ Instructions:
           throw new Error(data.error || 'Failed to import recipe from URL');
         }
 
-        setParsedRecipe(normalizeRecipe(data.recipe));
+        setParsedRecipe(normalizeRecipe(data.recipe, lang));
       } else {
         // Fallback or other tabs (youtube, text, photo)
         let payload: any = {
@@ -885,7 +1015,7 @@ Instructions:
           throw new Error(data.error || 'Failed to parse recipe');
         }
 
-        setParsedRecipe(normalizeRecipe(data.recipe));
+        setParsedRecipe(normalizeRecipe(data.recipe, lang));
       }
     } catch (err: any) {
       console.error('AI Parse/Import failed:', err);
@@ -912,11 +1042,13 @@ Instructions:
 
       const data = await res.json();
       if (data.success && data.recipe) {
-        setParsedRecipe(normalizeRecipe(data.recipe));
+        setParsedRecipe(normalizeRecipe(data.recipe, targetLang));
+      } else {
+        setParsedRecipe((prev) => (prev ? normalizeRecipe(prev, targetLang) : null));
       }
     } catch (err: any) {
-      console.error('Translation failed:', err);
-      setErrorMsg(err.message || 'Translation failed');
+      console.warn('Backend translation failed, using local deterministic translation:', err);
+      setParsedRecipe((prev) => (prev ? normalizeRecipe(prev, targetLang) : null));
     } finally {
       setIsTranslating(false);
     }
@@ -1173,12 +1305,45 @@ Instructions:
                         type="button"
                         onClick={() =>
                           loadSampleWebUrl(
-                            'https://www.ricardocuisine.com/recettes/5993-soupe-a-l-oignon-gratinée'
+                            'https://www.ricardocuisine.com/en/recipes/4512-apple-and-maple-syrup-pork-roast'
                           )
                         }
-                        className="px-2.5 py-1 rounded-lg bg-[#EBF3EA] hover:bg-[#DCEBD9] text-[#1E3022] text-[10px] font-bold transition-colors"
+                        className="px-2.5 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-900 border border-teal-200 text-[10px] font-black transition-colors"
                       >
-                        Ricardo (Soupe à l'oignon)
+                        🍁 Ricardo (Rôti porc érable)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          loadSampleWebUrl(
+                            'https://panlasangpinoy.com/killer-pork-sinigang/'
+                          )
+                        }
+                        className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-200 text-[10px] font-black transition-colors"
+                      >
+                        🇵🇭 Panlasang Pinoy (Sinigang)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          loadSampleWebUrl(
+                            'https://www.kawalingpinoy.com/pork-adobo/'
+                          )
+                        }
+                        className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-200 text-[10px] font-black transition-colors"
+                      >
+                        🇵🇭 Kawaling Pinoy (Adobo)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          loadSampleWebUrl(
+                            'https://www.foxyfolksy.com/pork-sinigang/'
+                          )
+                        }
+                        className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-200 text-[10px] font-black transition-colors"
+                      >
+                        🇵🇭 Foxy Folksy (Sinigang)
                       </button>
                       <button
                         type="button"
@@ -1189,18 +1354,7 @@ Instructions:
                         }
                         className="px-2.5 py-1 rounded-lg bg-[#EBF3EA] hover:bg-[#DCEBD9] text-[#1E3022] text-[10px] font-bold transition-colors"
                       >
-                        Marmiton (Poulet Curry)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          loadSampleWebUrl(
-                            'https://www.seriouseats.com/easy-pan-pizza-recipe'
-                          )
-                        }
-                        className="px-2.5 py-1 rounded-lg bg-[#EBF3EA] hover:bg-[#DCEBD9] text-[#1E3022] text-[10px] font-bold transition-colors"
-                      >
-                        Serious Eats (Pan Pizza)
+                        🇫🇷 Marmiton (Poulet Curry)
                       </button>
                       <button
                         type="button"
@@ -1826,11 +1980,15 @@ Instructions:
                 </div>
                 <button
                   type="button"
-                  onClick={() => setParsedRecipe(null)}
-                  className="text-[11px] font-bold text-emerald-800 hover:underline flex items-center gap-1 shrink-0"
+                  onClick={() => {
+                    if (window.confirm(lang === 'FR' ? 'Voulez-vous réinitialiser et saisir une nouvelle source de recette ?' : 'Do you want to discard this and enter a new recipe source?')) {
+                      setParsedRecipe(null);
+                    }
+                  }}
+                  className="text-[11px] font-bold text-emerald-800 hover:underline flex items-center gap-1 shrink-0 cursor-pointer"
                 >
                   <RotateCcw className="w-3 h-3" />
-                  <span>{lang === 'FR' ? 'Recommencer' : 'Edit Input'}</span>
+                  <span>{lang === 'FR' ? 'Changer de source' : 'Change Source'}</span>
                 </button>
               </div>
             )}
@@ -1862,7 +2020,7 @@ Instructions:
                   )}
                   <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between text-white text-xs">
                     <span className="text-[11px] opacity-90 drop-shadow-xs truncate">
-                      {lang === 'FR' && parsedRecipe.titleFr ? parsedRecipe.titleFr : parsedRecipe.title}
+                      {getRecipeDisplayTitle(parsedRecipe, lang)}
                     </span>
                     <button
                       type="button"
@@ -1922,55 +2080,101 @@ Instructions:
                   </div>
                 </div>
 
-                {/* Recipe Title Input */}
-                <div className="space-y-1">
+                {/* Bilingual Recipe Title */}
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-black text-[#1E3022] uppercase tracking-wider">
-                      {lang === 'FR' ? 'Titre de la recette' : 'Recipe Title'} *
+                    <label className="text-[11px] font-black text-[#1E3022] uppercase tracking-wider flex items-center gap-1.5">
+                      <span>{lang === 'FR' ? 'Titre de la recette (Bilingue)' : 'Recipe Title (Bilingual)'} *</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-50 text-teal-800 font-bold">
+                        {lang === 'FR' ? '🇫🇷 FR & 🇬🇧 EN' : '🇬🇧 EN & 🇫🇷 FR'}
+                      </span>
                     </label>
                     <span className="text-[10px] text-slate-400">
-                      {lang === 'FR' ? 'Visible dans votre cuisine' : 'Displayed in your kitchen'}
+                      {lang === 'FR' ? 'Traduction automatique intégrée' : 'Auto-translated fields'}
                     </span>
                   </div>
-                  <input
-                    type="text"
-                    value={lang === 'FR' && parsedRecipe.titleFr ? parsedRecipe.titleFr : parsedRecipe.title}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setParsedRecipe((prev) =>
-                        prev
-                          ? lang === 'FR'
-                            ? { ...prev, titleFr: val, title: prev.title || val }
-                            : { ...prev, title: val, titleFr: prev.titleFr || val }
-                          : null
-                      );
-                    }}
-                    placeholder={lang === 'FR' ? 'Ex: Poulet au beurre maison' : 'e.g. Homemade Butter Chicken'}
-                    className="w-full font-black text-base sm:text-lg text-[#1E3022] border border-[#CADBC7] rounded-xl px-3.5 py-2 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 bg-[#FAFBF9]"
-                  />
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 block mb-1">
+                        🇫🇷 {lang === 'FR' ? 'Titre en Français' : 'French Title'}
+                      </label>
+                      <input
+                        type="text"
+                        value={parsedRecipe.titleFr || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setParsedRecipe((prev) => (prev ? {
+                            ...prev,
+                            titleFr: val,
+                            title: lang === 'FR' ? (val || prev.title) : prev.title,
+                          } : null));
+                        }}
+                        placeholder="Ex: Rôti de porc aux pommes et sirop d'érable"
+                        className="w-full font-bold text-sm text-[#1E3022] border border-[#CADBC7] rounded-xl px-3 py-2 focus:outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20 bg-[#FAFBF9]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 block mb-1">
+                        🇬🇧 {lang === 'FR' ? 'Titre en Anglais' : 'English Title'}
+                      </label>
+                      <input
+                        type="text"
+                        value={parsedRecipe.titleEn || (parsedRecipe.title !== parsedRecipe.titleFr ? parsedRecipe.title : '') || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setParsedRecipe((prev) => (prev ? {
+                            ...prev,
+                            titleEn: val,
+                            title: lang === 'EN' ? val : (prev.titleFr || val),
+                          } : null));
+                        }}
+                        placeholder="e.g. Apple and Maple Syrup Pork Roast"
+                        className="w-full font-bold text-sm text-[#1E3022] border border-[#CADBC7] rounded-xl px-3 py-2 focus:outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20 bg-[#FAFBF9]"
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                {/* Recipe Description & Notes Textarea */}
-                <div className="space-y-1">
-                  <label className="text-[11px] font-black text-[#1E3022] uppercase tracking-wider">
-                    {lang === 'FR' ? 'Description & Notes de cuisine' : 'Description & Chef Notes'}
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={lang === 'FR' && parsedRecipe.descriptionFr ? parsedRecipe.descriptionFr : parsedRecipe.descriptionEn || ''}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setParsedRecipe((prev) =>
-                        prev
-                          ? lang === 'FR'
-                            ? { ...prev, descriptionFr: val }
-                            : { ...prev, descriptionEn: val }
-                          : null
-                      );
-                    }}
-                    placeholder={lang === 'FR' ? 'Ajoutez vos astuces ou notes pour réussir cette recette...' : 'Add preparation tips or chef notes for this recipe...'}
-                    className="w-full text-xs text-[#334D37] leading-relaxed border border-[#CADBC7] rounded-xl p-3 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 bg-[#FAFBF9] resize-y"
-                  />
+                {/* Bilingual Recipe Description & Chef Notes */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-black text-[#1E3022] uppercase tracking-wider">
+                      {lang === 'FR' ? 'Description & Notes de cuisine' : 'Description & Chef Notes'}
+                    </label>
+                    <span className="text-[10px] text-slate-400">
+                      {lang === 'FR' ? 'Description bilingue' : 'Bilingual summary'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 block mb-0.5">🇫🇷 Français</label>
+                      <textarea
+                        rows={2}
+                        value={parsedRecipe.descriptionFr || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setParsedRecipe((prev) => (prev ? { ...prev, descriptionFr: val } : null));
+                        }}
+                        placeholder="Description ou astuces en français..."
+                        className="w-full text-xs text-[#334D37] leading-relaxed border border-[#CADBC7] rounded-xl p-2.5 focus:outline-none focus:border-teal-600 bg-[#FAFBF9] resize-y"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 block mb-0.5">🇬🇧 English</label>
+                      <textarea
+                        rows={2}
+                        value={parsedRecipe.descriptionEn || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setParsedRecipe((prev) => (prev ? { ...prev, descriptionEn: val } : null));
+                        }}
+                        placeholder="Description or notes in English..."
+                        className="w-full text-xs text-[#334D37] leading-relaxed border border-[#CADBC7] rounded-xl p-2.5 focus:outline-none focus:border-teal-600 bg-[#FAFBF9] resize-y"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Key Recipe Metrics Grid: Time, Servings, Calories, Difficulty */}
@@ -2037,6 +2241,251 @@ Instructions:
                       <option value="Medium">{lang === 'FR' ? 'Moyen' : 'Medium'}</option>
                       <option value="Advanced">{lang === 'FR' ? 'Avancé' : 'Advanced'}</option>
                     </select>
+                  </div>
+                </div>
+
+                {/* Nutritional Engine Section (Methods A, B, C) */}
+                <div className="p-3.5 rounded-2xl bg-[#FAF7EE]/60 border border-[#E5DFD0] text-[#0D3B37] space-y-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <Flame className="w-4 h-4 text-amber-600 fill-amber-500" />
+                      <span className="text-xs font-bold uppercase tracking-wider text-[#0D3B37]">
+                        {lang === 'FR' ? 'Moteur Nutritionnel (Calories & Macros)' : 'Nutritional Engine (Calories & Macros)'}
+                      </span>
+                    </div>
+
+                    {/* Method Selector: A (AI), B (Dynamic), C (Manual) */}
+                    <div className="inline-flex rounded-xl border border-[#E5DFD0] bg-white p-0.5 text-[11px] font-bold shadow-2xs">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const servingsNum = parseInt(parsedRecipe.servings?.replace(/\D/g, '') || '4', 10) || 4;
+                          const est = estimateRecipeNutrition(parsedRecipe.title || 'Recipe', parsedRecipe.ingredients, servingsNum);
+                          setParsedRecipe((prev) => prev ? {
+                            ...prev,
+                            calories: `${est.caloriesPerServing} kcal`,
+                            caloriesPerServing: est.caloriesPerServing,
+                            totalCalories: est.totalCalories,
+                            macrosPerServing: est.macrosPerServing,
+                            calculationMethod: 'AI_ESTIMATED',
+                            nutrition: est,
+                          } : null);
+                        }}
+                        className={`px-2 py-1 rounded-lg transition-all cursor-pointer ${
+                          parsedRecipe.calculationMethod === 'AI_ESTIMATED' || !parsedRecipe.calculationMethod
+                            ? 'bg-purple-50 text-purple-900 border border-purple-200 font-bold shadow-2xs'
+                            : 'text-slate-600 hover:text-black'
+                        }`}
+                        title="Method A: AI Auto-Estimation"
+                      >
+                        ✨ {lang === 'FR' ? 'Méthode A (IA)' : 'Method A (AI)'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const servingsNum = parseInt(parsedRecipe.servings?.replace(/\D/g, '') || '4', 10) || 4;
+                          const dyn = recalculateDynamicNutrition(parsedRecipe.ingredients, servingsNum);
+                          setParsedRecipe((prev) => prev ? {
+                            ...prev,
+                            calories: `${dyn.caloriesPerServing} kcal`,
+                            caloriesPerServing: dyn.caloriesPerServing,
+                            totalCalories: dyn.totalCalories,
+                            macrosPerServing: dyn.macrosPerServing,
+                            calculationMethod: 'DYNAMIC_AGGREGATED',
+                            nutrition: dyn,
+                          } : null);
+                        }}
+                        className={`px-2 py-1 rounded-lg transition-all cursor-pointer ${
+                          parsedRecipe.calculationMethod === 'DYNAMIC_AGGREGATED'
+                            ? 'bg-teal-50 text-teal-900 border border-teal-200 font-bold shadow-2xs'
+                            : 'text-slate-600 hover:text-black'
+                        }`}
+                        title="Method B: Dynamic Aggregation"
+                      >
+                        ⚙️ {lang === 'FR' ? 'Méthode B (Dynamique)' : 'Method B (Dynamic)'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const isManual = parsedRecipe.calculationMethod === 'MANUAL_OVERRIDE';
+                          setParsedRecipe((prev) => prev ? {
+                            ...prev,
+                            calculationMethod: isManual ? 'DYNAMIC_AGGREGATED' : 'MANUAL_OVERRIDE',
+                          } : null);
+                        }}
+                        className={`px-2 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                          parsedRecipe.calculationMethod === 'MANUAL_OVERRIDE'
+                            ? 'bg-amber-50 text-amber-900 border border-amber-200 font-bold shadow-2xs'
+                            : 'text-slate-600 hover:text-black'
+                        }`}
+                        title="Method C: Manual Override"
+                      >
+                        {parsedRecipe.calculationMethod === 'MANUAL_OVERRIDE' ? (
+                          <Lock className="w-2.5 h-2.5 text-amber-700" />
+                        ) : (
+                          <Unlock className="w-2.5 h-2.5" />
+                        )}
+                        <span>{lang === 'FR' ? 'Méthode C (Manuel)' : 'Method C (Manual)'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Calories Inputs */}
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-[#0D3B37] flex items-center justify-between">
+                        <span>{lang === 'FR' ? 'Calories / portion :' : 'Calories / serving:'}</span>
+                        {parsedRecipe.calculationMethod === 'MANUAL_OVERRIDE' && (
+                          <span className="text-[9px] text-amber-800 font-mono font-bold">🔒 Locked</span>
+                        )}
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="0"
+                          step="5"
+                          value={parsedRecipe.caloriesPerServing || parseInt((parsedRecipe.calories || '400').replace(/\D/g, ''), 10) || 400}
+                          onChange={(e) => {
+                            const val = Number(e.target.value) || 0;
+                            const s = parseInt((parsedRecipe.servings || '4').replace(/\D/g, ''), 10) || 4;
+                            setParsedRecipe((prev) => prev ? {
+                              ...prev,
+                              calories: `${val} kcal`,
+                              caloriesPerServing: val,
+                              totalCalories: val * s,
+                              calculationMethod: 'MANUAL_OVERRIDE',
+                            } : null);
+                          }}
+                          className="w-full px-3 py-1.5 rounded-xl bg-white border border-[#D5CDBC] font-mono text-sm font-bold text-[#0D3B37] focus:outline-hidden focus:ring-2 focus:ring-teal-600 focus:border-teal-600"
+                        />
+                        <span className="absolute right-2.5 top-2 text-[10px] font-bold text-slate-400">kcal</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-[#0D3B37]">
+                        {lang === 'FR' ? 'Total plat (kcal) :' : 'Total dish calories:'}
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="0"
+                          step="10"
+                          value={parsedRecipe.totalCalories || ((parsedRecipe.caloriesPerServing || 400) * (parseInt((parsedRecipe.servings || '4').replace(/\D/g, ''), 10) || 4))}
+                          onChange={(e) => {
+                            const total = Number(e.target.value) || 0;
+                            const s = parseInt((parsedRecipe.servings || '4').replace(/\D/g, ''), 10) || 4;
+                            const perS = Math.round(total / Math.max(1, s));
+                            setParsedRecipe((prev) => prev ? {
+                              ...prev,
+                              calories: `${perS} kcal`,
+                              caloriesPerServing: perS,
+                              totalCalories: total,
+                              calculationMethod: 'MANUAL_OVERRIDE',
+                            } : null);
+                          }}
+                          className="w-full px-3 py-1.5 rounded-xl bg-white border border-[#D5CDBC] font-mono text-sm font-bold text-[#0D3B37] focus:outline-hidden focus:ring-2 focus:ring-teal-600 focus:border-teal-600"
+                        />
+                        <span className="absolute right-2.5 top-2 text-[10px] font-bold text-slate-400">kcal</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Macro Inputs (Protein, Carbs, Fat) */}
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-bold text-[#0D3B37] block">
+                      {lang === 'FR' ? 'Macronutriments par portion :' : 'Macronutrients per serving:'}
+                    </span>
+                    <div className="grid grid-cols-3 gap-2">
+                      {/* Protein */}
+                      <div className="p-2.5 rounded-xl bg-sky-50/70 border border-sky-100 space-y-1 shadow-2xs">
+                        <label className="text-[10px] font-bold uppercase text-sky-900 block">
+                          {lang === 'FR' ? 'Protéines' : 'Protein'}
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={parsedRecipe.macrosPerServing?.proteinGrams ?? 28}
+                            onChange={(e) => {
+                              const p = Number(e.target.value) || 0;
+                              setParsedRecipe((prev) => prev ? {
+                                ...prev,
+                                calculationMethod: 'MANUAL_OVERRIDE',
+                                macrosPerServing: {
+                                  proteinGrams: p,
+                                  carbsGrams: prev.macrosPerServing?.carbsGrams ?? 40,
+                                  fatGrams: prev.macrosPerServing?.fatGrams ?? 14,
+                                },
+                              } : null);
+                            }}
+                            className="w-full px-2 py-1 rounded-lg bg-white border border-sky-200 text-xs font-mono font-bold text-sky-950 focus:outline-hidden focus:ring-1 focus:ring-sky-500"
+                          />
+                          <span className="absolute right-2 top-1 text-[10px] font-bold text-slate-400">g</span>
+                        </div>
+                      </div>
+
+                      {/* Carbs */}
+                      <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-100 space-y-1 shadow-2xs">
+                        <label className="text-[10px] font-bold uppercase text-amber-900 block">
+                          {lang === 'FR' ? 'Glucides' : 'Carbs'}
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={parsedRecipe.macrosPerServing?.carbsGrams ?? 42}
+                            onChange={(e) => {
+                              const c = Number(e.target.value) || 0;
+                              setParsedRecipe((prev) => prev ? {
+                                ...prev,
+                                calculationMethod: 'MANUAL_OVERRIDE',
+                                macrosPerServing: {
+                                  proteinGrams: prev.macrosPerServing?.proteinGrams ?? 28,
+                                  carbsGrams: c,
+                                  fatGrams: prev.macrosPerServing?.fatGrams ?? 14,
+                                },
+                              } : null);
+                            }}
+                            className="w-full px-2 py-1 rounded-lg bg-white border border-amber-200 text-xs font-mono font-bold text-amber-950 focus:outline-hidden focus:ring-1 focus:ring-amber-500"
+                          />
+                          <span className="absolute right-2 top-1 text-[10px] font-bold text-slate-400">g</span>
+                        </div>
+                      </div>
+
+                      {/* Fat */}
+                      <div className="p-2.5 rounded-xl bg-rose-50/70 border border-rose-100 space-y-1 shadow-2xs">
+                        <label className="text-[10px] font-bold uppercase text-rose-900 block">
+                          {lang === 'FR' ? 'Lipides' : 'Fat'}
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={parsedRecipe.macrosPerServing?.fatGrams ?? 15}
+                            onChange={(e) => {
+                              const f = Number(e.target.value) || 0;
+                              setParsedRecipe((prev) => prev ? {
+                                ...prev,
+                                calculationMethod: 'MANUAL_OVERRIDE',
+                                macrosPerServing: {
+                                  proteinGrams: prev.macrosPerServing?.proteinGrams ?? 28,
+                                  carbsGrams: prev.macrosPerServing?.carbsGrams ?? 42,
+                                  fatGrams: f,
+                                },
+                              } : null);
+                            }}
+                            className="w-full px-2 py-1 rounded-lg bg-white border border-rose-200 text-xs font-mono font-bold text-rose-950 focus:outline-hidden focus:ring-1 focus:ring-rose-500"
+                          />
+                          <span className="absolute right-2 top-1 text-[10px] font-bold text-slate-400">g</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -2193,15 +2642,18 @@ Instructions:
                                   <option value="clove">{lang === 'FR' ? 'gousse' : 'clove'}</option>
                                   <option value="slice">{lang === 'FR' ? 'tranche' : 'slice'}</option>
                                   <option value="can">{lang === 'FR' ? 'boîte / conserve' : 'can / tin'}</option>
+                                  <option value="bunch">{lang === 'FR' ? 'botte / bouquet' : 'bunch / bundle'}</option>
+                                  <option value="packet">{lang === 'FR' ? 'sachet / paquet' : 'packet / pouch'}</option>
+                                  <option value="piece">{lang === 'FR' ? 'pièce / morceau' : 'piece / pc'}</option>
                                 </optgroup>
                               </select>
                             </div>
 
-                            {/* [ Nom de l'ingrédient ] Free text input for canonical ingredient name */}
-                            <div className="flex-1 min-w-[130px]">
+                            {/* [ Nom de l'ingrédient ] Free text input with bilingual subtitle preview */}
+                            <div className="flex-1 min-w-[130px] space-y-0.5">
                               <input
                                 type="text"
-                                value={lang === 'FR' && ing.nameFr ? ing.nameFr : ing.name}
+                                value={lang === 'FR' ? (ing.nameFr || getItemDisplayName(ing, 'FR')) : (ing.name || ing.nameEn || getItemDisplayName(ing, 'EN'))}
                                 onChange={(e) => {
                                   const val = e.target.value;
                                   handleUpdateIngredient(
@@ -2216,8 +2668,21 @@ Instructions:
                                     ? "ex. Huile d'olive, Sel, Farine..."
                                     : 'e.g. Olive oil, Salt, Flour...'
                                 }
-                                className="w-full font-bold text-xs text-[#1E3022] border border-slate-200 rounded-lg px-2.5 py-1.5 focus:border-emerald-600 focus:outline-none bg-white placeholder:font-normal placeholder:text-slate-400 transition-colors"
+                                className="w-full font-bold text-xs text-[#1E3022] border border-slate-200 rounded-lg px-2.5 py-1.5 focus:border-teal-600 focus:outline-none bg-white placeholder:font-normal placeholder:text-slate-400 transition-colors"
                               />
+                              {(() => {
+                                const displaySub = lang === 'FR' ? (ing.nameEn || ing.name) : ing.nameFr;
+                                const activeMain = lang === 'FR' ? (ing.nameFr || getItemDisplayName(ing, 'FR')) : (ing.name || ing.nameEn);
+                                if (displaySub && activeMain && displaySub.toLowerCase() !== activeMain.toLowerCase()) {
+                                  return (
+                                    <p className="text-[10px] text-slate-400 px-1 truncate font-medium">
+                                      <span className="font-bold text-slate-500">{lang === 'FR' ? 'EN:' : 'FR:'}</span>{' '}
+                                      {displaySub}
+                                    </p>
+                                  );
+                                }
+                                return null;
+                              })()}
                             </div>
 
                             {/* [ Zone de rangement ] Retained styled dropdown for kitchen locations */}
@@ -2226,11 +2691,13 @@ Instructions:
                                 value={activeStorage}
                                 onChange={(e) => {
                                   const newStorage = e.target.value;
-                                  const locType: 'FRIDGE' | 'FREEZER' | 'PANTRY' =
+                                  const locType: 'FRIDGE' | 'FREEZER' | 'PANTRY' | 'SPICE_RACK' =
                                     newStorage === 'freezer'
                                       ? 'FREEZER'
                                       : newStorage === 'fridge'
                                       ? 'FRIDGE'
+                                      : newStorage === 'spices'
+                                      ? 'SPICE_RACK'
                                       : 'PANTRY';
                                   handleUpdateIngredient(idx, {
                                     storage: newStorage,

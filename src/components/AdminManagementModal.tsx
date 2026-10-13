@@ -1767,7 +1767,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
               <div className="rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs overflow-hidden">
                 <div className="divide-y divide-[#EFEAE0]">
                   {usersList.map((u) => {
-                    const isCurrentUser = u.id === currentUser.id;
+                    const isCurrentUser = u.id === activeUser.id;
                     const isAdmin = u.role === 'ADMIN';
 
                     return (
@@ -2300,7 +2300,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
             <div className="space-y-6 text-xs text-[#2A4D48]">
               {/* FIDO2 WebAuthn Management Suite */}
               <Fido2SecurityPanel
-                user={currentUser}
+                user={activeUser}
                 householdMembers={usersList}
                 onUserUpdated={(updated) => {
                   if (onUserChange) onUserChange(updated);
@@ -3177,7 +3177,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
             <Shield className="w-4 h-4 text-teal-700" />
             <span>
               {lang === 'FR' ? 'Session active :' : 'Active session:'}{' '}
-              <strong className="text-[#0D3B37]">{currentUser.name}</strong> ({currentUser.role})
+              <strong className="text-[#0D3B37]">{activeUser.name}</strong> ({activeUser.role})
             </span>
           </div>
 

@@ -42,9 +42,16 @@ import { InventoryItem, PlannedMeal, MealType } from '../types';
 import { RICARDO_RECIPES, RicardoRecipe, formatRecipeIngredientAmount } from '../data/ricardoRecipes';
 import { AddRecipeModal } from './AddRecipeModal';
 import { useLanguage, getDifficultyLocalizedName } from '../utils/i18n';
-import { getItemDisplayName } from '../utils/foodTranslator';
+import {
+  getItemDisplayName,
+  getRecipeDisplayTitle,
+  getRecipeDisplayDescription,
+  getRecipeDisplayInstructions,
+  isTextFrench,
+} from '../utils/foodTranslator';
 import { ScrollableRow } from './ScrollableRow';
 import { detectSafeCookingRule, SAFE_COOKING_GUIDELINES, SafeCookingRule } from '../utils/safeCookingInstructions';
+import { getCuratedMealPhoto, getFoodSvgFallback } from '../utils/curatedFoodImages';
 
 const LOCAL_STORAGE_CUSTOM_RECIPES = 'kitchen_komrade_custom_recipes';
 
@@ -103,12 +110,28 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
 
   const handleEditRecipe = (recipe: RicardoRecipe, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    // If it's a built-in recipe or saved recipe, prepare it with a persistent id
+    const isFr = isTextFrench(recipe.titleFr || recipe.title);
+    const rawSteps = (recipe as any).instructions || [];
+    const stepsFr = (recipe.instructionsFr && recipe.instructionsFr.length > 0)
+      ? recipe.instructionsFr
+      : (isFr ? rawSteps : []);
+    const stepsEn = (recipe.instructionsEn && recipe.instructionsEn.length > 0)
+      ? recipe.instructionsEn
+      : (!isFr ? rawSteps : []);
+
+    // Prepare recipe with persistent id and full bilingual fields
     const editableRecipe: RicardoRecipe = {
       ...recipe,
       id: recipe.isCustom ? recipe.id : `custom_${recipe.id}`,
       isCustom: true,
       source: recipe.isRicardoOfficial ? 'Ricardo Cuisine' : (recipe.source || 'Personal'),
+      title: getRecipeDisplayTitle(recipe, lang),
+      titleEn: recipe.titleEn || getRecipeDisplayTitle(recipe, 'EN'),
+      titleFr: recipe.titleFr || getRecipeDisplayTitle(recipe, 'FR'),
+      descriptionEn: recipe.descriptionEn || getRecipeDisplayDescription(recipe, 'EN'),
+      descriptionFr: recipe.descriptionFr || getRecipeDisplayDescription(recipe, 'FR'),
+      instructionsEn: stepsEn,
+      instructionsFr: stepsFr,
     };
     setRecipeToEdit(editableRecipe);
     setCapturedRecipePhoto(null);
@@ -517,6 +540,11 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
     const ricardoLink =
       lang === 'FR' ? planningRecipe.ricardoUrlFr : planningRecipe.ricardoUrlEn;
 
+    const parsedKcal = planningRecipe.caloriesPerServing || (planningRecipe.calories ? parseInt(planningRecipe.calories.replace(/\D/g, ''), 10) : 420);
+    const servingsCount = planningRecipe.servings
+      ? parseInt(planningRecipe.servings.replace(/\D/g, ''), 10) || 2
+      : 2;
+
     const plannedMealPayload: Omit<PlannedMeal, 'id' | 'createdAt' | 'updatedAt'> = {
       householdId: 'hh_pantryo_main',
       title: recipeTitle,
@@ -525,17 +553,25 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
       recipeName: recipeTitle,
       recipeUrl: planningRecipe.youtubeUrl || ricardoLink || undefined,
       imageUrl: planningRecipe.imageUrl,
-      servings: planningRecipe.servings
-        ? parseInt(planningRecipe.servings.replace(/\D/g, ''), 10) || 2
-        : 2,
+      servings: servingsCount,
       prepTimeMinutes: planningRecipe.time
         ? parseInt(planningRecipe.time.replace(/\D/g, ''), 10) || 20
         : 20,
       notes: lang === 'FR' ? planningRecipe.descriptionFr : planningRecipe.descriptionEn,
       isCooked: false,
+      calories: parsedKcal,
+      caloriesPerServing: parsedKcal,
+      totalCalories: planningRecipe.totalCalories || (parsedKcal * servingsCount),
+      macrosPerServing: planningRecipe.macrosPerServing || planningRecipe.nutrition?.macrosPerServing || { proteinGrams: 28, carbsGrams: 35, fatGrams: 14 },
+      calculationMethod: planningRecipe.calculationMethod || 'AI_ESTIMATED',
+      nutrition: planningRecipe.nutrition,
       ingredients: planningRecipe.ingredients.map((ing) => ({
         name: getItemDisplayName(ing, lang),
         inStock: isIngredientInKitchen(ing.name, ing.inKitchenItemName),
+        estimatedKcal: ing.estimatedKcal,
+        proteinGrams: ing.proteinGrams,
+        carbsGrams: ing.carbsGrams,
+        fatGrams: ing.fatGrams,
       })),
     };
 
@@ -659,71 +695,71 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
         </div>
       </div>
 
-      {/* Hero Action Bar: Add Recipe with AI Button */}
-      <div className="p-3.5 rounded-2xl bg-gradient-to-r from-[#18281B] via-[#233827] to-[#162719] text-white shadow-lg flex items-center justify-between gap-3 border border-emerald-500/20">
+      {/* AI & Recipe Importer Shelf */}
+      <div className="p-4 rounded-3xl bg-gradient-to-r from-emerald-50 via-teal-50/60 to-amber-50/40 border border-[#CDE1CB] text-[#133E3B] flex items-center justify-between gap-3 shadow-2xs">
         <div className="space-y-0.5 min-w-0">
-          <div className="flex items-center gap-1.5 text-emerald-400 font-extrabold text-[10px] tracking-wider uppercase">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>{lang === 'FR' ? 'Assistant Culinaire IA' : 'AI Recipe Importer'}</span>
+          <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-emerald-800">
+            <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+            <span>{lang === 'FR' ? 'Importateur de Recettes & IA' : 'AI & Recipe Importer'}</span>
           </div>
-          <h3 className="text-xs font-black text-white truncate">
+          <h3 className="text-xs font-black text-[#0D3B37] truncate">
             {lang === 'FR'
-              ? 'Collez un lien YouTube, texte ou photo'
-              : 'Paste YouTube link, text, or snap photo'}
+              ? 'Collez un lien YouTube, texte ou scannez une recette'
+              : 'Paste YouTube link, text, or snap photo recipe'}
           </h3>
-          <p className="text-[10px] text-slate-300 truncate">
+          <p className="text-[11px] text-[#527470] truncate">
             {lang === 'FR'
-              ? 'L’IA extrait les ingrédients et les compare avec votre frigo'
-              : 'AI extracts ingredients & matches with your kitchen inventory'}
+              ? 'Extraction instantanée et vérification avec vos stocks'
+              : 'Extracts ingredients & matches with kitchen inventory'}
           </p>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={openRecipeScan}
-            className="px-3 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-700 text-white font-black text-xs flex items-center gap-1.5 shadow-md active:scale-95 transition-all cursor-pointer"
+            className="px-3 py-2 rounded-xl bg-white hover:bg-emerald-50 text-emerald-800 font-bold text-xs flex items-center gap-1.5 border border-emerald-300 active:scale-95 transition-all shadow-2xs cursor-pointer"
             title={lang === 'FR' ? 'Scanner une recette écrite avec la caméra' : 'Scan written recipe with camera'}
           >
-            <Camera className="w-4 h-4 text-teal-200 stroke-[2.5]" />
-            <span>{lang === 'FR' ? 'Scanner recette' : 'Scan Recipe'}</span>
+            <Camera className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span>{lang === 'FR' ? 'Scanner' : 'Scan'}</span>
           </button>
 
           <button
             onClick={openRecipeAdd}
-            className="px-3.5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md active:scale-95 transition-all shrink-0 cursor-pointer"
+            className="px-3.5 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all shrink-0 cursor-pointer"
           >
-            <Plus className="w-4 h-4 stroke-[3]" />
-            <span>{lang === 'FR' ? '+ Recette' : '+ Add Recipe'}</span>
+            <Plus className="w-3.5 h-3.5 stroke-[3]" />
+            <span>{lang === 'FR' ? '+ Recette' : '+ Add'}</span>
           </button>
         </div>
       </div>
 
       {/* Notice Alert */}
       {addedItemsNotice && (
-        <div className="p-3 rounded-2xl bg-emerald-700 text-white text-xs font-bold flex items-center gap-2 shadow-xs animate-fade-in">
-          <CheckCircle2 className="w-4 h-4 text-emerald-200 shrink-0" />
+        <div className="p-3 rounded-2xl bg-teal-50 text-teal-900 border border-teal-200 text-xs font-bold flex items-center gap-2 shadow-2xs">
+          <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0 stroke-[2.5]" />
           <span>{addedItemsNotice}</span>
         </div>
       )}
 
-      {/* Culinary Partners & Featured Chefs Banner */}
-      <div className="p-3.5 rounded-2xl bg-gradient-to-r from-[#1E293B] via-[#0F172A] to-[#1E1B4B] text-white shadow-md space-y-2.5">
+      {/* Culinary Partners & Featured Chefs Shelf */}
+      <div className="p-4 rounded-3xl bg-white text-[#133E3B] border border-[#E5DFD0] space-y-2.5 shadow-2xs">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 backdrop-blur-xs flex items-center justify-center font-black text-sm tracking-wider shadow-inner">
-              ⭐
+            <div className="w-7 h-7 rounded-xl bg-amber-100 text-amber-900 border border-amber-200 flex items-center justify-center font-black text-xs">
+              ★
             </div>
             <div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-amber-300 block">
-                {lang === 'FR' ? 'Partenaires Culinaires & Chefs Recommandés' : 'Culinary Partners & Recommended Chefs'}
+              <span className="text-[10px] font-black uppercase tracking-wider text-[#527470] block">
+                {lang === 'FR' ? 'Partenaires Culinaires & Chefs' : 'Culinary Partners & Chefs'}
               </span>
-              <h3 className="text-xs font-black tracking-tight leading-tight text-white">
+              <h3 className="text-xs font-black tracking-tight leading-tight text-[#0D3B37]">
                 {lang === 'FR' ? 'Ricardo, Marilou, Jamie Oliver, Marmiton & plus' : 'Ricardo, Marilou, Jamie Oliver, Marmiton & more'}
               </h3>
             </div>
           </div>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/10 text-slate-300">
-            {lang === 'FR' ? 'Cuisine équilibrée & anti-gaspillage' : 'Zero-waste & balanced meals'}
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+            {lang === 'FR' ? 'Anti-Gaspillage' : 'Zero-Waste'}
           </span>
         </div>
 
@@ -733,7 +769,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
             href={lang === 'FR' ? 'https://www.ricardocuisine.com/fr' : 'https://www.ricardocuisine.com/en'}
             target="_blank"
             rel="noopener noreferrer"
-            className="px-2 py-1 rounded-lg bg-red-600/90 hover:bg-red-600 text-white text-[10px] font-black flex items-center gap-1 transition-all active:scale-95 shadow-2xs"
+            className="px-2.5 py-1 rounded-xl bg-white hover:bg-slate-50 text-[#0D3B37] text-[10px] font-bold border border-[#E5DFD0] shadow-2xs flex items-center gap-1 transition-colors"
           >
             <span>Ricardo Cuisine</span>
             <ExternalLink className="w-2.5 h-2.5" />
@@ -742,7 +778,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
             href="https://www.troisfoisparjour.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="px-2 py-1 rounded-lg bg-emerald-700/90 hover:bg-emerald-700 text-white text-[10px] font-black flex items-center gap-1 transition-all active:scale-95 shadow-2xs"
+            className="px-2.5 py-1 rounded-xl bg-white hover:bg-slate-50 text-[#0D3B37] text-[10px] font-bold border border-[#E5DFD0] shadow-2xs flex items-center gap-1 transition-colors"
           >
             <span>Trois Fois Par Jour (Marilou)</span>
             <ExternalLink className="w-2.5 h-2.5" />
@@ -751,7 +787,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
             href="https://www.jamieoliver.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="px-2 py-1 rounded-lg bg-sky-700/90 hover:bg-sky-700 text-white text-[10px] font-black flex items-center gap-1 transition-all active:scale-95 shadow-2xs"
+            className="px-2.5 py-1 rounded-xl bg-white hover:bg-slate-50 text-[#0D3B37] text-[10px] font-bold border border-[#E5DFD0] shadow-2xs flex items-center gap-1 transition-colors"
           >
             <span>Jamie Oliver</span>
             <ExternalLink className="w-2.5 h-2.5" />
@@ -760,7 +796,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
             href="https://www.marmiton.org"
             target="_blank"
             rel="noopener noreferrer"
-            className="px-2 py-1 rounded-lg bg-orange-600/90 hover:bg-orange-600 text-white text-[10px] font-black flex items-center gap-1 transition-all active:scale-95 shadow-2xs"
+            className="px-2.5 py-1 rounded-xl bg-white hover:bg-slate-50 text-[#0D3B37] text-[10px] font-bold border border-[#E5DFD0] shadow-2xs flex items-center gap-1 transition-colors"
           >
             <span>Marmiton</span>
             <ExternalLink className="w-2.5 h-2.5" />
@@ -768,10 +804,10 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
         </div>
       </div>
 
-      {/* Search Bar with Multi-Chef & Recipe Web Links */}
+      {/* Search Bar */}
       <div className="space-y-2">
         <div className="relative">
-          <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             value={searchQuery}
@@ -781,15 +817,15 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                 ? 'Rechercher une recette (ex: saumon, pâtes, Jamie Oliver, Marilou)...'
                 : 'Search recipes (e.g. salmon, pasta, Jamie Oliver, Marilou)...'
             }
-            className="w-full pl-9 pr-36 py-2 bg-white border border-[#D5E1D2] rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800 font-medium"
+            className="w-full pl-10 pr-36 py-2 bg-white border border-[#E5DFD0] rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-teal-600/30 focus:border-teal-600 text-[#0D3B37] font-semibold placeholder-[#7C9A92] shadow-2xs"
           />
           {searchQuery && (
-            <div className="absolute right-1.5 top-1.5 flex items-center gap-1">
+            <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
               <a
                 href={getSearchUrl(searchQuery, 'ricardo')}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-2 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold flex items-center gap-1 transition-colors"
+                className="px-2 py-1 rounded-lg bg-rose-700 hover:bg-rose-800 text-white text-[10px] font-bold flex items-center gap-1 transition-colors shadow-2xs"
                 title="Search on Ricardo Cuisine"
               >
                 <span>Ricardo</span>
@@ -799,7 +835,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                 href={getSearchUrl(searchQuery, 'troisfoisparjour')}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-2 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-[10px] font-bold flex items-center gap-1 transition-colors hidden sm:flex"
+                className="px-2 py-1 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white text-[10px] font-bold flex items-center gap-1 transition-colors shadow-2xs hidden sm:flex"
                 title="Search on Trois Fois Par Jour"
               >
                 <span>Marilou</span>
@@ -811,14 +847,14 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
 
         {/* Expiring Soon Rescue Bar */}
         {expiringItems.length > 0 && (
-          <div className="p-3 rounded-2xl bg-[#EAF2E8] border border-[#CADBC7] text-xs space-y-1.5">
+          <div className="p-3 rounded-2xl bg-amber-50/80 border border-amber-200 text-xs space-y-1.5 shadow-2xs">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-emerald-900 font-black">
-                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                <span>{lang === 'FR' ? 'Anti-Gaspillage Prioritaire' : 'Priority Kitchen Rescue'}</span>
+              <div className="flex items-center gap-1.5 text-amber-950 font-black">
+                <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                <span className="uppercase tracking-wider">{lang === 'FR' ? 'Anti-gaspillage prioritaire' : 'Priority Rescue'}</span>
               </div>
-              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
-                {expiringItems.length} {lang === 'FR' ? 'à utiliser bientôt' : 'expiring soon'}
+              <span className="text-[10px] font-bold text-amber-900 bg-amber-100/80 px-2 py-0.5 rounded-full border border-amber-300">
+                {expiringItems.length} {lang === 'FR' ? 'bientôt expiré' : 'expiring soon'}
               </span>
             </div>
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -828,11 +864,11 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                   href={getSearchUrl(item.name, 'ricardo')}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-2 py-0.5 rounded-lg bg-white border border-[#CADBC7] text-[10px] font-bold text-[#273D2B] hover:bg-emerald-50 flex items-center gap-1 transition-all"
+                  className="px-2.5 py-0.5 rounded-full bg-white border border-amber-300 text-[10px] font-bold text-amber-950 hover:bg-amber-100/50 flex items-center gap-1 transition-colors shadow-2xs"
                   title={`Find recipes using ${item.name}`}
                 >
                   <span>{item.name}</span>
-                  <ExternalLink className="w-2.5 h-2.5 text-emerald-700" />
+                  <ExternalLink className="w-2.5 h-2.5 text-amber-700" />
                 </a>
               ))}
             </div>
@@ -840,50 +876,50 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
         )}
       </div>
 
-      {/* Filter Tabs with Left/Right Scroll Arrows & Drag Support */}
+      {/* Filter Tabs */}
       <ScrollableRow className="pb-1 text-xs" showChevrons={true}>
         <button
           onClick={() => setActiveFilter('ALL')}
-          className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all ${
+          className={`px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all cursor-pointer shadow-2xs ${
             activeFilter === 'ALL'
-              ? 'bg-[#233527] text-white shadow-xs'
-              : 'bg-white border border-[#D5E1D2] text-[#4E6751] hover:bg-slate-50'
+              ? 'bg-teal-700 text-white'
+              : 'bg-white text-[#527470] hover:text-[#0D3B37] border border-[#E5DFD0]'
           }`}
         >
-          {lang === 'FR' ? 'Toutes les Recettes' : 'All Ideas'} ({allRecipes.length})
+          {lang === 'FR' ? 'Toutes' : 'All'} ({allRecipes.length})
         </button>
 
         <button
           onClick={() => setActiveFilter('CUSTOM')}
-          className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap flex items-center gap-1.5 transition-all ${
+          className={`px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs ${
             activeFilter === 'CUSTOM'
-              ? 'bg-emerald-700 text-white shadow-xs'
-              : 'bg-emerald-50 border border-emerald-200 text-emerald-800 hover:bg-emerald-100'
+              ? 'bg-teal-700 text-white'
+              : 'bg-white text-[#527470] hover:text-[#0D3B37] border border-[#E5DFD0]'
           }`}
         >
-          <Youtube className="w-3.5 h-3.5 text-rose-500" />
+          <Youtube className="w-3.5 h-3.5 text-rose-600" />
           <span>
-            {lang === 'FR' ? 'Mes Recettes & YouTube' : 'My Recipes & YouTube'} ({customRecipes.length})
+            {lang === 'FR' ? 'Mes Recettes' : 'My Recipes'} ({customRecipes.length})
           </span>
         </button>
 
         <button
           onClick={() => setActiveFilter('CHEFS')}
-          className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap flex items-center gap-1.5 transition-all ${
+          className={`px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs ${
             activeFilter === 'CHEFS'
-              ? 'bg-amber-600 text-white shadow-xs'
-              : 'bg-amber-50 border border-amber-200 text-amber-900 hover:bg-amber-100'
+              ? 'bg-teal-700 text-white'
+              : 'bg-white text-[#527470] hover:text-[#0D3B37] border border-[#E5DFD0]'
           }`}
         >
-          <span>👨‍🍳 {lang === 'FR' ? 'Tous les Chefs' : 'All Chefs'}</span>
+          <span>{lang === 'FR' ? 'Chefs' : 'Chefs'}</span>
         </button>
 
         <button
           onClick={() => setActiveFilter('RICARDO')}
-          className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap flex items-center gap-1.5 transition-all ${
+          className={`px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs ${
             activeFilter === 'RICARDO'
-              ? 'bg-rose-700 text-white shadow-xs'
-              : 'bg-rose-50 border border-rose-200 text-rose-800 hover:bg-rose-100'
+              ? 'bg-rose-700 text-white'
+              : 'bg-white text-[#527470] hover:text-[#0D3B37] border border-[#E5DFD0]'
           }`}
         >
           <span>Ricardo</span>
@@ -891,21 +927,21 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
 
         <button
           onClick={() => setActiveFilter('TROISFOISPARJOUR')}
-          className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap flex items-center gap-1.5 transition-all ${
+          className={`px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs ${
             activeFilter === 'TROISFOISPARJOUR'
-              ? 'bg-emerald-700 text-white shadow-xs'
-              : 'bg-emerald-50 border border-emerald-200 text-emerald-800 hover:bg-emerald-100'
+              ? 'bg-emerald-800 text-white'
+              : 'bg-white text-[#527470] hover:text-[#0D3B37] border border-[#E5DFD0]'
           }`}
         >
-          <span>Marilou (3FPJ)</span>
+          <span>Marilou</span>
         </button>
 
         <button
           onClick={() => setActiveFilter('JAMIE')}
-          className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap flex items-center gap-1.5 transition-all ${
+          className={`px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs ${
             activeFilter === 'JAMIE'
-              ? 'bg-sky-700 text-white shadow-xs'
-              : 'bg-sky-50 border border-sky-200 text-sky-800 hover:bg-sky-100'
+              ? 'bg-teal-700 text-white'
+              : 'bg-white text-[#527470] hover:text-[#0D3B37] border border-[#E5DFD0]'
           }`}
         >
           <span>Jamie Oliver</span>
@@ -913,26 +949,26 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
 
         <button
           onClick={() => setActiveFilter('FAST')}
-          className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap flex items-center gap-1.5 transition-all ${
+          className={`px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs ${
             activeFilter === 'FAST'
-              ? 'bg-amber-600 text-white shadow-xs'
-              : 'bg-white border border-[#D5E1D2] text-[#4E6751] hover:bg-slate-50'
+              ? 'bg-teal-700 text-white'
+              : 'bg-white text-[#527470] hover:text-[#0D3B37] border border-[#E5DFD0]'
           }`}
         >
-          <Clock className="w-3 h-3" />
-          <span>{lang === 'FR' ? 'Moins de 20 min' : 'Under 20 Mins'}</span>
+          <Clock className="w-3 h-3 text-teal-600" />
+          <span>&lt; 20 min</span>
         </button>
 
         {expiringItems.length > 0 && (
           <button
             onClick={() => setActiveFilter('EXPIRING')}
-            className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap flex items-center gap-1.5 transition-all ${
+            className={`px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs ${
               activeFilter === 'EXPIRING'
-                ? 'bg-emerald-700 text-white shadow-xs'
-                : 'bg-white border border-[#D5E1D2] text-[#4E6751] hover:bg-slate-50'
+                ? 'bg-teal-700 text-white'
+                : 'bg-white text-[#527470] hover:text-[#0D3B37] border border-[#E5DFD0]'
             }`}
           >
-            <Sparkles className="w-3 h-3 text-emerald-600" />
+            <Sparkles className="w-3 h-3 text-amber-500" />
             <span>{lang === 'FR' ? 'Anti-Gaspillage' : 'Zero-Waste'}</span>
           </button>
         )}
@@ -1029,9 +1065,9 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
             const areStepsExpanded = expandedStepsRecipeId === recipe.id;
             const isVideoPlaying = playingVideoId === recipe.id;
             const ricardoLink = lang === 'FR' ? recipe.ricardoUrlFr : recipe.ricardoUrlEn;
-            const title = lang === 'FR' ? recipe.titleFr : recipe.title;
-            const desc = lang === 'FR' ? recipe.descriptionFr : recipe.descriptionEn;
-            const instructions = lang === 'FR' ? recipe.instructionsFr : recipe.instructionsEn;
+            const title = getRecipeDisplayTitle(recipe, lang);
+            const desc = getRecipeDisplayDescription(recipe, lang);
+            const instructions = getRecipeDisplayInstructions(recipe, lang);
             const difficultyLabel = lang === 'FR' ? (recipe.difficultyFr || getDifficultyLocalizedName(recipe.difficulty, 'FR')) : (recipe.difficulty || 'Easy');
             const isYoutube = Boolean(recipe.youtubeUrl || recipe.youtubeVideoId || recipe.source === 'YouTube');
             const isUserCustom = Boolean(recipe.isCustom);
@@ -1069,34 +1105,40 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                 <div
                   key={recipe.id}
                   onClick={() => setExpandedRecipeId(recipe.id)}
-                  className="p-2.5 sm:p-3 rounded-2xl bg-white border border-[#D5E1D2] hover:border-emerald-500 shadow-2xs hover:shadow-xs transition-all cursor-pointer flex items-center justify-between gap-3 group"
+                  className="p-3 sm:p-3.5 rounded-2xl bg-white border border-[#E5DFD0] shadow-2xs hover:shadow-xs transition-all cursor-pointer flex items-center justify-between gap-3 group select-none"
                 >
                   {/* Left: Thumbnail & Main Info */}
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     {/* Recipe Thumbnail */}
-                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden bg-[#EAF2E8] shrink-0 relative shadow-2xs flex items-center justify-center">
-                      {recipe.imageUrl && !recipe.imageUrl.includes('unsplash.com') ? (
-                        <img
-                          src={recipe.imageUrl}
-                          alt={title}
-                          referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-[#EAF2E8] flex flex-col items-center justify-center text-[#2D5A34]">
-                          <ChefHat className="w-7 h-7 text-[#2D5A34]/80 stroke-[1.8]" />
-                        </div>
-                      )}
-                      {recipe.authorBadge ? (
-                        <span className="absolute bottom-1 left-1 px-1 py-0.5 rounded bg-black/75 text-[8px] font-black text-white leading-none shadow-2xs backdrop-blur-xs">
-                          {recipe.authorBadge}
-                        </span>
-                      ) : recipe.isRicardoOfficial ? (
-                        <span className="absolute bottom-1 left-1 px-1 py-0.5 rounded bg-rose-600/90 text-[8px] font-black text-white leading-none shadow-2xs">
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl overflow-hidden bg-[#FAF7EE] shrink-0 relative border border-[#E5DFD0] flex items-center justify-center shadow-2xs">
+                      {(() => {
+                        const photo = recipe.imageUrl?.trim()
+                          ? recipe.imageUrl
+                          : getCuratedMealPhoto(recipe.title);
+                        return (
+                          <img
+                            src={photo}
+                            alt={title}
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const target = e.currentTarget as HTMLImageElement;
+                              const curated = getCuratedMealPhoto(recipe.title);
+                              if (target.src !== curated) {
+                                target.src = curated;
+                              } else {
+                                target.src = getFoodSvgFallback(recipe.title);
+                              }
+                            }}
+                          />
+                        );
+                      })()}
+                      {recipe.isRicardoOfficial ? (
+                        <span className="absolute bottom-0 left-0 px-1 py-0.2 bg-rose-700 text-[8px] font-black text-white leading-none rounded-tr-md">
                           RICARDO
                         </span>
                       ) : isYoutube ? (
-                        <span className="absolute bottom-1 left-1 p-0.5 rounded bg-red-600 text-white shadow-2xs">
+                        <span className="absolute bottom-0 left-0 p-0.5 bg-rose-600 text-white rounded-tr-md">
                           <Youtube className="w-2.5 h-2.5" />
                         </span>
                       ) : null}
@@ -1104,37 +1146,25 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
 
                     {/* Text Info */}
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                      <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                         {recipe.authorName ? (
-                          <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-black border ${
-                            recipe.source === 'Trois Fois Par Jour'
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200/70'
-                              : recipe.source === 'Jamie Oliver'
-                              ? 'bg-sky-50 text-sky-800 border-sky-200/70'
-                              : recipe.source === 'Marmiton'
-                              ? 'bg-orange-50 text-orange-800 border-orange-200/70'
-                              : recipe.isRicardoOfficial
-                              ? 'bg-rose-50 text-rose-700 border-rose-200/70'
-                              : 'bg-amber-50 text-amber-800 border-amber-200/70'
-                          }`}>
-                            {recipe.authorName.toUpperCase()}
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-teal-50 text-teal-800 border border-teal-200">
+                            {recipe.authorName}
                           </span>
                         ) : recipe.isRicardoOfficial ? (
-                          <span className="px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200/70 text-[9px] font-black">
-                            RICARDO
+                          <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[9px] font-bold">
+                            Ricardo
                           </span>
-                        ) : isYoutube ? (
-                          <span className="px-1.5 py-0.5 rounded-md bg-red-50 text-red-700 border border-red-200/70 text-[9px] font-black flex items-center gap-0.5">
-                            <Youtube className="w-2.5 h-2.5" />
-                            <span>YOUTUBE</span>
-                          </span>
-                        ) : (
-                          <span className="px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200/70 text-[9px] font-black">
-                            {lang === 'FR' ? 'MES RECETTES' : 'MY RECIPE'}
-                          </span>
-                        )}
+                        ) : null}
 
-                        <span className="px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[9px] font-bold flex items-center gap-0.5">
+                        {/* Status Flag */}
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold flex items-center gap-1 border ${
+                          matchPercentage >= 100
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            : matchPercentage >= 50
+                            ? 'bg-amber-50 text-amber-800 border-amber-200'
+                            : 'bg-slate-50 text-slate-700 border-slate-200'
+                        }`}>
                           <Check className="w-2.5 h-2.5 stroke-[3]" />
                           <span>
                             {matchPercentage}% {lang === 'FR' ? 'en stock' : 'in stock'}
@@ -1142,32 +1172,23 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                         </span>
                       </div>
 
-                      <h3 className="font-extrabold text-xs sm:text-sm text-[#1F3323] truncate group-hover:text-emerald-900 transition-colors">
+                      <h3 className="font-extrabold text-xs sm:text-sm text-[#0D3B37] truncate leading-tight">
                         {title}
                       </h3>
 
-                      <div className="flex items-center gap-2 text-[10px] text-[#556D58] mt-0.5 flex-wrap">
+                      <div className="flex items-center gap-2 text-[10px] font-medium text-[#527470] mt-1 flex-wrap">
                         <span className="flex items-center gap-0.5">
-                          <Clock className="w-2.5 h-2.5 text-emerald-600" />
+                          <Clock className="w-2.5 h-2.5 text-teal-700" />
                           <span>{recipe.time}</span>
                         </span>
                         <span>•</span>
                         <span>{recipe.servings}</span>
-                        {recipe.calories && (
-                          <>
-                            <span>•</span>
-                            <span className="flex items-center gap-0.5 text-amber-700">
-                              <Flame className="w-2.5 h-2.5 text-amber-500" />
-                              <span>{recipe.calories}</span>
-                            </span>
-                          </>
-                        )}
                         {safeRule && (
                           <>
                             <span>•</span>
-                            <span className="inline-flex items-center gap-0.5 font-bold text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                            <span className="inline-flex items-center gap-0.5 font-bold text-amber-900 bg-amber-50 px-1.5 py-0.2 rounded-full border border-amber-200">
                               <Thermometer className="w-2.5 h-2.5 text-amber-600" />
-                              <span>{safeRule.minTempC}°C ({safeRule.minTempF}°F)</span>
+                              <span>{safeRule.minTempC}°C</span>
                             </span>
                           </>
                         )}
@@ -1175,26 +1196,16 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Right: Actions */}
+                  {/* Right: Action Triggers "Plan" or "Fav" */}
                   <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                    {/* Edit Recipe Button */}
-                    <button
-                      type="button"
-                      onClick={(e) => handleEditRecipe(recipe, e)}
-                      className="p-2 rounded-xl border border-[#D5E1D2] bg-white text-slate-500 hover:text-emerald-700 hover:border-emerald-400 hover:bg-emerald-50 transition-all cursor-pointer shadow-2xs active:scale-95"
-                      title={lang === 'FR' ? 'Modifier la recette' : 'Edit recipe'}
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-
-                    {/* Save to My Recipes Button */}
+                    {/* Fav */}
                     <button
                       type="button"
                       onClick={(e) => handleToggleSaveRecipe(recipe, e)}
-                      className={`p-2 rounded-xl border transition-all cursor-pointer ${
+                      className={`p-2 rounded-xl border border-[#E5DFD0] transition-all cursor-pointer shadow-2xs ${
                         isSaved
-                          ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100 shadow-2xs'
-                          : 'bg-white border-[#D5E1D2] text-slate-400 hover:text-emerald-700 hover:border-emerald-400 hover:bg-emerald-50'
+                          ? 'bg-amber-50 text-amber-900 border-amber-200'
+                          : 'bg-white hover:bg-slate-50 text-slate-500 hover:text-[#0D3B37]'
                       }`}
                       title={
                         isSaved
@@ -1202,29 +1213,29 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                             ? 'Dans Mes Recettes (Cliquer pour retirer)'
                             : 'In My Recipes (Click to remove)'
                           : lang === 'FR'
-                          ? 'Sauvegarder dans Mes Recettes pour planifier'
-                          : 'Save to My Recipes for meal planning'
+                          ? 'Sauvegarder en Favori'
+                          : 'Save as Favorite'
                       }
                     >
-                      <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'fill-amber-500 text-amber-600' : ''}`} />
+                      <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'fill-amber-600 text-amber-600' : ''}`} />
                     </button>
 
-                    {/* Plan Meal Quick Button */}
+                    {/* Plan */}
                     <button
                       type="button"
                       onClick={(e) => handleOpenPlanMeal(recipe, e)}
-                      className="px-2.5 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 border border-teal-200/70 text-teal-800 text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 shadow-2xs cursor-pointer"
+                      className="px-3 py-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold flex items-center gap-1 transition-all active:scale-95 shadow-2xs cursor-pointer"
                       title={lang === 'FR' ? 'Planifier ce repas' : 'Meal plan this recipe'}
                     >
-                      <Calendar className="w-3 h-3 text-teal-700" />
-                      <span className="hidden sm:inline">{lang === 'FR' ? 'Planifier' : 'Plan'}</span>
+                      <Calendar className="w-3 h-3" />
+                      <span>{lang === 'FR' ? 'Planifier' : 'Plan'}</span>
                     </button>
 
                     {/* Expand chevron */}
                     <button
                       type="button"
                       onClick={() => setExpandedRecipeId(recipe.id)}
-                      className="p-1 text-[#69826C] hover:text-[#1F3323] hover:bg-[#EEF4EC] rounded-lg transition-colors ml-0.5 cursor-pointer"
+                      className="p-1 text-slate-400 hover:text-slate-700 rounded-lg transition-colors cursor-pointer"
                       title={lang === 'FR' ? 'Afficher les détails de la recette' : 'Show recipe details'}
                     >
                       <ChevronDown className="w-4 h-4" />
@@ -1234,15 +1245,15 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
               );
             }
 
-            // EXPANDED DETAILED RECIPE VIEW (Matches screenshot)
+            // EXPANDED DETAILED RECIPE VIEW
             return (
               <div
                 key={recipe.id}
-                className="rounded-3xl bg-white border-2 border-emerald-600/80 shadow-md transition-all overflow-hidden animate-fade-in group"
+                className="rounded-3xl bg-white border border-[#E5DFD0] shadow-sm transition-all overflow-hidden group select-none"
               >
                 {/* Embedded Video Player if active */}
                 {isVideoPlaying && recipe.youtubeVideoId ? (
-                  <div className="relative aspect-video w-full bg-black">
+                  <div className="relative aspect-video w-full bg-black border-b border-[#E5DFD0]">
                     <iframe
                       src={`https://www.youtube-nocookie.com/embed/${recipe.youtubeVideoId}?autoplay=1`}
                       title={title}
@@ -1252,64 +1263,74 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                     />
                     <button
                       onClick={() => setPlayingVideoId(null)}
-                      className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-black/80 hover:bg-black text-white text-[10px] font-bold backdrop-blur-xs cursor-pointer"
+                      className="absolute top-2 right-2 px-2.5 py-1 rounded-xl bg-black/80 hover:bg-black text-white text-xs font-bold border border-white/20 cursor-pointer"
                     >
-                      {lang === 'FR' ? '✕ Fermer la vidéo' : '✕ Close Video'}
+                      {lang === 'FR' ? '✕ Fermer la vidéo' : '✕ Close video'}
                     </button>
                   </div>
                 ) : (
                   /* Recipe Image Banner (Hero) */
-                  <div className="h-36 w-full relative overflow-hidden bg-[#1E3022]">
-                    {recipe.imageUrl && !recipe.imageUrl.includes('unsplash.com') ? (
-                      <img
-                        src={recipe.imageUrl}
-                        alt={title}
-                        referrerPolicy="no-referrer"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-[#1A2E1D] via-[#24422A] to-[#2D5A34] flex items-center justify-center">
-                        <ChefHat className="w-16 h-16 text-emerald-400/20" />
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
+                  <div className="h-40 w-full relative overflow-hidden bg-slate-900 border-b border-[#E5DFD0]">
+                    {(() => {
+                      const heroPhoto = recipe.imageUrl?.trim()
+                        ? recipe.imageUrl
+                        : getCuratedMealPhoto(recipe.title);
+                      return (
+                        <img
+                          src={heroPhoto}
+                          alt={title}
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+                          onError={(e) => {
+                            const target = e.currentTarget as HTMLImageElement;
+                            const curated = getCuratedMealPhoto(recipe.title);
+                            if (target.src !== curated) {
+                              target.src = curated;
+                            } else {
+                              target.src = getFoodSvgFallback(recipe.title);
+                            }
+                          }}
+                        />
+                      );
+                    })()}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/20" />
 
                     {/* Badges on image */}
-                    <div className="absolute top-2.5 left-3 right-3 flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
+                    <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         {recipe.authorBadge ? (
-                          <span className="px-2.5 py-0.5 rounded-full bg-black/80 text-white text-[10px] font-black backdrop-blur-xs flex items-center gap-1 shadow-xs border border-white/20">
+                          <span className="px-2.5 py-0.5 rounded-full bg-white/95 text-[#0D3B37] text-[10px] font-bold shadow-2xs">
                             <span>{recipe.authorBadge}</span>
                           </span>
                         ) : recipe.authorName ? (
-                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-700/90 text-white text-[10px] font-black backdrop-blur-xs flex items-center gap-1 shadow-xs">
-                            <span>{recipe.authorName.toUpperCase()}</span>
+                          <span className="px-2.5 py-0.5 rounded-full bg-teal-800 text-white text-[10px] font-bold shadow-2xs">
+                            <span>{recipe.authorName}</span>
                           </span>
                         ) : recipe.isRicardoOfficial ? (
-                          <span className="px-2.5 py-0.5 rounded-full bg-rose-600/95 text-white text-[10px] font-black backdrop-blur-xs flex items-center gap-1 shadow-xs">
+                          <span className="px-2.5 py-0.5 rounded-full bg-rose-700 text-white text-[10px] font-bold shadow-2xs">
                             <span>RICARDO</span>
                           </span>
                         ) : isYoutube ? (
-                          <span className="px-2.5 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-black backdrop-blur-xs flex items-center gap-1 shadow-xs">
-                            <Youtube className="w-3 h-3" />
-                            <span>YOUTUBE</span>
+                          <span className="px-2.5 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-bold flex items-center gap-1 shadow-2xs">
+                            <Youtube className="w-2.5 h-2.5" />
+                            <span>YouTube</span>
                           </span>
                         ) : recipe.source === 'Photo Import' ? (
-                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-700 text-white text-[10px] font-black backdrop-blur-xs flex items-center gap-1 shadow-xs">
-                            <Camera className="w-3 h-3" />
-                            <span>{lang === 'FR' ? 'SCAN PHOTO' : 'PHOTO SCAN'}</span>
+                          <span className="px-2.5 py-0.5 rounded-full bg-indigo-700 text-white text-[10px] font-bold flex items-center gap-1 shadow-2xs">
+                            <Camera className="w-2.5 h-2.5" />
+                            <span>{lang === 'FR' ? 'Scan Photo' : 'Photo Scan'}</span>
                           </span>
                         ) : (
-                          <span className="px-2.5 py-0.5 rounded-full bg-[#18281B]/90 text-white text-[10px] font-black backdrop-blur-xs flex items-center gap-1 shadow-xs">
-                            <FileText className="w-3 h-3" />
-                            <span>{lang === 'FR' ? 'MA RECETTE' : 'MY RECIPE'}</span>
+                          <span className="px-2.5 py-0.5 rounded-full bg-teal-700 text-white text-[10px] font-bold flex items-center gap-1 shadow-2xs">
+                            <FileText className="w-2.5 h-2.5" />
+                            <span>{lang === 'FR' ? 'Ma Recette' : 'My Recipe'}</span>
                           </span>
                         )}
 
                         {/* Edit Recipe Button */}
                         <button
                           onClick={(e) => handleEditRecipe(recipe, e)}
-                          className="p-1 rounded-full bg-black/50 hover:bg-emerald-600 text-white transition-colors cursor-pointer"
+                          className="p-1 rounded-lg bg-white/90 text-slate-700 hover:bg-white transition-colors cursor-pointer shadow-2xs"
                           title={lang === 'FR' ? 'Modifier cette recette' : 'Edit recipe'}
                         >
                           <Pencil className="w-2.5 h-2.5" />
@@ -1318,7 +1339,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                         {isUserCustom && (
                           <button
                             onClick={() => handleDeleteCustomRecipe(recipe.id, title)}
-                            className="p-1 rounded-full bg-black/50 hover:bg-red-600 text-white transition-colors cursor-pointer"
+                            className="p-1 rounded-lg bg-rose-600/90 text-white hover:bg-rose-700 transition-colors cursor-pointer shadow-2xs"
                             title={lang === 'FR' ? 'Supprimer la recette personnalisée' : 'Delete custom recipe'}
                           >
                             <Trash2 className="w-2.5 h-2.5" />
@@ -1327,7 +1348,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                       </div>
 
                       <div className="flex items-center gap-1.5">
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-600/95 text-white text-[10px] font-black backdrop-blur-xs flex items-center gap-1 shadow-xs">
+                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center gap-1 shadow-2xs">
                           <Check className="w-2.5 h-2.5 stroke-[3]" />
                           <span>
                             {matchPercentage}% {lang === 'FR' ? 'en stock' : 'in stock'}
@@ -1337,7 +1358,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                         {/* Quick minimize chevron button */}
                         <button
                           onClick={() => setExpandedRecipeId(null)}
-                          className="p-1 rounded-full bg-black/60 hover:bg-black text-white transition-colors cursor-pointer"
+                          className="p-1 rounded-lg bg-white/90 text-slate-700 hover:bg-white transition-colors cursor-pointer shadow-2xs"
                           title={lang === 'FR' ? 'Réduire la vue' : 'Minimise view'}
                         >
                           <ChevronUp className="w-3.5 h-3.5" />
@@ -1346,12 +1367,12 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                     </div>
 
                     {/* Title & Actions */}
-                    <div className="absolute bottom-2.5 left-3.5 right-3.5 flex items-end justify-between text-white">
+                    <div className="absolute bottom-3 left-4 right-4 flex items-end justify-between text-white">
                       <div className="pr-2">
-                        <h3 className="font-extrabold text-sm sm:text-base tracking-tight drop-shadow-md leading-snug">
+                        <h3 className="font-extrabold text-sm sm:text-base tracking-tight leading-snug">
                           {title}
                         </h3>
-                        <span className="text-[10px] text-slate-200 font-medium">
+                        <span className="text-[11px] font-medium text-white/90">
                           {recipe.servings} • {recipe.time}
                         </span>
                       </div>
@@ -1360,7 +1381,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                       {isYoutube && recipe.youtubeVideoId ? (
                         <button
                           onClick={() => setPlayingVideoId(recipe.id)}
-                          className="px-2.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[10px] font-black flex items-center gap-1 shadow-lg transition-all active:scale-95 shrink-0 cursor-pointer"
+                          className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1 transition-all active:scale-95 shrink-0 shadow-md cursor-pointer"
                         >
                           <Play className="w-3 h-3 fill-white" />
                           <span>{lang === 'FR' ? 'Lire' : 'Play'}</span>
@@ -1370,11 +1391,11 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                           href={ricardoLink}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="p-2 rounded-xl bg-white/20 hover:bg-white text-white hover:text-red-900 backdrop-blur-xs transition-all shrink-0 active:scale-95 shadow-md flex items-center gap-1 text-[10px] font-extrabold"
+                          className="p-1.5 rounded-xl bg-white/90 text-slate-800 hover:bg-white transition-all shrink-0 active:scale-95 shadow-md flex items-center gap-1 text-[10px] font-bold"
                           title={lang === 'FR' ? 'Ouvrir le lien de la recette' : 'Open recipe link'}
                         >
                           <span>{recipe.isRicardoOfficial ? 'Ricardo' : 'Source'}</span>
-                          <ExternalLink className="w-3 h-3" />
+                          <ExternalLink className="w-2.5 h-2.5" />
                         </a>
                       ) : null}
                     </div>
@@ -1382,34 +1403,34 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                 )}
 
                 {/* Primary Action Bar: Save to My Recipes, Edit Recipe, & Meal Plan */}
-                <div className="p-3 bg-[#F4F8F3] border-b border-[#D5E1D2] flex items-center justify-between gap-2 flex-wrap">
+                <div className="p-3 bg-slate-50 border-b border-[#E5DFD0] flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {/* Edit Recipe button */}
                     <button
                       type="button"
                       onClick={(e) => handleEditRecipe(recipe, e)}
-                      className="px-3 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 text-xs font-black flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-95"
+                      className="px-3 py-1.5 rounded-xl border border-[#E5DFD0] bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-2xs"
                       title={lang === 'FR' ? 'Modifier cette recette' : 'Edit this recipe'}
                     >
-                      <Pencil className="w-3.5 h-3.5 text-emerald-700" />
-                      <span>{lang === 'FR' ? 'Modifier la recette' : 'Edit Recipe'}</span>
+                      <Pencil className="w-3 h-3 text-slate-500" />
+                      <span>{lang === 'FR' ? 'Modifier' : 'Edit'}</span>
                     </button>
 
                     {/* Save to My Recipes button */}
                     <button
                       type="button"
                       onClick={(e) => handleToggleSaveRecipe(recipe, e)}
-                      className={`px-3 py-1.5 rounded-xl border text-xs font-black flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-95 ${
+                      className={`px-3 py-1.5 rounded-xl border border-[#E5DFD0] text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-2xs ${
                         isSaved
-                          ? 'bg-amber-100/80 border-amber-300 text-amber-900 hover:bg-amber-200'
-                          : 'bg-white border-[#D5E1D2] text-[#233527] hover:bg-emerald-50 hover:border-emerald-400'
+                          ? 'bg-amber-50 text-amber-900 border-amber-300'
+                          : 'bg-white hover:bg-slate-50 text-slate-700'
                       }`}
                     >
-                      <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'fill-amber-600 text-amber-600' : 'text-slate-500'}`} />
+                      <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'fill-amber-600 text-amber-600' : 'text-slate-400'}`} />
                       <span>
                         {isSaved
-                          ? lang === 'FR' ? '✓ Dans Mes Recettes' : '✓ In My Recipes'
-                          : lang === 'FR' ? 'Sauvegarder dans Mes Recettes' : 'Save to My Recipes'}
+                          ? lang === 'FR' ? '✓ Dans mes recettes' : '✓ In Recipes'
+                          : lang === 'FR' ? '+ Mes Recettes' : '+ Save Recipe'}
                       </span>
                     </button>
 
@@ -1417,10 +1438,10 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                     <button
                       type="button"
                       onClick={(e) => handleOpenPlanMeal(recipe, e)}
-                      className="px-3 py-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white border border-teal-800 text-xs font-black flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                      className="px-3 py-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
                     >
-                      <Calendar className="w-3.5 h-3.5 text-teal-200" />
-                      <span>{lang === 'FR' ? '📅 Planifier ce repas' : '📅 Plan this Meal'}</span>
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span>{lang === 'FR' ? 'Planifier repas' : 'Plan Meal'}</span>
                     </button>
 
                     {/* Cook Recipe button */}
@@ -1435,11 +1456,11 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                             ingredients: recipe.ingredients,
                           });
                         }}
-                        className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white border border-emerald-800 text-xs font-black flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                        className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
                         title={lang === 'FR' ? 'Cuisiner et déduire les ingrédients de la cuisine' : 'Cook and deduct ingredients from inventory'}
                       >
-                        <Utensils className="w-3.5 h-3.5 text-emerald-200" />
-                        <span>{lang === 'FR' ? '🍳 Cuisiner' : '🍳 Cook Recipe'}</span>
+                        <Utensils className="w-3.5 h-3.5" />
+                        <span>{lang === 'FR' ? 'Cuisiner' : 'Cook'}</span>
                       </button>
                     )}
                   </div>
@@ -1448,10 +1469,10 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setExpandedRecipeId(null)}
-                    className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 border border-[#D5E1D2] text-[#4E6751] text-xs font-bold flex items-center gap-1 transition-all cursor-pointer"
+                    className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-[#E5DFD0] text-slate-600 text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
                   >
                     <ChevronUp className="w-3.5 h-3.5" />
-                    <span>{lang === 'FR' ? 'Réduire' : 'Minimise'}</span>
+                    <span>{lang === 'FR' ? 'Réduire' : 'Minimize'}</span>
                   </button>
                 </div>
 
@@ -1505,7 +1526,13 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                               </span>
                             </div>
 
-                            <div className="flex items-center gap-1 shrink-0">
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {ing.estimatedKcal ? (
+                                <span className="text-[10px] font-mono font-bold text-amber-800 bg-amber-50/80 px-1.5 py-0.5 rounded border border-amber-200/80">
+                                  {ing.estimatedKcal} kcal
+                                </span>
+                              ) : null}
+
                               {inStock ? (
                                 <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 flex items-center gap-0.5">
                                   {ing.locationType === 'FRIDGE' && <Refrigerator className="w-2.5 h-2.5" />}
@@ -1539,15 +1566,29 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Recipe Telemetry (Prep time, Cook time, Calories, Difficulty) */}
-                  <div className="pt-2 border-t border-[#EDF3EC] flex items-center justify-between text-xs text-[#6C826E]">
-                    <div className="flex items-center gap-3">
+                  {/* Recipe Telemetry (Prep time, Cook time, Calories, Difficulty, Macros) */}
+                  <div className="pt-2 border-t border-[#EDF3EC] flex items-center justify-between text-xs text-[#6C826E] flex-wrap gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5 text-emerald-600" /> {recipe.time}
                       </span>
-                      <span className="flex items-center gap-1">
-                        <Flame className="w-3.5 h-3.5 text-amber-500" /> {recipe.calories}
+                      <span className="flex items-center gap-1 font-bold text-amber-900 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                        <Flame className="w-3.5 h-3.5 text-amber-500" /> {recipe.calories || (recipe.caloriesPerServing ? `${recipe.caloriesPerServing} kcal` : '420 kcal')}
                       </span>
+                      {recipe.macrosPerServing && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold bg-[#FAF7EE] text-[#0D3B37] px-2 py-0.5 rounded-full border border-[#E5DFD0] shadow-2xs">
+                          <span className="text-sky-700 font-bold">{recipe.macrosPerServing.proteinGrams}P</span>
+                          <span className="text-slate-300">•</span>
+                          <span className="text-amber-700 font-bold">{recipe.macrosPerServing.carbsGrams}C</span>
+                          <span className="text-slate-300">•</span>
+                          <span className="text-rose-700 font-bold">{recipe.macrosPerServing.fatGrams}F</span>
+                        </span>
+                      )}
+                      {recipe.calculationMethod && (
+                        <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs">
+                          {recipe.calculationMethod === 'AI_ESTIMATED' ? 'AI' : recipe.calculationMethod === 'DYNAMIC_AGGREGATED' ? 'Dyn' : 'Manual'}
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -1758,18 +1799,28 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
             <div className="p-4 space-y-4 overflow-y-auto flex-1">
               {/* Recipe Summary Card */}
               <div className="p-2.5 rounded-2xl bg-[#F6F9F5] border border-[#D5E1D2] flex items-center gap-3">
-                {planningRecipe.imageUrl && !planningRecipe.imageUrl.includes('unsplash.com') ? (
-                  <img
-                    src={planningRecipe.imageUrl}
-                    alt={planningRecipe.title}
-                    referrerPolicy="no-referrer"
-                    className="w-14 h-14 rounded-xl object-cover shrink-0 shadow-2xs"
-                  />
-                ) : (
-                  <div className="w-14 h-14 rounded-xl bg-[#EAF2E8] flex items-center justify-center shrink-0 text-[#2D5A34]">
-                    <ChefHat className="w-7 h-7 text-[#2D5A34]/80 stroke-[1.8]" />
-                  </div>
-                )}
+                {(() => {
+                  const modalPhoto = planningRecipe.imageUrl?.trim()
+                    ? planningRecipe.imageUrl
+                    : getCuratedMealPhoto(planningRecipe.title);
+                  return (
+                    <img
+                      src={modalPhoto}
+                      alt={planningRecipe.title}
+                      referrerPolicy="no-referrer"
+                      className="w-14 h-14 rounded-xl object-cover shrink-0 shadow-2xs"
+                      onError={(e) => {
+                        const target = e.currentTarget as HTMLImageElement;
+                        const curated = getCuratedMealPhoto(planningRecipe.title);
+                        if (target.src !== curated) {
+                          target.src = curated;
+                        } else {
+                          target.src = getFoodSvgFallback(planningRecipe.title);
+                        }
+                      }}
+                    />
+                  );
+                })()}
                 <div className="min-w-0 flex-1">
                   <h4 className="font-extrabold text-xs text-[#1F3323] truncate">
                     {lang === 'FR' ? planningRecipe.titleFr || planningRecipe.title : planningRecipe.title}

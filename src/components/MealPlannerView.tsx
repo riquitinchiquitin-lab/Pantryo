@@ -23,14 +23,39 @@ import {
   Refrigerator,
   BookmarkPlus,
   CalendarRange,
+  Lock,
+  Unlock,
+  SlidersHorizontal,
+  BarChart3,
+  Zap,
 } from 'lucide-react';
-import { PlannedMeal, MealType, InventoryItem, PlannedMealIngredient } from '../types';
+import { PlannedMeal, MealType, InventoryItem, PlannedMealIngredient, DailyNutritionGoals, NutritionCalculationMethod, Macros } from '../types';
 import { getFoodVisual } from '../utils/foodVisuals';
 import { useLanguage } from '../utils/i18n';
-import { getItemDisplayName } from '../utils/foodTranslator';
+import { getItemDisplayName, getRecipeDisplayTitle } from '../utils/foodTranslator';
 import { SmartMealSuggestionsModal } from './SmartMealSuggestionsModal';
 import { MealPlanShoppingListModal } from './MealPlanShoppingListModal';
 import { ScrollableRow } from './ScrollableRow';
+import {
+  computeDailyNutritionProgress,
+  DEFAULT_DAILY_NUTRITION_GOALS,
+  estimateRecipeNutrition,
+  recalculateDynamicNutrition,
+  estimateIngredientNutrition,
+} from '../services/nutritionEngine';
+import { getCuratedMealPhoto, getFoodSvgFallback, CURATED_FOOD_PHOTOS } from '../utils/curatedFoodImages';
+
+function parseLocalDate(dateStr: string): Date {
+  const parts = dateStr.split('-');
+  return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+}
+
+function formatLocalDate(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 interface MealPlannerViewProps {
   householdId: string;
@@ -66,7 +91,7 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
     { type: 'SNACK', label: lang === 'FR' ? 'Collation' : 'Snack', color: 'text-rose-700', bg: 'bg-rose-50', border: 'border-rose-200' },
   ], [lang]);
 
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayStr = useMemo(() => formatLocalDate(new Date()), []);
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
 
@@ -96,17 +121,105 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
 
+  // Daily Nutrition Goals & Settings State
+  const [dailyGoals, setDailyGoals] = useState<DailyNutritionGoals>(() => {
+    try {
+      const saved = localStorage.getItem('pantryo_daily_nutrition_goals');
+      if (saved) return JSON.parse(saved);
+    } catch (_) {}
+    return DEFAULT_DAILY_NUTRITION_GOALS;
+  });
+  const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
+  const [customGoalKcal, setCustomGoalKcal] = useState(dailyGoals.calorieTarget);
+  const [customGoalProtein, setCustomGoalProtein] = useState(dailyGoals.proteinGramsTarget);
+  const [customGoalCarbs, setCustomGoalCarbs] = useState(dailyGoals.carbsGramsTarget);
+  const [customGoalFat, setCustomGoalFat] = useState(dailyGoals.fatGramsTarget);
+
+  // Form Nutrition Engine State (Methods A, B, C)
+  const [formCaloriesPerServing, setFormCaloriesPerServing] = useState<number>(440);
+  const [formTotalCalories, setFormTotalCalories] = useState<number>(880);
+  const [formProteinGrams, setFormProteinGrams] = useState<number>(32);
+  const [formCarbsGrams, setFormCarbsGrams] = useState<number>(45);
+  const [formFatGrams, setFormFatGrams] = useState<number>(18);
+  const [formCalculationMethod, setFormCalculationMethod] = useState<NutritionCalculationMethod>('AI_ESTIMATED');
+  const [isManualOverrideLocked, setIsManualOverrideLocked] = useState<boolean>(false);
+
+  // Dynamic Aggregation: Recalculate daily progress for selected date
+  const dailyNutrition = useMemo(() => {
+    return computeDailyNutritionProgress(plannedMeals, selectedDate, dailyGoals);
+  }, [plannedMeals, selectedDate, dailyGoals]);
+
+  // Method A: AI Auto-Estimation
+  const handleAutoEstimateNutrition = () => {
+    const lines = ingredientsText.split('\n').map((l) => l.trim()).filter(Boolean);
+    const rawIngs = lines.map((l) => ({ name: l }));
+    const est = estimateRecipeNutrition(mealTitle || 'Planned Dish', rawIngs, servings);
+    setFormCaloriesPerServing(est.caloriesPerServing);
+    setFormTotalCalories(est.totalCalories);
+    setFormProteinGrams(est.macrosPerServing.proteinGrams);
+    setFormCarbsGrams(est.macrosPerServing.carbsGrams);
+    setFormFatGrams(est.macrosPerServing.fatGrams);
+    setFormCalculationMethod('AI_ESTIMATED');
+    setIsManualOverrideLocked(false);
+  };
+
+  // Method B: Dynamic Aggregation (Ingredient & Portion Scaling)
+  const handleRecalculateDynamicNutrition = (updatedServings: number = servings) => {
+    const s = Math.max(1, updatedServings);
+    const lines = ingredientsText.split('\n').map((l) => l.trim()).filter(Boolean);
+    const rawIngs = lines.map((l) => ({ name: l }));
+    const dyn = recalculateDynamicNutrition(rawIngs, s, {
+      title: mealTitle,
+      servings: s,
+      caloriesPerServing: formCaloriesPerServing,
+      totalCalories: formCaloriesPerServing * s,
+      macrosPerServing: { proteinGrams: formProteinGrams, carbsGrams: formCarbsGrams, fatGrams: formFatGrams },
+      calculationMethod: 'DYNAMIC_AGGREGATED',
+    });
+    setFormCaloriesPerServing(dyn.caloriesPerServing);
+    setFormTotalCalories(dyn.totalCalories);
+    setFormProteinGrams(dyn.macrosPerServing.proteinGrams);
+    setFormCarbsGrams(dyn.macrosPerServing.carbsGrams);
+    setFormFatGrams(dyn.macrosPerServing.fatGrams);
+    setFormCalculationMethod('DYNAMIC_AGGREGATED');
+    setIsManualOverrideLocked(false);
+  };
+
+  // Method C: Manual Override Toggle
+  const handleToggleManualOverride = () => {
+    const nextLocked = !isManualOverrideLocked;
+    setIsManualOverrideLocked(nextLocked);
+    setFormCalculationMethod(nextLocked ? 'MANUAL_OVERRIDE' : 'DYNAMIC_AGGREGATED');
+  };
+
+  // Save Daily Goal
+  const handleSaveDailyGoals = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newGoals: DailyNutritionGoals = {
+      calorieTarget: Number(customGoalKcal) || 2000,
+      proteinGramsTarget: Number(customGoalProtein) || 130,
+      carbsGramsTarget: Number(customGoalCarbs) || 220,
+      fatGramsTarget: Number(customGoalFat) || 65,
+    };
+    setDailyGoals(newGoals);
+    try {
+      localStorage.setItem('pantryo_daily_nutrition_goals', JSON.stringify(newGoals));
+    } catch (_) {}
+    setIsGoalModalOpen(false);
+    setSuccessToast(lang === 'FR' ? 'Objectif calorique quotidien enregistré !' : 'Daily nutrition budget updated!');
+    setTimeout(() => setSuccessToast(null), 3000);
+  };
+
   // Helper: Get days of the week for weekly strip
   const weekDays = useMemo(() => {
-    const curr = new Date(selectedDate);
+    const curr = parseLocalDate(selectedDate);
     const day = curr.getDay(); // 0 is Sunday
-    const diff = curr.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday to monday start
-    const monday = new Date(curr.setDate(diff));
+    const diff = curr.getDate() - day + (day === 0 ? -6 : 1); // Monday start
+    const monday = new Date(curr.getFullYear(), curr.getMonth(), diff);
 
     return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(monday);
-      d.setDate(monday.getDate() + i);
-      const iso = d.toISOString().split('T')[0];
+      const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
+      const iso = formatLocalDate(d);
       return {
         date: d,
         isoString: iso,
@@ -117,6 +230,32 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
       };
     });
   }, [selectedDate, todayStr, lang]);
+
+  // Day navigation helpers
+  const handlePrevDay = () => {
+    const d = parseLocalDate(selectedDate);
+    d.setDate(d.getDate() - 1);
+    setSelectedDate(formatLocalDate(d));
+  };
+
+  const handleNextDay = () => {
+    const d = parseLocalDate(selectedDate);
+    d.setDate(d.getDate() + 1);
+    setSelectedDate(formatLocalDate(d));
+  };
+
+  // Week navigation helpers
+  const handlePrevWeek = () => {
+    const d = parseLocalDate(selectedDate);
+    d.setDate(d.getDate() - 7);
+    setSelectedDate(formatLocalDate(d));
+  };
+
+  const handleNextWeek = () => {
+    const d = parseLocalDate(selectedDate);
+    d.setDate(d.getDate() + 7);
+    setSelectedDate(formatLocalDate(d));
+  };
 
   // Helper: Month calendar matrix
   const monthDays = useMemo(() => {
@@ -131,19 +270,20 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
     const prevMonthDays = new Date(year, month, 0).getDate();
     for (let i = startOffset - 1; i >= 0; i--) {
       const d = new Date(year, month - 1, prevMonthDays - i);
+      const iso = formatLocalDate(d);
       days.push({
         date: d,
-        isoString: d.toISOString().split('T')[0],
+        isoString: iso,
         dayNumber: d.getDate(),
         isCurrentMonth: false,
-        isToday: d.toISOString().split('T')[0] === todayStr,
+        isToday: iso === todayStr,
       });
     }
 
     // Current month days
     for (let i = 1; i <= daysInMonth; i++) {
       const d = new Date(year, month, i);
-      const iso = d.toISOString().split('T')[0];
+      const iso = formatLocalDate(d);
       days.push({
         date: d,
         isoString: iso,
@@ -157,12 +297,13 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
     const remaining = 42 - days.length;
     for (let i = 1; i <= remaining; i++) {
       const d = new Date(year, month + 1, i);
+      const iso = formatLocalDate(d);
       days.push({
         date: d,
-        isoString: d.toISOString().split('T')[0],
+        isoString: iso,
         dayNumber: i,
         isCurrentMonth: false,
-        isToday: d.toISOString().split('T')[0] === todayStr,
+        isToday: iso === todayStr,
       });
     }
 
@@ -201,6 +342,13 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
     setNotes('');
     setImageUrl('');
     setIngredientsText('');
+    setFormCaloriesPerServing(440);
+    setFormTotalCalories(880);
+    setFormProteinGrams(32);
+    setFormCarbsGrams(45);
+    setFormFatGrams(18);
+    setFormCalculationMethod('AI_ESTIMATED');
+    setIsManualOverrideLocked(false);
     setIsModalOpen(true);
   };
 
@@ -209,10 +357,20 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
     setMealTitle(meal.title);
     setMealType(meal.mealType);
     setPrepTime(meal.prepTimeMinutes || 30);
-    setServings(meal.servings || 2);
+    const s = meal.servings || 2;
+    setServings(s);
     setNotes(meal.notes || '');
     setImageUrl(meal.imageUrl || '');
     setIngredientsText(meal.ingredients.map((i) => `${i.name}${i.quantity ? ` (${i.quantity} ${i.unit || ''})` : ''}`).join('\n'));
+    
+    const kcal = meal.caloriesPerServing ?? meal.calories ?? (meal.nutrition?.caloriesPerServing ?? 440);
+    setFormCaloriesPerServing(kcal);
+    setFormTotalCalories(meal.totalCalories ?? (kcal * s));
+    setFormProteinGrams(meal.macrosPerServing?.proteinGrams ?? meal.nutrition?.macrosPerServing?.proteinGrams ?? 32);
+    setFormCarbsGrams(meal.macrosPerServing?.carbsGrams ?? meal.nutrition?.macrosPerServing?.carbsGrams ?? 45);
+    setFormFatGrams(meal.macrosPerServing?.fatGrams ?? meal.nutrition?.macrosPerServing?.fatGrams ?? 18);
+    setFormCalculationMethod(meal.calculationMethod || 'AI_ESTIMATED');
+    setIsManualOverrideLocked(meal.calculationMethod === 'MANUAL_OVERRIDE');
     setIsModalOpen(true);
   };
 
@@ -227,19 +385,42 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
         .map((line) => line.trim())
         .filter(Boolean)
         .map((line) => {
-          // Check if item exists in kitchen items
           const cleanName = line.replace(/\(.*\)/, '').trim();
           const found = items.some(
             (it) => it.name.toLowerCase().includes(cleanName.toLowerCase()) || cleanName.toLowerCase().includes(it.name.toLowerCase())
           );
+          const nut = estimateIngredientNutrition(cleanName, 1, 'unit');
           return {
             name: line,
             inStock: found,
+            estimatedKcal: nut.estimatedKcal,
+            proteinGrams: nut.proteinGrams,
+            carbsGrams: nut.carbsGrams,
+            fatGrams: nut.fatGrams,
           };
         });
 
-      // Only use provided user image, no stock unsplash fallback
-      const resolvedImage = imageUrl.trim() && !imageUrl.includes('unsplash.com') ? imageUrl.trim() : undefined;
+      // Ensure real delicious photo is always available: user custom photo or curated recipe visual
+      const resolvedImage = imageUrl.trim()
+        ? imageUrl.trim()
+        : getCuratedMealPhoto(mealTitle.trim(), mealType);
+
+      const nutritionPayload = {
+        calories: formCaloriesPerServing,
+        caloriesPerServing: formCaloriesPerServing,
+        totalCalories: formTotalCalories,
+        macrosPerServing: {
+          proteinGrams: formProteinGrams,
+          carbsGrams: formCarbsGrams,
+          fatGrams: formFatGrams,
+        },
+        totalMacros: {
+          proteinGrams: formProteinGrams * servings,
+          carbsGrams: formCarbsGrams * servings,
+          fatGrams: formFatGrams * servings,
+        },
+        calculationMethod: formCalculationMethod,
+      };
 
       if (editingMeal) {
         await onUpdateMeal(editingMeal.id, {
@@ -251,8 +432,9 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
           notes: notes.trim(),
           imageUrl: resolvedImage,
           ingredients: parsedIngredients,
+          ...nutritionPayload,
         });
-        setSuccessToast(lang === 'FR' ? 'Repas mis à jour !' : 'Meal plan updated!');
+        setSuccessToast(lang === 'FR' ? 'Repas mis à jour avec nutrition !' : 'Meal plan and nutrition updated!');
       } else {
         await onAddMeal({
           householdId,
@@ -265,8 +447,9 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
           imageUrl: resolvedImage,
           isCooked: false,
           ingredients: parsedIngredients,
+          ...nutritionPayload,
         });
-        setSuccessToast(lang === 'FR' ? 'Nouveau repas planifié !' : 'New meal planned!');
+        setSuccessToast(lang === 'FR' ? 'Nouveau repas planifié avec nutrition !' : 'New meal planned with nutrition!');
       }
 
       setIsModalOpen(false);
@@ -280,6 +463,8 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
 
   const handlePlanSuggestedMeal = async (params: {
     title: string;
+    titleFr?: string;
+    titleEn?: string;
     mealType: MealType;
     date: string;
     prepTimeMinutes: number;
@@ -290,11 +475,15 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
     ingredients: PlannedMealIngredient[];
     addMissingToGrocery: boolean;
   }) => {
-    const resolvedImage = params.imageUrl && !params.imageUrl.includes('unsplash.com') ? params.imageUrl : undefined;
+    const resolvedImage = params.imageUrl?.trim()
+      ? params.imageUrl.trim()
+      : getCuratedMealPhoto(params.title, params.mealType);
 
     await onAddMeal({
       householdId,
       title: params.title,
+      titleFr: params.titleFr,
+      titleEn: params.titleEn,
       date: params.date,
       mealType: params.mealType,
       servings: params.servings,
@@ -391,11 +580,11 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
         <div className="flex items-start justify-between flex-wrap gap-2">
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] uppercase font-black tracking-wider text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200/60">
-                {lang === 'FR' ? 'Calendrier Cuisine' : 'Kitchen Calendar'}
+              <span className="text-[10px] uppercase font-black tracking-wider text-[#527470]">
+                {lang === 'FR' ? 'Planificateur' : 'Planner'}
               </span>
-              <span className="text-[11px] text-[#527470]">
-                {lang === 'FR' ? 'Planning des Repas du Foyer' : 'Household Meal Schedule'}
+              <span className="text-[11px] font-bold text-[#7C9A92]">
+                • {lang === 'FR' ? 'Planning des Repas du Foyer' : 'Household Meal Schedule'}
               </span>
             </div>
             <h2 className="text-lg font-black tracking-tight text-[#0D3B37] mt-0.5">
@@ -412,7 +601,7 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
             <button
               id="btn-header-generate-shopping-list"
               onClick={() => setIsShoppingListModalOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-teal-50 border border-teal-300 hover:bg-teal-100 text-teal-900 text-xs font-bold shadow-2xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+              className="px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold border border-teal-200 flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-2xs"
               title={
                 lang === 'FR'
                   ? "Générer la liste d'épicerie selon vos repas planifiés et l'inventaire en stock"
@@ -428,36 +617,36 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                 setSuggestionsInitialSlot('DINNER');
                 setIsSuggestionsModalOpen(true);
               }}
-              className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-teal-700 to-emerald-700 hover:from-teal-800 hover:to-emerald-800 text-white text-xs font-black shadow-sm flex items-center gap-1.5 transition-all active:scale-95"
+              className="px-3.5 py-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-black shadow-2xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
-              <span>{lang === 'FR' ? 'Suggestions Intelligentes' : 'Smart Suggestions'}</span>
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span>{lang === 'FR' ? 'Auto-Suggest (Anti-Gaspillage)' : 'Auto-Suggest (Zero-Waste)'}</span>
               {expiringItems.length > 0 && (
-                <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-amber-300 text-teal-950 text-[10px] font-black">
+                <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[10px] font-black">
                   {expiringItems.length}
                 </span>
               )}
             </button>
             <button
               onClick={() => setSelectedDate(todayStr)}
-              className="px-3 py-1.5 rounded-xl border border-[#D5CDBC] bg-[#F8F5EC] text-xs font-bold text-[#133E3B] hover:bg-[#EFEAE0] transition-colors flex items-center gap-1.5 shadow-2xs"
+              className="px-3 py-1.5 rounded-xl border border-[#E5DFD0] bg-white text-xs font-bold text-[#0D3B37] hover:bg-[#FAF7EE] transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
             >
               <CalendarIcon className="w-3.5 h-3.5 text-teal-700" />
               {lang === 'FR' ? "Aujourd'hui" : 'Today'}
             </button>
-            <div className="inline-flex rounded-xl p-1 bg-[#F0EDE4] border border-[#E0D9C8]">
+            <div className="inline-flex rounded-xl p-0.5 bg-[#FAF7EE] border border-[#E5DFD0] shadow-2xs">
               <button
                 onClick={() => setViewMode('week')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-                  viewMode === 'week' ? 'bg-white text-teal-900 shadow-2xs' : 'text-[#627C65] hover:text-[#133E3B]'
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  viewMode === 'week' ? 'bg-teal-700 text-white shadow-2xs' : 'text-[#527470] hover:text-[#0D3B37]'
                 }`}
               >
                 {lang === 'FR' ? 'Semaine' : 'Week'}
               </button>
               <button
                 onClick={() => setViewMode('month')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-                  viewMode === 'month' ? 'bg-white text-teal-900 shadow-2xs' : 'text-[#627C65] hover:text-[#133E3B]'
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  viewMode === 'month' ? 'bg-teal-700 text-white shadow-2xs' : 'text-[#527470] hover:text-[#0D3B37]'
                 }`}
               >
                 {lang === 'FR' ? 'Mois' : 'Month'}
@@ -468,46 +657,131 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
 
         {/* View Mode: WEEK STRIP */}
         {viewMode === 'week' ? (
-          <div className="grid grid-cols-7 gap-1.5 pt-1">
-            {weekDays.map((d) => {
-              const count = mealsByDateMap.get(d.isoString)?.length || 0;
-              const hasCooked = mealsByDateMap.get(d.isoString)?.some((m) => m.isCooked);
-              return (
+          <div className="space-y-2.5 pt-1">
+            {/* Week navigation label & controls */}
+            <div className="flex items-center justify-between px-1 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs sm:text-sm font-black text-[#0D3B37] capitalize tracking-tight">
+                  {(() => {
+                    if (weekDays.length === 0) return '';
+                    const start = weekDays[0].date;
+                    const end = weekDays[6].date;
+                    const startStr = start.toLocaleDateString(lang === 'FR' ? 'fr-FR' : 'en-US', { day: 'numeric', month: 'short' });
+                    const endStr = end.toLocaleDateString(lang === 'FR' ? 'fr-FR' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+                    return `${startStr} – ${endStr}`;
+                  })()}
+                </span>
+                {weekDays.some((d) => d.isToday) ? (
+                  <span className="px-2.5 py-0.5 rounded-full bg-teal-100 text-teal-800 text-[10px] font-black uppercase tracking-wider">
+                    {lang === 'FR' ? 'Cette semaine' : 'This week'}
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDate(todayStr)}
+                    className="px-2 py-0.5 rounded-full bg-amber-100 hover:bg-amber-200 text-amber-900 text-[10px] font-bold cursor-pointer transition-colors"
+                  >
+                    {lang === 'FR' ? 'Revenir à aujourd’hui' : 'Jump to Today'}
+                  </button>
+                )}
+              </div>
+
+              {/* Prev / Today / Next Week Arrows */}
+              <div className="flex items-center gap-1.5">
                 <button
-                  key={d.isoString}
-                  onClick={() => setSelectedDate(d.isoString)}
-                  className={`p-2 rounded-2xl flex flex-col items-center justify-between transition-all text-center border relative ${
-                    d.isSelected
-                      ? 'bg-teal-700 text-white border-teal-800 shadow-sm scale-102'
-                      : d.isToday
-                      ? 'bg-teal-50/80 text-teal-900 border-teal-300'
-                      : 'bg-[#F9F7F1] text-[#133E3B] border-[#EAE3D4] hover:bg-white hover:border-[#D5CDBC]'
-                  }`}
+                  type="button"
+                  id="btn-prev-week-nav"
+                  onClick={handlePrevWeek}
+                  className="px-2.5 py-1.5 rounded-xl border border-[#E0D9C8] bg-white hover:bg-[#FAF7EE] text-[#0D3B37] transition-all cursor-pointer shadow-2xs flex items-center gap-1 text-xs font-bold active:scale-95"
+                  title={lang === 'FR' ? 'Semaine précédente (-7j)' : 'Previous week (-7d)'}
                 >
-                  <span className={`text-[10px] font-bold ${d.isSelected ? 'text-teal-100' : 'text-[#658578]'}`}>
-                    {d.dayName}
-                  </span>
-                  <span className={`text-base font-black my-0.5 ${d.isSelected ? 'text-white' : 'text-[#0D3B37]'}`}>
-                    {d.dayNumber}
-                  </span>
-                  {/* Meal Indicator Dots */}
-                  <div className="flex items-center gap-0.5 h-2">
-                    {count > 0 ? (
-                      Array.from({ length: Math.min(count, 3) }).map((_, idx) => (
-                        <span
-                          key={idx}
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            d.isSelected ? 'bg-amber-300' : hasCooked ? 'bg-emerald-500' : 'bg-indigo-600'
-                          }`}
-                        />
-                      ))
-                    ) : (
-                      <span className="w-1.5 h-1.5 opacity-0" />
-                    )}
-                  </div>
+                  <ChevronLeft className="w-4 h-4 text-teal-700" />
+                  <span className="hidden sm:inline">{lang === 'FR' ? 'Sem. précéd.' : 'Prev week'}</span>
                 </button>
-              );
-            })}
+                <button
+                  type="button"
+                  onClick={() => setSelectedDate(todayStr)}
+                  className="px-2.5 py-1.5 rounded-xl border border-[#E0D9C8] bg-white hover:bg-[#FAF7EE] text-xs font-bold text-[#0D3B37] transition-all cursor-pointer shadow-2xs active:scale-95"
+                  title={lang === 'FR' ? "Aujourd'hui" : 'Today'}
+                >
+                  {lang === 'FR' ? 'Aujourd’hui' : 'Today'}
+                </button>
+                <button
+                  type="button"
+                  id="btn-next-week-nav"
+                  onClick={handleNextWeek}
+                  className="px-2.5 py-1.5 rounded-xl border border-[#E0D9C8] bg-white hover:bg-[#FAF7EE] text-[#0D3B37] transition-all cursor-pointer shadow-2xs flex items-center gap-1 text-xs font-bold active:scale-95"
+                  title={lang === 'FR' ? 'Semaine suivante (+7j)' : 'Next week (+7d)'}
+                >
+                  <span className="hidden sm:inline">{lang === 'FR' ? 'Sem. suiv.' : 'Next week'}</span>
+                  <ChevronRight className="w-4 h-4 text-teal-700" />
+                </button>
+              </div>
+            </div>
+
+            {/* 7-Day Strip with prominent side chevron arrows */}
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <button
+                type="button"
+                id="btn-prev-week-side-chevron"
+                onClick={handlePrevWeek}
+                className="h-14 sm:h-16 w-8 sm:w-10 rounded-2xl border border-[#E5DFD0] bg-white hover:bg-teal-50 hover:border-teal-400 text-teal-800 flex items-center justify-center transition-all cursor-pointer shadow-2xs shrink-0 active:scale-90"
+                title={lang === 'FR' ? 'Semaine précédente (-7 jours)' : 'Previous week (-7 days)'}
+                aria-label={lang === 'FR' ? 'Semaine précédente' : 'Previous week'}
+              >
+                <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5]" />
+              </button>
+
+              <div className="grid grid-cols-7 gap-1 sm:gap-1.5 flex-1 min-w-0">
+                {weekDays.map((d) => {
+                  const count = mealsByDateMap.get(d.isoString)?.length || 0;
+                  const hasCooked = mealsByDateMap.get(d.isoString)?.some((m) => m.isCooked);
+                  return (
+                    <button
+                      key={d.isoString}
+                      onClick={() => setSelectedDate(d.isoString)}
+                      className={`p-1.5 sm:p-2.5 rounded-2xl flex flex-col items-center justify-between transition-all text-center border relative cursor-pointer select-none shadow-2xs ${
+                        d.isSelected
+                          ? 'bg-teal-700 text-white border-teal-800 shadow-xs ring-2 ring-teal-500/30'
+                          : d.isToday
+                          ? 'bg-amber-50 text-amber-950 border-amber-300'
+                          : 'bg-white text-[#0D3B37] border-[#E5DFD0] hover:border-teal-300'
+                      }`}
+                    >
+                      <span className={`text-[10px] font-bold uppercase ${d.isSelected ? 'text-teal-100' : 'text-[#7C9A92]'}`}>
+                        {d.dayName}
+                      </span>
+                      <span className={`text-sm sm:text-base font-black my-0.5 ${d.isSelected ? 'text-white' : 'text-[#0D3B37]'}`}>
+                        {d.dayNumber}
+                      </span>
+                      {/* Meal Indicator Dots */}
+                      <div className="flex items-center gap-0.5 h-2">
+                        {count > 0 ? (
+                          <span className={`text-[8px] font-bold px-1.5 rounded-full leading-tight ${
+                            d.isSelected ? 'bg-white/20 text-white' : hasCooked ? 'bg-emerald-100 text-emerald-800' : 'bg-teal-100 text-teal-800'
+                          }`}>
+                            {count}m
+                          </span>
+                        ) : (
+                          <span className="w-1.5 h-1.5 opacity-0" />
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                id="btn-next-week-side-chevron"
+                onClick={handleNextWeek}
+                className="h-14 sm:h-16 w-8 sm:w-10 rounded-2xl border border-[#E5DFD0] bg-white hover:bg-teal-50 hover:border-teal-400 text-teal-800 flex items-center justify-center transition-all cursor-pointer shadow-2xs shrink-0 active:scale-90"
+                title={lang === 'FR' ? 'Semaine suivante (+7 jours)' : 'Next week (+7 days)'}
+                aria-label={lang === 'FR' ? 'Semaine suivante' : 'Next week'}
+              >
+                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5]" />
+              </button>
+            </div>
           </div>
         ) : (
           /* View Mode: MONTH CALENDAR MATRIX */
@@ -603,21 +877,41 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
       </div>
 
       {/* Selected Day Header & Add Button */}
-      <div className="flex items-center justify-between px-1">
+      <div className="flex items-center justify-between px-1 flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <CalendarDays className="w-4 h-4 text-teal-700" />
-          <h3 className="text-sm font-black text-[#0D3B37] capitalize">
-            {new Date(selectedDate + 'T00:00:00').toLocaleDateString(lang === 'FR' ? 'fr-FR' : 'en-US', {
+          <CalendarDays className="w-4 h-4 text-teal-700 shrink-0" />
+          <h3 className="text-sm sm:text-base font-black text-[#0D3B37] capitalize">
+            {parseLocalDate(selectedDate).toLocaleDateString(lang === 'FR' ? 'fr-FR' : 'en-US', {
               weekday: 'long',
               month: 'short',
               day: 'numeric',
             })}
           </h3>
           {selectedDate === todayStr && (
-            <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-wider">
+            <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-wider shrink-0">
               {lang === 'FR' ? "Aujourd'hui" : 'Today'}
             </span>
           )}
+
+          {/* Quick day hopper arrows */}
+          <div className="inline-flex items-center gap-0.5 bg-white border border-[#E5DFD0] rounded-xl p-0.5 shadow-2xs ml-1">
+            <button
+              type="button"
+              onClick={handlePrevDay}
+              className="p-1 rounded-lg text-[#0D3B37] hover:bg-[#FAF7EE] transition-colors cursor-pointer"
+              title={lang === 'FR' ? 'Jour précédent' : 'Previous day'}
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={handleNextDay}
+              className="p-1 rounded-lg text-[#0D3B37] hover:bg-[#FAF7EE] transition-colors cursor-pointer"
+              title={lang === 'FR' ? 'Jour suivant' : 'Next day'}
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -701,40 +995,232 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
         </div>
       )}
 
+      {/* Daily Nutritional Intake Tracking inside Meal Planner */}
+      <div className="p-4 sm:p-5 rounded-3xl bg-white border border-[#E5DFD0] shadow-2xs space-y-3.5 select-none">
+        {/* Top Header Row */}
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-amber-600 shadow-2xs shrink-0">
+              <Flame className="w-4 h-4 fill-amber-500 text-amber-600" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="text-sm font-bold text-[#0D3B37] tracking-tight">
+                  {lang === 'FR' ? 'Apport Nutritionnel du Jour' : 'Daily Nutritional Intake'}
+                </h4>
+                <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border shadow-2xs ${
+                  dailyNutrition.status === 'OVER_BUDGET'
+                    ? 'bg-rose-50 text-rose-800 border-rose-200'
+                    : dailyNutrition.status === 'APPROACHING'
+                    ? 'bg-amber-50 text-amber-800 border-amber-200'
+                    : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                }`}>
+                  {dailyNutrition.status === 'OVER_BUDGET'
+                    ? (lang === 'FR' ? 'Budget Dépassé' : 'Over Budget')
+                    : dailyNutrition.status === 'APPROACHING'
+                    ? (lang === 'FR' ? 'Limite Proche' : 'Near Limit')
+                    : (lang === 'FR' ? 'Objectif Respecté' : 'On Track')}
+                </span>
+              </div>
+              <p className="text-xs text-[#527470]">
+                {lang === 'FR'
+                  ? `Suivi aggloméré pour le ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}`
+                  : `Aggregated intake tracking for ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })}`}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setCustomGoalKcal(dailyGoals.calorieTarget);
+                setCustomGoalProtein(dailyGoals.proteinGramsTarget);
+                setCustomGoalCarbs(dailyGoals.carbsGramsTarget);
+                setCustomGoalFat(dailyGoals.fatGramsTarget);
+                setIsGoalModalOpen(true);
+              }}
+              className="px-3 py-1.5 rounded-xl border border-[#E5DFD0] bg-white text-xs font-bold text-[#0D3B37] hover:bg-[#FAF7EE] transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              title="Edit Daily Goals"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 text-teal-700" />
+              <span>{lang === 'FR' ? 'Objectif' : 'Goal'}: <strong className="font-mono text-teal-900">{dailyGoals.calorieTarget} kcal</strong></span>
+            </button>
+          </div>
+        </div>
+
+        {/* Aggregated Numbers & Budget Status */}
+        <div className="flex items-end justify-between flex-wrap gap-2 pt-0.5">
+          <div>
+            <span className="text-[10px] uppercase font-bold tracking-wider text-[#7C9A92] block">
+              {lang === 'FR' ? 'Consommation Prévue / Budget' : 'Planned Intake / Daily Budget'}
+            </span>
+            <div className="flex items-baseline gap-1.5 mt-0.5">
+              <span className="text-2xl font-black font-mono text-[#0D3B37] tracking-tight">
+                {dailyNutrition.totalPlannedCalories.toLocaleString()}
+              </span>
+              <span className="text-sm font-semibold font-mono text-[#7C9A92]">
+                / {dailyNutrition.dailyCalorieBudget.toLocaleString()} kcal
+              </span>
+              <span className="text-xs font-bold font-mono text-teal-700 ml-1">
+                ({dailyNutrition.caloriePercent}%)
+              </span>
+            </div>
+          </div>
+
+          <div>
+            {dailyNutrition.isOverBudget ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 border border-rose-200 text-xs font-bold text-rose-800 shadow-2xs">
+                <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                <span>
+                  {lang === 'FR'
+                    ? `Dépassement de +${dailyNutrition.overBudgetAmount} kcal`
+                    : `Over budget by +${dailyNutrition.overBudgetAmount} kcal`}
+                </span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-800 shadow-2xs">
+                <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
+                <span>
+                  {lang === 'FR'
+                    ? `${dailyNutrition.remainingCalories} kcal restantes`
+                    : `${dailyNutrition.remainingCalories} kcal remaining`}
+                </span>
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Clean Rounded Calorie Progress Meter Bar */}
+        <div className="space-y-1">
+          <div className="w-full h-2.5 rounded-full bg-[#FAF7EE] border border-[#E5DFD0] overflow-hidden p-0.5">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${
+                dailyNutrition.status === 'OVER_BUDGET'
+                  ? 'bg-rose-500'
+                  : dailyNutrition.status === 'APPROACHING'
+                  ? 'bg-amber-500'
+                  : 'bg-teal-600'
+              }`}
+              style={{ width: `${Math.min(100, (dailyNutrition.totalPlannedCalories / dailyNutrition.dailyCalorieBudget) * 100)}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Macro Distribution Cards (Protein, Carbs, Fat) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-0.5">
+          {/* Protein */}
+          <div className="p-3 rounded-2xl bg-sky-50/70 border border-sky-100 text-[#0D3B37] space-y-1.5 shadow-2xs">
+            <div className="flex items-center justify-between text-xs font-bold">
+              <span className="uppercase text-sky-900 tracking-wider text-[11px]">
+                {lang === 'FR' ? 'Protéines' : 'Protein'}
+              </span>
+              <span className="font-mono text-xs text-sky-950 font-bold">
+                {dailyNutrition.totalProteinGrams}g <span className="text-sky-600 font-normal">/ {dailyNutrition.proteinBudgetGrams}g</span>
+              </span>
+            </div>
+            <div className="w-full h-1.5 rounded-full bg-sky-100 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-sky-500 transition-all duration-300"
+                style={{ width: `${dailyNutrition.proteinPercent}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-sky-800 font-medium">
+              <span>{dailyNutrition.proteinPercent}% {lang === 'FR' ? 'atteint' : 'met'}</span>
+              <span className="text-sky-600 font-semibold">{dailyNutrition.macroSplit.proteinPct}% {lang === 'FR' ? 'énergie' : 'energy'}</span>
+            </div>
+          </div>
+
+          {/* Carbs */}
+          <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-100 text-[#0D3B37] space-y-1.5 shadow-2xs">
+            <div className="flex items-center justify-between text-xs font-bold">
+              <span className="uppercase text-amber-900 tracking-wider text-[11px]">
+                {lang === 'FR' ? 'Glucides' : 'Carbs'}
+              </span>
+              <span className="font-mono text-xs text-amber-950 font-bold">
+                {dailyNutrition.totalCarbsGrams}g <span className="text-amber-600 font-normal">/ {dailyNutrition.carbsBudgetGrams}g</span>
+              </span>
+            </div>
+            <div className="w-full h-1.5 rounded-full bg-amber-100 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-amber-500 transition-all duration-300"
+                style={{ width: `${dailyNutrition.carbsPercent}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-amber-800 font-medium">
+              <span>{dailyNutrition.carbsPercent}% {lang === 'FR' ? 'atteint' : 'met'}</span>
+              <span className="text-amber-600 font-semibold">{dailyNutrition.macroSplit.carbsPct}% {lang === 'FR' ? 'énergie' : 'energy'}</span>
+            </div>
+          </div>
+
+          {/* Fat */}
+          <div className="p-3 rounded-2xl bg-rose-50/70 border border-rose-100 text-[#0D3B37] space-y-1.5 shadow-2xs">
+            <div className="flex items-center justify-between text-xs font-bold">
+              <span className="uppercase text-rose-900 tracking-wider text-[11px]">
+                {lang === 'FR' ? 'Lipides' : 'Fat'}
+              </span>
+              <span className="font-mono text-xs text-rose-950 font-bold">
+                {dailyNutrition.totalFatGrams}g <span className="text-rose-600 font-normal">/ {dailyNutrition.fatBudgetGrams}g</span>
+              </span>
+            </div>
+            <div className="w-full h-1.5 rounded-full bg-rose-100 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-rose-500 transition-all duration-300"
+                style={{ width: `${dailyNutrition.fatPercent}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-rose-800 font-medium">
+              <span>{dailyNutrition.fatPercent}% {lang === 'FR' ? 'atteint' : 'met'}</span>
+              <span className="text-rose-600 font-semibold">{dailyNutrition.macroSplit.fatPct}% {lang === 'FR' ? 'énergie' : 'energy'}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Meal Slots (Breakfast, Lunch, Dinner, Snack) */}
       <div className="space-y-3">
-        {MEAL_TYPES.map(({ type, label, color, bg, border }) => {
+        {MEAL_TYPES.map(({ type, label, bg, border, color }) => {
           const meals = mealsForSelectedDate.filter((m) => m.mealType === type);
+          const slotData = dailyNutrition.slots[type];
 
           return (
-            <div key={type} className="rounded-3xl bg-white border border-[#E5DFD0] shadow-2xs p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className={`px-2.5 py-0.5 rounded-lg text-xs font-black tracking-wide ${bg} ${color} border ${border}`}>
+            <div key={type} className="rounded-3xl bg-white border border-[#E5DFD0] p-3.5 sm:p-4 shadow-2xs space-y-3 select-none">
+              <div className="flex items-center justify-between pb-2 border-b border-[#FAF7EE] flex-wrap gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider ${bg} ${border} ${color} border`}>
                     {label}
                   </span>
-                  <span className="text-xs text-[#627C65]">
+                  {slotData && slotData.calories > 0 && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-[#E5DFD0] bg-[#FAF7EE] text-[10px] font-mono font-bold text-[#0D3B37] shadow-2xs">
+                      <Flame className="w-3 h-3 text-amber-600 fill-amber-500" />
+                      <span>{slotData.calories} kcal</span>
+                      <span className="text-slate-300">•</span>
+                      <span className="text-sky-700">{slotData.proteinGrams}P</span>
+                      <span className="text-amber-700">{slotData.carbsGrams}C</span>
+                      <span className="text-rose-700">{slotData.fatGrams}F</span>
+                    </span>
+                  )}
+                  <span className="text-xs font-medium text-[#7C9A92]">
                     {meals.length === 0
-                      ? (lang === 'FR' ? 'Aucun repas prévu' : 'No meals planned')
+                      ? (lang === 'FR' ? '0 repas planifié' : '0 planned')
                       : (lang === 'FR' ? `${meals.length} planifié${meals.length > 1 ? 's' : ''}` : `${meals.length} planned`)}
                   </span>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
                   <button
                     id={`btn-suggest-slot-${type.toLowerCase()}`}
                     onClick={() => {
                       setSuggestionsInitialSlot(type);
                       setIsSuggestionsModalOpen(true);
                     }}
-                    className="p-1 rounded-lg text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50 transition-colors flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 border border-emerald-200/60 bg-emerald-50/50"
+                    className="p-1.5 rounded-xl text-teal-700 hover:bg-teal-50 transition-colors flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 border border-teal-200 bg-teal-50/50 cursor-pointer"
                     title={`${lang === 'FR' ? 'Suggérer pour' : 'Suggest for'} ${label}`}
                   >
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                    <span className="hidden sm:inline">{lang === 'FR' ? 'Suggérer' : 'Suggest'}</span>
+                    <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+                    <span className="hidden sm:inline">{lang === 'FR' ? 'Auto-Suggest' : 'Auto-Suggest'}</span>
                   </button>
                   <button
                     onClick={() => handleOpenAddModal(type)}
-                    className="p-1 rounded-lg text-slate-500 hover:text-teal-700 hover:bg-[#F3EFE6] transition-colors"
+                    className="p-1.5 rounded-xl text-slate-500 hover:text-[#0D3B37] hover:bg-slate-100 transition-colors cursor-pointer"
                     title={`${lang === 'FR' ? 'Ajouter' : 'Add'} ${label}`}
                   >
                     <Plus className="w-4 h-4" />
@@ -750,17 +1236,17 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                       setSuggestionsInitialSlot(type);
                       setIsSuggestionsModalOpen(true);
                     }}
-                    className="py-2.5 px-3 rounded-2xl bg-gradient-to-r from-teal-50 to-emerald-50 hover:from-teal-100 hover:to-emerald-100 border border-teal-200 text-center text-xs font-bold text-teal-900 transition-all flex items-center justify-center gap-1.5 shadow-2xs active:scale-95"
+                    className="py-2.5 px-3 rounded-2xl bg-teal-50/70 hover:bg-teal-100/70 border border-teal-200/80 text-center text-xs font-bold text-teal-900 transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
                   >
-                    <Sparkles className="w-3.5 h-3.5 text-teal-600" />
-                    <span>{lang === 'FR' ? `✨ Suggérer ${label} anti-gaspillage` : `✨ Suggest ${label} (Zero-Waste)`}</span>
+                    <Sparkles className="w-3.5 h-3.5 text-teal-700" />
+                    <span>{lang === 'FR' ? `Auto-Suggest (Anti-Gaspillage)` : `Auto-Suggest (Zero-Waste)`}</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => handleOpenAddModal(type)}
-                    className="py-2.5 px-3 rounded-2xl border border-dashed border-[#E5DFD0] text-center text-xs font-semibold text-[#82998C] hover:text-teal-800 hover:border-teal-300 hover:bg-white transition-all flex items-center justify-center gap-1.5"
+                    className="py-2.5 px-3 rounded-2xl bg-[#FAF7EE] hover:bg-[#F3EFE3] border border-[#E5DFD0] text-center text-xs font-bold text-[#0D3B37] transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
                   >
-                    <Plus className="w-3.5 h-3.5 text-slate-400" />
+                    <Plus className="w-3.5 h-3.5 text-slate-500" />
                     <span>{lang === 'FR' ? `Planifier manuellement` : `Plan manually`}</span>
                   </button>
                 </div>
@@ -772,37 +1258,41 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                     return (
                       <div
                         key={meal.id}
-                        className={`p-3.5 rounded-2xl border transition-all ${
+                        className={`p-3 rounded-2xl border transition-all select-none ${
                           meal.isCooked
-                            ? 'bg-emerald-50/50 border-emerald-200 text-[#133E3B]'
-                            : 'bg-[#FCFAF4] border-[#E8E2D5] hover:border-[#D0C7B5]'
+                            ? 'bg-slate-50/80 border-slate-200 text-slate-400'
+                            : 'bg-white border-[#E5DFD0] shadow-2xs hover:shadow-xs'
                         }`}
                       >
                         <div className="flex items-start gap-3">
-                          {/* Meal Photo Thumbnail or Category Icon */}
-                          <div className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-[#E5DFD0] bg-slate-100">
-                            {meal.imageUrl && !meal.imageUrl.includes('unsplash.com') ? (
-                              <img
-                                src={meal.imageUrl}
-                                alt={meal.title}
-                                referrerPolicy="no-referrer"
-                                className={`w-full h-full object-cover transition-transform duration-300 ${
-                                  meal.isCooked ? 'grayscale-25' : ''
-                                }`}
-                              />
-                            ) : (
-                              (() => {
-                                const visual = getFoodVisual(meal.title);
-                                const MealIcon = visual.icon;
-                                return (
-                                  <div className={`w-full h-full flex items-center justify-center ${visual.bgColor} ${visual.textColor}`}>
-                                    <MealIcon className="w-8 h-8 stroke-[1.6]" />
-                                  </div>
-                                );
-                              })()
-                            )}
+                          {/* Meal Photo Thumbnail */}
+                          <div className="relative w-14 h-14 rounded-2xl overflow-hidden shrink-0 border border-[#E5DFD0] bg-[#FAF8F5] shadow-2xs">
+                            {(() => {
+                              const photoSrc = meal.imageUrl?.trim()
+                                ? meal.imageUrl
+                                : getCuratedMealPhoto(meal.title, meal.mealType);
+                              return (
+                                <img
+                                  src={photoSrc}
+                                  alt={meal.title}
+                                  referrerPolicy="no-referrer"
+                                  className={`w-full h-full object-cover transition-transform duration-300 hover:scale-105 ${
+                                    meal.isCooked ? 'grayscale-25 opacity-70' : ''
+                                  }`}
+                                  onError={(e) => {
+                                    const target = e.currentTarget as HTMLImageElement;
+                                    const fallbackPhoto = getCuratedMealPhoto(meal.title, meal.mealType);
+                                    if (target.src !== fallbackPhoto) {
+                                      target.src = fallbackPhoto;
+                                    } else {
+                                      target.src = getFoodSvgFallback(meal.title);
+                                    }
+                                  }}
+                                />
+                              );
+                            })()}
                             {meal.isCooked && (
-                              <div className="absolute inset-0 bg-emerald-900/40 flex items-center justify-center text-white">
+                              <div className="absolute inset-0 bg-emerald-900/60 flex items-center justify-center text-white">
                                 <Check className="w-5 h-5 stroke-[3]" />
                               </div>
                             )}
@@ -812,11 +1302,11 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                           <div className="flex-1 min-w-0 space-y-1">
                             <div className="flex items-start justify-between gap-1">
                               <h4
-                                className={`text-sm font-bold tracking-tight leading-snug ${
-                                  meal.isCooked ? 'line-through text-slate-500' : 'text-[#0D3B37]'
+                                className={`text-sm font-extrabold tracking-tight leading-snug ${
+                                  meal.isCooked ? 'line-through opacity-60 text-slate-500' : 'text-[#0D3B37]'
                                 }`}
                               >
-                                {meal.title}
+                                {getRecipeDisplayTitle(meal, lang)}
                               </h4>
 
                               <div className="flex items-center gap-1 shrink-0">
@@ -849,6 +1339,46 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                               </span>
                             </div>
 
+                            {/* Nutritional Badges */}
+                            <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                              {/* Calorie Flame Badge */}
+                              <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-amber-900 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-full shadow-2xs">
+                                <Flame className="w-3 h-3 text-amber-600 fill-amber-500" />
+                                <span>{meal.caloriesPerServing ?? meal.calories ?? (meal.nutrition?.caloriesPerServing ?? 440)} kcal</span>
+                              </span>
+
+                              {/* Macros Badge */}
+                              {(meal.macrosPerServing || meal.nutrition?.macrosPerServing) && (() => {
+                                const mac = meal.macrosPerServing || meal.nutrition?.macrosPerServing!;
+                                return (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold bg-[#FAF7EE] border border-[#E5DFD0] text-[#0D3B37] px-2 py-0.5 rounded-full shadow-2xs">
+                                    <span className="text-sky-700 font-bold">{mac.proteinGrams}P</span>
+                                    <span className="text-slate-300">•</span>
+                                    <span className="text-amber-700 font-bold">{mac.carbsGrams}C</span>
+                                    <span className="text-slate-300">•</span>
+                                    <span className="text-rose-700 font-bold">{mac.fatGrams}F</span>
+                                  </span>
+                                );
+                              })()}
+
+                              {/* Calculation Tier Badge */}
+                              <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border flex items-center gap-1 shadow-2xs ${
+                                meal.calculationMethod === 'MANUAL_OVERRIDE'
+                                  ? 'bg-amber-50 text-amber-900 border-amber-200'
+                                  : meal.calculationMethod === 'DYNAMIC_AGGREGATED'
+                                  ? 'bg-teal-50 text-teal-800 border-teal-200'
+                                  : 'bg-purple-50 text-purple-800 border-purple-200'
+                              }`}>
+                                {meal.calculationMethod === 'MANUAL_OVERRIDE' ? (
+                                  <>🔒 {lang === 'FR' ? 'Manuel' : 'Manual'}</>
+                                ) : meal.calculationMethod === 'DYNAMIC_AGGREGATED' ? (
+                                  <>⚙️ {lang === 'FR' ? 'Dynamique' : 'Dynamic'}</>
+                                ) : (
+                                  <>✨ {lang === 'FR' ? 'Estimé IA' : 'AI Estimated'}</>
+                                )}
+                              </span>
+                            </div>
+
                             {/* Notes if available */}
                             {meal.notes && (
                               <p className="text-xs text-[#627C65] line-clamp-1 italic">
@@ -873,7 +1403,7 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                                     ) : (
                                       <AlertCircle className="w-2.5 h-2.5 text-amber-600 shrink-0" />
                                     )}
-                                    <span className="truncate max-w-[120px]">{ing.name}</span>
+                                    <span className="truncate max-w-[120px]">{getItemDisplayName(ing, lang)}</span>
                                   </span>
                                 ))}
                               </div>
@@ -1036,7 +1566,14 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                     min="1"
                     max="20"
                     value={servings}
-                    onChange={(e) => setServings(Number(e.target.value))}
+                    onChange={(e) => {
+                      const val = Math.max(1, Number(e.target.value) || 1);
+                      setServings(val);
+                      if (!isManualOverrideLocked) {
+                        setFormTotalCalories(formCaloriesPerServing * val);
+                        setFormCalculationMethod('DYNAMIC_AGGREGATED');
+                      }
+                    }}
                     className="w-full px-3 py-2 rounded-xl bg-white border border-[#D5CDBC] text-sm"
                   />
                 </div>
@@ -1052,6 +1589,204 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                     onChange={(e) => setPrepTime(Number(e.target.value))}
                     className="w-full px-3 py-2 rounded-xl bg-white border border-[#D5CDBC] text-sm"
                   />
+                </div>
+              </div>
+
+              {/* Nutritional Engine Control Section (Methods A, B, C) */}
+              <div className="p-3.5 rounded-2xl bg-[#FAF7EE]/60 border border-[#E5DFD0] space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <Flame className="w-4 h-4 text-amber-600 fill-amber-500" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-[#0D3B37]">
+                      {lang === 'FR' ? 'Calculateur Nutritionnel (Calories & Macros)' : 'Nutritional Engine (Calories & Macros)'}
+                    </span>
+                  </div>
+
+                  {/* 3 Calculation Tiers Switcher */}
+                  <div className="inline-flex rounded-xl border border-[#E5DFD0] bg-white p-0.5 text-[11px] font-bold shadow-2xs">
+                    <button
+                      type="button"
+                      onClick={handleAutoEstimateNutrition}
+                      className={`px-2 py-1 rounded-lg transition-all cursor-pointer ${
+                        formCalculationMethod === 'AI_ESTIMATED'
+                          ? 'bg-purple-50 text-purple-900 border border-purple-200 font-bold shadow-2xs'
+                          : 'text-slate-600 hover:text-black'
+                      }`}
+                      title="Method A: AI Auto-Estimation based on ingredients"
+                    >
+                      ✨ {lang === 'FR' ? 'Méthode A (IA)' : 'Method A (AI)'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRecalculateDynamicNutrition(servings)}
+                      className={`px-2 py-1 rounded-lg transition-all cursor-pointer ${
+                        formCalculationMethod === 'DYNAMIC_AGGREGATED'
+                          ? 'bg-teal-50 text-teal-900 border border-teal-200 font-bold shadow-2xs'
+                          : 'text-slate-600 hover:text-black'
+                      }`}
+                      title="Method B: Dynamic Aggregation scaling"
+                    >
+                      ⚙️ {lang === 'FR' ? 'Méthode B (Dynamique)' : 'Method B (Dynamic)'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleToggleManualOverride}
+                      className={`px-2 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                        formCalculationMethod === 'MANUAL_OVERRIDE' || isManualOverrideLocked
+                          ? 'bg-amber-50 text-amber-900 border border-amber-200 font-bold shadow-2xs'
+                          : 'text-slate-600 hover:text-black'
+                      }`}
+                      title="Method C: Manual Override Lock"
+                    >
+                      {isManualOverrideLocked ? <Lock className="w-2.5 h-2.5 text-amber-700" /> : <Unlock className="w-2.5 h-2.5" />}
+                      <span>{lang === 'FR' ? 'Méthode C (Manuel)' : 'Method C (Manual)'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Calorie Inputs Row */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-[#0D3B37] flex items-center justify-between">
+                      <span>{lang === 'FR' ? 'Calories / portion :' : 'Calories / serving:'}</span>
+                      {isManualOverrideLocked && <span className="text-[9px] text-amber-800 font-mono font-bold">🔒 Locked</span>}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        step="5"
+                        value={formCaloriesPerServing}
+                        onChange={(e) => {
+                          const val = Number(e.target.value) || 0;
+                          setFormCaloriesPerServing(val);
+                          setFormTotalCalories(val * servings);
+                          setFormCalculationMethod('MANUAL_OVERRIDE');
+                          setIsManualOverrideLocked(true);
+                        }}
+                        className="w-full px-3 py-1.5 rounded-xl bg-white border border-[#D5CDBC] font-mono text-sm font-bold text-[#0D3B37] focus:outline-hidden focus:ring-2 focus:ring-teal-600 focus:border-teal-600"
+                      />
+                      <span className="absolute right-2.5 top-2 text-[10px] font-bold text-slate-400">kcal</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-[#0D3B37]">
+                      {lang === 'FR' ? 'Total plat (x portions) :' : 'Total dish calories:'}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        step="10"
+                        value={formTotalCalories}
+                        onChange={(e) => {
+                          const val = Number(e.target.value) || 0;
+                          setFormTotalCalories(val);
+                          setFormCaloriesPerServing(Math.round(val / Math.max(1, servings)));
+                          setFormCalculationMethod('MANUAL_OVERRIDE');
+                          setIsManualOverrideLocked(true);
+                        }}
+                        className="w-full px-3 py-1.5 rounded-xl bg-white border border-[#D5CDBC] font-mono text-sm font-bold text-[#0D3B37] focus:outline-hidden focus:ring-2 focus:ring-teal-600 focus:border-teal-600"
+                      />
+                      <span className="absolute right-2.5 top-2 text-[10px] font-bold text-slate-400">kcal</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Macro Inputs Row (Protein, Carbs, Fat) */}
+                <div className="space-y-1">
+                  <span className="text-[11px] font-bold text-[#0D3B37] block">
+                    {lang === 'FR' ? 'Macronutriments par portion :' : 'Macronutrients per serving:'}
+                  </span>
+                  <div className="grid grid-cols-3 gap-2">
+                    {/* Protein */}
+                    <div className="p-2.5 rounded-xl bg-sky-50/70 border border-sky-100 space-y-1 shadow-2xs">
+                      <label className="text-[10px] font-bold uppercase text-sky-900 block">
+                        {lang === 'FR' ? 'Protéines' : 'Protein'}
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={formProteinGrams}
+                          onChange={(e) => {
+                            setFormProteinGrams(Number(e.target.value) || 0);
+                            setFormCalculationMethod('MANUAL_OVERRIDE');
+                            setIsManualOverrideLocked(true);
+                          }}
+                          className="w-full px-2 py-1 rounded-lg bg-white border border-sky-200 text-xs font-mono font-bold text-sky-950 focus:outline-hidden focus:ring-1 focus:ring-sky-500"
+                        />
+                        <span className="absolute right-2 top-1 text-[10px] font-bold text-slate-400">g</span>
+                      </div>
+                    </div>
+
+                    {/* Carbs */}
+                    <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-100 space-y-1 shadow-2xs">
+                      <label className="text-[10px] font-bold uppercase text-amber-900 block">
+                        {lang === 'FR' ? 'Glucides' : 'Carbs'}
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={formCarbsGrams}
+                          onChange={(e) => {
+                            setFormCarbsGrams(Number(e.target.value) || 0);
+                            setFormCalculationMethod('MANUAL_OVERRIDE');
+                            setIsManualOverrideLocked(true);
+                          }}
+                          className="w-full px-2 py-1 rounded-lg bg-white border border-amber-200 text-xs font-mono font-bold text-amber-950 focus:outline-hidden focus:ring-1 focus:ring-amber-500"
+                        />
+                        <span className="absolute right-2 top-1 text-[10px] font-bold text-slate-400">g</span>
+                      </div>
+                    </div>
+
+                    {/* Fat */}
+                    <div className="p-2.5 rounded-xl bg-rose-50/70 border border-rose-100 space-y-1 shadow-2xs">
+                      <label className="text-[10px] font-bold uppercase text-rose-900 block">
+                        {lang === 'FR' ? 'Lipides' : 'Fat'}
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={formFatGrams}
+                          onChange={(e) => {
+                            setFormFatGrams(Number(e.target.value) || 0);
+                            setFormCalculationMethod('MANUAL_OVERRIDE');
+                            setIsManualOverrideLocked(true);
+                          }}
+                          className="w-full px-2 py-1 rounded-lg bg-white border border-rose-200 text-xs font-mono font-bold text-rose-950 focus:outline-hidden focus:ring-1 focus:ring-rose-500"
+                        />
+                        <span className="absolute right-2 top-1 text-[10px] font-bold text-slate-400">g</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Calculation Tier Status & Helper Message */}
+                <div className="flex items-center justify-between text-[11px] pt-0.5">
+                  <div className="flex items-center gap-1.5 text-[#556D58]">
+                    <Zap className="w-3.5 h-3.5 text-amber-600" />
+                    <span>
+                      {formCalculationMethod === 'MANUAL_OVERRIDE'
+                        ? (lang === 'FR' ? 'Valeurs personnalisées verrouillées' : 'Custom values locked manually')
+                        : formCalculationMethod === 'DYNAMIC_AGGREGATED'
+                        ? (lang === 'FR' ? 'Calcul dynamique selon les portions' : 'Dynamically aggregated from portions')
+                        : (lang === 'FR' ? 'Estimation auto IA d’après les ingrédients' : 'AI estimated from ingredients')}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAutoEstimateNutrition}
+                    className="text-[10px] font-black text-teal-800 hover:underline cursor-pointer"
+                  >
+                    {lang === 'FR' ? '↻ Recalculer auto' : '↻ Recalculate'}
+                  </button>
                 </div>
               </div>
 
@@ -1096,18 +1831,81 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                 />
               </div>
 
-              {/* Photo URL (Optional) */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-[#0D3B37]">
-                  {lang === 'FR' ? 'URL Photo Web (Optionnel - auto-généré si vide)' : 'Web Photo URL (Optional - auto-generated if empty)'}
-                </label>
-                <input
-                  type="url"
-                  placeholder="https://example.com/recipe.jpg"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-white border border-[#D5CDBC] text-xs"
-                />
+              {/* Photo & Visual Representation (Live Preview & Presets) */}
+              <div className="space-y-2 p-3 rounded-2xl bg-[#FAF8F5] border border-[#E5DFD0]">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-[#0D3B37]">
+                    {lang === 'FR' ? 'Photo du Repas (Aperçu & Suggérés)' : 'Meal Photo (Preview & Presets)'}
+                  </label>
+                  {imageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setImageUrl('')}
+                      className="text-[10px] font-bold text-rose-600 hover:text-rose-700 cursor-pointer"
+                    >
+                      {lang === 'FR' ? 'Réinitialiser' : 'Reset'}
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-start gap-3">
+                  {/* Live Photo Preview */}
+                  <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-[#E0D9C8] bg-white shadow-2xs relative">
+                    <img
+                      src={imageUrl.trim() || getCuratedMealPhoto(mealTitle || 'Repas', mealType)}
+                      alt="Aperçu repas"
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    <input
+                      type="url"
+                      placeholder={lang === 'FR' ? 'Lien image https://... (optionnel)' : 'Image URL https://... (optional)'}
+                      value={imageUrl}
+                      onChange={(e) => setImageUrl(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-xl bg-white border border-[#D5CDBC] text-xs font-sans placeholder:text-slate-400"
+                    />
+                    <p className="text-[10px] text-[#527470]">
+                      {lang === 'FR'
+                        ? 'Une photo haute résolution est automatiquement assignée si le champ est vide.'
+                        : 'A curated high-definition photo is automatically assigned if left empty.'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Popular Photo Presets */}
+                <div className="pt-1">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#7C9A92] block mb-1">
+                    {lang === 'FR' ? 'Photos populaires suggérées :' : 'Suggested Photo Presets:'}
+                  </span>
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                    {CURATED_FOOD_PHOTOS.slice(0, 8).map((preset) => {
+                      const isSelected = imageUrl === preset.url;
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => setImageUrl(preset.url)}
+                          className={`px-2 py-1 rounded-xl text-[10px] font-bold border shrink-0 flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs ${
+                            isSelected
+                              ? 'bg-teal-700 text-white border-teal-800'
+                              : 'bg-white hover:bg-teal-50 border-[#E5DFD0] text-[#0D3B37]'
+                          }`}
+                        >
+                          <img
+                            src={preset.url}
+                            alt={preset.labelFr}
+                            className="w-4 h-4 rounded-full object-cover shrink-0"
+                            referrerPolicy="no-referrer"
+                          />
+                          <span>{lang === 'FR' ? preset.labelFr.split(' ')[0] : preset.labelEn.split(' ')[0]}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               {/* Submit Buttons */}
@@ -1155,6 +1953,114 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
         onAddIngredientsToGrocery={onAddIngredientsToGrocery}
         onNavigateToGrocery={onNavigateToGrocery}
       />
+
+      {/* Daily Nutrition Goal Settings Modal (2D Flat Design Aesthetic) */}
+      {isGoalModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in select-none">
+          <div className="bg-white border border-[#E5DFD0] rounded-3xl w-full max-w-md p-5 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between border-b border-[#FAF7EE] pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-teal-50 border border-teal-200/80 flex items-center justify-center text-teal-700">
+                  <SlidersHorizontal className="w-4 h-4" />
+                </div>
+                <h3 className="text-sm font-bold text-[#0D3B37]">
+                  {lang === 'FR' ? 'Objectifs Nutritionnels Quotidiens' : 'Daily Nutritional Budget Goals'}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsGoalModalOpen(false)}
+                className="p-1.5 rounded-xl border border-[#E5DFD0] bg-white text-slate-500 hover:text-[#0D3B37] hover:bg-[#FAF7EE] transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveDailyGoals} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-[#0D3B37] block">
+                  {lang === 'FR' ? 'Budget Calorique Journalier (kcal) :' : 'Daily Calorie Target (kcal):'}
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="800"
+                    max="6000"
+                    step="50"
+                    value={customGoalKcal}
+                    onChange={(e) => setCustomGoalKcal(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-[#D5CDBC] font-mono text-base font-bold text-[#0D3B37] focus:outline-hidden focus:ring-2 focus:ring-teal-600 focus:border-teal-600"
+                  />
+                  <span className="absolute right-3 top-2.5 text-xs font-bold text-slate-400">kcal/day</span>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-[#0D3B37] block">
+                  {lang === 'FR' ? 'Objectifs Macronutriments (g) :' : 'Daily Macro Targets (grams):'}
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase text-sky-900 block">
+                      {lang === 'FR' ? 'Protéines' : 'Protein'}
+                    </label>
+                    <input
+                      type="number"
+                      min="20"
+                      max="400"
+                      value={customGoalProtein}
+                      onChange={(e) => setCustomGoalProtein(Number(e.target.value))}
+                      className="w-full px-2.5 py-1.5 rounded-xl bg-sky-50/70 border border-sky-200 font-mono text-xs font-bold text-sky-950 focus:outline-hidden focus:ring-1 focus:ring-sky-500"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase text-amber-900 block">
+                      {lang === 'FR' ? 'Glucides' : 'Carbs'}
+                    </label>
+                    <input
+                      type="number"
+                      min="20"
+                      max="600"
+                      value={customGoalCarbs}
+                      onChange={(e) => setCustomGoalCarbs(Number(e.target.value))}
+                      className="w-full px-2.5 py-1.5 rounded-xl bg-amber-50/70 border border-amber-200 font-mono text-xs font-bold text-amber-950 focus:outline-hidden focus:ring-1 focus:ring-amber-500"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase text-rose-900 block">
+                      {lang === 'FR' ? 'Lipides' : 'Fat'}
+                    </label>
+                    <input
+                      type="number"
+                      min="10"
+                      max="250"
+                      value={customGoalFat}
+                      onChange={(e) => setCustomGoalFat(Number(e.target.value))}
+                      className="w-full px-2.5 py-1.5 rounded-xl bg-rose-50/70 border border-rose-200 font-mono text-xs font-bold text-rose-950 focus:outline-hidden focus:ring-1 focus:ring-rose-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsGoalModalOpen(false)}
+                  className="px-3.5 py-2 rounded-xl border border-[#E5DFD0] bg-white text-xs font-bold text-[#0D3B37] hover:bg-[#FAF7EE] transition-colors cursor-pointer shadow-2xs"
+                >
+                  {lang === 'FR' ? 'Annuler' : 'Cancel'}
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold shadow-2xs transition-all active:scale-95 cursor-pointer"
+                >
+                  {lang === 'FR' ? 'Enregistrer le budget' : 'Save Budget'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

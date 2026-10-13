@@ -2371,6 +2371,13 @@ router.post("/household/:householdId/meals", (req, res) => {
       prepTimeMinutes = 30,
       notes = "",
       ingredients = [],
+      calories,
+      caloriesPerServing,
+      totalCalories,
+      macrosPerServing,
+      totalMacros,
+      calculationMethod,
+      nutrition,
     } = req.body;
 
     if (!title || !date) {
@@ -2379,6 +2386,15 @@ router.post("/household/:householdId/meals", (req, res) => {
         error: "Title and date (YYYY-MM-DD) are required for meal planning.",
       });
     }
+
+    const calculatedCalories =
+      calories !== undefined && calories !== null
+        ? Number(calories)
+        : caloriesPerServing !== undefined && caloriesPerServing !== null
+        ? Number(caloriesPerServing)
+        : nutrition?.caloriesPerServing
+        ? Number(nutrition.caloriesPerServing)
+        : null;
 
     const newMeal = {
       id: `meal_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -2394,6 +2410,18 @@ router.post("/household/:householdId/meals", (req, res) => {
       notes: notes || "",
       isCooked: false,
       ingredients: Array.isArray(ingredients) ? ingredients : [],
+      calories: calculatedCalories,
+      caloriesPerServing: calculatedCalories,
+      totalCalories:
+        totalCalories !== undefined && totalCalories !== null
+          ? Number(totalCalories)
+          : calculatedCalories !== null
+          ? calculatedCalories * (Number(servings) || 2)
+          : null,
+      macrosPerServing: macrosPerServing || nutrition?.macrosPerServing || null,
+      totalMacros: totalMacros || nutrition?.totalMacros || null,
+      calculationMethod: calculationMethod || nutrition?.calculationMethod || (calculatedCalories ? "AI_ESTIMATED" : null),
+      nutrition: nutrition || null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

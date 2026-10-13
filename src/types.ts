@@ -180,18 +180,64 @@ export interface SavedGroceryList {
 
 export type MealType = 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SNACK';
 
+export type NutritionCalculationMethod = 'AI_ESTIMATED' | 'DYNAMIC_AGGREGATED' | 'MANUAL_OVERRIDE';
+
+export interface Macros {
+  proteinGrams: number;
+  carbsGrams: number;
+  fatGrams: number;
+}
+
+export interface RecipeIngredientNutrition {
+  name: string;
+  amount: number | string;
+  unit: string;
+  estimatedKcal: number;
+  proteinGrams?: number;
+  carbsGrams?: number;
+  fatGrams?: number;
+}
+
+export interface RecipeNutritionSummary {
+  title?: string;
+  servings: number;
+  caloriesPerServing: number;
+  totalCalories: number;
+  macrosPerServing: Macros;
+  totalMacros?: Macros;
+  calculationMethod: NutritionCalculationMethod;
+  ingredients?: RecipeIngredientNutrition[];
+  isManualOverride?: boolean;
+  lastCalculatedAt?: string;
+}
+
+export interface DailyNutritionGoals {
+  calorieTarget: number;
+  proteinGramsTarget: number;
+  carbsGramsTarget: number;
+  fatGramsTarget: number;
+}
+
 export interface PlannedMealIngredient {
   name: string;
+  nameFr?: string;
+  nameEn?: string;
   quantity?: number;
   unit?: string;
   inStock?: boolean;
   inventoryItemId?: string;
+  estimatedKcal?: number;
+  proteinGrams?: number;
+  carbsGrams?: number;
+  fatGrams?: number;
 }
 
 export interface PlannedMeal {
   id: string;
   householdId: string;
   title: string;
+  titleFr?: string;
+  titleEn?: string;
   date: string; // YYYY-MM-DD
   mealType: MealType;
   recipeName?: string;
@@ -202,6 +248,16 @@ export interface PlannedMeal {
   notes?: string;
   isCooked: boolean;
   ingredients: PlannedMealIngredient[];
+  
+  // Dual-Part Nutritional Engine Fields
+  calories?: number;
+  caloriesPerServing?: number;
+  totalCalories?: number;
+  macrosPerServing?: Macros;
+  totalMacros?: Macros;
+  calculationMethod?: NutritionCalculationMethod;
+  nutrition?: RecipeNutritionSummary;
+
   createdAt: string;
   updatedAt: string;
 }

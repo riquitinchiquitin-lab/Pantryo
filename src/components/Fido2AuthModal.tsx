@@ -484,8 +484,14 @@ export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
           </div>
 
           <button
-            onClick={onClose}
+            onClick={() => {
+              if (mode === 'ENROLL_MANDATORY') {
+                onSuccess(targetUser);
+              }
+              onClose();
+            }}
             className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center cursor-pointer transition-colors"
+            title={lang === 'FR' ? 'Fermer et continuer' : 'Close and continue'}
           >
             <X className="w-4 h-4" />
           </button>
@@ -683,6 +689,22 @@ export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
                           ? 'Configurer Clé Passkey / FIDO2'
                           : 'Setup Passkey / FIDO2 Key'}
                       </span>
+                    </button>
+                  </div>
+
+                  {/* Skip for now option */}
+                  <div className="pt-2 text-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onSuccess(targetUser);
+                        onClose();
+                      }}
+                      className="text-xs font-semibold text-[#527470] hover:text-[#0D3B37] underline underline-offset-4 cursor-pointer transition-colors py-1 px-3"
+                    >
+                      {lang === 'FR'
+                        ? 'Passer pour l’instant et accéder à l’application →'
+                        : 'Skip for now and enter application →'}
                     </button>
                   </div>
                 </div>

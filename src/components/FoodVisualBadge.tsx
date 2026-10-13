@@ -25,8 +25,8 @@ export const FoodVisualBadge: React.FC<FoodVisualBadgeProps> = ({
 
   const dimensions = {
     sm: 'w-10 h-10 rounded-xl',
-    md: 'w-14 h-14 rounded-2xl',
-    lg: 'w-20 h-20 rounded-3xl',
+    md: 'w-13 h-13 rounded-2xl',
+    lg: 'w-16 h-16 rounded-2xl',
   }[size];
 
   const iconSizes = {
@@ -36,13 +36,13 @@ export const FoodVisualBadge: React.FC<FoodVisualBadgeProps> = ({
   }[size];
 
   const badgeIconSizes = {
-    sm: 'w-3 h-3',
-    md: 'w-3.5 h-3.5',
-    lg: 'w-4 h-4',
+    sm: 'w-2.5 h-2.5',
+    md: 'w-3 h-3',
+    lg: 'w-3.5 h-3.5',
   }[size];
 
   return (
-    <div className={`relative shrink-0 ${dimensions} overflow-hidden border ${visual.borderColor} shadow-2xs group`}>
+    <div className={`relative shrink-0 ${dimensions} overflow-hidden border border-[#E5DFD0] shadow-2xs group select-none`}>
       {isUserImage ? (
         <>
           <img
@@ -50,11 +50,11 @@ export const FoodVisualBadge: React.FC<FoodVisualBadgeProps> = ({
             alt={itemName}
             referrerPolicy="no-referrer"
             onError={() => setImageError(true)}
-            className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-full object-cover object-center"
           />
           {showCategoryIcon && (
             <div
-              className={`absolute bottom-1 right-1 p-1 rounded-lg bg-white/95 backdrop-blur-xs shadow-xs border border-white/80 ${visual.textColor}`}
+              className={`absolute bottom-0 right-0 p-1 rounded-tl-lg bg-white/90 backdrop-blur-xs shadow-2xs ${visual.textColor}`}
               title={visual.badgeLabel}
             >
               <Icon className={badgeIconSizes} />

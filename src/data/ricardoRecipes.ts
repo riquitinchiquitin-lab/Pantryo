@@ -1,4 +1,5 @@
-import { MealType } from '../types';
+import { MealType, Macros, RecipeNutritionSummary, NutritionCalculationMethod } from '../types';
+import { estimateRecipeNutrition } from '../services/nutritionEngine';
 
 export interface RecipeIngredient {
   id?: string;
@@ -7,9 +8,14 @@ export interface RecipeIngredient {
   name: string; // e.g. "Huile d'olive"
   storage?: string; // e.g. "pantry", "fridge", "freezer", "spices"
   nameFr?: string;
+  nameEn?: string;
   inKitchenItemName?: string; // name in kitchen inventory if matched
   category?: string;
   locationType?: 'FRIDGE' | 'FREEZER' | 'PANTRY' | 'SPICE_RACK';
+  estimatedKcal?: number;
+  proteinGrams?: number;
+  carbsGrams?: number;
+  fatGrams?: number;
 }
 
 export function formatRecipeIngredientAmount(
@@ -61,6 +67,7 @@ export interface RicardoRecipe {
   id: string;
   title: string;
   titleFr: string;
+  titleEn?: string;
   ricardoUrlEn: string;
   ricardoUrlFr: string;
   imageUrl: string;
@@ -71,6 +78,11 @@ export interface RicardoRecipe {
   difficulty: 'Easy' | 'Medium' | 'Advanced';
   difficultyFr: 'Facile' | 'Moyen' | 'Avancé';
   calories: string;
+  caloriesPerServing?: number;
+  totalCalories?: number;
+  macrosPerServing?: Macros;
+  calculationMethod?: NutritionCalculationMethod;
+  nutrition?: RecipeNutritionSummary;
   source: 'Ricardo Cuisine' | 'Trois Fois Par Jour' | 'Jamie Oliver' | 'Marmiton' | 'Gordon Ramsay' | 'Serious Eats' | 'Kitchen Rescue' | 'YouTube' | 'Personal' | 'Photo Import';
   authorName?: string;
   authorBadge?: string;
@@ -161,14 +173,14 @@ export function inferRecipeMealTypes(recipe: {
   return types;
 }
 
-export const RICARDO_RECIPES: RicardoRecipe[] = [
+const RAW_RICARDO_RECIPES: RicardoRecipe[] = [
   {
     id: 'ricardo_sheet_pan_salmon',
     title: 'Sheet-Pan Salmon with Herb Butter & Veggies',
     titleFr: 'Saumon et légumes sur plaque au beurre d\'herbes',
     ricardoUrlEn: 'https://www.ricardocuisine.com/en/recipes/8276-sheet-pan-salmon-and-vegetables',
     ricardoUrlFr: 'https://www.ricardocuisine.com/fr/recettes/8276-saumon-et-legumes-sur-une-plaque',
-    imageUrl: "",
+    imageUrl: "https://images.unsplash.com/photo-1467003909585-2f8a72700288?auto=format&fit=crop&w=800&q=80",
     time: '25 mins',
     prepTime: '10 mins',
     cookTime: '15 mins',
@@ -211,7 +223,7 @@ export const RICARDO_RECIPES: RicardoRecipe[] = [
     titleFr: 'La meilleure sauce à spaghetti de Ricardo',
     ricardoUrlEn: 'https://www.ricardocuisine.com/en/recipes/4436-the-best-spaghetti-sauce',
     ricardoUrlFr: 'https://www.ricardocuisine.com/fr/recettes/4436-la-meilleure-sauce-a-spaghetti',
-    imageUrl: "",
+    imageUrl: "https://images.unsplash.com/photo-1555949258-eb67b1ef0ceb?auto=format&fit=crop&w=800&q=80",
     time: '45 mins',
     prepTime: '15 mins',
     cookTime: '30 mins',
@@ -254,7 +266,7 @@ export const RICARDO_RECIPES: RicardoRecipe[] = [
     titleFr: 'Parfait aux fraises, yogourt grec et crumble d\'avoine',
     ricardoUrlEn: 'https://www.ricardocuisine.com/en/recipes/5863-strawberry-and-yogurt-parfaits',
     ricardoUrlFr: 'https://www.ricardocuisine.com/fr/recettes/5863-parfaits-aux-fraises-et-au-yogourt',
-    imageUrl: "",
+    imageUrl: "https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=800&q=80",
     time: '10 mins',
     prepTime: '10 mins',
     cookTime: '0 mins',
@@ -295,7 +307,7 @@ export const RICARDO_RECIPES: RicardoRecipe[] = [
     titleFr: 'Saumon glacé à l\'érable traditionnel de Ricardo',
     ricardoUrlEn: 'https://www.ricardocuisine.com/en/recipes/4207-maple-glazed-salmon',
     ricardoUrlFr: 'https://www.ricardocuisine.com/fr/recettes/4207-saumon-glace-a-l-erable',
-    imageUrl: "",
+    imageUrl: "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=800&q=80",
     time: '20 mins',
     prepTime: '5 mins',
     cookTime: '15 mins',
@@ -335,7 +347,7 @@ export const RICARDO_RECIPES: RicardoRecipe[] = [
     titleFr: 'Tartines crémeuses à l\'avocat et œuf mollet',
     ricardoUrlEn: 'https://www.ricardocuisine.com/en/recipes/7724-avocado-toast-with-soft-boiled-egg',
     ricardoUrlFr: 'https://www.ricardocuisine.com/fr/recettes/7724-tartines-a-l-avocat-et-a-l-oeuf-mollet',
-    imageUrl: "",
+    imageUrl: "https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&w=800&q=80",
     time: '12 mins',
     prepTime: '6 mins',
     cookTime: '6 mins',
@@ -375,7 +387,7 @@ export const RICARDO_RECIPES: RicardoRecipe[] = [
     titleFr: 'Pain doré au levain et compote tiède de petits fruits',
     ricardoUrlEn: 'https://www.ricardocuisine.com/en/recipes/498-french-toast',
     ricardoUrlFr: 'https://www.ricardocuisine.com/fr/recettes/498-pain-dore',
-    imageUrl: "",
+    imageUrl: "https://images.unsplash.com/photo-1484723091739-30a097e8f929?auto=format&fit=crop&w=800&q=80",
     time: '15 mins',
     prepTime: '5 mins',
     cookTime: '10 mins',
@@ -416,7 +428,7 @@ export const RICARDO_RECIPES: RicardoRecipe[] = [
     titleFr: 'Poêlée mexicaine express de bœuf à la Ricardo',
     ricardoUrlEn: 'https://www.ricardocuisine.com/en/recipes/6890-ground-beef-taco-bowls',
     ricardoUrlFr: 'https://www.ricardocuisine.com/fr/recettes/6890-bols-de-tacos-au-boeuf-hache',
-    imageUrl: "",
+    imageUrl: "https://images.unsplash.com/photo-1551504734-5ee1c4a1479b?auto=format&fit=crop&w=800&q=80",
     time: '20 mins',
     prepTime: '5 mins',
     cookTime: '15 mins',
@@ -454,7 +466,7 @@ export const RICARDO_RECIPES: RicardoRecipe[] = [
     titleFr: 'Brouillade d\'œufs aux légumes du frigo et cheddar',
     ricardoUrlEn: 'https://www.ricardocuisine.com/en/recipes/scrambled-eggs-with-vegetables',
     ricardoUrlFr: 'https://www.ricardocuisine.com/fr/recettes/oeufs-brouilles-aux-legumes',
-    imageUrl: "",
+    imageUrl: "https://images.unsplash.com/photo-1582169505937-b9992bd01ed9?auto=format&fit=crop&w=800&q=80",
     time: '12 mins',
     prepTime: '5 mins',
     cookTime: '7 mins',
@@ -494,7 +506,7 @@ export const RICARDO_RECIPES: RicardoRecipe[] = [
     titleFr: 'Pitas croustillantes aux herbes et tartinade de pois chiches à l\'ail',
     ricardoUrlEn: 'https://www.ricardocuisine.com/en/recipes/hummus-and-pita-chips',
     ricardoUrlFr: 'https://www.ricardocuisine.com/fr/recettes/houmous-et-chips-de-pita',
-    imageUrl: "",
+    imageUrl: "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?auto=format&fit=crop&w=800&q=80",
     time: '15 mins',
     prepTime: '10 mins',
     cookTime: '5 mins',
@@ -531,7 +543,7 @@ export const RICARDO_RECIPES: RicardoRecipe[] = [
     titleFr: 'Bol zen saumon sésame et avocat par Marilou',
     ricardoUrlEn: 'https://www.troisfoisparjour.com/en/recipes',
     ricardoUrlFr: 'https://www.troisfoisparjour.com/fr/recettes',
-    imageUrl: "",
+    imageUrl: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80",
     time: '20 mins',
     prepTime: '10 mins',
     cookTime: '10 mins',
@@ -574,7 +586,7 @@ export const RICARDO_RECIPES: RicardoRecipe[] = [
     titleFr: 'Pâtes rustiques express à la tomate et à l\'ail de Jamie Oliver',
     ricardoUrlEn: 'https://www.jamieoliver.com/recipes/pasta-recipes',
     ricardoUrlFr: 'https://www.jamieoliver.com/recipes/pasta-recipes',
-    imageUrl: "",
+    imageUrl: "https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=800&q=80",
     time: '15 mins',
     prepTime: '5 mins',
     cookTime: '10 mins',
@@ -616,7 +628,7 @@ export const RICARDO_RECIPES: RicardoRecipe[] = [
     titleFr: 'Les célèbres œufs brouillés fondants de Gordon Ramsay',
     ricardoUrlEn: 'https://www.gordonramsay.com/gr/recipes',
     ricardoUrlFr: 'https://www.gordonramsay.com/gr/recipes',
-    imageUrl: "",
+    imageUrl: "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?auto=format&fit=crop&w=800&q=80",
     time: '8 mins',
     prepTime: '2 mins',
     cookTime: '6 mins',
@@ -658,7 +670,7 @@ export const RICARDO_RECIPES: RicardoRecipe[] = [
     titleFr: 'Poêlée campagnarde de bœuf et légumes façon Marmiton',
     ricardoUrlEn: 'https://www.marmiton.org',
     ricardoUrlFr: 'https://www.marmiton.org/recettes/recherche.aspx',
-    imageUrl: "",
+    imageUrl: "https://images.unsplash.com/photo-1534939561126-855b8675edd7?auto=format&fit=crop&w=800&q=80",
     time: '25 mins',
     prepTime: '10 mins',
     cookTime: '15 mins',
@@ -695,3 +707,24 @@ export const RICARDO_RECIPES: RicardoRecipe[] = [
     suggestedPantryNeeds: ['Herbes de Provence', 'Black Pepper'],
   }
 ];
+
+// Enrich built-in sample recipes with complete Nutritional Engine data (Method A: AI Auto-Estimation)
+export const RICARDO_RECIPES: RicardoRecipe[] = RAW_RICARDO_RECIPES.map((recipe) => {
+  const servingsNum = parseInt(recipe.servings?.replace(/\D/g, '') || '4', 10) || 4;
+  const nutrition = estimateRecipeNutrition(recipe.title, recipe.ingredients, servingsNum);
+  return {
+    ...recipe,
+    caloriesPerServing: nutrition.caloriesPerServing,
+    totalCalories: nutrition.totalCalories,
+    macrosPerServing: nutrition.macrosPerServing,
+    calculationMethod: 'AI_ESTIMATED',
+    nutrition,
+    ingredients: recipe.ingredients.map((ing, idx) => ({
+      ...ing,
+      estimatedKcal: nutrition.ingredients?.[idx]?.estimatedKcal || 80,
+      proteinGrams: nutrition.ingredients?.[idx]?.proteinGrams || 5,
+      carbsGrams: nutrition.ingredients?.[idx]?.carbsGrams || 10,
+      fatGrams: nutrition.ingredients?.[idx]?.fatGrams || 3,
+    })),
+  };
+});

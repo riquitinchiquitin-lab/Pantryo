@@ -51,9 +51,9 @@ router.get("/policy", (req, res) => {
         role: u.role,
         avatarUrl: u.avatarUrl,
         fido2Enabled: Boolean(u.fido2Enabled && u.fido2Credentials?.length > 0),
-        fido2Enforced: true,
+        fido2Enforced: Boolean(u.fido2Enforced),
         credentialsCount: (u.fido2Credentials || []).length,
-        isCompliant: Boolean(u.fido2Enabled && u.fido2Credentials?.length > 0),
+        isCompliant: Boolean(u.fido2Enabled && u.fido2Credentials?.length > 0) || Boolean(u.totpEnabled && u.totpSecret),
       })),
     });
   } catch (err) {

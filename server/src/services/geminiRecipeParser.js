@@ -1,8 +1,25 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import Tesseract from "tesseract.js";
 import { validateSafeExternalUrl, safeFetch } from "./ssrfGuard.js";
-import { getBilingualNames, translateFoodItem } from "./foodTranslator.js";
+import {
+  getBilingualNames,
+  translateFoodItem,
+  parseIngredientString,
+  detectIngredientStorage,
+  translateCookingStepToFrench,
+  translateCookingStepToEnglish,
+  isTextFrench,
+  isTextTagalog,
+  translateTagalogToEnglish,
+  translateTagalogToFrench,
+  cleanDuplicatedNotes,
+  translateRecipeTitleToEnglish,
+  translateRecipeTitleToFrench,
+  translateRecipeDescriptionToEnglish,
+  translateRecipeDescriptionToFrench,
+} from "./foodTranslator.js";
 import { dbStore } from "./dbStore.js";
+import { estimateRecipeNutrition } from "./nutritionEngine.js";
 
 /**
  * Pantryo - Gemini Recipe Parser Service
@@ -379,15 +396,15 @@ Respond strictly in JSON following the schema.`;
 }
 
 /**
- * Normalizes and validates the parsed recipe object
+ * Normalizes and validates the parsed recipe object with full bilingual compliance
  */
 function normalizeRecipeOutput(parsed, extra = {}) {
-  const id = `rec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-  const youtubeId = extra.youtubeId || null;
-  const youtubeUrl = extra.youtubeUrl || null;
+  const id = parsed.id || `rec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const youtubeId = extra.youtubeId || parsed.youtubeVideoId || null;
+  const youtubeUrl = extra.youtubeUrl || parsed.youtubeUrl || null;
 
   // Auto-generate YouTube thumbnail if available
-  let imageUrl = extra.imageUrl;
+  let imageUrl = extra.imageUrl || parsed.imageUrl;
   if (!imageUrl && youtubeId) {
     imageUrl = `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
   }
@@ -395,24 +412,144 @@ function normalizeRecipeOutput(parsed, extra = {}) {
     imageUrl = "";
   }
 
-  const ingredients = (parsed.ingredients || []).map((ing) => {
+  const servingsNum = parseInt(`${parsed.servings || "4"}`.replace(/\D/g, ""), 10) || 4;
+  const appLang = (extra.language || parsed.language || "FR").toUpperCase() === "FR" ? "FR" : "EN";
+
+  // Determine base recipe language
+  const rawTitleCandidate = (parsed.title || parsed.titleFr || "").trim();
+  const isTagalog = isTextTagalog(rawTitleCandidate) || (Array.isArray(parsed.tags) && parsed.tags.some(t => isTextTagalog(t)));
+  const isFrench = !isTagalog && isTextFrench(parsed.titleFr || rawTitleCandidate);
+
+  // Clean Titles
+  let titleEn = (parsed.titleEn || (!isFrench ? (parsed.title || "") : "") || "").trim();
+  let titleFr = (parsed.titleFr || (isFrench ? (parsed.title || "") : "") || "").trim();
+
+  if (isTagalog) {
+    if (!titleEn || isTextTagalog(titleEn)) {
+      titleEn = cleanDuplicatedNotes(translateRecipeTitleToEnglish(rawTitleCandidate) || translateTagalogToEnglish(rawTitleCandidate) || rawTitleCandidate);
+    }
+    if (!titleFr || isTextTagalog(titleFr)) {
+      titleFr = cleanDuplicatedNotes(translateRecipeTitleToFrench(rawTitleCandidate) || translateTagalogToFrench(rawTitleCandidate) || translateFoodItem(titleEn, "FR") || rawTitleCandidate);
+    }
+  } else if (isFrench) {
+    if (!titleFr) titleFr = parsed.titleFr || rawTitleCandidate;
+    if (!titleEn || (isTextFrench(titleEn) && titleEn.toLowerCase() === titleFr.toLowerCase())) {
+      titleEn = cleanDuplicatedNotes(translateRecipeTitleToEnglish(titleFr) || translateFoodItem(titleFr, "EN") || rawTitleCandidate);
+    }
+  } else {
+    // English
+    if (!titleEn) titleEn = parsed.title || parsed.titleEn || rawTitleCandidate;
+    if (!titleFr || !isTextFrench(titleFr) || titleFr.toLowerCase() === titleEn.toLowerCase()) {
+      titleFr = cleanDuplicatedNotes(translateRecipeTitleToFrench(titleEn) || translateFoodItem(titleEn, "FR") || rawTitleCandidate);
+    }
+  }
+
+  const rawIngredients = (parsed.ingredients || []).map((ing) => {
     let loc = (ing.locationType || "PANTRY").toUpperCase();
     if (!["FRIDGE", "FREEZER", "PANTRY", "SPICE_RACK"].includes(loc)) {
       loc = "FRIDGE";
     }
+
+    const rawIngName = (ing.name || ing.nameFr || "Ingredient").trim();
+    const rawIngFr = (ing.nameFr || "").trim();
+
+    let ingEn = (ing.nameEn || (!isFrench ? (ing.name || "") : "") || "").trim();
+    let ingFr = (ing.nameFr || (isFrench ? (ing.name || "") : "") || "").trim();
+
+    if (ingEn && ingFr && ingEn.toLowerCase() !== ingFr.toLowerCase()) {
+      // Both distinct and valid, preserve both
+    } else if (isTextTagalog(rawIngName) || isTextTagalog(rawIngFr) || isTagalog) {
+      const candidate = rawIngName || rawIngFr;
+      if (!ingEn || isTextTagalog(ingEn)) ingEn = cleanDuplicatedNotes(translateTagalogToEnglish(candidate) || candidate);
+      if (!ingFr || isTextTagalog(ingFr)) ingFr = cleanDuplicatedNotes(translateTagalogToFrench(candidate) || translateFoodItem(ingEn, "FR") || candidate);
+    } else if (isFrench) {
+      if (!ingFr) ingFr = rawIngFr || rawIngName;
+      if (!ingEn || ingEn.toLowerCase() === ingFr.toLowerCase()) {
+        ingEn = cleanDuplicatedNotes(translateFoodItem(ingFr, "EN") || ingFr);
+      }
+    } else {
+      // English
+      if (!ingEn) ingEn = ing.name || rawIngName;
+      if (!ingFr || ingFr.toLowerCase() === ingEn.toLowerCase()) {
+        ingFr = cleanDuplicatedNotes(translateFoodItem(ingEn, "FR") || ingEn);
+      }
+    }
+
+    const activeIngName = appLang === "FR" ? (ingFr || ingEn || "Ingrédient") : (ingEn || ingFr || "Ingredient");
     return {
-      name: ing.name || "Ingredient",
-      nameFr: ing.nameFr || ing.name || "Ingrédient",
-      amount: ing.amount || "To taste",
+      name: activeIngName,
+      nameEn: ingEn || "Ingredient",
+      nameFr: ingFr || "Ingrédient",
+      amount: ing.amount || "1",
+      unit: ing.unit || "",
       category: ing.category || "Pantry",
       locationType: loc,
+      storage: ing.storage || (loc === "SPICE_RACK" ? "spices" : loc.toLowerCase()),
+      prepNotes: ing.prepNotes || "",
     };
   });
 
+  // Calculate Method A: AI Auto-Estimation nutrition
+  const recipeTitle = titleEn || "Custom Homemade Recipe";
+  const nutrition = estimateRecipeNutrition(recipeTitle, rawIngredients, servingsNum);
+
+  // Attach estimatedKcal and macros to ingredients
+  const ingredients = rawIngredients.map((ing, idx) => {
+    const nut = nutrition.ingredients && nutrition.ingredients[idx];
+    return {
+      ...ing,
+      estimatedKcal: nut ? nut.estimatedKcal : 80,
+      proteinGrams: nut ? nut.proteinGrams : 5,
+      carbsGrams: nut ? nut.carbsGrams : 10,
+      fatGrams: nut ? nut.fatGrams : 3,
+    };
+  });
+
+  // Instructions translation
+  const rawStepsEn = Array.isArray(parsed.instructionsEn) ? parsed.instructionsEn : (Array.isArray(parsed.instructions) && !isFrench ? parsed.instructions : []);
+  const rawStepsFr = Array.isArray(parsed.instructionsFr) ? parsed.instructionsFr : (Array.isArray(parsed.instructions) && isFrench ? parsed.instructions : []);
+
+  let instructionsEn = [];
+  let instructionsFr = [];
+
+  if (isTagalog) {
+    const sourceSteps = rawStepsEn.length > 0 ? rawStepsEn : rawStepsFr;
+    instructionsEn = rawStepsEn.length > 0 && !rawStepsEn.every(s => isTextTagalog(s))
+      ? rawStepsEn
+      : sourceSteps.map(s => translateCookingStepToEnglish(s) || s);
+    instructionsFr = rawStepsFr.length > 0 && !rawStepsFr.every(s => isTextTagalog(s))
+      ? rawStepsFr
+      : sourceSteps.map(s => translateCookingStepToFrench(s) || s);
+  } else if (isFrench) {
+    instructionsFr = rawStepsFr.length > 0 ? rawStepsFr : rawStepsEn;
+    if (rawStepsEn.length > 0 && !rawStepsEn.every(s => isTextFrench(s))) {
+      instructionsEn = rawStepsEn;
+    } else {
+      instructionsEn = instructionsFr.map(s => translateCookingStepToEnglish(s) || s);
+    }
+  } else {
+    // English
+    instructionsEn = rawStepsEn.length > 0 ? rawStepsEn : rawStepsFr;
+    if (rawStepsFr.length > 0 && rawStepsFr.some(s => isTextFrench(s))) {
+      instructionsFr = rawStepsFr;
+    } else {
+      instructionsFr = instructionsEn.map(s => translateCookingStepToFrench(s) || s);
+    }
+  }
+
+  if (instructionsEn.length === 0) {
+    instructionsEn = ["Prepare ingredients according to recipe directions.", "Cook thoroughly and serve hot."];
+  }
+  if (instructionsFr.length === 0) {
+    instructionsFr = ["Préparer les ingrédients selon les étapes indiquées.", "Bien cuire et servir chaud."];
+  }
+
+  const activeTitle = appLang === "FR" ? (titleFr || titleEn) : (titleEn || titleFr);
   return {
     id,
-    title: parsed.title || "Custom Homemade Recipe",
-    titleFr: parsed.titleFr || parsed.title || "Recette maison personnalisée",
+    title: activeTitle,
+    titleEn,
+    titleFr,
     ricardoUrlEn: youtubeUrl || "",
     ricardoUrlFr: youtubeUrl || "",
     youtubeUrl: youtubeUrl || null,
@@ -421,19 +558,25 @@ function normalizeRecipeOutput(parsed, extra = {}) {
     time: parsed.totalTime || parsed.cookTime || "30 mins",
     prepTime: parsed.prepTime || "10 mins",
     cookTime: parsed.cookTime || "20 mins",
-    servings: parsed.servings || "4 servings",
+    servings: parsed.servings || `${servingsNum} servings`,
     difficulty: parsed.difficulty || "Easy",
     difficultyFr: parsed.difficultyFr || "Facile",
-    calories: parsed.calories || "400 kcal",
-    source: extra.source || "Personal",
+    calories: `${nutrition.caloriesPerServing} kcal`,
+    caloriesPerServing: nutrition.caloriesPerServing,
+    totalCalories: nutrition.totalCalories,
+    macrosPerServing: nutrition.macrosPerServing,
+    totalMacros: nutrition.totalMacros,
+    calculationMethod: "AI_ESTIMATED",
+    nutrition,
+    source: extra.source || parsed.source || "Personal",
     isRicardoOfficial: false,
     isCustom: true,
-    descriptionEn: parsed.descriptionEn || "Delicious custom recipe saved to your kitchen.",
-    descriptionFr: parsed.descriptionFr || "Délicieuse recette personnalisée enregistrée dans votre cuisine.",
+    descriptionEn: parsed.descriptionEn || `Delicious ${titleEn} saved to your kitchen.`,
+    descriptionFr: parsed.descriptionFr || `Délicieuse recette de ${titleFr} enregistrée dans votre cuisine.`,
     tags: parsed.tags || [extra.source || "Personal", "Custom Recipe"],
     ingredients,
-    instructionsEn: parsed.instructionsEn || ["Prepare ingredients according to recipe directions.", "Cook thoroughly and serve hot."],
-    instructionsFr: parsed.instructionsFr || parsed.instructionsEn || ["Préparer les ingrédients selon les étapes.", "Bien cuire et servir chaud."],
+    instructionsEn,
+    instructionsFr,
     suggestedPantryNeeds: ingredients.filter((i) => i.locationType === "PANTRY").map((i) => i.name).slice(0, 3),
     createdAt: new Date().toISOString(),
   };
@@ -567,8 +710,10 @@ export function parseRecipeTextDirectly(text, { language = "EN", source = "Perso
       }
 
       const biling = getBilingualNames(name, language);
+      const activeIng = language === "FR" && biling.nameFr ? biling.nameFr : (biling.nameEn || name);
       ingredients.push({
-        name: biling.nameEn || name,
+        name: activeIng,
+        nameEn: biling.nameEn || name,
         nameFr: biling.nameFr || name,
         amount,
         category,
@@ -604,9 +749,11 @@ export function parseRecipeTextDirectly(text, { language = "EN", source = "Perso
   }
 
   const recipeId = `rec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const directActiveTitle = language === "FR" && resolvedTitleFr ? resolvedTitleFr : (resolvedTitleEn || resolvedTitleFr);
   return {
     id: recipeId,
-    title: resolvedTitleEn,
+    title: directActiveTitle,
+    titleEn: resolvedTitleEn,
     titleFr: resolvedTitleFr,
     ricardoUrlEn: youtubeUrl || "",
     ricardoUrlFr: youtubeUrl || "",
@@ -627,8 +774,8 @@ export function parseRecipeTextDirectly(text, { language = "EN", source = "Perso
     descriptionFr: `${titleCandidate} maison numérisée à partir de votre fiche de recette.`,
     tags: [source, "Custom Recipe", "Home Cooking"],
     ingredients,
-    instructionsEn: instructions,
-    instructionsFr: instructions,
+    instructionsEn: isFrench ? instructions.map(s => translateCookingStepToEnglish(s) || s) : instructions,
+    instructionsFr: isFrench ? instructions : instructions.map(s => translateCookingStepToFrench(s) || s),
     suggestedPantryNeeds: ingredients.filter((i) => i.locationType === "PANTRY").map((i) => i.name).slice(0, 3),
     rawOcrText: clean,
     createdAt: new Date().toISOString(),
@@ -1087,6 +1234,318 @@ Output a JSON array of 3 to 4 recipe objects inside a \`\`\`json\`\`\` code bloc
 /**
  * Parses and automatically translates a recipe from ANY external website URL
  * Supports Ricardo, Marmiton, 750g, Cuisine AZ, Serious Eats, BBC Good Food, Allrecipes, etc.
+/**
+ * Helper to parse ISO 8601 duration string (e.g. PT20M, PT1H, PT1H30M, P0DT45M) into human readable time
+ */
+export function parseIsoDuration(durationStr) {
+  if (!durationStr || typeof durationStr !== "string") return "";
+  const str = durationStr.trim();
+  if (/^\d+\s*(mins?|minutes?|hours?|hrs?|h|m)/i.test(str)) return str;
+
+  const match = str.match(/P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/i);
+  if (!match) return str;
+
+  const days = parseInt(match[1] || "0", 10);
+  const hours = parseInt(match[2] || "0", 10);
+  const minutes = parseInt(match[3] || "0", 10);
+
+  const parts = [];
+  if (days > 0) parts.push(`${days} day${days > 1 ? "s" : ""}`);
+  if (hours > 0) parts.push(`${hours} hr${hours > 1 ? "s" : ""}`);
+  if (minutes > 0) parts.push(`${minutes} min${minutes > 1 ? "s" : ""}`);
+
+  return parts.length > 0 ? parts.join(" ") : str;
+}
+
+/**
+ * Parses Schema.org Recipe JSON-LD data into a full, high-precision RicardoRecipe object.
+ */
+
+/**
+ * Asynchronously translates text using high-accuracy translation with culinary fallback
+ */
+export async function translateTextAsync(text, targetLang = "EN") {
+  if (!text || typeof text !== "string") return "";
+  const trimmed = text.trim();
+  if (trimmed.length < 2) return trimmed;
+
+  const target = targetLang.toUpperCase() === "FR" ? "fr" : "en";
+  try {
+    const q = encodeURIComponent(trimmed);
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${target}&dt=t&q=${q}`;
+    const res = await safeFetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0" },
+      signal: AbortSignal.timeout(4000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && Array.isArray(data[0])) {
+        const translated = data[0].map((s) => s[0]).join("");
+        if (translated && translated.trim().length > 0) {
+          return translated.trim();
+        }
+      }
+    }
+  } catch (err) {}
+
+  return target === "fr" ? translateRecipeDescriptionToFrench(trimmed) : translateRecipeDescriptionToEnglish(trimmed);
+}
+
+export async function parseRecipeFromJsonLd(
+  jsonLdData,
+  { cleanUrl, domain, language = "FR", pageTitle = "", rawHtml = "", alternateLangJsonLd = null, alternateLangUrl = null } = {}
+) {
+  if (!jsonLdData) return null;
+
+  // Title
+  let rawTitle = jsonLdData.name || jsonLdData.headline || pageTitle || `Recipe from ${domain}`;
+  if (typeof rawTitle !== "string") rawTitle = `${rawTitle}`;
+  rawTitle = rawTitle
+    .replace(/\s*[-|–—]\s*(Ricardo|Panlasang Pinoy|Kawaling Pinoy|Marmiton|750g|Allrecipes|Food Network|Serious Eats|Yummy\.ph|Foxy Folksy|Simpol).*$/i, "")
+    .trim();
+
+  // Bilingual Title
+  let titleEn = "";
+  let titleFr = "";
+  const isSourceFrench = isTextFrench(rawTitle);
+
+  if (alternateLangJsonLd && alternateLangJsonLd.name) {
+    let cleanAlt = `${alternateLangJsonLd.name}`
+      .replace(/\s*[-|–—]\s*(Ricardo|Panlasang Pinoy|Kawaling Pinoy|Marmiton|750g|Allrecipes|Food Network|Serious Eats|Yummy\.ph|Foxy Folksy|Simpol).*$/i, "")
+      .trim();
+    if (isSourceFrench) {
+      titleFr = rawTitle;
+      titleEn = cleanAlt;
+    } else {
+      titleEn = rawTitle;
+      titleFr = cleanAlt;
+    }
+  } else if (isTextTagalog(rawTitle)) {
+    titleEn = await translateTextAsync(rawTitle, "EN");
+    titleFr = await translateTextAsync(rawTitle, "FR");
+  } else if (isSourceFrench) {
+    titleFr = rawTitle;
+    titleEn = translateRecipeTitleToEnglish(rawTitle);
+    if (!titleEn || isTextFrench(titleEn) || titleEn.toLowerCase() === rawTitle.toLowerCase()) {
+      titleEn = await translateTextAsync(rawTitle, "EN");
+    }
+  } else {
+    titleEn = rawTitle;
+    titleFr = translateRecipeTitleToFrench(rawTitle);
+    if (!titleFr || !isTextFrench(titleFr) || titleFr.toLowerCase() === rawTitle.toLowerCase()) {
+      titleFr = await translateTextAsync(rawTitle, "FR");
+    }
+  }
+
+  // Times
+  const prepTime = parseIsoDuration(jsonLdData.prepTime) || "15 mins";
+  const cookTime = parseIsoDuration(jsonLdData.cookTime) || "25 mins";
+  const totalTime = parseIsoDuration(jsonLdData.totalTime) || (cookTime ? cookTime : "40 mins");
+
+  // Servings / Yield
+  let servings = "4 servings";
+  if (jsonLdData.recipeYield) {
+    if (Array.isArray(jsonLdData.recipeYield)) {
+      servings = `${jsonLdData.recipeYield[0]}`.includes("serving")
+        ? `${jsonLdData.recipeYield[0]}`
+        : `${jsonLdData.recipeYield[0]} servings`;
+    } else {
+      const yStr = `${jsonLdData.recipeYield}`;
+      servings = yStr.includes("serving") || yStr.includes("portion") ? yStr : `${yStr} servings`;
+    }
+  }
+
+  // Description
+  const rawDesc = jsonLdData.description || `Authentic ${rawTitle} imported from ${domain}.`;
+  let descriptionEn = "";
+  let descriptionFr = "";
+  if (alternateLangJsonLd && alternateLangJsonLd.description) {
+    if (isSourceFrench) {
+      descriptionFr = rawDesc;
+      descriptionEn = alternateLangJsonLd.description.trim();
+    } else {
+      descriptionEn = rawDesc;
+      descriptionFr = alternateLangJsonLd.description.trim();
+    }
+  } else if (isTextTagalog(rawDesc)) {
+    descriptionEn = await translateTextAsync(rawDesc, "EN");
+    descriptionFr = await translateTextAsync(rawDesc, "FR");
+  } else if (isSourceFrench) {
+    descriptionFr = rawDesc;
+    descriptionEn = await translateTextAsync(rawDesc, "EN");
+  } else {
+    descriptionEn = rawDesc;
+    descriptionFr = await translateTextAsync(rawDesc, "FR");
+  }
+
+  // Image
+  let imageUrl = "";
+  if (typeof jsonLdData.image === "string") {
+    imageUrl = jsonLdData.image;
+  } else if (Array.isArray(jsonLdData.image) && jsonLdData.image.length > 0) {
+    imageUrl = typeof jsonLdData.image[0] === "string" ? jsonLdData.image[0] : jsonLdData.image[0]?.url;
+  } else if (jsonLdData.image && typeof jsonLdData.image === "object") {
+    imageUrl = jsonLdData.image.url || jsonLdData.image.contentUrl || "";
+  }
+  // Fallback to og:image from rawHtml
+  if (!imageUrl && rawHtml) {
+    const ogMatch = rawHtml.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i);
+    if (ogMatch) imageUrl = ogMatch[1];
+  }
+
+  // Ingredients (recipeIngredient)
+  const rawIngredientsList = Array.isArray(jsonLdData.recipeIngredient)
+    ? jsonLdData.recipeIngredient
+    : [];
+  const altIngredientsList = alternateLangJsonLd && Array.isArray(alternateLangJsonLd.recipeIngredient)
+    ? alternateLangJsonLd.recipeIngredient
+    : [];
+
+  const parsedIngredients = [];
+  for (let idx = 0; idx < rawIngredientsList.length; idx++) {
+    const rawIng = rawIngredientsList[idx];
+    const baseSourceLang = isSourceFrench ? "FR" : "EN";
+    const parsedBase = parseIngredientString(rawIng, baseSourceLang);
+    let altIngString = altIngredientsList[idx] || null;
+    let finalEn = "";
+    let finalFr = "";
+
+    if (isSourceFrench) {
+      finalFr = parsedBase.nameFr || parsedBase.name;
+      if (altIngString) {
+        const altParsed = parseIngredientString(altIngString, "EN");
+        finalEn = altParsed.name || altParsed.nameEn;
+      } else {
+        finalEn = await translateTextAsync(finalFr, "EN");
+      }
+    } else {
+      finalEn = parsedBase.name || parsedBase.nameEn;
+      if (altIngString) {
+        const altParsed = parseIngredientString(altIngString, "FR");
+        finalFr = altParsed.nameFr || altParsed.name;
+      } else {
+        finalFr = await translateTextAsync(finalEn, "FR");
+      }
+    }
+
+    parsedIngredients.push({
+      ...parsedBase,
+      name: language === "FR" ? (finalFr || finalEn) : (finalEn || finalFr),
+      nameEn: finalEn,
+      nameFr: finalFr,
+    });
+  }
+
+  // Instructions (recipeInstructions)
+  let instructionsEn = [];
+  let instructionsFr = [];
+
+  const rawInstructions = jsonLdData.recipeInstructions;
+  const altInstructions = alternateLangJsonLd?.recipeInstructions;
+
+  const extractAllSteps = (instructions) => {
+    const list = [];
+    if (!instructions) return list;
+    if (typeof instructions === "string") {
+      return instructions.split(/\r?\n+/).map((s) => s.trim()).filter((s) => s.length > 5);
+    }
+    if (Array.isArray(instructions)) {
+      for (const item of instructions) {
+        list.push(...extractAllSteps(item));
+      }
+      return list;
+    }
+    if (typeof instructions === "object") {
+      if (Array.isArray(instructions.itemListElement)) {
+        return extractAllSteps(instructions.itemListElement);
+      }
+      if (instructions.text && typeof instructions.text === "string" && instructions.text.trim().length > 3) {
+        return [instructions.text.trim()];
+      }
+      if (
+        instructions.name &&
+        typeof instructions.name === "string" &&
+        instructions.name.trim().length > 3 &&
+        !instructions["@type"]?.includes("HowToSection")
+      ) {
+        return [instructions.name.trim()];
+      }
+    }
+    return list;
+  };
+
+  const extractedSteps = extractAllSteps(rawInstructions);
+  const altSteps = altInstructions ? extractAllSteps(altInstructions) : [];
+
+  if (altSteps.length > 0) {
+    if (isSourceFrench) {
+      instructionsFr = extractedSteps;
+      instructionsEn = altSteps;
+    } else {
+      instructionsEn = extractedSteps;
+      instructionsFr = altSteps;
+    }
+  } else {
+    for (const stepText of extractedSteps) {
+      if (stepText && stepText.length > 3) {
+        if (isTextTagalog(stepText)) {
+          instructionsEn.push(await translateTextAsync(stepText, "EN"));
+          instructionsFr.push(await translateTextAsync(stepText, "FR"));
+        } else if (isTextFrench(stepText)) {
+          instructionsFr.push(stepText);
+          instructionsEn.push(await translateTextAsync(stepText, "EN"));
+        } else {
+          instructionsEn.push(stepText);
+          instructionsFr.push(await translateTextAsync(stepText, "FR"));
+        }
+      }
+    }
+  }
+
+  if (instructionsEn.length === 0) {
+    instructionsEn.push(`Follow directions from original recipe at ${cleanUrl}`);
+    instructionsFr.push(`Suivre les étapes indiquées sur le site original : ${cleanUrl}`);
+  }
+
+  const recipeId = `rec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const recipeObject = {
+    id: recipeId,
+    title: language === "FR" ? (titleFr || titleEn) : (titleEn || titleFr),
+    titleEn,
+    titleFr,
+    descriptionEn,
+    descriptionFr,
+    prepTime,
+    cookTime,
+    totalTime,
+    servings,
+    difficulty: "Easy",
+    difficultyFr: "Facile",
+    calories: "450 kcal",
+    source: domain,
+    sourceUrl: cleanUrl,
+    imageUrl: imageUrl || "",
+    isRicardoOfficial: domain.includes("ricardocuisine.com"),
+    isCustom: true,
+    tags: [domain, "Web Recipe", "Imported"],
+    ingredients: parsedIngredients,
+    instructionsEn,
+    instructionsFr,
+    suggestedPantryNeeds: parsedIngredients.filter((i) => i.locationType === "PANTRY").map((i) => i.name).slice(0, 3),
+    createdAt: new Date().toISOString(),
+  };
+
+  return normalizeRecipeOutput(recipeObject, {
+    source: domain,
+    sourceUrl: cleanUrl,
+    imageUrl: imageUrl || "",
+    language,
+  });
+}
+
+/**
+ * Parses and automatically translates a recipe from ANY external website URL
+ * Supports Ricardo, Panlasang Pinoy, Kawaling Pinoy, Yummy.ph, Marmiton, 750g, Allrecipes, etc.
  * Automatically translates all fields (title, ingredients, instructions) to FR or EN on import.
  */
 export async function parseRecipeFromUrl({
@@ -1107,26 +1566,15 @@ export async function parseRecipeFromUrl({
     domain = "Web Recipe";
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return generateFallbackRecipe({
-      rawText: `Imported Recipe from ${domain}\nURL: ${cleanUrl}`,
-      source: domain,
-      language,
-      reason: `Gemini API key not configured. Generated demo recipe for ${domain}.`,
-    });
-  }
-
-  const ai = getGeminiClient();
-
-  // Try to fetch page content directly
+  // 1. Fetch webpage safely
   let pageContent = "";
   let jsonLdData = null;
   let pageTitle = "";
+  let rawHtml = "";
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
     const res = await safeFetch(cleanUrl, {
       signal: controller.signal,
       headers: {
@@ -1140,11 +1588,11 @@ export async function parseRecipeFromUrl({
     clearTimeout(timeoutId);
 
     if (res.ok) {
-      const html = await res.text();
-      const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+      rawHtml = await res.text();
+      const titleMatch = rawHtml.match(/<title[^>]*>([^<]+)<\/title>/i);
       if (titleMatch) pageTitle = titleMatch[1].trim();
 
-      const jsonLdMatches = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+      const jsonLdMatches = rawHtml.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
       if (jsonLdMatches) {
         for (const tag of jsonLdMatches) {
           const content = tag.replace(/<\/?script[^>]*>/gi, "").trim();
@@ -1162,7 +1610,7 @@ export async function parseRecipeFromUrl({
       }
 
       if (!jsonLdData) {
-        pageContent = html
+        pageContent = rawHtml
           .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
           .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "")
           .replace(/<svg\b[^<]*(?:(?!<\/svg>)<[^<]*)*<\/svg>/gi, "")
@@ -1175,27 +1623,94 @@ export async function parseRecipeFromUrl({
       }
     }
   } catch (err) {
-    console.warn(`[Gemini Recipe Parser] Direct fetch for ${cleanUrl} notice: ${err.message}. Using Gemini Search fallback.`);
+    console.warn(`[Gemini Recipe Parser] Direct fetch for ${cleanUrl} notice: ${err.message}.`);
   }
 
-  const systemInstruction = `You are Pantryo's master bilingual culinary digitizer and international recipe archivist.
-Your job is to accurately extract the complete recipe from this webpage (${cleanUrl}).
+  // Check for bilingual alternate page link (e.g., Ricardo Cuisine has official alternate link)
+  let alternateLangJsonLd = null;
+  let alternateLangUrl = null;
+  if (rawHtml) {
+    const isSourceFr = cleanUrl.includes("/recettes/") || /hreflang=["']fr["']/i.test(rawHtml);
+    const targetAltLang = isSourceFr ? "en" : "fr";
+    const altRegex = new RegExp(`<link[^>]+(?:href=["']([^"']+)["'][^>]+hreflang=["']${targetAltLang}["']|hreflang=["']${targetAltLang}["'][^>]+href=["']([^"']+)["'])`, "i");
+    const altMatch = rawHtml.match(altRegex);
+    const altCandidate = altMatch ? (altMatch[1] || altMatch[2]) : null;
+    if (altCandidate && altCandidate.startsWith("http")) {
+      alternateLangUrl = altCandidate;
+      try {
+        const altSafe = await validateSafeExternalUrl(altCandidate);
+        const altRes = await safeFetch(altSafe, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          },
+        });
+        if (altRes.ok) {
+          const altHtml = await altRes.text();
+          const altJsonMatches = altHtml.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+          if (altJsonMatches) {
+            for (const tag of altJsonMatches) {
+              const content = tag.replace(/<\/?script[^>]*>/gi, "").trim();
+              try {
+                const parsed = JSON.parse(content);
+                const found = findRecipeInJsonLd(parsed);
+                if (found) {
+                  alternateLangJsonLd = found;
+                  break;
+                }
+              } catch (e) {}
+            }
+          }
+        }
+      } catch (altErr) {
+        console.warn(`[Gemini Recipe Parser] Alternate scrape notice:`, altErr.message);
+      }
+    }
+  }
 
-CRITICAL MANDATE - AUTOMATIC TRANSLATION:
+  // 2. If Schema.org Recipe was extracted, produce clean deterministic recipe
+  let deterministicRecipe = null;
+  if (jsonLdData) {
+    try {
+      deterministicRecipe = await parseRecipeFromJsonLd(jsonLdData, {
+        cleanUrl,
+        domain,
+        language,
+        pageTitle,
+        rawHtml,
+        alternateLangJsonLd,
+        alternateLangUrl,
+      });
+    } catch (detErr) {
+      console.warn(`[parseRecipeFromJsonLd error]:`, detErr.message);
+    }
+  }
+
+  // 3. If Gemini is available, attempt AI enhancement & translation
+  const apiKey = (process.env.GEMINI_API_KEY || dbStore?.systemSettings?.geminiApiKey || "").trim();
+  const hasGemini = Boolean(apiKey && apiKey.length > 10 && apiKey !== "MY_GEMINI_API_KEY");
+
+  if (hasGemini) {
+    try {
+      const ai = getGeminiClient();
+
+      const systemInstruction = `You are Pantryo's master bilingual culinary digitizer and international recipe archivist.
+Your job is to accurately extract and polish the complete recipe from this webpage (${cleanUrl}).
+
+CRITICAL MANDATE - AUTOMATIC TRANSLATION & STORAGE ZONING:
 Target primary language for this import: ${language === "FR" ? "French (Français)" : "English"}.
-Regardless of the language of the source website (French, English, Italian, Spanish, etc.):
-1. AUTOMATICALLY TRANSLATE ALL ELEMENTS into ${language === "FR" ? "French" : "English"} as requested!
+1. AUTOMATICALLY TRANSLATE ALL ELEMENTS into ${language === "FR" ? "French" : "English"}!
 2. Provide complete bilingual output for seamless switching:
    - title: English title
    - titleFr: French title
    - descriptionEn: Appetizing English summary
    - descriptionFr: Appetizing French summary
    - ingredients: array of {
-       "name": clear English ingredient name,
+       "name": clear English ingredient name (without prep instructions),
        "nameFr": clear French ingredient name,
        "amount": measurement/quantity (e.g. "250g", "2 tbsp / 2 c. à soupe", "3 cloves / 3 gousses"),
-       "category": One of "Produce", "Dairy & Eggs", "Meat & Seafood", "Bakery", "Beverages", "Condiments", "Pantry Staples", "Frozen Meals", "Snacks",
-       "locationType": "FRIDGE", "PANTRY", or "FREEZER"
+       "category": One of "Produce", "Dairy & Eggs", "Meat & Seafood", "Bakery", "Beverages", "Condiments", "Pantry Staples", "Frozen Foods", "Spices & Seasonings",
+       "locationType": "FRIDGE", "PANTRY", "FREEZER", or "SPICE_RACK"
      }
    - instructionsEn: Complete step-by-step instructions in English
    - instructionsFr: Complete step-by-step instructions in French
@@ -1207,122 +1722,266 @@ Regardless of the language of the source website (French, English, Italian, Span
    - difficultyFr: "Facile", "Moyen", ou "Avancé"
    - calories: e.g. "450 kcal"
    - tags: array of 3-5 tags
-   - source: Name of website (e.g. "Marmiton", "Ricardo Cuisine", "750g", "Serious Eats", "Allrecipes", "${domain}")
+   - source: Name of website ("${domain}")
    - sourceUrl: "${cleanUrl}"
-   - imageUrl: High-quality recipe food image URL from the page, or Unsplash if unavailable.
+   - imageUrl: High-quality recipe food image URL from the page.
 
 Always output strictly valid JSON conforming to the schema.`;
 
-  const prompt = jsonLdData
-    ? `Extract and translate this recipe from ${cleanUrl}.
+      const prompt = jsonLdData
+        ? `Extract and translate this recipe from ${cleanUrl}.
 Schema.org JSON-LD from page:
 ${JSON.stringify(jsonLdData).slice(0, 9000)}`
-    : pageContent
-    ? `Extract and translate the recipe from webpage (${cleanUrl}):
+        : pageContent
+        ? `Extract and translate the recipe from webpage (${cleanUrl}):
 Title: ${pageTitle}
 Page Text:
 ${pageContent.slice(0, 10000)}`
-    : `Please search for, extract and translate the recipe at this URL using Google Search: ${cleanUrl}`;
+        : `Please search for, extract and translate the recipe at this URL using Google Search: ${cleanUrl}`;
 
-  const config = {
-    systemInstruction,
-    temperature: 0.2,
-  };
+      const config = {
+        systemInstruction,
+        temperature: 0.2,
+      };
 
-  if (!jsonLdData && !pageContent) {
-    config.tools = [{ googleSearch: {} }];
-  } else {
-    config.responseMimeType = "application/json";
+      if (!jsonLdData && !pageContent) {
+        config.tools = [{ googleSearch: {} }];
+      } else {
+        config.responseMimeType = "application/json";
+      }
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.8-flash",
+        contents: prompt,
+        config,
+      });
+
+      const rawText = response.text || "";
+      let cleanJson = rawText.trim();
+      if (cleanJson.includes("```json")) {
+        cleanJson = cleanJson.split("```json")[1].split("```")[0].trim();
+      } else if (cleanJson.includes("```")) {
+        cleanJson = cleanJson.split("```")[1].split("```")[0].trim();
+      }
+
+      const parsed = JSON.parse(cleanJson);
+      const normalized = normalizeRecipeOutput(parsed, {
+        source: parsed.source || domain,
+        sourceUrl: cleanUrl,
+        imageUrl: parsed.imageUrl || deterministicRecipe?.imageUrl,
+      });
+
+      return {
+        success: true,
+        message:
+          language === "FR"
+            ? `Recette importée et traduite avec succès depuis ${domain} !`
+            : `Recipe imported and translated successfully from ${domain}!`,
+        recipe: normalized,
+      };
+    } catch (aiError) {
+      console.warn(`[Gemini Recipe Parser] Gemini API failed, falling back to deterministic:`, aiError.message);
+      if (deterministicRecipe) {
+        return {
+          success: true,
+          notice: `Imported via direct Schema.org parser (${aiError.message})`,
+          recipe: deterministicRecipe,
+        };
+      }
+    }
   }
 
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
-      contents: prompt,
-      config,
-    });
-
-    const rawText = response.text || "";
-    let cleanJson = rawText.trim();
-    if (cleanJson.includes("```json")) {
-      cleanJson = cleanJson.split("```json")[1].split("```")[0].trim();
-    } else if (cleanJson.includes("```")) {
-      cleanJson = cleanJson.split("```")[1].split("```")[0].trim();
-    }
-
-    const parsed = JSON.parse(cleanJson);
-    const normalized = normalizeRecipeOutput(parsed, {
-      source: parsed.source || domain,
-      sourceUrl: cleanUrl,
-      imageUrl: parsed.imageUrl,
-    });
-
+  // 4. Return deterministic recipe if we parsed JSON-LD
+  if (deterministicRecipe) {
     return {
       success: true,
       message:
         language === "FR"
-          ? `Recette importée et traduite avec succès depuis ${domain} !`
-          : `Recipe imported and translated successfully from ${domain}!`,
-      recipe: normalized,
+          ? `Recette importée avec succès depuis ${domain} !`
+          : `Recipe imported successfully from ${domain}!`,
+      recipe: deterministicRecipe,
     };
-  } catch (error) {
-    console.error("[Gemini Recipe Parser] Error in parseRecipeFromUrl:", error);
-    return generateFallbackRecipe({
-      rawText: `Imported Recipe from ${domain}\nURL: ${cleanUrl}`,
-      source: domain,
-      language,
-      reason: `AI URL Extraction note: ${error.message}. Generated fallback recipe.`,
-    });
   }
+
+  // 5. If no JSON-LD but we have page text, parse text directly
+  if (pageContent) {
+    const directRecipe = parseRecipeTextDirectly(pageContent, {
+      language,
+      source: domain,
+    });
+    return {
+      success: true,
+      recipe: directRecipe,
+    };
+  }
+
+  // 6. Last resort fallback
+  return generateFallbackRecipe({
+    rawText: `Imported Recipe from ${domain}\nURL: ${cleanUrl}`,
+    source: domain,
+    language,
+    reason: `Could not reach ${cleanUrl} directly. Generated demo recipe for ${domain}.`,
+  });
 }
 
 /**
  * Translates an existing recipe into the target language (FR or EN)
+ *
+ * EXACT SPECIFIED LOGIC:
+ * 1. If it's French: translate to English ONLY for the English app version (preserve French for French app version).
+ * 2. If it's English: translate to French for the French app version (preserve English for English app version).
+ * 3. If it's Tagalog: translate to BOTH English and French!
  */
 export async function translateRecipe({ recipe, targetLanguage = "FR" }) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || !recipe) {
-    return { success: true, recipe };
+  if (!recipe) {
+    return { success: false, error: "Missing recipe data" };
   }
 
-  const ai = getGeminiClient();
-  const systemInstruction = `You are Pantryo's expert culinary translator.
-Translate all elements of the recipe into ${targetLanguage === "FR" ? "French" : "English"}.
+  const targetLang = (targetLanguage || "FR").toUpperCase() === "FR" ? "FR" : "EN";
+
+  // 1. If Gemini API key is configured, attempt AI culinary translation
+  const apiKey = (process.env.GEMINI_API_KEY || dbStore?.systemSettings?.geminiApiKey || "").trim();
+  const hasGemini = Boolean(apiKey && apiKey.length > 10 && apiKey !== "MY_GEMINI_API_KEY");
+
+  if (hasGemini) {
+    try {
+      const ai = getGeminiClient();
+      const systemInstruction = `You are Pantryo's master bilingual culinary translator.
+Translate this recipe into ${targetLang === "FR" ? "French" : "English"}.
+If source is French: preserve French in titleFr/instructionsFr/nameFr and supply English in title/instructionsEn/name.
+If source is English: preserve English in title/instructionsEn/name and supply French in titleFr/instructionsFr/nameFr.
+If source is Tagalog: translate to BOTH English and French!
 Return a JSON object containing:
-- title
-- titleFr
+- title: English title
+- titleFr: French title
 - descriptionEn
 - descriptionFr
-- ingredients: array of { name, nameFr, amount, category, locationType }
+- ingredients: array of { name, nameFr, amount, unit, category, locationType, storage }
 - instructionsEn
 - instructionsFr
 - difficulty
 - difficultyFr
 - tags`;
 
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
-      contents: `Translate this recipe:\n${JSON.stringify(recipe)}`,
-      config: {
-        systemInstruction,
-        temperature: 0.1,
-        responseMimeType: "application/json",
-      },
-    });
+      const response = await ai.models.generateContent({
+        model: "gemini-3.8-flash",
+        contents: `Translate this recipe:\n${JSON.stringify(recipe)}`,
+        config: {
+          systemInstruction,
+          temperature: 0.1,
+          responseMimeType: "application/json",
+        },
+      });
 
-    const parsed = JSON.parse(response.text.trim());
-    return {
-      success: true,
-      recipe: {
+      const parsed = JSON.parse(response.text.trim());
+      const normalized = normalizeRecipeOutput({
         ...recipe,
         ...parsed,
-      },
-    };
-  } catch (error) {
-    console.error("[Gemini Recipe Parser] translateRecipe error:", error);
-    return { success: false, error: error.message, recipe };
+      });
+
+      return {
+        success: true,
+        recipe: {
+          ...normalized,
+          title: targetLang === "FR" && normalized.titleFr ? normalized.titleFr : normalized.title,
+        },
+      };
+    } catch (error) {
+      console.warn("[Gemini Recipe Parser] Gemini translateRecipe failed, applying deterministic translation:", error.message);
+    }
   }
+
+  // 2. High-precision Deterministic Bilingual Translation
+  const rawTitle = (recipe.title || recipe.titleFr || recipe.titleEn || recipe.name || "").trim();
+  const rawDesc = (recipe.description || recipe.descriptionFr || recipe.descriptionEn || recipe.zeroWasteReason || "").trim();
+
+  let titleEn = recipe.titleEn || "";
+  let titleFr = recipe.titleFr || "";
+  let descEn = recipe.descriptionEn || "";
+  let descFr = recipe.descriptionFr || "";
+
+  if (targetLang === "EN") {
+    if (!titleEn || isTextFrench(titleEn)) {
+      titleEn = cleanDuplicatedNotes(translateRecipeTitleToEnglish(titleFr || rawTitle) || await translateTextAsync(titleFr || rawTitle, "EN"));
+    }
+    if (!descEn || isTextFrench(descEn)) {
+      descEn = cleanDuplicatedNotes(await translateTextAsync(descFr || rawDesc, "EN"));
+    }
+    titleFr = titleFr || rawTitle;
+    descFr = descFr || rawDesc;
+  } else {
+    if (!titleFr || !isTextFrench(titleFr)) {
+      titleFr = cleanDuplicatedNotes(translateRecipeTitleToFrench(titleEn || rawTitle) || await translateTextAsync(titleEn || rawTitle, "FR"));
+    }
+    if (!descFr || !isTextFrench(descFr)) {
+      descFr = cleanDuplicatedNotes(await translateTextAsync(descEn || rawDesc, "FR"));
+    }
+    titleEn = titleEn || rawTitle;
+    descEn = descEn || rawDesc;
+  }
+
+  const activeTitle = targetLang === "FR" ? (titleFr || titleEn || rawTitle) : (titleEn || titleFr || rawTitle);
+
+  // Ingredients translation
+  const rawIngredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
+  const translatedIngredients = await Promise.all(
+    rawIngredients.map(async (ing) => {
+      let ingEn = ing.nameEn || ing.name || "";
+      let ingFr = ing.nameFr || "";
+
+      if (targetLang === "EN") {
+        if (!ingEn || isTextFrench(ingEn)) {
+          ingEn = await translateTextAsync(ingFr || ing.name, "EN");
+        }
+      } else {
+        if (!ingFr || !isTextFrench(ingFr)) {
+          ingFr = await translateTextAsync(ingEn || ing.name, "FR");
+        }
+      }
+
+      const activeName = targetLang === "FR" ? (ingFr || ingEn) : (ingEn || ingFr);
+      return {
+        ...ing,
+        name: activeName,
+        nameEn: ingEn,
+        nameFr: ingFr,
+      };
+    })
+  );
+
+  // Instructions translation
+  const rawStepsEn = Array.isArray(recipe.instructionsEn) ? recipe.instructionsEn : (Array.isArray(recipe.instructions) ? recipe.instructions : []);
+  const rawStepsFr = Array.isArray(recipe.instructionsFr) ? recipe.instructionsFr : [];
+
+  let instructionsEn = [...rawStepsEn];
+  let instructionsFr = [...rawStepsFr];
+
+  if (targetLang === "EN") {
+    const src = rawStepsFr.length > 0 ? rawStepsFr : rawStepsEn;
+    instructionsEn = await Promise.all(src.map((s) => translateTextAsync(s, "EN")));
+    if (instructionsFr.length === 0) instructionsFr = src;
+  } else {
+    const src = rawStepsEn.length > 0 ? rawStepsEn : rawStepsFr;
+    instructionsFr = await Promise.all(src.map((s) => translateTextAsync(s, "FR")));
+    if (instructionsEn.length === 0) instructionsEn = src;
+  }
+
+  return {
+    success: true,
+    recipe: {
+      ...recipe,
+      title: activeTitle,
+      titleEn,
+      titleFr,
+      descriptionEn: descEn,
+      descriptionFr: descFr,
+      ingredients: translatedIngredients,
+      instructionsEn,
+      instructionsFr,
+      difficulty: recipe.difficulty || "Easy",
+      difficultyFr: recipe.difficultyFr || (recipe.difficulty === "Advanced" ? "Avancé" : recipe.difficulty === "Medium" ? "Moyen" : "Facile"),
+    },
+  };
 }
 
 /**
@@ -1781,6 +2440,10 @@ Each recipe object must have:
  * Generates tailored fallback web suggestions when API key is pending
  * Strictly specialized for BREAKFAST, LUNCH, DINNER, or SNACK
  */
+/**
+ * Generates tailored fallback web suggestions when API key is pending
+ * Strictly specialized for BREAKFAST, LUNCH, DINNER, or SNACK
+ */
 function generateFallbackWebSuggestions({
   inventory = [],
   expiringItems = [],
@@ -1788,18 +2451,26 @@ function generateFallbackWebSuggestions({
   language = "EN",
 }) {
   const topExpiringNames = expiringItems.map((i) => i.name);
-  const heroItem = topExpiringNames[0] || (inventory[0] ? inventory[0].name : "Fresh Ingredients");
-  const secondaryItem = topExpiringNames[1] || (inventory[1] ? inventory[1].name : "Herbs & Veggies");
+  const heroRaw = topExpiringNames[0] || (inventory[0] ? inventory[0].name : "Fresh Ingredients");
+  const secondaryRaw = topExpiringNames[1] || (inventory[1] ? inventory[1].name : "Herbs & Veggies");
+
+  const heroBiling = getBilingualNames(heroRaw, language);
+  const heroEn = heroBiling.nameEn || heroRaw;
+  const heroFr = heroBiling.nameFr || heroRaw;
+
+  const secBiling = getBilingualNames(secondaryRaw, language);
+  const secEn = secBiling.nameEn || secondaryRaw;
+  const secFr = secBiling.nameFr || secondaryRaw;
 
   if (targetMealType === "BREAKFAST") {
     return [
       {
         id: "web_fallback_bfast_01",
-        title: `Golden Zero-Waste Morning Hash with ${heroItem} & Fried Eggs`,
-        titleFr: `Poêlée déjeuner dorée aux œufs et ${heroItem}`,
+        title: `Golden Zero-Waste Morning Hash with ${heroEn} & Fried Eggs`,
+        titleFr: `Poêlée déjeuner dorée aux œufs et ${heroFr}`,
         source: "Ricardo Cuisine (Web)",
         sourceUrl: "https://www.ricardocuisine.com/en/recipes/breakfast-and-brunch",
-        imageUrl: "",
+        imageUrl: "https://images.unsplash.com/photo-1582169505937-b9992bd01ed9?auto=format&fit=crop&w=800&q=80",
         prepTime: "5 mins",
         cookTime: "12 mins",
         totalTime: "17 mins",
@@ -1808,29 +2479,29 @@ function generateFallbackWebSuggestions({
         difficultyFr: "Facile",
         zeroWasteReason:
           language === "FR"
-            ? `Transforme votre ${heroItem} en un savoureux déjeuner nourrissant avant qu'il ne se perde.`
-            : `Transforms your ${heroItem} into a satisfying morning skillet before it goes to waste.`,
-        rescuedIngredients: [heroItem, secondaryItem].filter(Boolean),
+            ? `Transforme votre ${heroFr} en un savoureux déjeuner nourrissant avant qu'il ne se perde.`
+            : `Transforms your ${heroEn} into a satisfying morning skillet before it goes to waste.`,
+        rescuedIngredients: [heroRaw, secondaryRaw].filter(Boolean),
         matchPercentage: 90,
         mealType: "BREAKFAST",
         suitableMealTypes: ["BREAKFAST"],
         ingredients: [
-          { name: heroItem, nameFr: heroItem, amount: "1.5 cups diced", inStock: true, category: "Produce" },
+          { name: heroEn, nameFr: heroFr, amount: "1.5 cups diced", inStock: true, category: "Produce" },
           { name: "Fresh Eggs", nameFr: "Œufs frais", amount: "4 eggs", inStock: true, category: "Dairy & Eggs" },
           { name: "Butter or Olive Oil", nameFr: "Beurre ou huile d'olive", amount: "1 tbsp", inStock: true, category: "Pantry" },
           { name: "Salt, Pepper & Paprika", nameFr: "Sel, poivre et paprika", amount: "To taste", inStock: true, category: "Pantry" },
         ],
         instructionsEn: [
-          `Dice ${heroItem} into small, uniform cubes for quick cooking.`,
+          `Dice ${heroEn} into small, uniform cubes for quick cooking.`,
           "Heat butter or oil in a heavy skillet over medium-high heat.",
-          `Sauté ${heroItem} until tender and golden brown with crispy edges (8 mins).`,
+          `Sauté ${heroEn} until tender and golden brown with crispy edges (8 mins).`,
           "Make two wells in the hash and crack the eggs directly inside. Cover for 3-4 minutes until whites are set.",
           "Season with salt, pepper, and paprika. Serve warm.",
         ],
         instructionsFr: [
-          `Couper ${heroItem} en petits dés réguliers pour une cuisson rapide.`,
+          `Couper ${heroFr} en petits dés réguliers pour une cuisson rapide.`,
           "Faire chauffer le beurre ou l'huile dans une poêle à feu moyen-vif.",
-          `Faire dorer ${heroItem} jusqu'à ce qu'il soit bien doré et croustillant (8 min).`,
+          `Faire dorer ${heroFr} jusqu'à ce qu'il soit bien doré et croustillant (8 min).`,
           "Former des puits et casser les œufs directement dedans. Couvrir 3-4 minutes jusqu'à cuisson voulue.",
           "Assaisonner de sel, poivre et paprika. Servir bien chaud.",
         ],
@@ -1839,11 +2510,11 @@ function generateFallbackWebSuggestions({
       },
       {
         id: "web_fallback_bfast_02",
-        title: `Fluffy Farmhouse Breakfast Omelette with ${heroItem}`,
-        titleFr: `Omelette paysanne moelleuse au ${heroItem}`,
+        title: `Fluffy Farmhouse Breakfast Omelette with ${heroEn}`,
+        titleFr: `Omelette paysanne moelleuse au ${heroFr}`,
         source: "Marmiton (Web)",
         sourceUrl: "https://www.marmiton.org/recettes/recherche.aspx?aqt=omelette",
-        imageUrl: "",
+        imageUrl: "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?auto=format&fit=crop&w=800&q=80",
         prepTime: "5 mins",
         cookTime: "8 mins",
         totalTime: "13 mins",
@@ -1852,25 +2523,25 @@ function generateFallbackWebSuggestions({
         difficultyFr: "Facile",
         zeroWasteReason:
           language === "FR"
-            ? `Une excellente manière d'utiliser ${heroItem} avec des œufs dès le réveil.`
-            : `A delicious way to utilize ${heroItem} with wholesome eggs for breakfast.`,
-        rescuedIngredients: [heroItem].filter(Boolean),
+            ? `Une excellente manière d'utiliser ${heroFr} avec des œufs dès le réveil.`
+            : `A delicious way to utilize ${heroEn} with wholesome eggs for breakfast.`,
+        rescuedIngredients: [heroRaw].filter(Boolean),
         matchPercentage: 85,
         mealType: "BREAKFAST",
         suitableMealTypes: ["BREAKFAST"],
         ingredients: [
-          { name: heroItem, nameFr: heroItem, amount: "1 cup chopped", inStock: true, category: "Produce" },
+          { name: heroEn, nameFr: heroFr, amount: "1 cup chopped", inStock: true, category: "Produce" },
           { name: "Large Eggs", nameFr: "Gros œufs", amount: "4 eggs", inStock: true, category: "Dairy & Eggs" },
           { name: "Cheese or Milk", nameFr: "Fromage ou lait", amount: "2 tbsp", inStock: true, category: "Dairy & Eggs" },
         ],
         instructionsEn: [
           "Whisk eggs with a splash of milk, salt, and black pepper.",
-          `Quickly cook ${heroItem} in a nonstick pan with butter until tender.`,
+          `Quickly cook ${heroEn} in a nonstick pan with butter until tender.`,
           "Pour eggs over top and cook gently, folding gently until fluffy and creamy.",
         ],
         instructionsFr: [
           "Battre les œufs avec une cuillère de lait, sel et poivre.",
-          `Faire revenir rapidement ${heroItem} dans une poêle antiadhésive avec une noix de beurre.`,
+          `Faire revenir rapidement ${heroFr} dans une poêle antiadhésive avec une noix de beurre.`,
           "Verser les œufs et cuire doucement en pliant pour une texture moelleuse et baveuse.",
         ],
         tags: ["BREAKFAST", "Omelette", "High-Protein"],
@@ -1883,11 +2554,11 @@ function generateFallbackWebSuggestions({
     return [
       {
         id: "web_fallback_lunch_01",
-        title: `Toasted Artisan Lunch Panini with ${heroItem}`,
-        titleFr: `Panini artisanal grillé du midi au ${heroItem}`,
+        title: `Toasted Artisan Lunch Panini with ${heroEn}`,
+        titleFr: `Panini artisanal grillé du midi au ${heroFr}`,
         source: "Serious Eats (Web)",
         sourceUrl: "https://www.seriouseats.com/sandwich-recipes",
-        imageUrl: "",
+        imageUrl: "https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&w=800&q=80",
         prepTime: "8 mins",
         cookTime: "6 mins",
         totalTime: "14 mins",
@@ -1896,26 +2567,26 @@ function generateFallbackWebSuggestions({
         difficultyFr: "Facile",
         zeroWasteReason:
           language === "FR"
-            ? `Donne une seconde vie à votre ${heroItem} dans un sandwich chaud et croustillant.`
-            : `Gives your ${heroItem} a second life inside a warm, golden pressed sandwich.`,
-        rescuedIngredients: [heroItem].filter(Boolean),
+            ? `Donne une seconde vie à votre ${heroFr} dans un sandwich chaud et croustillant.`
+            : `Gives your ${heroEn} a second life inside a warm, golden pressed sandwich.`,
+        rescuedIngredients: [heroRaw].filter(Boolean),
         matchPercentage: 88,
         mealType: "LUNCH",
         suitableMealTypes: ["LUNCH"],
         ingredients: [
-          { name: heroItem, nameFr: heroItem, amount: "1 cup sliced", inStock: true, category: "Produce" },
+          { name: heroEn, nameFr: heroFr, amount: "1 cup sliced", inStock: true, category: "Produce" },
           { name: "Crusty Bread or Ciabatta", nameFr: "Pain croûté ou ciabatta", amount: "4 slices", inStock: true, category: "Bakery" },
           { name: "Cheese slices", nameFr: "Tranches de fromage", amount: "2 slices", inStock: true, category: "Dairy & Eggs" },
           { name: "Mustard or Mayo", nameFr: "Moutarde ou mayo", amount: "1 tbsp", inStock: true, category: "Pantry" },
         ],
         instructionsEn: [
           "Spread condiments over bread slices.",
-          `Layer sliced cheese and cooked or roasted ${heroItem}.`,
+          `Layer sliced cheese and cooked or roasted ${heroEn}.`,
           "Toast in a hot skillet or press with a touch of butter until golden and melted.",
         ],
         instructionsFr: [
           "Tartiner le pain avec vos condiments préférés.",
-          `Garnir de tranches de fromage et de ${heroItem} émincé.`,
+          `Garnir de tranches de fromage et de ${heroFr} émincé.`,
           "Griller dans une poêle chaude avec un peu de beurre jusqu'à ce que le fromage fonde.",
         ],
         tags: ["LUNCH", "Sandwich", "Anti-Gaspillage"],
@@ -1923,11 +2594,11 @@ function generateFallbackWebSuggestions({
       },
       {
         id: "web_fallback_lunch_02",
-        title: `Fresh Mediterranean Power Lunch Bowl with ${heroItem}`,
-        titleFr: `Bol repas méditerranéen du midi au ${heroItem}`,
+        title: `Fresh Mediterranean Power Lunch Bowl with ${heroEn}`,
+        titleFr: `Bol repas méditerranéen du midi au ${heroFr}`,
         source: "Trois Fois Par Jour (Web)",
         sourceUrl: "https://www.troisfoisparjour.com",
-        imageUrl: "",
+        imageUrl: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80",
         prepTime: "10 mins",
         cookTime: "0 mins",
         totalTime: "10 mins",
@@ -1936,26 +2607,26 @@ function generateFallbackWebSuggestions({
         difficultyFr: "Facile",
         zeroWasteReason:
           language === "FR"
-            ? `Associe ${heroItem} et ${secondaryItem} dans une salade-repas fraîche et équilibrée.`
-            : `Combines ${heroItem} and ${secondaryItem} in a crisp, balanced power bowl.`,
-        rescuedIngredients: [heroItem, secondaryItem].filter(Boolean),
+            ? `Associe ${heroFr} et ${secFr} dans une salade-repas fraîche et équilibrée.`
+            : `Combines ${heroEn} and ${secEn} in a crisp, balanced power bowl.`,
+        rescuedIngredients: [heroRaw, secondaryRaw].filter(Boolean),
         matchPercentage: 85,
         mealType: "LUNCH",
         suitableMealTypes: ["LUNCH"],
         ingredients: [
-          { name: heroItem, nameFr: heroItem, amount: "1 cup chopped", inStock: true, category: "Produce" },
-          { name: secondaryItem, nameFr: secondaryItem, amount: "1/2 cup", inStock: true, category: "Produce" },
+          { name: heroEn, nameFr: heroFr, amount: "1 cup chopped", inStock: true, category: "Produce" },
+          { name: secEn, nameFr: secFr, amount: "1/2 cup", inStock: true, category: "Produce" },
           { name: "Greens or Cooked Grains", nameFr: "Salade verte ou grains", amount: "2 cups", inStock: true, category: "Produce" },
           { name: "Vinaigrette", nameFr: "Vinaigrette maison", amount: "2 tbsp", inStock: true, category: "Pantry" },
         ],
         instructionsEn: [
           "Assemble grains or greens in serving bowls.",
-          `Top with ${heroItem}, ${secondaryItem}, and pantry toppings.`,
+          `Top with ${heroEn}, ${secEn}, and pantry toppings.`,
           "Drizzle with vinaigrette and toss lightly before serving.",
         ],
         instructionsFr: [
           "Disposer la verdure ou les grains dans les bols.",
-          `Garnir avec ${heroItem}, ${secondaryItem} et vos graines ou noix.`,
+          `Garnir avec ${heroFr}, ${secFr} et vos graines ou noix.`,
           "Arroser de vinaigrette et mélanger avant de déguster.",
         ],
         tags: ["LUNCH", "Salad Bowl", "Fresh"],
@@ -1968,11 +2639,11 @@ function generateFallbackWebSuggestions({
     return [
       {
         id: "web_fallback_snack_01",
-        title: `Crispy Herb & Spiced Roasted ${heroItem} Bites`,
-        titleFr: `Bouchées croustillantes et épicées de ${heroItem} rôti`,
+        title: `Crispy Herb & Spiced Roasted ${heroEn} Bites`,
+        titleFr: `Bouchées croustillantes et épicées de ${heroFr} rôti`,
         source: "Allrecipes (Web)",
         sourceUrl: "https://www.allrecipes.com/recipes/76/appetizers-and-snacks",
-        imageUrl: "",
+        imageUrl: "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?auto=format&fit=crop&w=800&q=80",
         prepTime: "5 mins",
         cookTime: "12 mins",
         totalTime: "17 mins",
@@ -1981,23 +2652,23 @@ function generateFallbackWebSuggestions({
         difficultyFr: "Facile",
         zeroWasteReason:
           language === "FR"
-            ? `Idéal pour grignoter sans gaspiller vos surplus de ${heroItem}.`
-            : `Perfect crispy snack that utilizes leftover ${heroItem}.`,
-        rescuedIngredients: [heroItem].filter(Boolean),
+            ? `Idéal pour grignoter sans gaspiller vos surplus de ${heroFr}.`
+            : `Perfect crispy snack that utilizes leftover ${heroEn}.`,
+        rescuedIngredients: [heroRaw].filter(Boolean),
         matchPercentage: 90,
         mealType: "SNACK",
         suitableMealTypes: ["SNACK"],
         ingredients: [
-          { name: heroItem, nameFr: heroItem, amount: "200g cut into bite sizes", inStock: true, category: "Produce" },
+          { name: heroEn, nameFr: heroFr, amount: "200g cut into bite sizes", inStock: true, category: "Produce" },
           { name: "Olive Oil & Salt", nameFr: "Huile d'olive et sel", amount: "1 tbsp oil, pinch salt", inStock: true, category: "Pantry" },
         ],
         instructionsEn: [
-          `Toss ${heroItem} with olive oil, salt, and favourite spices.`,
+          `Toss ${heroEn} with olive oil, salt, and favourite spices.`,
           "Roast in hot air fryer or oven at 400°F (200°C) until crispy and browned (10-12 mins).",
           "Cool slightly and enjoy warm.",
         ],
         instructionsFr: [
-          `Mélanger ${heroItem} avec l'huile d'olive, le sel et vos épices préférées.`,
+          `Mélanger ${heroFr} avec l'huile d'olive, le sel et vos épices préférées.`,
           "Cuire à l'air fryer ou au four à 200°C (400°F) jusqu'à consistance bien croustillante (10-12 min).",
           "Laisser tiédir et savourer comme collation.",
         ],
@@ -2006,11 +2677,11 @@ function generateFallbackWebSuggestions({
       },
       {
         id: "web_fallback_snack_02",
-        title: `Creamy Zero-Waste ${heroItem} Dip with Pita Chips`,
-        titleFr: `Trempette crémeuse au ${heroItem} et croustilles de pita`,
+        title: `Creamy Zero-Waste ${heroEn} Dip with Pita Chips`,
+        titleFr: `Trempette crémeuse au ${heroFr} et croustilles de pita`,
         source: "Marmiton (Web)",
         sourceUrl: "https://www.marmiton.org/recettes/recherche.aspx?aqt=apero",
-        imageUrl: "",
+        imageUrl: "https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=800&q=80",
         prepTime: "8 mins",
         cookTime: "0 mins",
         totalTime: "8 mins",
@@ -2019,23 +2690,23 @@ function generateFallbackWebSuggestions({
         difficultyFr: "Facile",
         zeroWasteReason:
           language === "FR"
-            ? `Mixez ${heroItem} avec du yogourt ou fromage à la crème pour une superbe collation anti-gaspi.`
-            : `Blend ${heroItem} with yogurt or cream cheese for an easy anti-waste dip.`,
-        rescuedIngredients: [heroItem].filter(Boolean),
+            ? `Mixez ${heroFr} avec du yogourt ou fromage à la crème pour une superbe collation anti-gaspi.`
+            : `Blend ${heroEn} with yogurt or cream cheese for an easy anti-waste dip.`,
+        rescuedIngredients: [heroRaw].filter(Boolean),
         matchPercentage: 85,
         mealType: "SNACK",
         suitableMealTypes: ["SNACK"],
         ingredients: [
-          { name: heroItem, nameFr: heroItem, amount: "1 cup", inStock: true, category: "Produce" },
+          { name: heroEn, nameFr: heroFr, amount: "1 cup", inStock: true, category: "Produce" },
           { name: "Greek Yogurt or Cream Cheese", nameFr: "Yogourt grec ou fromage blanc", amount: "1/2 cup", inStock: true, category: "Dairy & Eggs" },
           { name: "Lemon juice & Garlic", nameFr: "Jus de citron et ail", amount: "1 tsp each", inStock: true, category: "Pantry" },
         ],
         instructionsEn: [
-          `Blend or finely mash ${heroItem} with yogurt, lemon, and seasonings until smooth.`,
+          `Blend or finely mash ${heroEn} with yogurt, lemon, and seasonings until smooth.`,
           "Serve in a bowl alongside crackers, pita, or raw veggies.",
         ],
         instructionsFr: [
-          `Mixer ou écraser finement ${heroItem} avec le yogourt, le citron et les aromates.`,
+          `Mixer ou écraser finement ${heroFr} avec le yogourt, le citron et les aromates.`,
           "Servir dans un bol avec des craquelins, des pitas ou des crudités.",
         ],
         tags: ["SNACK", "Dip", "Apéro"],
@@ -2048,11 +2719,11 @@ function generateFallbackWebSuggestions({
   return [
     {
       id: "web_fallback_dinner_01",
-      title: `Crispy Skillet Toss with ${heroItem} & Garlic Butter`,
-      titleFr: `Poêlée croustillante au beurre d'ail avec ${heroItem}`,
+      title: `Crispy Skillet Toss with ${heroEn} & Garlic Butter`,
+      titleFr: `Poêlée croustillante au beurre d'ail avec ${heroFr}`,
       source: "Ricardo Cuisine (Web)",
       sourceUrl: "https://www.ricardocuisine.com/en/recipes/sheet-pan-dinners",
-      imageUrl: "",
+      imageUrl: "https://images.unsplash.com/photo-1467003909585-2f8a72700288?auto=format&fit=crop&w=800&q=80",
       prepTime: "10 mins",
       cookTime: "15 mins",
       totalTime: "25 mins",
@@ -2061,30 +2732,30 @@ function generateFallbackWebSuggestions({
       difficultyFr: "Facile",
       zeroWasteReason:
         language === "FR"
-          ? `Consomme directement votre ${heroItem} et ${secondaryItem} avant qu'ils ne se perdent.`
-          : `Directly uses up your ${heroItem} and ${secondaryItem} to eliminate kitchen waste.`,
-      rescuedIngredients: [heroItem, secondaryItem].filter(Boolean),
+          ? `Consomme directement votre ${heroFr} et ${secFr} avant qu'ils ne se perdent.`
+          : `Directly uses up your ${heroEn} and ${secEn} to eliminate kitchen waste.`,
+      rescuedIngredients: [heroRaw, secondaryRaw].filter(Boolean),
       matchPercentage: 90,
       mealType: "DINNER",
       suitableMealTypes: ["DINNER"],
       ingredients: [
-        { name: heroItem, nameFr: heroItem, amount: "300g", inStock: true, category: "Produce" },
-        { name: secondaryItem, nameFr: secondaryItem, amount: "1 cup", inStock: true, category: "Produce" },
+        { name: heroEn, nameFr: heroFr, amount: "300g", inStock: true, category: "Produce" },
+        { name: secEn, nameFr: secFr, amount: "1 cup", inStock: true, category: "Produce" },
         { name: "Garlic Cloves & Butter", nameFr: "Ail et beurre", amount: "2 tbsp butter, 3 cloves", inStock: true, category: "Dairy & Eggs" },
         { name: "Olive Oil & Seasonings", nameFr: "Huile d'olive et assaisonnements", amount: "1 tbsp oil, pinch of salt", inStock: true, category: "Pantry" },
       ],
       instructionsEn: [
         "Chop all ingredients into bite-sized pieces.",
         "Melt butter and olive oil in a large hot skillet over medium-high heat.",
-        `Toss in ${heroItem} and cook until tender and slightly caramelized (8-10 mins).`,
-        `Add ${secondaryItem} and minced garlic, tossing vigorously for 2 more minutes.`,
+        `Toss in ${heroEn} and cook until tender and slightly caramelized (8-10 mins).`,
+        `Add ${secEn} and minced garlic, tossing vigorously for 2 more minutes.`,
         "Season with fresh cracked black pepper and serve hot.",
       ],
       instructionsFr: [
         "Couper tous les ingrédients en morceaux réguliers.",
         "Faire fondre le beurre et l'huile dans une grande poêle chaude à feu moyen-vif.",
-        `Faire sauter ${heroItem} jusqu'à tendreté et belle coloration dorée (8-10 min).`,
-        `Ajouter ${secondaryItem} et l'ail haché, mélanger 2 minutes supplémentaires.`,
+        `Faire sauter ${heroFr} jusqu'à tendreté et belle coloration dorée (8-10 min).`,
+        `Ajouter ${secFr} et l'ail haché, mélanger 2 minutes supplémentaires.`,
         "Assaisonner de poivre moulu et servir chaud immédiatement.",
       ],
       tags: ["DINNER", "Anti-Gaspillage", "Quick Skillet", "Web Recipe"],
@@ -2092,11 +2763,11 @@ function generateFallbackWebSuggestions({
     },
     {
       id: "web_fallback_dinner_02",
-      title: `Zero-Waste Chef's Frittata & Sheet-Pan Roast with ${heroItem}`,
-      titleFr: `Frittata anti-gaspillage du chef au ${heroItem}`,
+      title: `Zero-Waste Chef's Frittata & Sheet-Pan Roast with ${heroEn}`,
+      titleFr: `Frittata anti-gaspillage du chef au ${heroFr}`,
       source: "Serious Eats (Web)",
       sourceUrl: "https://www.seriouseats.com/easy-frittata-recipes",
-      imageUrl: "",
+      imageUrl: "https://images.unsplash.com/photo-1555949258-eb67b1ef0ceb?auto=format&fit=crop&w=800&q=80",
       prepTime: "10 mins",
       cookTime: "20 mins",
       totalTime: "30 mins",
@@ -2107,25 +2778,25 @@ function generateFallbackWebSuggestions({
         language === "FR"
           ? `La méthode reine anti-gaspillage : transforme vos restes de frigo en un savoureux souper doré.`
           : `The gold-standard zero-waste method: transforms fridge odds and ends into a golden, fluffy dinner.`,
-      rescuedIngredients: [heroItem].filter(Boolean),
+      rescuedIngredients: [heroRaw].filter(Boolean),
       matchPercentage: 85,
       mealType: "DINNER",
       suitableMealTypes: ["DINNER"],
       ingredients: [
-        { name: heroItem, nameFr: heroItem, amount: "1.5 cups diced", inStock: true, category: "Produce" },
+        { name: heroEn, nameFr: heroFr, amount: "1.5 cups diced", inStock: true, category: "Produce" },
         { name: "Fresh Eggs", nameFr: "Œufs frais", amount: "6 large eggs", inStock: true, category: "Dairy & Eggs" },
         { name: "Grated Cheese", nameFr: "Fromage râpé", amount: "1/2 cup", inStock: true, category: "Dairy & Eggs" },
         { name: "Milk or Cream", nameFr: "Lait ou crème", amount: "1/4 cup", inStock: true, category: "Dairy & Eggs" },
       ],
       instructionsEn: [
         "Preheat oven to 375°F (190°C). Whisk eggs with milk, salt, and pepper in a medium bowl.",
-        `Sauté ${heroItem} in an oven-safe skillet with a little oil until tender.`,
+        `Sauté ${heroEn} in an oven-safe skillet with a little oil until tender.`,
         "Pour whisked eggs evenly over the skillet and sprinkle with cheese.",
         "Bake for 14-18 minutes until puffed, golden, and set in the center.",
       ],
       instructionsFr: [
         "Préchauffer le four à 190°C (375°F). Battre les œufs avec le lait, le sel et le poivre.",
-        `Faire revenir ${heroItem} dans une poêle allant au four avec un filet d'huile.`,
+        `Faire revenir ${heroFr} dans une poêle allant au four avec un filet d'huile.`,
         "Verser les œufs battus uniformément et saupoudrer de fromage.",
         "Cuire au four 14 à 18 minutes jusqu'à ce que la frittata soit dorée et prise au centre.",
       ],

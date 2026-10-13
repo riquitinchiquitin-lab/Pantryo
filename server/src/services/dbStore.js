@@ -700,6 +700,22 @@ class EncryptedDatabaseStore {
           }
         }
 
+        // Ensure clean-install / zero-credentials safety:
+        // Never enforce 2FA globally or lock out users if no user has configured credentials yet
+        const anyUserHas2FA = this.users.some(
+          (u) => Boolean(u.fido2Enabled && u.fido2Credentials?.length > 0) || Boolean(u.totpEnabled && u.totpSecret)
+        );
+        if (!anyUserHas2FA) {
+          this.fido2Policy = {
+            allUsersRequired: false,
+            enforced: false,
+            updatedAt: new Date().toISOString(),
+          };
+          this.users.forEach((u) => {
+            u.fido2Enforced = false;
+          });
+        }
+
         this.persistToEncryptedDisk();
         console.log(
           `[Pantryo DB] Successfully loaded from SQLCipher SQLite database with ${this.items.length} items, ${this.customRecipes.length} recipes, ${this.users.length} users.`
@@ -757,6 +773,19 @@ class EncryptedDatabaseStore {
           const hasAdmin = this.users.some((u) => u.role === "ADMIN" || u.id === "usr_admin");
           if (!hasAdmin || this.users.length === 0) {
             this.seedAdminFromEnvOrInstall();
+          }
+          const anyUserHas2FAJson = this.users.some(
+            (u) => Boolean(u.fido2Enabled && u.fido2Credentials?.length > 0) || Boolean(u.totpEnabled && u.totpSecret)
+          );
+          if (!anyUserHas2FAJson) {
+            this.fido2Policy = {
+              allUsersRequired: false,
+              enforced: false,
+              updatedAt: new Date().toISOString(),
+            };
+            this.users.forEach((u) => {
+              u.fido2Enforced = false;
+            });
           }
 
           this.persistToEncryptedDisk();
@@ -1425,7 +1454,7 @@ class EncryptedDatabaseStore {
         avatarUrl ||
         "/avatars/chef-cat.svg",
       createdAt: new Date().toISOString(),
-      fido2Enforced: true,
+      fido2Enforced: false,
       fido2Enabled: false,
       mustChangePassword: true,
       mustSetupProfile: false,

@@ -25,18 +25,30 @@ import { useLanguage } from '../utils/i18n';
 import { canUseSandboxBypass } from '../utils/installStatus';
 
 interface Fido2SecurityPanelProps {
-  user: User;
+  user?: User | null;
   onUserUpdated?: (updatedUser: User) => void;
   householdMembers?: User[];
 }
 
+const DEFAULT_PANEL_USER: User = {
+  id: 'usr_admin',
+  name: 'Admin',
+  email: 'admin@example.com',
+  role: 'ADMIN',
+  avatarUrl: '/avatars/chef-cat.svg',
+  fido2Enabled: false,
+  fido2Enforced: false,
+  isCompliant: true,
+};
+
 export const Fido2SecurityPanel: React.FC<Fido2SecurityPanelProps> = ({
-  user,
+  user = DEFAULT_PANEL_USER,
   onUserUpdated,
   householdMembers,
 }) => {
+  const safeUser = user || DEFAULT_PANEL_USER;
   const { lang } = useLanguage();
-  const [selectedUserId, setSelectedUserId] = useState<string>(user?.id || 'usr_admin');
+  const [selectedUserId, setSelectedUserId] = useState<string>(safeUser.id || 'usr_admin');
   const [policy, setPolicy] = useState<Fido2PolicyInfo | null>(null);
   const [fido2Status, setFido2Status] = useState<Fido2Status | null>(null);
   const [loading, setLoading] = useState(true);
@@ -147,12 +159,12 @@ export const Fido2SecurityPanel: React.FC<Fido2SecurityPanelProps> = ({
         }
 
         await loadFido2Status(selectedUserId);
-        if (onUserUpdated && selectedUserId === user.id) {
+        if (onUserUpdated && selectedUserId === safeUser.id) {
           onUserUpdated({
-            ...user,
+            ...safeUser,
             fido2Enabled: true,
             fido2Credentials: [
-              ...(user.fido2Credentials || []),
+              ...(safeUser.fido2Credentials || []),
               result.credential!,
             ],
           });
@@ -227,10 +239,10 @@ export const Fido2SecurityPanel: React.FC<Fido2SecurityPanelProps> = ({
       });
       setKeyToDelete(null);
       await loadFido2Status(selectedUserId);
-      if (onUserUpdated && selectedUserId === user.id) {
-        const remaining = (user.fido2Credentials || []).filter((c) => c.id !== credentialId);
+      if (onUserUpdated && selectedUserId === safeUser.id) {
+        const remaining = (safeUser.fido2Credentials || []).filter((c) => c.id !== credentialId);
         onUserUpdated({
-          ...user,
+          ...safeUser,
           fido2Enabled: remaining.length > 0,
           fido2Credentials: remaining,
         });
@@ -260,9 +272,9 @@ export const Fido2SecurityPanel: React.FC<Fido2SecurityPanelProps> = ({
       });
       setShowDeleteAllModal(false);
       await loadFido2Status(selectedUserId);
-      if (onUserUpdated && selectedUserId === user.id) {
+      if (onUserUpdated && selectedUserId === safeUser.id) {
         onUserUpdated({
-          ...user,
+          ...safeUser,
           fido2Enabled: false,
           fido2Credentials: [],
         });
@@ -330,9 +342,9 @@ export const Fido2SecurityPanel: React.FC<Fido2SecurityPanelProps> = ({
           setShowRecoveryModal(true);
         }
 
-        if (onUserUpdated && selectedUserId === user.id) {
+        if (onUserUpdated && selectedUserId === safeUser.id) {
           onUserUpdated({
-            ...user,
+            ...safeUser,
             totpEnabled: true,
             isCompliant: true,
           });
@@ -448,7 +460,7 @@ export const Fido2SecurityPanel: React.FC<Fido2SecurityPanelProps> = ({
   const handleDownloadCodes = () => {
     const content =
       `# PANTRYO 2FA EMERGENCY RECOVERY CODES\n` +
-      `# Account: ${user.email} (${user.name})\n` +
+      `# Account: ${safeUser.email} (${safeUser.name})\n` +
       `# Generated: ${new Date().toISOString()}\n` +
       `# Store these codes securely. Each code can be used exactly once.\n\n` +
       recoveryCodesList.map((c, i) => `${i + 1}. ${c}`).join('\n') +
@@ -458,7 +470,7 @@ export const Fido2SecurityPanel: React.FC<Fido2SecurityPanelProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `pantryo-fido2-recovery-codes-${user.name.toLowerCase()}.txt`;
+    a.download = `pantryo-fido2-recovery-codes-${safeUser.name.toLowerCase()}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };

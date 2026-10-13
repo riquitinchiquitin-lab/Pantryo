@@ -951,10 +951,10 @@ router.post("/login", async (req, res) => {
     const hasCreds = Boolean(user.fido2Enabled && user.fido2Credentials && user.fido2Credentials.length > 0);
     const hasTotp = Boolean(user.totpEnabled);
 
-    // Only challenge for 2FA if:
-    // - User explicitly has fido2Enforced enabled OR
-    // - Global policy enforces 2FA AND user has enrolled credentials or TOTP
-    if (user.fido2Enforced || (isGlobalEnforced && (hasCreds || hasTotp))) {
+    // Only challenge for 2FA if the account actually has 2FA configured (Passkey or TOTP).
+    // On fresh install or default accounts with no 2FA credentials, allow direct password login.
+    const hasAny2FA = hasCreds || hasTotp;
+    if (hasAny2FA && (user.fido2Enforced || isGlobalEnforced)) {
       if (hasCreds) {
         return res.json({
           success: true,
@@ -974,18 +974,6 @@ router.post("/login", async (req, res) => {
           user,
           hasTotp: true,
           message: "2ème facteur à 6 chiffres requis.",
-        });
-      } else if (isGlobalEnforced || user.fido2Enforced) {
-        // Enforced globally or on account, but user hasn't enrolled any credentials yet
-        return res.json({
-          success: true,
-          requires2FA: true,
-          requiresEnrollment: true,
-          authType: "ENROLL_REQUIRED",
-          userId: user.id,
-          user,
-          hasTotp: false,
-          message: "Configuration 2FA obligatoire requise pour ce compte.",
         });
       }
     }
