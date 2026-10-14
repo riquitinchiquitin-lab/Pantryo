@@ -1101,16 +1101,16 @@ Instructions:
   return (
     <div
       id="add-recipe-fullscreen-view"
-      className="fixed inset-0 z-50 bg-[#F8FAF6] flex flex-col w-full h-full overflow-hidden text-[#133E3B] animate-fade-in"
+      className="fixed inset-0 z-50 bg-[var(--md-sys-color-surface)] flex flex-col w-full h-full overflow-hidden text-[var(--md-sys-color-on-surface)] animate-fade-in"
     >
-      {/* Top Header Bar */}
-      <header className="px-4 sm:px-6 py-3.5 bg-white border-b border-[#E1EDE0] flex items-center justify-between shrink-0 shadow-2xs">
+      {/* Top Header Bar - M3 Styling */}
+      <header className="px-4 sm:px-6 py-3.5 bg-[var(--md-sys-color-surface-container-high)] border-b border-[var(--md-sys-color-outline-variant)] flex items-center justify-between shrink-0 shadow-none">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shadow-xs">
+          <div className="w-9 h-9 rounded-full bg-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-primary)] flex items-center justify-center shadow-xs">
             {recipeToEdit ? <Pencil className="w-5 h-5" /> : <Sparkles className="w-5 h-5" />}
           </div>
           <div>
-            <h2 className="text-sm sm:text-base font-black text-[#1E3022]">
+            <h2 className="text-sm sm:text-base font-bold text-[var(--md-sys-color-on-surface)]">
               {recipeToEdit
                 ? lang === 'FR'
                   ? 'Modifier la Recette'
@@ -1119,7 +1119,7 @@ Instructions:
                 ? 'Importer ou Ajouter une Recette'
                 : 'Import or Add a Recipe'}
             </h2>
-            <p className="text-[11px] text-[#556D58]">
+            <p className="text-[11px] text-[var(--md-sys-color-on-surface-variant)]">
               {recipeToEdit
                 ? lang === 'FR'
                   ? 'Personnalisez le titre, les portions, les ingrédients et les étapes'
@@ -1136,7 +1136,7 @@ Instructions:
           id="btn-exit-add-recipe"
           type="button"
           onClick={onClose}
-          className="px-4 py-2 rounded-full bg-[#EFEAE0] hover:bg-[#E2DBCB] text-[#133E3B] font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 border border-[#D5CDBC] shadow-2xs shrink-0"
+          className="px-4 py-2 rounded-full bg-[var(--md-sys-color-surface-container)] hover:bg-[var(--md-sys-color-surface-container-highest)] text-[var(--md-sys-color-on-surface)] font-medium text-xs flex items-center gap-1.5 transition-all active:scale-95 border border-[var(--md-sys-color-outline-variant)] shadow-none shrink-0 cursor-pointer"
           title={lang === 'FR' ? 'Quitter' : 'Exit'}
         >
           <X className="w-4 h-4" />
@@ -1156,18 +1156,18 @@ Instructions:
         {/* If NOT yet parsed, show source selectors and inputs */}
         {!parsedRecipe ? (
           <div className="space-y-4">
-            {/* Source Tabs: URL, YouTube, Text, Photo */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1.5 bg-white border border-[#D5E1D2] rounded-2xl shadow-2xs">
+            {/* Source Tabs: URL, YouTube, Text, Photo - M3 Segmented Bar */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 p-1 bg-[var(--md-sys-color-surface-container)] border border-[var(--md-sys-color-outline-variant)] rounded-full">
               <button
                 type="button"
                 onClick={() => {
                   setActiveTab('url');
                   setErrorMsg(null);
                 }}
-                className={`py-2.5 px-2 rounded-xl font-black flex items-center justify-center gap-2 transition-all ${
+                className={`py-2 px-3 rounded-full font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                   activeTab === 'url'
-                    ? 'bg-teal-700 text-white shadow-xs'
-                    : 'text-slate-600 hover:bg-slate-50'
+                    ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] shadow-xs'
+                    : 'text-[var(--md-sys-color-on-surface-variant)] hover:bg-[var(--md-sys-color-surface-container-high)]'
                 }`}
               >
                 <Globe className="w-4 h-4" />
@@ -1182,10 +1182,10 @@ Instructions:
                   setActiveTab('youtube');
                   setErrorMsg(null);
                 }}
-                className={`py-2.5 px-2 rounded-xl font-black flex items-center justify-center gap-2 transition-all ${
+                className={`py-2 px-3 rounded-full font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                   activeTab === 'youtube'
                     ? 'bg-rose-600 text-white shadow-xs'
-                    : 'text-slate-600 hover:bg-slate-50'
+                    : 'text-[var(--md-sys-color-on-surface-variant)] hover:bg-[var(--md-sys-color-surface-container-high)]'
                 }`}
               >
                 <Youtube className="w-4 h-4" />
@@ -1198,10 +1198,10 @@ Instructions:
                   setActiveTab('text');
                   setErrorMsg(null);
                 }}
-                className={`py-2.5 px-2 rounded-xl font-black flex items-center justify-center gap-2 transition-all ${
+                className={`py-2 px-3 rounded-full font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                   activeTab === 'text'
-                    ? 'bg-[#233527] text-white shadow-xs'
-                    : 'text-slate-600 hover:bg-slate-50'
+                    ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] shadow-xs'
+                    : 'text-[var(--md-sys-color-on-surface-variant)] hover:bg-[var(--md-sys-color-surface-container-high)]'
                 }`}
               >
                 <FileText className="w-4 h-4" />
@@ -1216,10 +1216,10 @@ Instructions:
                   setActiveTab('photo');
                   setErrorMsg(null);
                 }}
-                className={`py-2.5 px-2 rounded-xl font-black flex items-center justify-center gap-2 transition-all ${
+                className={`py-2 px-3 rounded-full font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                   activeTab === 'photo'
-                    ? 'bg-emerald-700 text-white shadow-xs'
-                    : 'text-slate-600 hover:bg-slate-50'
+                    ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] shadow-xs'
+                    : 'text-[var(--md-sys-color-on-surface-variant)] hover:bg-[var(--md-sys-color-surface-container-high)]'
                 }`}
               >
                 <Camera className="w-4 h-4" />

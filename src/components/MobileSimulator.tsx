@@ -67,6 +67,9 @@ import { AdminRestrictedModal } from './AdminRestrictedModal';
 import { LoginSplash } from './LoginSplash';
 import { ChangeAvatarModal } from './ChangeAvatarModal';
 import { AddRecipeModal } from './AddRecipeModal';
+import { ActiveCookingBar } from './ActiveCookingBar';
+import { GuidedCookingModal } from './GuidedCookingModal';
+import { useCookingSession } from '../contexts/CookingSessionContext';
 import { isAppInstalledOrStandalone } from '../utils/installStatus';
 import {
   useLanguage,
@@ -146,6 +149,15 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
 }) => {
   const { t, lang } = useLanguage();
   const isInstalledEffective = Boolean(isInstalled || isAppInstalledOrStandalone());
+
+  // Global Cooking Session & Background Timer
+  const {
+    activeRecipe: sessionActiveRecipe,
+    isOpen: isSessionCookingOpen,
+    minimizeCooking,
+    exitCooking,
+    handlers: sessionHandlers,
+  } = useCookingSession();
 
   // Direct camera input for recipe scanning (triggers native camera app immediately)
   const directRecipeCamInputRef = useRef<HTMLInputElement | null>(null);
@@ -600,6 +612,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
       );
     }
     setTimeout(() => setBannerNotice(null), 5000);
+    return outcome;
   };
 
   const toggleExpandItem = (id: string) => {
@@ -1076,9 +1089,9 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   }
 
   return (
-    <div className="relative w-full max-w-7xl mx-auto text-[#133E3B] flex flex-col min-h-screen sm:min-h-[850px] sm:rounded-3xl border-0 sm:border border-[#E5DFD0] shadow-sm bg-[#FAF7EE] overflow-hidden">
-      {/* App Top Bar */}
-      <header className="sticky top-0 z-30 px-3 sm:px-5 py-2.5 pt-[max(0.6rem,env(safe-area-inset-top,0px))] bg-white/95 backdrop-blur-md border-b border-[#E8E2D5] shadow-2xs shrink-0">
+    <div className="relative w-full max-w-7xl mx-auto text-[var(--md-sys-color-on-surface)] flex flex-col min-h-screen sm:min-h-[850px] sm:rounded-[28px] border-0 sm:border border-[var(--md-sys-color-outline-variant)] shadow-none bg-[var(--md-sys-color-surface)] overflow-hidden">
+      {/* M3 Top App Bar */}
+      <header className="sticky top-0 z-30 px-3 sm:px-5 py-2.5 pt-[max(0.6rem,env(safe-area-inset-top,0px))] bg-[var(--md-sys-color-surface-container-high)]/95 backdrop-blur-md border-b border-[var(--md-sys-color-outline-variant)]/60 shadow-none shrink-0">
         <div className="flex items-center justify-between gap-2 lg:gap-4 max-w-7xl mx-auto w-full">
           {/* 1. Left: Bold Wordmark & Admin Console Trigger */}
           <div className="flex items-center gap-2 shrink-0">
@@ -1091,7 +1104,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                   setIsAdminRestrictedOpen(true);
                 }
               }}
-              className="flex items-center gap-2 shrink-0 hover:bg-teal-50/60 p-1.5 -m-1 rounded-2xl transition-all cursor-pointer group text-left"
+              className="flex items-center gap-2.5 shrink-0 hover:bg-[var(--md-sys-color-surface-container-highest)] p-1.5 -m-1 rounded-2xl transition-all cursor-pointer group text-left"
               title={
                 currentUser.role === 'ADMIN'
                   ? lang === 'FR'
@@ -1106,17 +1119,17 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 <PantryoLogo size={28} />
               </div>
               <div className="shrink-0 flex flex-col items-start justify-center">
-                <h1 className="text-base sm:text-lg font-black tracking-tight text-[#0D3B37] leading-tight whitespace-nowrap">
+                <h1 className="text-base sm:text-lg font-bold tracking-tight text-[var(--md-sys-color-on-surface)] leading-tight whitespace-nowrap">
                   Pantryo
                 </h1>
                 {currentUser.role === 'ADMIN' ? (
-                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[9px] font-black uppercase bg-amber-100 text-amber-900 border border-amber-200 mt-0.5 leading-tight">
-                    <ShieldCheck className="w-2 h-2" />
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[var(--md-sys-color-secondary-container)] text-[var(--md-sys-color-on-secondary-container)] mt-0.5 leading-tight">
+                    <ShieldCheck className="w-2.5 h-2.5" />
                     <span>Admin</span>
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-bold text-teal-800 bg-teal-50 border border-teal-200/60 mt-0.5 leading-tight">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold text-[var(--md-sys-color-on-surface-variant)] bg-[var(--md-sys-color-surface-container-lowest)] border border-[var(--md-sys-color-outline-variant)] mt-0.5 leading-tight">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--md-sys-color-primary)] shrink-0" />
                     <span>{currentUser.role === 'GUEST' ? (lang === 'FR' ? 'Invité' : 'Guest') : (lang === 'FR' ? 'Membre' : 'Member')}</span>
                   </span>
                 )}
@@ -1124,19 +1137,19 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             </button>
           </div>
 
-          {/* 2. Center: Segmented Main Navigation Bar (Visible on Desktop) */}
-          <nav aria-label="Main Navigation" className="hidden xl:flex items-center p-0.5 lg:p-1 bg-[#F0ECE1] rounded-2xl border border-[#E5DFD0] shrink min-w-0 gap-0.5 lg:gap-1 shadow-2xs">
+          {/* 2. Center: M3 Main Navigation Bar with Pill Indicators (Visible on Desktop) */}
+          <nav aria-label="Main Navigation" className="hidden xl:flex items-center p-1 bg-[var(--md-sys-color-surface-container)] rounded-full border border-[var(--md-sys-color-outline-variant)]/60 shrink min-w-0 gap-1 shadow-none">
             {/* Inventory */}
             <button
               onClick={() => setActiveNav('home')}
               title={t('nav_inventory')}
-              className={`px-2 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 lg:gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-full text-xs transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
                 activeNav === 'home'
-                  ? 'bg-teal-700 text-white shadow-2xs'
-                  : 'text-[#527470] hover:text-[#0D3B37] hover:bg-white/50'
+                  ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] font-bold shadow-xs'
+                  : 'text-[var(--md-sys-color-on-surface-variant)] hover:text-[var(--md-sys-color-on-surface)] hover:bg-[var(--md-sys-color-surface-container-high)] font-medium'
               }`}
             >
-              <Home className="w-3.5 h-3.5 shrink-0" />
+              <Home className="w-4 h-4 shrink-0" />
               <span>{t('nav_inventory')}</span>
             </button>
 
@@ -1144,32 +1157,32 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             <button
               onClick={() => setActiveNav('meals')}
               title={t('nav_meals')}
-              className={`px-2 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 lg:gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-full text-xs transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
                 activeNav === 'meals'
-                  ? 'bg-teal-700 text-white shadow-2xs'
-                  : 'text-[#527470] hover:text-[#0D3B37] hover:bg-white/50'
+                  ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] font-bold shadow-xs'
+                  : 'text-[var(--md-sys-color-on-surface-variant)] hover:text-[var(--md-sys-color-on-surface)] hover:bg-[var(--md-sys-color-surface-container-high)] font-medium'
               }`}
             >
-              <CalendarDays className="w-3.5 h-3.5 shrink-0" />
+              <CalendarDays className="w-4 h-4 shrink-0" />
               <span>{lang === 'FR' ? 'Repas' : 'Meals'}</span>
               {plannedMeals.length > 0 && (
                 <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full shrink-0 ${
-                  activeNav === 'meals' ? 'bg-white/20 text-white' : 'bg-teal-100 text-teal-800'
+                  activeNav === 'meals' ? 'bg-[var(--md-sys-color-primary)] text-white' : 'bg-[var(--md-sys-color-surface-container-high)] text-[var(--md-sys-color-on-surface)]'
                 }`}>
                   {plannedMeals.length}
                 </span>
               )}
             </button>
 
-            {/* Center: Mobile-Style Add Button (Functions like mobile phone on desktop) */}
+            {/* Center: M3 Add Button */}
             <button
               type="button"
               id="top-nav-center-add-btn"
               onClick={() => setIsAddMenuOpen((prev) => !prev)}
-              className="px-2.5 lg:px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1 lg:gap-1.5 shrink-0 whitespace-nowrap cursor-pointer bg-teal-700 hover:bg-teal-800 text-white shadow-2xs active:scale-95 group"
+              className="px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer bg-[var(--md-sys-color-primary)] hover:brightness-105 text-[var(--md-sys-color-on-primary)] shadow-xs active:scale-95 group"
               title={lang === 'FR' ? 'Ajouter (Menu Mobile Rapide)' : 'Add (Mobile Quick Menu)'}
             >
-              <Plus className="w-3.5 h-3.5 lg:w-4 lg:h-4 stroke-[3] group-hover:rotate-90 transition-transform" />
+              <Plus className="w-4 h-4 stroke-[2.5] group-hover:rotate-90 transition-transform" />
               <span>{lang === 'FR' ? 'Ajouter' : 'Add'}</span>
             </button>
 
@@ -1177,17 +1190,17 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             <button
               onClick={() => setActiveNav('grocery')}
               title={t('nav_grocery')}
-              className={`px-2 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 lg:gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-full text-xs transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
                 activeNav === 'grocery'
-                  ? 'bg-teal-700 text-white shadow-2xs'
-                  : 'text-[#527470] hover:text-[#0D3B37] hover:bg-white/50'
+                  ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] font-bold shadow-xs'
+                  : 'text-[var(--md-sys-color-on-surface-variant)] hover:text-[var(--md-sys-color-on-surface)] hover:bg-[var(--md-sys-color-surface-container-high)] font-medium'
               }`}
             >
-              <ShoppingCart className="w-3.5 h-3.5 shrink-0" />
+              <ShoppingCart className="w-4 h-4 shrink-0" />
               <span>{lang === 'FR' ? 'Épicerie' : 'Grocery'}</span>
               {groceryItems.filter((i) => i.inCart).length > 0 && (
                 <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full shrink-0 ${
-                  activeNav === 'grocery' ? 'bg-white/20 text-white' : 'bg-teal-100 text-teal-800'
+                  activeNav === 'grocery' ? 'bg-[var(--md-sys-color-primary)] text-white' : 'bg-[var(--md-sys-color-surface-container-high)] text-[var(--md-sys-color-on-surface)]'
                 }`}>
                   {groceryItems.filter((i) => i.inCart).length}
                 </span>
@@ -1198,13 +1211,13 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             <button
               onClick={() => setActiveNav('cooking')}
               title={t('nav_cooking')}
-              className={`px-2 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 lg:gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-full text-xs transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
                 activeNav === 'cooking'
-                  ? 'bg-teal-700 text-white shadow-2xs'
-                  : 'text-[#527470] hover:text-[#0D3B37] hover:bg-white/50'
+                  ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] font-bold shadow-xs'
+                  : 'text-[var(--md-sys-color-on-surface-variant)] hover:text-[var(--md-sys-color-on-surface)] hover:bg-[var(--md-sys-color-surface-container-high)] font-medium'
               }`}
             >
-              <ChefHat className="w-3.5 h-3.5 shrink-0" />
+              <ChefHat className="w-4 h-4 shrink-0" />
               <span>{t('nav_cooking')}</span>
             </button>
 
@@ -1212,13 +1225,13 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             <button
               onClick={() => setActiveNav('sync')}
               title={t('nav_family')}
-              className={`px-2 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 lg:gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-full text-xs transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
                 activeNav === 'sync'
-                  ? 'bg-teal-700 text-white shadow-2xs'
-                  : 'text-[#527470] hover:text-[#0D3B37] hover:bg-white/50'
+                  ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] font-bold shadow-xs'
+                  : 'text-[var(--md-sys-color-on-surface-variant)] hover:text-[var(--md-sys-color-on-surface)] hover:bg-[var(--md-sys-color-surface-container-high)] font-medium'
               }`}
             >
-              <Users className="w-3.5 h-3.5 shrink-0" />
+              <Users className="w-4 h-4 shrink-0" />
               <span>{t('nav_family')}</span>
             </button>
           </nav>
@@ -1303,25 +1316,25 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         {/* VIEW: HOME INVENTORY */}
         {activeNav === 'home' && (
           <>
-            {/* 4 EQUAL METRIC BOXES AT THE TOP */}
+            {/* 4 EQUAL METRIC BOXES AT THE TOP - M3 Surface Containers */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               {/* Box 1: Fridge */}
               <button
                 type="button"
                 onClick={() => setFilterLocation(filterLocation === 'FRIDGE' ? 'ALL' : 'FRIDGE')}
-                className={`p-3 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs ${
+                className={`p-3 rounded-[16px] border text-left transition-all cursor-pointer ${
                   filterLocation === 'FRIDGE'
-                    ? 'bg-teal-700 text-white border-teal-800 shadow-xs'
-                    : 'bg-white border-[#E5DFD0] hover:border-teal-300 text-[#0D3B37]'
+                    ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] border-[var(--md-sys-color-primary)] shadow-xs'
+                    : 'bg-[var(--md-sys-color-surface-container-low)] border-[var(--md-sys-color-outline-variant)] hover:bg-[var(--md-sys-color-surface-container)] text-[var(--md-sys-color-on-surface)]'
                 }`}
               >
                 <div className="flex items-center justify-between text-xs font-bold">
                   <span>{lang === 'FR' ? 'Frigo' : 'Fridge'}</span>
-                  <Refrigerator className={`w-4 h-4 shrink-0 ${filterLocation === 'FRIDGE' ? 'text-teal-200' : 'text-teal-600'}`} />
+                  <Refrigerator className={`w-4 h-4 shrink-0 ${filterLocation === 'FRIDGE' ? 'text-[var(--md-sys-color-primary)]' : 'text-[var(--md-sys-color-secondary)]'}`} />
                 </div>
                 <div className="mt-1 flex items-baseline justify-between">
-                  <span className="text-2xl font-black">{fridgeCount}</span>
-                  <span className={`text-[10px] font-bold ${filterLocation === 'FRIDGE' ? 'text-teal-200' : 'text-[#527470]'}`}>
+                  <span className="text-2xl font-bold">{fridgeCount}</span>
+                  <span className={`text-[10px] font-medium ${filterLocation === 'FRIDGE' ? 'text-[var(--md-sys-color-on-primary-container)]' : 'text-[var(--md-sys-color-on-surface-variant)]'}`}>
                     {lang === 'FR' ? 'articles' : 'items'}
                   </span>
                 </div>
@@ -1331,19 +1344,19 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               <button
                 type="button"
                 onClick={() => setFilterLocation(filterLocation === 'FREEZER' ? 'ALL' : 'FREEZER')}
-                className={`p-3 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs ${
+                className={`p-3 rounded-[16px] border text-left transition-all cursor-pointer ${
                   filterLocation === 'FREEZER'
-                    ? 'bg-blue-700 text-white border-blue-800 shadow-xs'
-                    : 'bg-white border-[#E5DFD0] hover:border-blue-300 text-[#0D3B37]'
+                    ? 'bg-[var(--md-sys-color-tertiary-container)] text-[var(--md-sys-color-on-tertiary-container)] border-[var(--md-sys-color-tertiary)] shadow-xs'
+                    : 'bg-[var(--md-sys-color-surface-container-low)] border-[var(--md-sys-color-outline-variant)] hover:bg-[var(--md-sys-color-surface-container)] text-[var(--md-sys-color-on-surface)]'
                 }`}
               >
                 <div className="flex items-center justify-between text-xs font-bold">
                   <span>{lang === 'FR' ? 'Congélateur' : 'Freezer'}</span>
-                  <Snowflake className={`w-4 h-4 shrink-0 ${filterLocation === 'FREEZER' ? 'text-blue-200' : 'text-blue-600'}`} />
+                  <Snowflake className={`w-4 h-4 shrink-0 ${filterLocation === 'FREEZER' ? 'text-[var(--md-sys-color-tertiary)]' : 'text-[var(--md-sys-color-secondary)]'}`} />
                 </div>
                 <div className="mt-1 flex items-baseline justify-between">
-                  <span className="text-2xl font-black">{freezerCount}</span>
-                  <span className={`text-[10px] font-bold ${filterLocation === 'FREEZER' ? 'text-blue-200' : 'text-[#527470]'}`}>
+                  <span className="text-2xl font-bold">{freezerCount}</span>
+                  <span className={`text-[10px] font-medium ${filterLocation === 'FREEZER' ? 'text-[var(--md-sys-color-on-tertiary-container)]' : 'text-[var(--md-sys-color-on-surface-variant)]'}`}>
                     {lang === 'FR' ? 'articles' : 'items'}
                   </span>
                 </div>
@@ -1353,19 +1366,19 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               <button
                 type="button"
                 onClick={() => setFilterLocation(filterLocation === 'PANTRY' ? 'ALL' : 'PANTRY')}
-                className={`p-3 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs ${
+                className={`p-3 rounded-[16px] border text-left transition-all cursor-pointer ${
                   filterLocation === 'PANTRY'
-                    ? 'bg-amber-700 text-white border-amber-800 shadow-xs'
-                    : 'bg-white border-[#E5DFD0] hover:border-amber-300 text-[#0D3B37]'
+                    ? 'bg-amber-100 text-amber-950 border-amber-300 shadow-xs'
+                    : 'bg-[var(--md-sys-color-surface-container-low)] border-[var(--md-sys-color-outline-variant)] hover:bg-[var(--md-sys-color-surface-container)] text-[var(--md-sys-color-on-surface)]'
                 }`}
               >
                 <div className="flex items-center justify-between text-xs font-bold">
                   <span>{lang === 'FR' ? 'Garde-manger' : 'Pantry'}</span>
-                  <Boxes className={`w-4 h-4 shrink-0 ${filterLocation === 'PANTRY' ? 'text-amber-200' : 'text-amber-600'}`} />
+                  <Boxes className={`w-4 h-4 shrink-0 ${filterLocation === 'PANTRY' ? 'text-amber-800' : 'text-amber-600'}`} />
                 </div>
                 <div className="mt-1 flex items-baseline justify-between">
-                  <span className="text-2xl font-black">{pantryCount}</span>
-                  <span className={`text-[10px] font-bold ${filterLocation === 'PANTRY' ? 'text-amber-200' : 'text-[#527470]'}`}>
+                  <span className="text-2xl font-bold">{pantryCount}</span>
+                  <span className={`text-[10px] font-medium ${filterLocation === 'PANTRY' ? 'text-amber-900' : 'text-[var(--md-sys-color-on-surface-variant)]'}`}>
                     {lang === 'FR' ? 'articles' : 'items'}
                   </span>
                 </div>
@@ -1375,22 +1388,22 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               <button
                 type="button"
                 onClick={() => setFilterLocation(filterLocation === 'EXPIRING' ? 'ALL' : 'EXPIRING')}
-                className={`p-3 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs ${
+                className={`p-3 rounded-[16px] border text-left transition-all cursor-pointer ${
                   filterLocation === 'EXPIRING'
-                    ? 'bg-rose-700 text-white border-rose-800 shadow-xs'
+                    ? 'bg-[var(--md-sys-color-error-container)] text-[var(--md-sys-color-on-error-container)] border-[var(--md-sys-color-error)] shadow-xs'
                     : expiringItems.length > 0
-                    ? 'bg-rose-50/70 border-rose-200 hover:border-rose-400 text-rose-950'
-                    : 'bg-white border-[#E5DFD0] hover:border-slate-300 text-[#0D3B37]'
+                    ? 'bg-[var(--md-sys-color-error-container)]/50 border-[var(--md-sys-color-outline-variant)] hover:border-[var(--md-sys-color-error)] text-[var(--md-sys-color-on-error-container)]'
+                    : 'bg-[var(--md-sys-color-surface-container-low)] border-[var(--md-sys-color-outline-variant)] hover:border-slate-300 text-[var(--md-sys-color-on-surface)]'
                 }`}
               >
                 <div className="flex items-center justify-between text-xs font-bold">
                   <span>{lang === 'FR' ? 'Bientôt expiré' : 'Expiring Soon'}</span>
-                  <AlertTriangle className={`w-4 h-4 shrink-0 ${filterLocation === 'EXPIRING' ? 'text-rose-200' : 'text-rose-600'}`} />
+                  <AlertTriangle className={`w-4 h-4 shrink-0 ${filterLocation === 'EXPIRING' ? 'text-[var(--md-sys-color-error)]' : 'text-rose-600'}`} />
                 </div>
                 <div className="mt-1 flex items-baseline justify-between">
-                  <span className="text-2xl font-black">{expiringItems.length}</span>
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                    expiringItems.length > 0 ? 'bg-rose-200/80 text-rose-900' : 'bg-slate-100 text-[#527470]'
+                  <span className="text-2xl font-bold">{expiringItems.length}</span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    expiringItems.length > 0 ? 'bg-[var(--md-sys-color-error-container)] text-[var(--md-sys-color-on-error-container)]' : 'bg-[var(--md-sys-color-surface-container-high)] text-[var(--md-sys-color-on-surface-variant)]'
                   }`}>
                     {expiringItems.length > 0 ? (lang === 'FR' ? 'Alerte' : 'Alert') : (lang === 'FR' ? 'Sûr' : 'Safe')}
                   </span>
@@ -1398,25 +1411,25 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               </button>
             </div>
 
-            {/* Search Bar & Quick Add Button */}
+            {/* M3 Search Bar & Quick Add Button */}
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--md-sys-color-outline)]" />
                 <input
                   type="text"
                   placeholder={t('search_placeholder')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 text-xs font-semibold bg-white border border-[#E5DFD0] rounded-2xl focus:outline-none focus:ring-2 focus:ring-teal-600/30 focus:border-teal-600 text-[#0D3B37] placeholder-[#7C9A92] shadow-2xs"
+                  className="w-full pl-10 pr-4 py-2.5 text-xs font-medium bg-[var(--md-sys-color-surface-container-lowest)] border border-[var(--md-sys-color-outline-variant)] rounded-full focus:outline-none focus:ring-2 focus:ring-[var(--md-sys-color-primary-container)] focus:border-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-surface)] placeholder-[var(--md-sys-color-outline)] shadow-none transition-all"
                 />
               </div>
               <button
                 id="quick-add-item-btn"
                 onClick={handleOpenAddModal}
-                className="py-2 px-3.5 rounded-2xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-2xs shrink-0 transition-all active:scale-95 cursor-pointer"
+                className="m3-btn-filled py-2 px-4 rounded-full font-medium text-xs flex items-center gap-1.5 shrink-0 transition-all active:scale-95 cursor-pointer shadow-xs"
                 title={t('quick_add_tooltip')}
               >
-                <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                <Plus className="w-4 h-4 stroke-[2.5]" />
                 <span>{lang === 'FR' ? '+ Ajouter' : '+ Add'}</span>
               </button>
             </div>
@@ -2227,18 +2240,18 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             if (e.target === e.currentTarget) setIsAddMenuOpen(false);
           }}
         >
-          <div className="w-full sm:max-w-lg bg-[#FAF7EE] h-full sm:h-auto sm:max-h-[92vh] sm:rounded-3xl shadow-2xl border-0 sm:border border-[#E5DFD0] flex flex-col overflow-hidden text-[#133E3B]">
+          <div className="w-full sm:max-w-lg bg-[var(--md-sys-color-surface-container-highest)] h-full sm:h-auto sm:max-h-[92vh] sm:rounded-[28px] shadow-2xl border-0 sm:border border-[var(--md-sys-color-outline-variant)] flex flex-col overflow-hidden text-[var(--md-sys-color-on-surface)]">
             {/* Header */}
-            <div className="px-5 py-3.5 border-b border-[#E8E2D5] flex items-center justify-between bg-white/95 backdrop-blur-xs shrink-0">
+            <div className="px-5 py-3.5 border-b border-[var(--md-sys-color-outline-variant)] flex items-center justify-between bg-[var(--md-sys-color-surface-container-high)] backdrop-blur-xs shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-teal-800 text-white flex items-center justify-center shadow-xs">
+                <div className="w-8 h-8 rounded-full bg-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-primary)] flex items-center justify-center shadow-xs">
                   <Plus className="w-4 h-4 stroke-[3]" />
                 </div>
                 <div>
-                  <h2 className="text-sm sm:text-base font-black text-[#0D3B37] leading-tight">
+                  <h2 className="text-sm sm:text-base font-bold text-[var(--md-sys-color-on-surface)] leading-tight">
                     {lang === 'FR' ? 'Ajouter à la cuisine' : 'Add to Kitchen'}
                   </h2>
-                  <p className="text-[11px] text-[#527470]">
+                  <p className="text-[11px] text-[var(--md-sys-color-on-surface-variant)]">
                     {lang === 'FR' ? 'Choisissez le mode d’ajout souhaité' : 'Choose how you want to add items'}
                   </p>
                 </div>
@@ -2247,7 +2260,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               <button
                 type="button"
                 onClick={() => setIsAddMenuOpen(false)}
-                className="px-3.5 py-1.5 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
+                className="px-3.5 py-1.5 rounded-full bg-[var(--md-sys-color-surface-container)] hover:bg-[var(--md-sys-color-surface-container-highest)] text-[var(--md-sys-color-on-surface)] font-medium text-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer border border-[var(--md-sys-color-outline-variant)]"
                 title={lang === 'FR' ? 'Quitter' : 'Exit'}
               >
                 <X className="w-4 h-4" />
@@ -2256,7 +2269,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             </div>
 
             {/* Options in Responsive Modal View */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-5 max-w-lg mx-auto w-full flex flex-col justify-center space-y-3.5">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 max-w-lg mx-auto w-full flex flex-col justify-center space-y-3">
               {/* Option 1: Manual Add */}
               <button
                 type="button"
@@ -2264,16 +2277,16 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                   setIsAddMenuOpen(false);
                   handleOpenAddModal();
                 }}
-                className="w-full p-3.5 sm:p-4 rounded-3xl bg-white hover:bg-[#F6F2E8] border-2 border-[#E5DFD0] hover:border-teal-400 flex items-center gap-3.5 sm:gap-4 text-left transition-all active:scale-[0.98] shadow-xs group cursor-pointer"
+                className="w-full p-3.5 sm:p-4 rounded-[16px] bg-[var(--md-sys-color-surface-container-lowest)] hover:bg-[var(--md-sys-color-surface-container-low)] border border-[var(--md-sys-color-outline-variant)] hover:border-[var(--md-sys-color-primary)] flex items-center gap-3.5 sm:gap-4 text-left transition-all active:scale-[0.98] group cursor-pointer"
               >
-                <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-teal-700 group-hover:bg-teal-800 text-white flex items-center justify-center shadow-xs shrink-0 transition-colors">
+                <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-[12px] bg-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-primary)] flex items-center justify-center shadow-xs shrink-0 transition-colors">
                   <Plus className="w-6 h-6 stroke-[2.5]" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-extrabold text-[#0D3B37]">
+                  <p className="text-sm font-bold text-[var(--md-sys-color-on-surface)]">
                     {lang === 'FR' ? 'Saisie manuelle' : 'Manual Add'}
                   </p>
-                  <p className="text-xs text-[#527470]">
+                  <p className="text-xs text-[var(--md-sys-color-on-surface-variant)]">
                     {lang === 'FR' ? 'Entrez le nom, la quantité, le lieu de stockage et la date' : 'Name, quantity, compartment, and expiry date'}
                   </p>
                 </div>
@@ -2444,148 +2457,195 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         </div>
       )}
 
-      {/* Bottom Navigation Bar (Visible on Mobile & Tablet Mode) */}
+      {/* M3 Navigation Bar (Visible on Mobile & Tablet Mode) */}
       <nav
         aria-label="Bottom Navigation"
-        className="xl:hidden fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-[#E8E2D5] shadow-lg pt-1.5 pb-[max(0.75rem,env(safe-area-inset-bottom,0.75rem))] px-2 z-30"
+        className="xl:hidden fixed bottom-0 inset-x-0 h-20 bg-[var(--md-sys-color-surface-container)]/98 backdrop-blur-md border-t border-[var(--md-sys-color-outline-variant)]/40 shadow-none pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom,0.75rem))] px-2 z-30 flex items-center"
       >
-        <div className="w-full max-w-lg md:max-w-2xl mx-auto flex items-end justify-between">
-          {/* Tab 1: Inventory (Left 1) */}
+        <div className="w-full max-w-lg md:max-w-2xl mx-auto flex items-center justify-around">
+          {/* Destination 1: Kitchen / Inventory */}
           <button
             type="button"
             onClick={() => {
               setIsAddMenuOpen(false);
               setActiveNav('home');
             }}
-            className={`min-w-0 flex-1 flex flex-col items-center justify-center py-1 rounded-2xl transition-all cursor-pointer active:scale-95 ${
-              activeNav === 'home' ? 'text-teal-700' : 'text-[#7C9A92] hover:text-[#0D3B37]'
-            }`}
+            className="flex-1 flex flex-col items-center justify-center py-1 cursor-pointer transition-all select-none"
           >
-            <div className={`p-1 rounded-xl transition-colors ${activeNav === 'home' ? 'bg-teal-50' : ''}`}>
+            <div
+              className={`w-16 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+                activeNav === 'home'
+                  ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)]'
+                  : 'text-[var(--md-sys-color-on-surface-variant)] hover:bg-[var(--md-sys-color-surface-container-high)]/60'
+              }`}
+            >
               <Home className="w-5 h-5 shrink-0" />
             </div>
-            <span className={`text-[10px] tracking-tight leading-tight mt-0.5 truncate max-w-full text-center ${
-              activeNav === 'home' ? 'font-bold text-teal-900' : 'font-medium'
-            }`}>
+            <span
+              className={`text-[11px] tracking-tight leading-none mt-1 truncate max-w-full text-center ${
+                activeNav === 'home' ? 'font-bold text-[var(--md-sys-color-on-surface)]' : 'font-medium text-[var(--md-sys-color-on-surface-variant)]'
+              }`}
+            >
               {t('bottom_home')}
             </span>
           </button>
 
-          {/* Tab 2: Meals (Left 2) */}
+          {/* Destination 2: Meals */}
           <button
             type="button"
             onClick={() => {
               setIsAddMenuOpen(false);
               setActiveNav('meals');
             }}
-            className={`min-w-0 flex-1 flex flex-col items-center justify-center py-1 rounded-2xl transition-all cursor-pointer active:scale-95 ${
-              activeNav === 'meals' ? 'text-teal-700' : 'text-[#7C9A92] hover:text-[#0D3B37]'
-            }`}
+            className="flex-1 flex flex-col items-center justify-center py-1 cursor-pointer transition-all select-none"
           >
             <div className="relative">
-              <div className={`p-1 rounded-xl transition-colors ${activeNav === 'meals' ? 'bg-teal-50' : ''}`}>
+              <div
+                className={`w-16 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+                  activeNav === 'meals'
+                    ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)]'
+                    : 'text-[var(--md-sys-color-on-surface-variant)] hover:bg-[var(--md-sys-color-surface-container-high)]/60'
+                }`}
+              >
                 <CalendarDays className="w-5 h-5 shrink-0" />
               </div>
               {plannedMeals.length > 0 && (
-                <span className="absolute -top-1 -right-1.5 w-4 h-4 bg-teal-600 text-white rounded-full text-[9px] font-bold flex items-center justify-center">
+                <span className="absolute top-1 right-3 px-1 min-w-4 h-4 bg-[var(--md-sys-color-primary)] text-white rounded-full text-[9px] font-bold flex items-center justify-center">
                   {plannedMeals.length}
                 </span>
               )}
             </div>
-            <span className={`text-[10px] tracking-tight leading-tight mt-0.5 truncate max-w-full text-center ${
-              activeNav === 'meals' ? 'font-bold text-teal-900' : 'font-medium'
-            }`}>
+            <span
+              className={`text-[11px] tracking-tight leading-none mt-1 truncate max-w-full text-center ${
+                activeNav === 'meals' ? 'font-bold text-[var(--md-sys-color-on-surface)]' : 'font-medium text-[var(--md-sys-color-on-surface-variant)]'
+              }`}
+            >
               {t('bottom_meals')}
             </span>
           </button>
 
-          {/* EXACT CENTER: Raised Add Button (Functions like Mobile Phone) */}
-          <div className="flex flex-col items-center justify-center px-2 shrink-0 relative">
-            <button
-              id="bottom-center-add-btn"
-              type="button"
-              onClick={() => setIsAddMenuOpen((prev) => !prev)}
-              className={`w-12 h-12 -mt-5 rounded-full bg-teal-700 hover:bg-teal-800 text-white flex items-center justify-center shadow-lg active:scale-90 transition-all cursor-pointer ${
-                isAddMenuOpen ? 'rotate-45 bg-rose-600' : ''
-              }`}
-              aria-label={lang === 'FR' ? 'Ajouter un aliment' : 'Add Item'}
-              title={lang === 'FR' ? 'Ajouter un aliment' : 'Add Item'}
-            >
-              <Plus className="w-6 h-6 stroke-[2.5]" />
-            </button>
-            <span className="text-[10px] font-bold text-[#0D3B37] mt-0.5 tracking-tight leading-tight">
-              {lang === 'FR' ? 'Ajout' : 'Add'}
-            </span>
-          </div>
-
-          {/* Tab 3: Grocery (Right 1) */}
+          {/* Destination 3: Grocery */}
           <button
             type="button"
             onClick={() => {
               setIsAddMenuOpen(false);
               setActiveNav('grocery');
             }}
-            className={`min-w-0 flex-1 flex flex-col items-center justify-center py-1 rounded-2xl transition-all cursor-pointer active:scale-95 ${
-              activeNav === 'grocery' ? 'text-teal-700' : 'text-[#7C9A92] hover:text-[#0D3B37]'
-            }`}
+            className="flex-1 flex flex-col items-center justify-center py-1 cursor-pointer transition-all select-none"
           >
             <div className="relative">
-              <div className={`p-1 rounded-xl transition-colors ${activeNav === 'grocery' ? 'bg-teal-50' : ''}`}>
+              <div
+                className={`w-16 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+                  activeNav === 'grocery'
+                    ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)]'
+                    : 'text-[var(--md-sys-color-on-surface-variant)] hover:bg-[var(--md-sys-color-surface-container-high)]/60'
+                }`}
+              >
                 <ShoppingCart className="w-5 h-5 shrink-0" />
               </div>
               {groceryItems.filter((i) => i.inCart).length > 0 && (
-                <span className="absolute -top-1 -right-1.5 w-4 h-4 bg-teal-600 text-white rounded-full text-[9px] font-bold flex items-center justify-center">
+                <span className="absolute top-1 right-3 px-1 min-w-4 h-4 bg-[var(--md-sys-color-primary)] text-white rounded-full text-[9px] font-bold flex items-center justify-center">
                   {groceryItems.filter((i) => i.inCart).length}
                 </span>
               )}
             </div>
-            <span className={`text-[10px] tracking-tight leading-tight mt-0.5 truncate max-w-full text-center ${
-              activeNav === 'grocery' ? 'font-bold text-teal-900' : 'font-medium'
-            }`}>
+            <span
+              className={`text-[11px] tracking-tight leading-none mt-1 truncate max-w-full text-center ${
+                activeNav === 'grocery' ? 'font-bold text-[var(--md-sys-color-on-surface)]' : 'font-medium text-[var(--md-sys-color-on-surface-variant)]'
+              }`}
+            >
               {t('bottom_grocery')}
             </span>
           </button>
 
-          {/* Tab 4: Cooking Ideas (Right 2) */}
+          {/* Destination 4: Cooking Ideas */}
           <button
             type="button"
             onClick={() => {
               setIsAddMenuOpen(false);
               setActiveNav('cooking');
             }}
-            className={`min-w-0 flex-1 flex flex-col items-center justify-center py-1 rounded-2xl transition-all cursor-pointer active:scale-95 ${
-              activeNav === 'cooking' ? 'text-teal-700' : 'text-[#7C9A92] hover:text-[#0D3B37]'
-            }`}
+            className="flex-1 flex flex-col items-center justify-center py-1 cursor-pointer transition-all select-none"
           >
-            <div className={`p-1 rounded-xl transition-colors ${activeNav === 'cooking' ? 'bg-teal-50' : ''}`}>
+            <div
+              className={`w-16 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+                activeNav === 'cooking'
+                  ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)]'
+                  : 'text-[var(--md-sys-color-on-surface-variant)] hover:bg-[var(--md-sys-color-surface-container-high)]/60'
+              }`}
+            >
               <ChefHat className="w-5 h-5 shrink-0" />
             </div>
-            <span className={`text-[10px] tracking-tight leading-tight mt-0.5 truncate max-w-full text-center ${
-              activeNav === 'cooking' ? 'font-bold text-teal-900' : 'font-medium'
-            }`}>
+            <span
+              className={`text-[11px] tracking-tight leading-none mt-1 truncate max-w-full text-center ${
+                activeNav === 'cooking' ? 'font-bold text-[var(--md-sys-color-on-surface)]' : 'font-medium text-[var(--md-sys-color-on-surface-variant)]'
+              }`}
+            >
               {t('bottom_cooking')}
+            </span>
+          </button>
+
+          {/* Destination 5: Family & Sync */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsAddMenuOpen(false);
+              setActiveNav('sync');
+            }}
+            className="flex-1 flex flex-col items-center justify-center py-1 cursor-pointer transition-all select-none"
+          >
+            <div
+              className={`w-16 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+                activeNav === 'sync'
+                  ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)]'
+                  : 'text-[var(--md-sys-color-on-surface-variant)] hover:bg-[var(--md-sys-color-surface-container-high)]/60'
+              }`}
+            >
+              <Users className="w-5 h-5 shrink-0" />
+            </div>
+            <span
+              className={`text-[11px] tracking-tight leading-none mt-1 truncate max-w-full text-center ${
+                activeNav === 'sync' ? 'font-bold text-[var(--md-sys-color-on-surface)]' : 'font-medium text-[var(--md-sys-color-on-surface-variant)]'
+              }`}
+            >
+              {lang === 'FR' ? 'Famille' : 'Family'}
             </span>
           </button>
         </div>
       </nav>
 
-      {/* Desktop Floating Mobile-Style Add Button (Functions like Mobile Phone on Desktop) */}
-      <div className="hidden xl:flex fixed bottom-8 right-8 z-40 items-center gap-2 group animate-fade-in">
+      {/* Mobile Floating M3 Extended FAB */}
+      <div className="xl:hidden fixed bottom-24 right-4 z-40">
         <button
           type="button"
-          id="desktop-floating-mobile-add-btn"
+          id="mobile-floating-extended-fab"
           onClick={() => setIsAddMenuOpen((prev) => !prev)}
-          className={`w-14 h-14 rounded-full bg-teal-700 hover:bg-teal-800 text-white flex items-center justify-center shadow-xl hover:shadow-2xl active:scale-95 transition-all cursor-pointer border-2 border-white group-hover:scale-105 ${
-            isAddMenuOpen ? 'rotate-45 bg-rose-600' : ''
+          className={`m3-extended-fab flex items-center gap-2 px-4 py-3 shadow-[var(--md-sys-elevation-2)] hover:shadow-[var(--md-sys-elevation-3)] active:scale-95 transition-all cursor-pointer font-medium text-xs ${
+            isAddMenuOpen ? 'bg-[var(--md-sys-color-error-container)] text-[var(--md-sys-color-on-error-container)]' : ''
           }`}
-          aria-label={lang === 'FR' ? 'Ajouter (Menu Mobile)' : 'Add (Mobile Menu)'}
-          title={lang === 'FR' ? 'Ajouter comme sur mobile' : 'Add like on mobile'}
+          aria-label={lang === 'FR' ? 'Ajouter un aliment' : 'Add Item'}
+          title={lang === 'FR' ? 'Ajouter un aliment' : 'Add Item'}
         >
-          <Plus className="w-7 h-7 stroke-[2.5]" />
+          <Plus className={`w-5 h-5 stroke-[2.5] transition-transform ${isAddMenuOpen ? 'rotate-45' : ''}`} />
+          <span>{lang === 'FR' ? 'Ajouter' : 'Add Item'}</span>
         </button>
-        <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-[#0D3B37] text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-lg pointer-events-none whitespace-nowrap">
-          {lang === 'FR' ? 'Ajouter comme sur mobile' : 'Add like on mobile'}
-        </div>
+      </div>
+
+      {/* Desktop Floating M3 Extended FAB */}
+      <div className="hidden xl:flex fixed bottom-8 right-8 z-40 items-center gap-2">
+        <button
+          type="button"
+          id="desktop-floating-extended-fab"
+          onClick={() => setIsAddMenuOpen((prev) => !prev)}
+          className={`m3-extended-fab flex items-center gap-2.5 px-5 py-3.5 shadow-[var(--md-sys-elevation-2)] hover:shadow-[var(--md-sys-elevation-3)] active:scale-95 transition-all cursor-pointer font-medium text-sm ${
+            isAddMenuOpen ? 'bg-[var(--md-sys-color-error-container)] text-[var(--md-sys-color-on-error-container)]' : ''
+          }`}
+          aria-label={lang === 'FR' ? 'Ajouter un aliment' : 'Add Item'}
+          title={lang === 'FR' ? 'Ajouter un aliment' : 'Add Item'}
+        >
+          <Plus className={`w-5 h-5 stroke-[2.5] transition-transform ${isAddMenuOpen ? 'rotate-45' : ''}`} />
+          <span>{lang === 'FR' ? 'Ajouter un aliment' : 'Add Item'}</span>
+        </button>
       </div>
 
       {/* Vision Scanner Modal */}
@@ -2821,6 +2881,50 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Floating Active Cooking Mini-Bar (persists across all pages while cooking in background) */}
+      <ActiveCookingBar />
+
+      {/* Full Screen Guided Cooking Modal (driven by global session) */}
+      {sessionActiveRecipe && (
+        <GuidedCookingModal
+          isOpen={isSessionCookingOpen}
+          onClose={exitCooking}
+          onMinimize={minimizeCooking}
+          recipe={sessionActiveRecipe}
+          inventoryItems={items}
+          onCookRecipe={sessionHandlers.onCookRecipe || handleCookRecipeDirectly}
+          onAddMissingToGrocery={
+            sessionHandlers.onAddMissingToGrocery ||
+            ((missing) => {
+              setGroceryItems((prev) => [
+                {
+                  id: `g_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                  name: missing.name,
+                  category: missing.category || 'Produce',
+                  quantity: missing.quantity || 1,
+                  unit: missing.unit || 'item',
+                  locationType: 'FRIDGE',
+                  inCart: false,
+                  notes: missing.recipeTitle
+                    ? lang === 'FR'
+                      ? `Pour : ${missing.recipeTitle}`
+                      : `For: ${missing.recipeTitle}`
+                    : undefined,
+                },
+                ...prev,
+              ]);
+              setBannerNotice(
+                lang === 'FR'
+                  ? `🛒 "${missing.name}" ajouté à votre liste de courses !`
+                  : `🛒 Added "${missing.name}" to your grocery list!`
+              );
+              setTimeout(() => setBannerNotice(null), 3000);
+            })
+          }
+          onRecipeCookedSuccessfully={sessionHandlers.onRecipeCookedSuccessfully}
+        />
       )}
     </div>
   );

@@ -61,13 +61,13 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
   const CategoryIcon = visual.icon;
 
   if (!isExpanded) {
-    /* COMPACT / COLLAPSED ROW */
+    /* COMPACT / COLLAPSED ROW - M3 Surface Container Low */
     return (
       <div
         id={`inventory-item-collapsed-${item.id}`}
         onClick={onToggleExpand}
-        className={`p-2.5 sm:p-3 rounded-2xl bg-white border border-[#E5DFD0] shadow-2xs hover:shadow-xs hover:border-[#D0C7B2] transition-all flex items-center justify-between gap-2.5 cursor-pointer group select-none ${
-          isSelected ? 'bg-teal-50/50 ring-2 ring-teal-600' : ''
+        className={`p-2.5 sm:p-3 rounded-[16px] bg-[var(--md-sys-color-surface-container-low)] border border-[var(--md-sys-color-outline-variant)] hover:bg-[var(--md-sys-color-surface-container)] hover:border-[var(--md-sys-color-outline)] transition-all flex items-center justify-between gap-2.5 cursor-pointer group select-none ${
+          isSelected ? 'bg-[var(--md-sys-color-primary-container)]/30 ring-2 ring-[var(--md-sys-color-primary)]' : ''
         }`}
       >
         {/* Left: Select Checkbox + Circle Quick-Consume + Food Badge + Title & Qty */}
@@ -80,10 +80,10 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
                 e.stopPropagation();
                 onToggleSelect();
               }}
-              className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all cursor-pointer ${
+              className={`w-5 h-5 rounded-[4px] border-2 flex items-center justify-center shrink-0 transition-all cursor-pointer ${
                 isSelected
-                  ? 'bg-teal-700 border-teal-700 text-white shadow-2xs'
-                  : 'border-slate-300 hover:border-teal-500 bg-white'
+                  ? 'bg-[var(--md-sys-color-primary)] border-[var(--md-sys-color-primary)] text-white shadow-xs'
+                  : 'border-[var(--md-sys-color-outline)] hover:border-[var(--md-sys-color-primary)] bg-[var(--md-sys-color-surface-container-lowest)]'
               }`}
               title={lang === 'FR' ? (isSelected ? 'Désélectionner' : 'Sélectionner') : (isSelected ? 'Deselect' : 'Select')}
             >
@@ -99,7 +99,7 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
               e.stopPropagation();
               onConsume(item);
             }}
-            className="w-5 h-5 rounded-full border-2 border-slate-300 hover:border-emerald-600 hover:bg-emerald-50 flex items-center justify-center shrink-0 transition-all cursor-pointer"
+            className="w-5 h-5 rounded-full border-2 border-[var(--md-sys-color-outline)] hover:border-[var(--md-sys-color-primary)] hover:bg-[var(--md-sys-color-primary-container)]/30 flex items-center justify-center shrink-0 transition-all cursor-pointer"
             title={lang === 'FR' ? 'Consommer cet article' : 'Mark as consumed'}
           >
             <span className="sr-only">Consume</span>
@@ -118,19 +118,19 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
           {/* Title & Quantity */}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-extrabold text-xs sm:text-sm text-[#0D3B37] truncate leading-tight">
+              <h3 className="font-bold text-xs sm:text-sm text-[var(--md-sys-color-on-surface)] truncate leading-tight">
                 {displayName}
               </h3>
               {/* Status Badge */}
               {isSoon && (
-                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200 tracking-tight shrink-0">
+                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-[var(--md-sys-color-error-container)] text-[var(--md-sys-color-on-error-container)] tracking-tight shrink-0">
                   {daysLeft !== null && daysLeft <= 0
                     ? (lang === 'FR' ? 'EXP: 0j' : 'EXP: 0d')
                     : (lang === 'FR' ? `EXP: ${daysLeft}j` : `EXP: ${daysLeft}d`)}
                 </span>
               )}
               {isFreezer && (
-                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200 tracking-tight shrink-0 flex items-center gap-0.5">
+                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-[var(--md-sys-color-tertiary-container)] text-[var(--md-sys-color-on-tertiary-container)] tracking-tight shrink-0 flex items-center gap-0.5">
                   <Snowflake className="w-2.5 h-2.5" />
                   <span>{lang === 'FR' ? 'CONGELÉ' : 'FROZEN'}</span>
                 </span>
@@ -138,18 +138,18 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
             </div>
 
             <div className="flex items-center gap-2 mt-1 flex-wrap">
-              <span className="text-xs font-semibold text-[#527470]">
+              <span className="text-xs font-medium text-[var(--md-sys-color-secondary)]">
                 {formatLocalizedQuantityUnit(item.quantity, item.unit, lang)}
               </span>
 
               {item.isLeftover && (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 inline-flex items-center gap-1">
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[var(--md-sys-color-secondary-container)] text-[var(--md-sys-color-on-secondary-container)] inline-flex items-center gap-1">
                   <span>🍲</span>
                   <span>{lang === 'FR' ? 'Reste' : 'Leftover'}</span>
                 </span>
               )}
 
-              <span className="text-xs text-[#7C9A92] truncate">
+              <span className="text-xs text-[var(--md-sys-color-on-surface-variant)] truncate">
                 • {getLocationLocalizedName(item.locationName, lang)}
               </span>
             </div>
@@ -164,7 +164,7 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
             e.stopPropagation();
             onDelete(item.id, item.name);
           }}
-          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors shrink-0 cursor-pointer"
+          className="p-1.5 text-[var(--md-sys-color-outline)] hover:text-[var(--md-sys-color-error)] hover:bg-[var(--md-sys-color-error-container)] rounded-full transition-colors shrink-0 cursor-pointer"
           title={lang === 'FR' ? "Supprimer l'article" : 'Delete item'}
         >
           <Trash2 className="w-4 h-4" />
@@ -173,12 +173,12 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
     );
   }
 
-  /* EXPANDED DETAILED CARD */
+  /* EXPANDED DETAILED CARD - M3 Surface Container */
   return (
     <div
       id={`inventory-item-expanded-${item.id}`}
       onClick={onToggleExpand}
-      className="p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl bg-white border border-[#E5DFD0] shadow-xs space-y-3 cursor-pointer transition-all select-none"
+      className="p-3.5 sm:p-4 rounded-[20px] bg-[var(--md-sys-color-surface-container)] border border-[var(--md-sys-color-outline-variant)] shadow-none space-y-3 cursor-pointer transition-all select-none"
     >
       {/* Top Row: Food Image/Icon + Title + Quantity & Category Pill + Location Badge */}
       <div className="flex items-start gap-2.5">
@@ -189,10 +189,10 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
               e.stopPropagation();
               onToggleSelect();
             }}
-            className={`w-6 h-6 mt-1 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all cursor-pointer ${
+            className={`w-6 h-6 mt-1 rounded-[4px] border-2 flex items-center justify-center shrink-0 transition-all cursor-pointer ${
               isSelected
-                ? 'bg-teal-700 border-teal-700 text-white shadow-2xs'
-                : 'border-slate-300 hover:border-teal-500 bg-white'
+                ? 'bg-[var(--md-sys-color-primary)] border-[var(--md-sys-color-primary)] text-white shadow-xs'
+                : 'border-[var(--md-sys-color-outline)] hover:border-[var(--md-sys-color-primary)] bg-[var(--md-sys-color-surface-container-lowest)]'
             }`}
             title={lang === 'FR' ? (isSelected ? 'Désélectionner' : 'Sélectionner') : (isSelected ? 'Deselect' : 'Select')}
           >
@@ -213,20 +213,20 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
         {/* Item Details */}
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-1.5">
-            <h3 className="font-extrabold text-sm sm:text-base text-[#0D3B37] truncate leading-snug">
+            <h3 className="font-bold text-sm sm:text-base text-[var(--md-sys-color-on-surface)] truncate leading-snug">
               {displayName}
             </h3>
 
             {/* Storage Location Badge (Top Right) */}
             <span
-              className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1 ${
+              className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full shrink-0 flex items-center gap-1 ${
                 isFreezer
-                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                  ? 'bg-[var(--md-sys-color-tertiary-container)] text-[var(--md-sys-color-on-tertiary-container)] border border-[var(--md-sys-color-outline-variant)]/60'
                   : item.locationType === 'SPICE_RACK'
-                  ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                  ? 'bg-amber-100/80 text-amber-900 border border-amber-300'
                   : item.locationType === 'PANTRY'
-                  ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                  : 'bg-teal-50 text-teal-800 border border-teal-200'
+                  ? 'bg-amber-100/80 text-amber-900 border border-amber-300'
+                  : 'bg-[var(--md-sys-color-secondary-container)] text-[var(--md-sys-color-on-secondary-container)] border border-[var(--md-sys-color-outline-variant)]/60'
               }`}
             >
               {isFreezer ? (
@@ -244,7 +244,7 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
 
           {/* Food Type & Quantity Pill + Category Pill */}
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-[#FAF7EE] text-[#0D3B37] border border-[#E5DFD0]">
+            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[var(--md-sys-color-surface-container-highest)] text-[var(--md-sys-color-on-surface)] border border-[var(--md-sys-color-outline-variant)]">
               {formatLocalizedQuantityUnit(item.quantity, item.unit, lang)}
             </span>
 
@@ -470,7 +470,7 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
           </span>
         </div>
 
-        {/* Action buttons */}
+        {/* Action buttons - M3 Tonal & Pill controls */}
         <div className="flex items-center gap-1.5 shrink-0">
           {/* +Cart */}
           <button
@@ -478,9 +478,9 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
             type="button"
             onClick={() => onAddToCart(item)}
             title={lang === 'FR' ? 'Ajouter à la liste' : 'Add to cart'}
-            className="py-1 px-2.5 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 rounded-xl text-xs font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
+            className="py-1 px-3 bg-[var(--md-sys-color-secondary-container)] hover:brightness-95 text-[var(--md-sys-color-on-secondary-container)] rounded-full text-xs font-medium flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
           >
-            <ShoppingCart className="w-3 h-3 text-teal-700" />
+            <ShoppingCart className="w-3.5 h-3.5" />
             <span>{lang === 'FR' ? '+Panier' : '+Cart'}</span>
           </button>
 
@@ -492,9 +492,9 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
               onClick={() => onDefrost(item)}
               disabled={isDefrosting}
               title={lang === 'FR' ? 'Décongeler' : 'Defrost'}
-              className="py-1 px-3 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-xl text-xs font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+              className="py-1 px-3 bg-[var(--md-sys-color-tertiary-container)] hover:brightness-95 text-[var(--md-sys-color-on-tertiary-container)] rounded-full text-xs font-medium flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
             >
-              <Flame className="w-3 h-3 text-blue-700" />
+              <Flame className="w-3.5 h-3.5" />
               <span>
                 {isDefrosting
                   ? '...'
@@ -511,9 +511,9 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
             type="button"
             onClick={() => onEdit(item)}
             title={lang === 'FR' ? "Modifier l'article" : 'Edit item'}
-            className="py-1 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
+            className="py-1 px-3 bg-[var(--md-sys-color-surface-container-high)] hover:bg-[var(--md-sys-color-surface-container-highest)] text-[var(--md-sys-color-on-surface)] border border-[var(--md-sys-color-outline-variant)] rounded-full text-xs font-medium flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
           >
-            <Edit3 className="w-3 h-3" />
+            <Edit3 className="w-3.5 h-3.5" />
             <span>{lang === 'FR' ? 'Modifier' : 'Edit'}</span>
           </button>
 
@@ -523,7 +523,7 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
             type="button"
             onClick={() => onConsume(item)}
             title={lang === 'FR' ? 'Consommer cet article' : 'Mark as consumed'}
-            className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center transition-all active:scale-95 shadow-2xs cursor-pointer"
+            className="p-1.5 bg-[var(--md-sys-color-primary)] hover:brightness-105 text-[var(--md-sys-color-on-primary)] rounded-full text-xs font-bold flex items-center justify-center transition-all active:scale-95 shadow-xs cursor-pointer"
           >
             <Check className="w-3.5 h-3.5 stroke-[2.5]" />
           </button>
@@ -534,7 +534,7 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
             type="button"
             onClick={() => onDelete(item.id, item.name)}
             title={lang === 'FR' ? "Supprimer l'article" : 'Delete item'}
-            className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-xl text-xs font-bold flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+            className="p-1.5 text-[var(--md-sys-color-outline)] hover:text-[var(--md-sys-color-error)] hover:bg-[var(--md-sys-color-error-container)] rounded-full text-xs font-bold flex items-center justify-center transition-all active:scale-95 cursor-pointer"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>

@@ -960,6 +960,15 @@ class EncryptedDatabaseStore {
       ? `${rawKey.substring(0, 4)}••••••••••••••••${rawKey.substring(rawKey.length - 4)}`
       : "";
 
+    const configuredMode = this.systemSettings?.hostingMode || (
+      (this.systemSettings?.cloudflareTunnelToken || process.env.CLOUDFLARE_TUNNEL_TOKEN) ? "cloudflare" :
+      (this.systemSettings?.appUrl && !this.systemSettings.appUrl.includes("localhost") && !this.systemSettings.appUrl.includes("127.0.0.1") && !this.systemSettings.appUrl.includes(".local")) ? "custom_domain" : "local_lan"
+    );
+
+    const configuredCustomDomain = this.systemSettings?.customDomain || (
+      this.systemSettings?.appUrl ? this.systemSettings.appUrl.replace(/^https?:\/\//i, '').replace(/:\d+$/, '').replace(/\/.*$/, '') : ""
+    );
+
     return {
       kitchenName: this.household?.name || process.env.KITCHEN_NAME || "Your Kitchen",
       appUrl: this.systemSettings?.appUrl || process.env.APP_URL || "http://localhost:3000",
@@ -968,6 +977,9 @@ class EncryptedDatabaseStore {
         : (process.env.GEMINI_API_KEY || this.systemSettings?.geminiApiKey ? "••••••••••••••••" : ""),
       hasGeminiKey: Boolean(process.env.GEMINI_API_KEY || this.systemSettings?.geminiApiKey),
       isGoogleManagedKey: Boolean(process.env.GEMINI_API_KEY),
+      hostingMode: configuredMode,
+      customDomain: configuredCustomDomain,
+      reverseProxyType: this.systemSettings?.reverseProxyType || "caddy",
       cloudflareTunnelToken: includeSensitiveKeys
         ? (this.systemSettings?.cloudflareTunnelToken || process.env.CLOUDFLARE_TUNNEL_TOKEN || "")
         : (this.systemSettings?.cloudflareTunnelToken || process.env.CLOUDFLARE_TUNNEL_TOKEN ? "••••••••••••••••" : ""),
@@ -1010,6 +1022,21 @@ class EncryptedDatabaseStore {
       this.systemSettings.geminiApiKey = val;
       process.env.GEMINI_API_KEY = val;
       envSyncObj.GEMINI_API_KEY = val;
+    }
+
+    if (updates.hostingMode !== undefined) {
+      this.systemSettings.hostingMode = updates.hostingMode;
+      envSyncObj.PANTRYO_HOSTING_MODE = updates.hostingMode;
+    }
+
+    if (updates.customDomain !== undefined) {
+      const val = updates.customDomain.trim();
+      this.systemSettings.customDomain = val;
+      envSyncObj.PANTRYO_CUSTOM_DOMAIN = val;
+    }
+
+    if (updates.reverseProxyType !== undefined) {
+      this.systemSettings.reverseProxyType = updates.reverseProxyType;
     }
 
     if (updates.cloudflareTunnelToken !== undefined) {

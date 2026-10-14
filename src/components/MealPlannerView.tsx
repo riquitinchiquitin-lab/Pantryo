@@ -32,6 +32,7 @@ import {
 import { PlannedMeal, MealType, InventoryItem, PlannedMealIngredient, DailyNutritionGoals, NutritionCalculationMethod, Macros } from '../types';
 import { getFoodVisual } from '../utils/foodVisuals';
 import { useLanguage } from '../utils/i18n';
+import { useCookingSession } from '../contexts/CookingSessionContext';
 import { getItemDisplayName, getRecipeDisplayTitle } from '../utils/foodTranslator';
 import { SmartMealSuggestionsModal } from './SmartMealSuggestionsModal';
 import { MealPlanShoppingListModal } from './MealPlanShoppingListModal';
@@ -44,6 +45,7 @@ import {
   estimateIngredientNutrition,
 } from '../services/nutritionEngine';
 import { getCuratedMealPhoto, getFoodSvgFallback, CURATED_FOOD_PHOTOS } from '../utils/curatedFoodImages';
+import { GuidedCookingModal } from './GuidedCookingModal';
 
 function parseLocalDate(dateStr: string): Date {
   const parts = dateStr.split('-');
@@ -93,7 +95,51 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
 
   const todayStr = useMemo(() => formatLocalDate(new Date()), []);
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
+  const { startCooking } = useCookingSession();
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
+
+  const handleLaunchMealCooking = (meal: PlannedMeal) => {
+    startCooking(
+      {
+        id: meal.id,
+        title: meal.title,
+        titleFr: meal.titleFr,
+        titleEn: meal.titleEn,
+        ingredients: meal.ingredients.map((ing) => ({
+          name: ing.name,
+          nameFr: ing.nameFr,
+          nameEn: (ing as any).nameEn,
+          quantity: ing.quantity,
+          unit: ing.unit,
+        })),
+        instructions: (meal as any).instructions || (meal.notes ? [meal.notes] : undefined),
+        instructionsFr: (meal as any).instructionsFr,
+        instructionsEn: (meal as any).instructionsEn,
+        servings: meal.servings,
+        prepTimeMinutes: meal.prepTimeMinutes,
+        cookTimeMinutes: (meal as any).cookTimeMinutes || 15,
+        imageUrl: meal.imageUrl,
+        caloriesPerServing: meal.calories,
+        macrosPerServing: meal.macrosPerServing,
+      },
+      {
+        onCookRecipe: async () => {
+          await handleToggleCooked(meal);
+        },
+        onAddMissingToGrocery: (missing) => {
+          if (onAddIngredientsToGrocery) {
+            onAddIngredientsToGrocery([
+              {
+                name: missing.name,
+                quantity: missing.quantity || 1,
+                unit: missing.unit || 'portion',
+              },
+            ]);
+          }
+        },
+      }
+    );
+  };
 
   // Month navigation state
   const [currentMonthDate, setCurrentMonthDate] = useState<Date>(() => new Date());
@@ -520,6 +566,12 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
   const handleToggleCooked = async (meal: PlannedMeal) => {
     if (onCookMeal) {
       await onCookMeal(meal);
+      setSuccessToast(
+        !meal.isCooked
+          ? (lang === 'FR' ? `🎉 Repas "${meal.title}" cuisiné ! Ingrédients déduits.` : `🎉 Meal "${meal.title}" cooked & deducted!`)
+          : (lang === 'FR' ? 'Marqué comme prévu' : 'Marked as planned')
+      );
+      setTimeout(() => setSuccessToast(null), 3500);
     } else {
       await onUpdateMeal(meal.id, { isCooked: !meal.isCooked });
       setSuccessToast(
@@ -575,22 +627,22 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
         </div>
       )}
 
-      {/* Header Banner */}
-      <div className="p-4 rounded-3xl bg-white border border-[#E5DFD0] shadow-2xs space-y-3">
+      {/* Header Banner - M3 Surface Container */}
+      <div className="p-4 rounded-[24px] bg-[var(--md-sys-color-surface-container-low)] border border-[var(--md-sys-color-outline-variant)] space-y-3 shadow-none">
         <div className="flex items-start justify-between flex-wrap gap-2">
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] uppercase font-black tracking-wider text-[#527470]">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-[var(--md-sys-color-secondary)]">
                 {lang === 'FR' ? 'Planificateur' : 'Planner'}
               </span>
-              <span className="text-[11px] font-bold text-[#7C9A92]">
+              <span className="text-[11px] font-medium text-[var(--md-sys-color-on-surface-variant)]">
                 • {lang === 'FR' ? 'Planning des Repas du Foyer' : 'Household Meal Schedule'}
               </span>
             </div>
-            <h2 className="text-lg font-black tracking-tight text-[#0D3B37] mt-0.5">
+            <h2 className="text-lg font-bold tracking-tight text-[var(--md-sys-color-on-surface)] mt-0.5">
               {lang === 'FR' ? 'Planificateur & Calendrier des Repas' : 'Meal Planner & Calendar'}
             </h2>
-            <p className="text-xs text-[#527470]">
+            <p className="text-xs text-[var(--md-sys-color-on-surface-variant)]">
               {lang === 'FR'
                 ? 'Planifiez vos repas en utilisant les ingrédients disponibles dans votre frigo et garde-manger.'
                 : 'Plan breakfasts, lunches & dinners using ingredients in your fridge & pantry.'}
@@ -601,14 +653,14 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
             <button
               id="btn-header-generate-shopping-list"
               onClick={() => setIsShoppingListModalOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold border border-teal-200 flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-2xs"
+              className="px-3.5 py-1.5 rounded-full bg-[var(--md-sys-color-secondary-container)] hover:brightness-95 text-[var(--md-sys-color-on-secondary-container)] text-xs font-medium flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
               title={
                 lang === 'FR'
                   ? "Générer la liste d'épicerie selon vos repas planifiés et l'inventaire en stock"
                   : 'Generate shopping list based on planned meals and current kitchen inventory'
               }
             >
-              <ShoppingBag className="w-3.5 h-3.5 text-teal-700" />
+              <ShoppingBag className="w-3.5 h-3.5" />
               <span>{lang === 'FR' ? "Générer liste d'épicerie" : 'Generate Shopping List'}</span>
             </button>
             <button
@@ -617,36 +669,36 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                 setSuggestionsInitialSlot('DINNER');
                 setIsSuggestionsModalOpen(true);
               }}
-              className="px-3.5 py-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-black shadow-2xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+              className="m3-btn-filled text-xs py-1.5 px-4 rounded-full font-medium flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <Sparkles className="w-3.5 h-3.5" />
               <span>{lang === 'FR' ? 'Auto-Suggest (Anti-Gaspillage)' : 'Auto-Suggest (Zero-Waste)'}</span>
               {expiringItems.length > 0 && (
-                <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[10px] font-black">
+                <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-[var(--md-sys-color-error)] text-white text-[10px] font-bold">
                   {expiringItems.length}
                 </span>
               )}
             </button>
             <button
               onClick={() => setSelectedDate(todayStr)}
-              className="px-3 py-1.5 rounded-xl border border-[#E5DFD0] bg-white text-xs font-bold text-[#0D3B37] hover:bg-[#FAF7EE] transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              className="px-3 py-1.5 rounded-full border border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface-container-lowest)] text-xs font-medium text-[var(--md-sys-color-on-surface)] hover:bg-[var(--md-sys-color-surface-container)] transition-colors flex items-center gap-1.5 cursor-pointer"
             >
-              <CalendarIcon className="w-3.5 h-3.5 text-teal-700" />
+              <CalendarIcon className="w-3.5 h-3.5 text-[var(--md-sys-color-primary)]" />
               {lang === 'FR' ? "Aujourd'hui" : 'Today'}
             </button>
-            <div className="inline-flex rounded-xl p-0.5 bg-[#FAF7EE] border border-[#E5DFD0] shadow-2xs">
+            <div className="inline-flex rounded-full p-0.5 bg-[var(--md-sys-color-surface-container)] border border-[var(--md-sys-color-outline-variant)]">
               <button
                 onClick={() => setViewMode('week')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  viewMode === 'week' ? 'bg-teal-700 text-white shadow-2xs' : 'text-[#527470] hover:text-[#0D3B37]'
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
+                  viewMode === 'week' ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] font-bold shadow-xs' : 'text-[var(--md-sys-color-on-surface-variant)] hover:text-[var(--md-sys-color-on-surface)]'
                 }`}
               >
                 {lang === 'FR' ? 'Semaine' : 'Week'}
               </button>
               <button
                 onClick={() => setViewMode('month')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  viewMode === 'month' ? 'bg-teal-700 text-white shadow-2xs' : 'text-[#527470] hover:text-[#0D3B37]'
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
+                  viewMode === 'month' ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] font-bold shadow-xs' : 'text-[var(--md-sys-color-on-surface-variant)] hover:text-[var(--md-sys-color-on-surface)]'
                 }`}
               >
                 {lang === 'FR' ? 'Mois' : 'Month'}
@@ -740,25 +792,25 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                     <button
                       key={d.isoString}
                       onClick={() => setSelectedDate(d.isoString)}
-                      className={`p-1.5 sm:p-2.5 rounded-2xl flex flex-col items-center justify-between transition-all text-center border relative cursor-pointer select-none shadow-2xs ${
+                      className={`p-1.5 sm:p-2.5 rounded-[16px] flex flex-col items-center justify-between transition-all text-center border relative cursor-pointer select-none ${
                         d.isSelected
-                          ? 'bg-teal-700 text-white border-teal-800 shadow-xs ring-2 ring-teal-500/30'
+                          ? 'bg-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-primary)] border-[var(--md-sys-color-primary)] shadow-xs ring-2 ring-[var(--md-sys-color-primary-container)]'
                           : d.isToday
-                          ? 'bg-amber-50 text-amber-950 border-amber-300'
-                          : 'bg-white text-[#0D3B37] border-[#E5DFD0] hover:border-teal-300'
+                          ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] border-[var(--md-sys-color-outline)]'
+                          : 'bg-[var(--md-sys-color-surface-container-lowest)] text-[var(--md-sys-color-on-surface)] border-[var(--md-sys-color-outline-variant)] hover:bg-[var(--md-sys-color-surface-container)]'
                       }`}
                     >
-                      <span className={`text-[10px] font-bold uppercase ${d.isSelected ? 'text-teal-100' : 'text-[#7C9A92]'}`}>
+                      <span className={`text-[10px] font-bold uppercase ${d.isSelected ? 'text-[var(--md-sys-color-on-primary)]' : 'text-[var(--md-sys-color-on-surface-variant)]'}`}>
                         {d.dayName}
                       </span>
-                      <span className={`text-sm sm:text-base font-black my-0.5 ${d.isSelected ? 'text-white' : 'text-[#0D3B37]'}`}>
+                      <span className={`text-sm sm:text-base font-bold my-0.5 ${d.isSelected ? 'text-[var(--md-sys-color-on-primary)]' : 'text-[var(--md-sys-color-on-surface)]'}`}>
                         {d.dayNumber}
                       </span>
                       {/* Meal Indicator Dots */}
                       <div className="flex items-center gap-0.5 h-2">
                         {count > 0 ? (
                           <span className={`text-[8px] font-bold px-1.5 rounded-full leading-tight ${
-                            d.isSelected ? 'bg-white/20 text-white' : hasCooked ? 'bg-emerald-100 text-emerald-800' : 'bg-teal-100 text-teal-800'
+                            d.isSelected ? 'bg-white/20 text-white' : hasCooked ? 'bg-emerald-100 text-emerald-800' : 'bg-[var(--md-sys-color-secondary-container)] text-[var(--md-sys-color-on-secondary-container)]'
                           }`}>
                             {count}m
                           </span>
@@ -1190,13 +1242,36 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                     {label}
                   </span>
                   {slotData && slotData.calories > 0 && (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-[#E5DFD0] bg-[#FAF7EE] text-[10px] font-mono font-bold text-[#0D3B37] shadow-2xs">
-                      <Flame className="w-3 h-3 text-amber-600 fill-amber-500" />
-                      <span>{slotData.calories} kcal</span>
+                    <span
+                      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-[#E5DFD0] bg-[#FAF7EE] text-[10px] text-[#0D3B37] shadow-2xs select-none"
+                      title={
+                        lang === 'FR'
+                          ? `Total créneau : ${slotData.calories} kcal (${slotData.proteinGrams}g Protéines, ${slotData.carbsGrams}g Glucides, ${slotData.fatGrams}g Lipides)`
+                          : `Slot total: ${slotData.calories} kcal (${slotData.proteinGrams}g Protein, ${slotData.carbsGrams}g Carbs, ${slotData.fatGrams}g Fat)`
+                      }
+                    >
+                      <span className="flex items-center gap-1 font-bold text-amber-900">
+                        <Flame className="w-3 h-3 text-amber-600 fill-amber-500" />
+                        <span>{slotData.calories} kcal</span>
+                      </span>
                       <span className="text-slate-300">•</span>
-                      <span className="text-sky-700">{slotData.proteinGrams}P</span>
-                      <span className="text-amber-700">{slotData.carbsGrams}C</span>
-                      <span className="text-rose-700">{slotData.fatGrams}F</span>
+                      <span className="flex items-center gap-0.5 text-sky-800 font-semibold" title={lang === 'FR' ? 'Protéines' : 'Protein'}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-sky-500 inline-block" />
+                        <span>{slotData.proteinGrams}g</span>
+                        <span className="text-[9px] text-sky-600 font-normal">{lang === 'FR' ? 'Prot' : 'Pro'}</span>
+                      </span>
+                      <span className="text-slate-300">•</span>
+                      <span className="flex items-center gap-0.5 text-amber-800 font-semibold" title={lang === 'FR' ? 'Glucides' : 'Carbs'}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
+                        <span>{slotData.carbsGrams}g</span>
+                        <span className="text-[9px] text-amber-600 font-normal">{lang === 'FR' ? 'Gluc' : 'Carb'}</span>
+                      </span>
+                      <span className="text-slate-300">•</span>
+                      <span className="flex items-center gap-0.5 text-rose-800 font-semibold" title={lang === 'FR' ? 'Lipides' : 'Fat'}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block" />
+                        <span>{slotData.fatGrams}g</span>
+                        <span className="text-[9px] text-rose-600 font-normal">{lang === 'FR' ? 'Lip' : 'Fat'}</span>
+                      </span>
                     </span>
                   )}
                   <span className="text-xs font-medium text-[#7C9A92]">
@@ -1342,7 +1417,10 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                             {/* Nutritional Badges */}
                             <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                               {/* Calorie Flame Badge */}
-                              <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-amber-900 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-full shadow-2xs">
+                              <span
+                                className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-900 bg-amber-50 border border-amber-200/80 px-2.5 py-0.5 rounded-full shadow-2xs select-none"
+                                title={lang === 'FR' ? 'Calories par portion' : 'Calories per serving'}
+                              >
                                 <Flame className="w-3 h-3 text-amber-600 fill-amber-500" />
                                 <span>{meal.caloriesPerServing ?? meal.calories ?? (meal.nutrition?.caloriesPerServing ?? 440)} kcal</span>
                               </span>
@@ -1351,24 +1429,52 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                               {(meal.macrosPerServing || meal.nutrition?.macrosPerServing) && (() => {
                                 const mac = meal.macrosPerServing || meal.nutrition?.macrosPerServing!;
                                 return (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold bg-[#FAF7EE] border border-[#E5DFD0] text-[#0D3B37] px-2 py-0.5 rounded-full shadow-2xs">
-                                    <span className="text-sky-700 font-bold">{mac.proteinGrams}P</span>
-                                    <span className="text-slate-300">•</span>
-                                    <span className="text-amber-700 font-bold">{mac.carbsGrams}C</span>
-                                    <span className="text-slate-300">•</span>
-                                    <span className="text-rose-700 font-bold">{mac.fatGrams}F</span>
+                                  <span
+                                    className="inline-flex items-center gap-1.5 text-[10.5px] font-medium bg-[#FAF7EE] border border-[#E5DFD0] text-[#0D3B37] px-2.5 py-0.5 rounded-full shadow-2xs select-none"
+                                    title={
+                                      lang === 'FR'
+                                        ? `Macronutriments par portion : ${mac.proteinGrams}g Protéines, ${mac.carbsGrams}g Glucides, ${mac.fatGrams}g Lipides`
+                                        : `Macronutrients per serving: ${mac.proteinGrams}g Protein, ${mac.carbsGrams}g Carbs, ${mac.fatGrams}g Fat`
+                                    }
+                                  >
+                                    <span className="flex items-center gap-0.5 text-sky-800 font-semibold" title={lang === 'FR' ? 'Protéines' : 'Protein'}>
+                                      <span className="w-1.5 h-1.5 rounded-full bg-sky-500 inline-block" />
+                                      <span>{mac.proteinGrams}g</span>
+                                      <span className="text-[9.5px] text-sky-600 font-normal">{lang === 'FR' ? 'Prot' : 'Pro'}</span>
+                                    </span>
+                                    <span className="text-slate-300 text-[10px]">•</span>
+                                    <span className="flex items-center gap-0.5 text-amber-800 font-semibold" title={lang === 'FR' ? 'Glucides' : 'Carbs'}>
+                                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
+                                      <span>{mac.carbsGrams}g</span>
+                                      <span className="text-[9.5px] text-amber-600 font-normal">{lang === 'FR' ? 'Gluc' : 'Carb'}</span>
+                                    </span>
+                                    <span className="text-slate-300 text-[10px]">•</span>
+                                    <span className="flex items-center gap-0.5 text-rose-800 font-semibold" title={lang === 'FR' ? 'Lipides' : 'Fat'}>
+                                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block" />
+                                      <span>{mac.fatGrams}g</span>
+                                      <span className="text-[9.5px] text-rose-600 font-normal">{lang === 'FR' ? 'Lip' : 'Fat'}</span>
+                                    </span>
                                   </span>
                                 );
                               })()}
 
                               {/* Calculation Tier Badge */}
-                              <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border flex items-center gap-1 shadow-2xs ${
-                                meal.calculationMethod === 'MANUAL_OVERRIDE'
-                                  ? 'bg-amber-50 text-amber-900 border-amber-200'
-                                  : meal.calculationMethod === 'DYNAMIC_AGGREGATED'
-                                  ? 'bg-teal-50 text-teal-800 border-teal-200'
-                                  : 'bg-purple-50 text-purple-800 border-purple-200'
-                              }`}>
+                              <span
+                                className={`text-[9.5px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border flex items-center gap-1 shadow-2xs select-none ${
+                                  meal.calculationMethod === 'MANUAL_OVERRIDE'
+                                    ? 'bg-amber-50 text-amber-900 border-amber-200'
+                                    : meal.calculationMethod === 'DYNAMIC_AGGREGATED'
+                                    ? 'bg-teal-50 text-teal-800 border-teal-200'
+                                    : 'bg-purple-50 text-purple-800 border-purple-200'
+                                }`}
+                                title={
+                                  meal.calculationMethod === 'MANUAL_OVERRIDE'
+                                    ? (lang === 'FR' ? 'Valeurs personnalisées saisies manuellement' : 'Custom values locked manually')
+                                    : meal.calculationMethod === 'DYNAMIC_AGGREGATED'
+                                    ? (lang === 'FR' ? 'Calculé dynamiquement selon les ingrédients et portions' : 'Dynamically aggregated from ingredients & portions')
+                                    : (lang === 'FR' ? 'Estimé automatiquement par l’intelligence artificielle' : 'AI estimated from recipe ingredients')
+                                }
+                              >
                                 {meal.calculationMethod === 'MANUAL_OVERRIDE' ? (
                                   <>🔒 {lang === 'FR' ? 'Manuel' : 'Manual'}</>
                                 ) : meal.calculationMethod === 'DYNAMIC_AGGREGATED' ? (
@@ -1411,26 +1517,38 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
 
                             {/* Action Buttons: Mark Cooked & Missing to Grocery */}
                             <div className="pt-2 flex items-center justify-between gap-2 flex-wrap">
-                              <button
-                                onClick={() => handleToggleCooked(meal)}
-                                className={`px-2.5 py-1 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs ${
-                                  meal.isCooked
-                                    ? 'bg-emerald-600 text-white'
-                                    : 'bg-white border border-[#D5CDBC] text-[#133E3B] hover:bg-[#F0EDE4]'
-                                }`}
-                              >
-                                {meal.isCooked ? (
-                                  <>
-                                    <CheckSquare className="w-3.5 h-3.5" />
-                                    <span>{lang === 'FR' ? 'Cuisiné' : 'Cooked'}</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Square className="w-3.5 h-3.5" />
-                                    <span>{lang === 'FR' ? 'Marquer cuisiné' : 'Mark as Cooked'}</span>
-                                  </>
-                                )}
-                              </button>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  onClick={() => handleToggleCooked(meal)}
+                                  className={`px-2.5 py-1 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs ${
+                                    meal.isCooked
+                                      ? 'bg-emerald-600 text-white'
+                                      : 'bg-white border border-[#D5CDBC] text-[#133E3B] hover:bg-[#F0EDE4]'
+                                  }`}
+                                >
+                                  {meal.isCooked ? (
+                                    <>
+                                      <CheckSquare className="w-3.5 h-3.5" />
+                                      <span>{lang === 'FR' ? 'Cuisiné' : 'Cooked'}</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Square className="w-3.5 h-3.5" />
+                                      <span>{lang === 'FR' ? 'Marquer cuisiné' : 'Mark as Cooked'}</span>
+                                    </>
+                                  )}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleLaunchMealCooking(meal)}
+                                  className="px-2 py-1 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-all cursor-pointer shadow-2xs flex items-center gap-1"
+                                  title={lang === 'FR' ? 'Mode cuisine guidé avec minuteur' : 'Guided cooking mode with timer'}
+                                >
+                                  <ChefHat className="w-3 h-3 text-emerald-600" />
+                                  <span className="hidden sm:inline">{lang === 'FR' ? 'Cuisiner' : 'Cook'}</span>
+                                </button>
+                              </div>
 
                               {hasMissingIngredients && onAddIngredientsToGrocery && (
                                 <button

@@ -3,6 +3,7 @@ import { MobileSimulator } from './components/MobileSimulator';
 import { PantryoLogo } from './components/PantryoLogo';
 import { Share, X, Download, Smartphone, Check, Laptop } from 'lucide-react';
 import { LanguageProvider, useLanguage } from './utils/i18n';
+import { CookingSessionProvider } from './contexts/CookingSessionContext';
 import { usePWAInstall } from './hooks/usePWAInstall';
 
 function AppContent() {
@@ -248,7 +249,9 @@ function AppContent() {
 export default function App() {
   return (
     <LanguageProvider>
-      <AppContent />
+      <CookingSessionProvider>
+        <AppContent />
+      </CookingSessionProvider>
     </LanguageProvider>
   );
 }

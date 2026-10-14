@@ -44,6 +44,10 @@ import {
   Home,
   CalendarDays,
   ShoppingCart,
+  Cloud,
+  Network,
+  Zap,
+  CheckCheck,
 } from 'lucide-react';
 import { User, DatabaseStats, DatabaseBackupPackage } from '../types';
 import { useLanguage } from '../utils/i18n';
@@ -138,6 +142,9 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     geminiApiKey: string;
     hasGeminiKey: boolean;
     isGoogleManagedKey?: boolean;
+    hostingMode?: 'cloudflare' | 'custom_domain' | 'local_lan';
+    customDomain?: string;
+    reverseProxyType?: 'caddy' | 'nginx' | 'npm' | 'traefik' | 'dns';
     cloudflareTunnelToken: string;
     hasTunnelToken: boolean;
     expoPublicApiUrl: string;
@@ -151,6 +158,9 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     appUrl: '',
     geminiApiKey: '',
     hasGeminiKey: false,
+    hostingMode: 'cloudflare',
+    customDomain: '',
+    reverseProxyType: 'caddy',
     cloudflareTunnelToken: '',
     hasTunnelToken: false,
     expoPublicApiUrl: '',
@@ -159,6 +169,18 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     dbEncryptionKey: '',
     nodeEnv: 'production',
   });
+  const [selectedHostingMode, setSelectedHostingMode] = useState<'cloudflare' | 'custom_domain' | 'local_lan'>('cloudflare');
+  const [selectedReverseProxy, setSelectedReverseProxy] = useState<'caddy' | 'nginx' | 'npm' | 'traefik' | 'dns'>('caddy');
+  const [isTestingDomain, setIsTestingDomain] = useState(false);
+  const [domainTestResult, setDomainTestResult] = useState<{
+    success: boolean;
+    message: string;
+    statusCode?: number;
+    durationMs?: number;
+    isCloudflare?: boolean;
+    resolvedIp?: string | null;
+  } | null>(null);
+  const [copiedSnippetId, setCopiedSnippetId] = useState<string | null>(null);
   const [adminKitchenNameInput, setAdminKitchenNameInput] = useState('Your Kitchen');
   const [isSavingAdminKitchenName, setIsSavingAdminKitchenName] = useState(false);
   const [showGeminiKey, setShowGeminiKey] = useState(false);
@@ -398,6 +420,18 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
       if (res.ok) {
         const data = await res.json();
         setSettings(data);
+        if (data.hostingMode) {
+          setSelectedHostingMode(data.hostingMode);
+        } else if (data.hasTunnelToken || (data.cloudflareTunnelToken && !data.cloudflareTunnelToken.includes('••••'))) {
+          setSelectedHostingMode('cloudflare');
+        } else if (data.appUrl && !data.appUrl.includes('localhost') && !data.appUrl.includes('127.0.0.1') && !data.appUrl.includes('.local')) {
+          setSelectedHostingMode('custom_domain');
+        } else {
+          setSelectedHostingMode('local_lan');
+        }
+        if (data.reverseProxyType) {
+          setSelectedReverseProxy(data.reverseProxyType);
+        }
       }
     } catch (err) {
       console.warn('Settings fetch note:', err);
@@ -504,6 +538,53 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     }
   };
 
+  const handleCopySnippet = (text: string, id: string) => {
+    try {
+      navigator.clipboard.writeText(text);
+      setCopiedSnippetId(id);
+      setTimeout(() => setCopiedSnippetId(null), 2500);
+    } catch (_) {}
+  };
+
+  const handleTestDomain = async (target?: string) => {
+    const urlToTest = (target || settings.appUrl || '').trim();
+    if (!urlToTest) {
+      setDomainTestResult({
+        success: false,
+        message: lang === 'FR' ? 'Veuillez renseigner une URL de domaine à tester.' : 'Please enter a domain URL to test.',
+      });
+      return;
+    }
+    setIsTestingDomain(true);
+    setDomainTestResult(null);
+    try {
+      const res = await fetch('/api/v1/admin/test-domain', {
+        method: 'POST',
+        headers: await getAdminHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ domainUrl: urlToTest }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || (lang === 'FR' ? 'Échec du test de connectivité.' : 'Connectivity test failed.'));
+      }
+      setDomainTestResult({
+        success: true,
+        message: data.message,
+        statusCode: data.statusCode,
+        durationMs: data.durationMs,
+        isCloudflare: data.isCloudflare,
+        resolvedIp: data.resolvedIp,
+      });
+    } catch (err: any) {
+      setDomainTestResult({
+        success: false,
+        message: err.message || (lang === 'FR' ? 'Impossible de joindre le domaine.' : 'Could not reach the domain.'),
+      });
+    } finally {
+      setIsTestingDomain(false);
+    }
+  };
+
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingSettings(true);
@@ -512,7 +593,11 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
       const res = await fetch('/api/v1/admin/settings', {
         method: 'POST',
         headers: await getAdminHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify(settings),
+        body: JSON.stringify({
+          ...settings,
+          hostingMode: selectedHostingMode,
+          reverseProxyType: selectedReverseProxy,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -2635,13 +2720,27 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                     </div>
                     <div
                       className={`px-2.5 py-1 rounded-lg border flex items-center gap-1.5 font-medium ${
-                        settings.hasTunnelToken
+                        selectedHostingMode === 'cloudflare'
                           ? 'bg-blue-50 border-blue-200 text-blue-800'
+                          : selectedHostingMode === 'custom_domain'
+                          ? 'bg-purple-50 border-purple-200 text-purple-800'
                           : 'bg-slate-100 border-slate-200 text-slate-700'
                       }`}
                     >
-                      <Terminal className="w-3.5 h-3.5" />
-                      <span>{settings.hasTunnelToken ? 'Cloudflare Tunnel' : 'Réseau Local'}</span>
+                      {selectedHostingMode === 'cloudflare' ? (
+                        <Cloud className="w-3.5 h-3.5 text-blue-600" />
+                      ) : selectedHostingMode === 'custom_domain' ? (
+                        <Globe className="w-3.5 h-3.5 text-purple-600" />
+                      ) : (
+                        <Home className="w-3.5 h-3.5 text-slate-600" />
+                      )}
+                      <span>
+                        {selectedHostingMode === 'cloudflare'
+                          ? 'Cloudflare Zero Trust'
+                          : selectedHostingMode === 'custom_domain'
+                          ? (lang === 'FR' ? 'Propre Domaine' : 'Custom Domain')
+                          : (lang === 'FR' ? 'Réseau Local' : 'Local LAN')}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -2715,63 +2814,753 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                   </div>
                 </div>
 
-                {/* 1. Public App URL & Port */}
-                <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-4">
-                  <div className="flex items-center gap-2 pb-2 border-b border-[#F0EBE1]">
-                    <Globe className="w-4 h-4 text-teal-800" />
-                    <h3 className="font-bold text-[#0D3B37] text-xs uppercase tracking-wider">
-                      {lang === 'FR' ? '1. Domaine Public & Réseau' : '1. Public Domain & Network'}
-                    </h3>
+                {/* 1. Hosting Mode & Domain Configuration: Cloudflare or Custom Domain */}
+                <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#F0EBE1] gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-teal-800 text-white flex items-center justify-center shrink-0">
+                        <Globe className="w-4 h-4 text-teal-200" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-[#0D3B37] text-xs uppercase tracking-wider">
+                          {lang === 'FR'
+                            ? '1. Mode d’Hébergement & Domaine : Cloudflare ou Propre Domaine'
+                            : '1. Hosting Mode & Domain: Cloudflare or Custom Domain'}
+                        </h3>
+                        <p className="text-[11px] text-[#527470]">
+                          {lang === 'FR'
+                            ? 'Choisissez comment exécuter et exposer Pantryo : via un Tunnel Cloudflare Zero Trust sécurisé, avec votre propre nom de domaine personnalisé, ou en réseau local privé.'
+                            : 'Choose how to run and access Pantryo: via secure Cloudflare Zero Trust Tunnel, with your own custom domain, or private local LAN.'}
+                        </p>
+                      </div>
+                    </div>
+                    <span
+                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold shrink-0 self-start sm:self-auto ${
+                        selectedHostingMode === 'cloudflare'
+                          ? 'bg-blue-100 text-blue-900 border border-blue-200'
+                          : selectedHostingMode === 'custom_domain'
+                          ? 'bg-purple-100 text-purple-900 border border-purple-200'
+                          : 'bg-emerald-100 text-emerald-900 border border-emerald-200'
+                      }`}
+                    >
+                      {selectedHostingMode === 'cloudflare'
+                        ? '☁️ Cloudflare Zero Trust'
+                        : selectedHostingMode === 'custom_domain'
+                        ? (lang === 'FR' ? '🌐 Propre Domaine' : '🌐 Custom Domain')
+                        : (lang === 'FR' ? '🏠 Réseau Local' : '🏠 Local LAN')}
+                    </span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="sm:col-span-2 space-y-1.5">
-                      <label className="font-bold text-[#0D3B37] block text-[11px]">
-                        {lang === 'FR' ? 'URL Publique de l’Application (APP_URL)' : 'Public Application URL (APP_URL)'}
-                      </label>
-                      <div className="flex gap-2">
-                        <input
-                          type="url"
-                          value={settings.appUrl}
-                          onChange={(e) => setSettings({ ...settings, appUrl: e.target.value })}
-                          placeholder="https://pantryo.example.com ou http://192.168.1.50:3000"
-                          className="flex-1 px-3.5 py-2.5 rounded-xl border border-[#D5CEBD] bg-[#FAF7EE] focus:bg-white focus:outline-teal-800 text-xs text-[#0D3B37]"
-                        />
-                        {settings.appUrl && (
-                          <a
-                            href={settings.appUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-3 py-2.5 rounded-xl bg-[#FAF7EE] hover:bg-[#EFEAE0] border border-[#D5CEBD] text-[#0D3B37] flex items-center justify-center shrink-0"
-                            title={lang === 'FR' ? 'Ouvrir le lien' : 'Open link'}
+                  {/* Mode Selector Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {/* Card 1: Cloudflare Tunnel */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedHostingMode('cloudflare');
+                        setSettings({ ...settings, hostingMode: 'cloudflare' });
+                      }}
+                      className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-3 ${
+                        selectedHostingMode === 'cloudflare'
+                          ? 'bg-blue-50/70 border-blue-500 shadow-xs ring-2 ring-blue-500/20'
+                          : 'bg-[#FAF7EE] border-[#E0D9C8] hover:bg-white hover:border-blue-300'
+                      }`}
+                    >
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0">
+                            <Cloud className="w-4 h-4" />
+                          </div>
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-blue-100 text-blue-800 border border-blue-200">
+                            {lang === 'FR' ? 'Recommandé' : 'Recommended'}
+                          </span>
+                        </div>
+                        <div className="font-bold text-xs text-[#0D3B37]">
+                          Cloudflare Tunnel (Zero Trust)
+                        </div>
+                        <p className="text-[10px] text-[#527470] leading-snug">
+                          {lang === 'FR'
+                            ? 'Zéro port ouvert, SSL automatique, protection anti-DDoS. Idéal même derrière CGNAT ou 4G/5G.'
+                            : 'Zero open ports, automatic HTTPS, DDoS protection. Works behind CGNAT, firewalls & cellular.'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-blue-700">
+                        <div className={`w-2 h-2 rounded-full ${selectedHostingMode === 'cloudflare' ? 'bg-blue-600 animate-pulse' : 'bg-slate-300'}`} />
+                        <span>{selectedHostingMode === 'cloudflare' ? (lang === 'FR' ? 'Mode Sélectionné' : 'Selected Mode') : (lang === 'FR' ? 'Activer ce mode' : 'Select mode')}</span>
+                      </div>
+                    </button>
+
+                    {/* Card 2: Custom Domain */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedHostingMode('custom_domain');
+                        setSettings({ ...settings, hostingMode: 'custom_domain' });
+                      }}
+                      className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-3 ${
+                        selectedHostingMode === 'custom_domain'
+                          ? 'bg-purple-50/70 border-purple-500 shadow-xs ring-2 ring-purple-500/20'
+                          : 'bg-[#FAF7EE] border-[#E0D9C8] hover:bg-white hover:border-purple-300'
+                      }`}
+                    >
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0">
+                            <Globe className="w-4 h-4" />
+                          </div>
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-purple-100 text-purple-800 border border-purple-200">
+                            {lang === 'FR' ? 'Contrôle Total' : 'Full Control'}
+                          </span>
+                        </div>
+                        <div className="font-bold text-xs text-[#0D3B37]">
+                          {lang === 'FR' ? 'Mon Propre Domaine' : 'My Own Custom Domain'}
+                        </div>
+                        <p className="text-[10px] text-[#527470] leading-snug">
+                          {lang === 'FR'
+                            ? 'Votre domaine (pantryo.domaine.fr) avec Caddy, Nginx, NPM ou Traefik et certificats Let’s Encrypt.'
+                            : 'Your domain (pantryo.domain.com) with Caddy, Nginx, NPM, or Traefik & Let’s Encrypt SSL.'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-purple-700">
+                        <div className={`w-2 h-2 rounded-full ${selectedHostingMode === 'custom_domain' ? 'bg-purple-600 animate-pulse' : 'bg-slate-300'}`} />
+                        <span>{selectedHostingMode === 'custom_domain' ? (lang === 'FR' ? 'Mode Sélectionné' : 'Selected Mode') : (lang === 'FR' ? 'Activer ce mode' : 'Select mode')}</span>
+                      </div>
+                    </button>
+
+                    {/* Card 3: Local LAN */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedHostingMode('local_lan');
+                        setSettings({ ...settings, hostingMode: 'local_lan' });
+                      }}
+                      className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-3 ${
+                        selectedHostingMode === 'local_lan'
+                          ? 'bg-emerald-50/70 border-emerald-500 shadow-xs ring-2 ring-emerald-500/20'
+                          : 'bg-[#FAF7EE] border-[#E0D9C8] hover:bg-white hover:border-emerald-300'
+                      }`}
+                    >
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <div className="w-8 h-8 rounded-xl bg-emerald-700 text-white flex items-center justify-center shrink-0">
+                            <Home className="w-4 h-4" />
+                          </div>
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            {lang === 'FR' ? 'Intranet Privé' : 'Private LAN'}
+                          </span>
+                        </div>
+                        <div className="font-bold text-xs text-[#0D3B37]">
+                          {lang === 'FR' ? 'Réseau Local Homelab' : 'Local Homelab LAN'}
+                        </div>
+                        <p className="text-[10px] text-[#527470] leading-snug">
+                          {lang === 'FR'
+                            ? 'Accès exclusif via votre réseau Wi-Fi local (192.168.x.x ou mDNS http://pantryo.local:3000).'
+                            : 'Exclusive access over home Wi-Fi (192.168.x.x or mDNS http://pantryo.local:3000).'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-700">
+                        <div className={`w-2 h-2 rounded-full ${selectedHostingMode === 'local_lan' ? 'bg-emerald-600 animate-pulse' : 'bg-slate-300'}`} />
+                        <span>{selectedHostingMode === 'local_lan' ? (lang === 'FR' ? 'Mode Sélectionné' : 'Selected Mode') : (lang === 'FR' ? 'Activer ce mode' : 'Select mode')}</span>
+                      </div>
+                    </button>
+                  </div>
+
+                  {/* SUB-PANEL A: CLOUDFLARE TUNNEL (ZERO TRUST) */}
+                  {selectedHostingMode === 'cloudflare' && (
+                    <div className="p-4 rounded-2xl bg-blue-50/50 border border-blue-200/80 space-y-4 animate-fade-in">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          <Cloud className="w-4 h-4 text-blue-700" />
+                          <h4 className="font-bold text-xs text-blue-950 uppercase tracking-wide">
+                            {lang === 'FR' ? 'Configuration Cloudflare Zero Trust Tunnel' : 'Cloudflare Zero Trust Tunnel Setup'}
+                          </h4>
+                        </div>
+                        <a
+                          href="https://one.dash.cloudflare.com/"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] flex items-center gap-1.5 transition-colors shadow-2xs"
+                        >
+                          <span>{lang === 'FR' ? 'Ouvrir Dashboard Cloudflare' : 'Open Cloudflare Dashboard'}</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+
+                      {/* Token input */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="font-bold text-blue-950 block text-[11px]">
+                            {lang === 'FR'
+                              ? 'Jeton de Tunnel Cloudflare (CLOUDFLARE_TUNNEL_TOKEN)'
+                              : 'Cloudflare Tunnel Token (CLOUDFLARE_TUNNEL_TOKEN)'}
+                          </label>
+                          <span className="text-[10px] font-bold text-blue-700">
+                            {settings.cloudflareTunnelToken ? (lang === 'FR' ? '✓ Configuré' : '✓ Configured') : (lang === 'FR' ? 'Requis pour accès distant' : 'Required for remote access')}
+                          </span>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type={showTunnelToken ? 'text' : 'password'}
+                            value={settings.cloudflareTunnelToken}
+                            onChange={(e) => setSettings({ ...settings, cloudflareTunnelToken: e.target.value })}
+                            placeholder="eyJhIjoi..."
+                            className="w-full pl-3.5 pr-20 py-2.5 rounded-xl border border-blue-200 bg-white focus:outline-blue-700 text-xs font-mono text-blue-950 shadow-2xs"
+                          />
+                          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setShowTunnelToken(!showTunnelToken)}
+                              className="p-1 rounded-md text-slate-400 hover:text-slate-700"
+                              title={showTunnelToken ? 'Hide' : 'Show'}
+                            >
+                              {showTunnelToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            </button>
+                            {settings.cloudflareTunnelToken && (
+                              <button
+                                type="button"
+                                onClick={() => handleCopySnippet(settings.cloudflareTunnelToken, 'cf-token')}
+                                className="p-1 rounded-md text-slate-400 hover:text-blue-700"
+                                title={lang === 'FR' ? 'Copier le jeton' : 'Copy token'}
+                              >
+                                {copiedSnippetId === 'cf-token' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-blue-800/80">
+                          {lang === 'FR'
+                            ? 'Généré dans Cloudflare Zero Trust > Networks > Tunnels > Add a tunnel. Aucune redirection de port sur votre routeur n’est requise.'
+                            : 'Generated in Cloudflare Zero Trust > Networks > Tunnels > Add a tunnel. No router port forwarding required.'}
+                        </p>
+                      </div>
+
+                      {/* Public Cloudflare URL */}
+                      <div className="space-y-1.5">
+                        <label className="font-bold text-blue-950 block text-[11px]">
+                          {lang === 'FR'
+                            ? 'URL Publique Cloudflare (APP_URL)'
+                            : 'Public Cloudflare URL (APP_URL)'}
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            type="url"
+                            value={settings.appUrl}
+                            onChange={(e) => setSettings({ ...settings, appUrl: e.target.value })}
+                            placeholder="https://pantryo.votre-domaine.com"
+                            className="flex-1 px-3.5 py-2.5 rounded-xl border border-blue-200 bg-white focus:outline-blue-700 text-xs text-blue-950 shadow-2xs"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleTestDomain(settings.appUrl)}
+                            disabled={isTestingDomain || !settings.appUrl}
+                            className="px-3.5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer shrink-0 shadow-2xs"
                           >
-                            <ExternalLink className="w-4 h-4" />
-                          </a>
+                            {isTestingDomain ? (
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                            )}
+                            <span>{lang === 'FR' ? 'Tester Connectivité' : 'Test Endpoint'}</span>
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-blue-800/80">
+                          {lang === 'FR'
+                            ? 'L’adresse HTTPS attribuée dans "Public Hostname" qui route vers http://localhost:3000 (ou app:3000 sous Docker).'
+                            : 'The HTTPS hostname configured under "Public Hostname" routing to http://localhost:3000 (or app:3000 in Docker).'}
+                        </p>
+                      </div>
+
+                      {/* Diagnostic test result banner */}
+                      {domainTestResult && (
+                        <div
+                          className={`p-3 rounded-xl text-xs flex items-start gap-2.5 ${
+                            domainTestResult.success
+                              ? 'bg-emerald-50 border border-emerald-200 text-emerald-950'
+                              : 'bg-rose-50 border border-rose-200 text-rose-950'
+                          }`}
+                        >
+                          {domainTestResult.success ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                          ) : (
+                            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                          )}
+                          <div className="flex-1 space-y-1">
+                            <div className="font-bold flex items-center gap-2 flex-wrap">
+                              <span>{domainTestResult.message}</span>
+                              {domainTestResult.durationMs && (
+                                <span className="px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-mono">
+                                  {domainTestResult.durationMs}ms
+                                </span>
+                              )}
+                              {domainTestResult.isCloudflare && (
+                                <span className="px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-800 text-[10px] font-bold">
+                                  Cloudflare Ray Validé
+                                </span>
+                              )}
+                            </div>
+                            {domainTestResult.resolvedIp && (
+                              <div className="text-[10px] text-[#527470] font-mono">
+                                IP Résolue : {domainTestResult.resolvedIp}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Ready-to-run Deployment Snippets */}
+                      <div className="space-y-2 pt-2 border-t border-blue-200/60">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs text-blue-950">
+                            {lang === 'FR' ? 'Commandes & Déploiement du Tunnel' : 'Tunnel Runner Commands'}
+                          </span>
+                          <span className="text-[10px] text-blue-700 font-medium">
+                            {lang === 'FR' ? 'Copiez et exécutez sur votre hôte' : 'Copy and run on your host'}
+                          </span>
+                        </div>
+
+                        {/* Docker CLI snippet */}
+                        <div className="p-3 rounded-xl bg-slate-900 text-slate-100 font-mono text-[11px] space-y-1.5">
+                          <div className="flex items-center justify-between text-[10px] text-slate-400">
+                            <span>{lang === 'FR' ? '1. Docker CLI (Lancer le conteneur tunnel)' : '1. Docker CLI (Run tunnel daemon)'}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleCopySnippet(
+                                  `docker run -d --name pantryo_tunnel --restart unless-stopped cloudflare/cloudflared:latest tunnel --no-autoupdate run --token ${settings.cloudflareTunnelToken || '<VOTRE_TOKEN>'}`,
+                                  'docker-run'
+                                )
+                              }
+                              className="text-xs text-teal-300 hover:text-white flex items-center gap-1 cursor-pointer"
+                            >
+                              {copiedSnippetId === 'docker-run' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                              <span>{copiedSnippetId === 'docker-run' ? (lang === 'FR' ? 'Copié !' : 'Copied!') : (lang === 'FR' ? 'Copier' : 'Copy')}</span>
+                            </button>
+                          </div>
+                          <div className="break-all select-all text-blue-300">
+                            docker run -d --name pantryo_tunnel --restart unless-stopped cloudflare/cloudflared:latest tunnel --no-autoupdate run --token {settings.cloudflareTunnelToken ? `${settings.cloudflareTunnelToken.substring(0, 16)}...` : '<VOTRE_TOKEN>'}
+                          </div>
+                        </div>
+
+                        {/* Systemd Proxmox Service snippet */}
+                        <div className="p-3 rounded-xl bg-slate-900 text-slate-100 font-mono text-[11px] space-y-1.5">
+                          <div className="flex items-center justify-between text-[10px] text-slate-400">
+                            <span>{lang === 'FR' ? '2. Proxmox / Debian Service Systemd' : '2. Proxmox / Debian Systemd Service'}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleCopySnippet(
+                                  `# /etc/systemd/system/pantryo-tunnel.service\n[Unit]\nDescription=Cloudflare Zero Trust Tunnel for Pantryo\nAfter=network.target pantryo.service\n\n[Service]\nType=simple\nUser=root\nExecStart=/usr/local/bin/cloudflared tunnel --no-autoupdate run --token ${settings.cloudflareTunnelToken || '<TOKEN>'}\nRestart=always\nRestartSec=5\n\n[Install]\nWantedBy=multi-user.target`,
+                                  'systemd-service'
+                                )
+                              }
+                              className="text-xs text-teal-300 hover:text-white flex items-center gap-1 cursor-pointer"
+                            >
+                              {copiedSnippetId === 'systemd-service' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                              <span>{copiedSnippetId === 'systemd-service' ? (lang === 'FR' ? 'Copié !' : 'Copied!') : (lang === 'FR' ? 'Copier' : 'Copy')}</span>
+                            </button>
+                          </div>
+                          <div className="text-slate-300 text-[10px]">
+                            systemctl enable --now pantryo-tunnel.service
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SUB-PANEL B: CUSTOM DOMAIN & REVERSE PROXY */}
+                  {selectedHostingMode === 'custom_domain' && (
+                    <div className="p-4 rounded-2xl bg-purple-50/50 border border-purple-200/80 space-y-4 animate-fade-in">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          <Globe className="w-4 h-4 text-purple-700" />
+                          <h4 className="font-bold text-xs text-purple-950 uppercase tracking-wide">
+                            {lang === 'FR' ? 'Configuration de Votre Propre Domaine & Reverse Proxy' : 'Custom Domain & Reverse Proxy Setup'}
+                          </h4>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-900 border border-purple-200">
+                          {lang === 'FR' ? 'Let’s Encrypt / Certbot / Caddy' : 'Let’s Encrypt / Certbot / Caddy'}
+                        </span>
+                      </div>
+
+                      {/* Domain URL & HTTP Port input */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="sm:col-span-2 space-y-1.5">
+                          <label className="font-bold text-purple-950 block text-[11px]">
+                            {lang === 'FR'
+                              ? 'Nom de Domaine Personnalisé (APP_URL)'
+                              : 'Custom Domain URL (APP_URL)'}
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="url"
+                              value={settings.appUrl}
+                              onChange={(e) => setSettings({ ...settings, appUrl: e.target.value })}
+                              placeholder="https://pantryo.votre-domaine.com"
+                              className="flex-1 px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white focus:outline-purple-700 text-xs text-purple-950 shadow-2xs font-semibold"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleTestDomain(settings.appUrl)}
+                              disabled={isTestingDomain || !settings.appUrl}
+                              className="px-3.5 py-2.5 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer shrink-0 shadow-2xs"
+                            >
+                              {isTestingDomain ? (
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                              )}
+                              <span>{lang === 'FR' ? 'Tester Domaine' : 'Test Domain'}</span>
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-purple-900/80">
+                            {lang === 'FR'
+                              ? 'URL publique configurée dans vos DNS pointant vers votre serveur ou reverse proxy.'
+                              : 'Public URL configured in your registrar DNS pointing to your host or reverse proxy.'}
+                          </p>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="font-bold text-purple-950 block text-[11px]">
+                            {lang === 'FR' ? 'Port Interne Node.js (PORT)' : 'Internal Node.js Port (PORT)'}
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="65535"
+                            value={settings.port}
+                            onChange={(e) => setSettings({ ...settings, port: parseInt(e.target.value, 10) || 3000 })}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white focus:outline-purple-700 text-xs text-purple-950 shadow-2xs font-mono"
+                          />
+                          <p className="text-[10px] text-purple-900/80">
+                            {lang === 'FR' ? 'Port cible (défaut: 3000).' : 'Target port (default: 3000).'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Diagnostic test result banner */}
+                      {domainTestResult && (
+                        <div
+                          className={`p-3 rounded-xl text-xs flex items-start gap-2.5 ${
+                            domainTestResult.success
+                              ? 'bg-emerald-50 border border-emerald-200 text-emerald-950'
+                              : 'bg-rose-50 border border-rose-200 text-rose-950'
+                          }`}
+                        >
+                          {domainTestResult.success ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                          ) : (
+                            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                          )}
+                          <div className="flex-1 space-y-1">
+                            <div className="font-bold flex items-center gap-2 flex-wrap">
+                              <span>{domainTestResult.message}</span>
+                              {domainTestResult.durationMs && (
+                                <span className="px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-mono">
+                                  {domainTestResult.durationMs}ms
+                                </span>
+                              )}
+                            </div>
+                            {domainTestResult.resolvedIp && (
+                              <div className="text-[10px] text-emerald-800 font-mono">
+                                IP Résolue : {domainTestResult.resolvedIp}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Reverse Proxy Config Generator */}
+                      <div className="space-y-2 pt-2 border-t border-purple-200/60">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <span className="font-bold text-xs text-purple-950">
+                            {lang === 'FR' ? 'Générateur de Configuration Reverse Proxy' : 'Reverse Proxy Configuration Generator'}
+                          </span>
+                          <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-purple-200 text-[11px] font-bold">
+                            {(['caddy', 'nginx', 'npm', 'traefik', 'dns'] as const).map((mode) => (
+                              <button
+                                key={mode}
+                                type="button"
+                                onClick={() => setSelectedReverseProxy(mode)}
+                                className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+                                  selectedReverseProxy === mode
+                                    ? 'bg-purple-700 text-white shadow-2xs'
+                                    : 'text-purple-900 hover:bg-purple-50'
+                                }`}
+                              >
+                                {mode === 'caddy'
+                                  ? 'Caddy'
+                                  : mode === 'nginx'
+                                  ? 'Nginx'
+                                  : mode === 'npm'
+                                  ? 'NPM (GUI)'
+                                  : mode === 'traefik'
+                                  ? 'Traefik'
+                                  : 'DNS A/CNAME'}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* CADDY TAB */}
+                        {selectedReverseProxy === 'caddy' && (
+                          <div className="p-3.5 rounded-xl bg-slate-900 text-slate-100 font-mono text-[11px] space-y-2">
+                            <div className="flex items-center justify-between text-[10px] text-slate-400">
+                              <span># Caddyfile (SSL Let's Encrypt automatique sans configuration)</span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleCopySnippet(
+                                    `${(settings.appUrl || 'pantryo.votre-domaine.com').replace(/^https?:\/\//i, '').replace(/:\d+$/, '').replace(/\/.*$/, '')} {\n    reverse_proxy 127.0.0.1:${settings.port || 3000}\n}`,
+                                    'caddy-config'
+                                  )
+                                }
+                                className="text-xs text-teal-300 hover:text-white flex items-center gap-1 cursor-pointer"
+                              >
+                                {copiedSnippetId === 'caddy-config' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                                <span>{copiedSnippetId === 'caddy-config' ? (lang === 'FR' ? 'Copié !' : 'Copied!') : (lang === 'FR' ? 'Copier' : 'Copy')}</span>
+                              </button>
+                            </div>
+                            <pre className="text-emerald-300 whitespace-pre-wrap select-all">
+{`${(settings.appUrl || 'pantryo.votre-domaine.com').replace(/^https?:\/\//i, '').replace(/:\d+$/, '').replace(/\/.*$/, '')} {
+    reverse_proxy 127.0.0.1:${settings.port || 3000}
+}`}
+                            </pre>
+                            <p className="text-[10px] text-slate-400 font-sans">
+                              {lang === 'FR'
+                                ? '✓ Caddy gère automatiquement l’obtention et le renouvellement de vos certificats SSL Let’s Encrypt.'
+                                : '✓ Caddy automatically provisions and renews Let’s Encrypt HTTPS certificates.'}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* NGINX TAB */}
+                        {selectedReverseProxy === 'nginx' && (
+                          <div className="p-3.5 rounded-xl bg-slate-900 text-slate-100 font-mono text-[11px] space-y-2">
+                            <div className="flex items-center justify-between text-[10px] text-slate-400">
+                              <span># /etc/nginx/sites-available/pantryo</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const host = (settings.appUrl || 'pantryo.votre-domaine.com').replace(/^https?:\/\//i, '').replace(/:\d+$/, '').replace(/\/.*$/, '');
+                                  handleCopySnippet(
+                                    `server {\n    listen 80;\n    server_name ${host};\n    return 301 https://$host$request_uri;\n}\n\nserver {\n    listen 443 ssl http2;\n    server_name ${host};\n\n    # Certbot SSL\n    ssl_certificate /etc/letsencrypt/live/${host}/fullchain.pem;\n    ssl_certificate_key /etc/letsencrypt/live/${host}/privkey.pem;\n\n    location / {\n        proxy_pass http://127.0.0.1:${settings.port || 3000};\n        proxy_http_version 1.1;\n        proxy_set_header Upgrade $http_upgrade;\n        proxy_set_header Connection "upgrade";\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n        client_max_body_size 50M;\n    }\n}`,
+                                    'nginx-config'
+                                  );
+                                }}
+                                className="text-xs text-teal-300 hover:text-white flex items-center gap-1 cursor-pointer"
+                              >
+                                {copiedSnippetId === 'nginx-config' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                                <span>{copiedSnippetId === 'nginx-config' ? (lang === 'FR' ? 'Copié !' : 'Copied!') : (lang === 'FR' ? 'Copier' : 'Copy')}</span>
+                              </button>
+                            </div>
+                            <pre className="text-purple-300 whitespace-pre-wrap select-all max-h-48 overflow-y-auto">
+{`server {
+    listen 80;
+    server_name ${(settings.appUrl || 'pantryo.votre-domaine.com').replace(/^https?:\/\//i, '').replace(/:\d+$/, '').replace(/\/.*$/, '')};
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${(settings.appUrl || 'pantryo.votre-domaine.com').replace(/^https?:\/\//i, '').replace(/:\d+$/, '').replace(/\/.*$/, '')};
+
+    # ssl_certificate /etc/letsencrypt/live/.../fullchain.pem;
+    # ssl_certificate_key /etc/letsencrypt/live/.../privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:${settings.port || 3000};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        client_max_body_size 50M;
+    }
+}`}
+                            </pre>
+                            <p className="text-[10px] text-slate-400 font-sans">
+                              {lang === 'FR'
+                                ? 'Activez les certificats SSL avec Certbot : certbot --nginx -d ' + (settings.appUrl || 'pantryo.votre-domaine.com').replace(/^https?:\/\//i, '').replace(/:\d+$/, '').replace(/\/.*$/, '')
+                                : 'Enable free SSL with Certbot: certbot --nginx -d ' + (settings.appUrl || 'pantryo.votre-domaine.com').replace(/^https?:\/\//i, '').replace(/:\d+$/, '').replace(/\/.*$/, '')}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* NPM TAB */}
+                        {selectedReverseProxy === 'npm' && (
+                          <div className="p-3.5 rounded-xl bg-slate-900 text-slate-100 text-[11px] space-y-2">
+                            <div className="font-bold text-amber-300 text-xs">
+                              {lang === 'FR' ? 'Paramétrage dans Nginx Proxy Manager (Interface Web) :' : 'Nginx Proxy Manager (Web GUI) Setup:'}
+                            </div>
+                            <div className="space-y-1 text-slate-300 text-[11px] leading-relaxed">
+                              <div>1. Onglet <strong>Details</strong> :</div>
+                              <ul className="list-disc pl-5 text-[10px] text-slate-400 space-y-0.5">
+                                <li>Domain Names: <strong className="text-white font-mono">{(settings.appUrl || 'pantryo.votre-domaine.com').replace(/^https?:\/\//i, '').replace(/:\d+$/, '').replace(/\/.*$/, '')}</strong></li>
+                                <li>Scheme: <strong className="text-white font-mono">http</strong></li>
+                                <li>Forward Hostname / IP: <strong className="text-white font-mono">127.0.0.1</strong> (ou IP du conteneur Proxmox)</li>
+                                <li>Forward Port: <strong className="text-white font-mono">{settings.port || 3000}</strong></li>
+                                <li>Cocher : <strong className="text-emerald-400">Websockets Support</strong> & <strong className="text-emerald-400">Block Common Exploits</strong></li>
+                              </ul>
+                              <div>2. Onglet <strong>SSL</strong> :</div>
+                              <ul className="list-disc pl-5 text-[10px] text-slate-400 space-y-0.5">
+                                <li>Sélectionner : <strong className="text-white">Request a new SSL Certificate</strong></li>
+                                <li>Cocher : <strong className="text-emerald-400">Force SSL</strong> & <strong className="text-emerald-400">HTTP/2 Support</strong></li>
+                              </ul>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* TRAEFIK TAB */}
+                        {selectedReverseProxy === 'traefik' && (
+                          <div className="p-3.5 rounded-xl bg-slate-900 text-slate-100 font-mono text-[11px] space-y-2">
+                            <div className="flex items-center justify-between text-[10px] text-slate-400">
+                              <span># Labels Docker Traefik v2/v3</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const host = (settings.appUrl || 'pantryo.votre-domaine.com').replace(/^https?:\/\//i, '').replace(/:\d+$/, '').replace(/\/.*$/, '');
+                                  handleCopySnippet(
+                                    `labels:\n  - "traefik.enable=true"\n  - "traefik.http.routers.pantryo.rule=Host(\`${host}\`)"\n  - "traefik.http.routers.pantryo.entrypoints=websecure"\n  - "traefik.http.routers.pantryo.tls.certresolver=myresolver"\n  - "traefik.http.services.pantryo.loadbalancer.server.port=${settings.port || 3000}"`,
+                                    'traefik-config'
+                                  );
+                                }}
+                                className="text-xs text-teal-300 hover:text-white flex items-center gap-1 cursor-pointer"
+                              >
+                                {copiedSnippetId === 'traefik-config' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                                <span>{copiedSnippetId === 'traefik-config' ? (lang === 'FR' ? 'Copié !' : 'Copied!') : (lang === 'FR' ? 'Copier' : 'Copy')}</span>
+                              </button>
+                            </div>
+                            <pre className="text-blue-300 whitespace-pre-wrap select-all">
+{`labels:
+  - "traefik.enable=true"
+  - "traefik.http.routers.pantryo.rule=Host(\`${(settings.appUrl || 'pantryo.votre-domaine.com').replace(/^https?:\/\//i, '').replace(/:\d+$/, '').replace(/\/.*$/, '')}\`)"
+  - "traefik.http.routers.pantryo.entrypoints=websecure"
+  - "traefik.http.routers.pantryo.tls.certresolver=myresolver"
+  - "traefik.http.services.pantryo.loadbalancer.server.port=${settings.port || 3000}"`}
+                            </pre>
+                          </div>
+                        )}
+
+                        {/* DNS A/CNAME TAB */}
+                        {selectedReverseProxy === 'dns' && (
+                          <div className="p-3.5 rounded-xl bg-slate-900 text-slate-100 text-[11px] space-y-2">
+                            <div className="font-bold text-teal-300 text-xs">
+                              {lang === 'FR' ? 'Configuration DNS chez votre bureau d’enregistrement (OVH, Namecheap, etc.) :' : 'DNS Record Configuration at your Registrar:'}
+                            </div>
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-left font-mono text-[10px] text-slate-300 border border-slate-700">
+                                <thead>
+                                  <tr className="bg-slate-800 text-slate-200">
+                                    <th className="p-2 border border-slate-700">Type</th>
+                                    <th className="p-2 border border-slate-700">Hôte / Nom</th>
+                                    <th className="p-2 border border-slate-700">Valeur / Cible</th>
+                                    <th className="p-2 border border-slate-700">TTL</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <tr>
+                                    <td className="p-2 border border-slate-700 font-bold text-amber-400">A</td>
+                                    <td className="p-2 border border-slate-700">pantryo</td>
+                                    <td className="p-2 border border-slate-700">&lt;Votre IP Publique Box / VPS&gt;</td>
+                                    <td className="p-2 border border-slate-700">Auto (ou 3600)</td>
+                                  </tr>
+                                  <tr>
+                                    <td className="p-2 border border-slate-700 font-bold text-blue-400">CNAME</td>
+                                    <td className="p-2 border border-slate-700">pantryo</td>
+                                    <td className="p-2 border border-slate-700">&lt;votre-ddns.duckdns.org&gt;</td>
+                                    <td className="p-2 border border-slate-700">Auto (ou 3600)</td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                            <p className="text-[10px] text-slate-400">
+                              {lang === 'FR'
+                                ? 'Pour une connexion directe sans reverse proxy, ouvrez le port 80/443 sur votre box et redirigez vers le port local.'
+                                : 'For direct connections, forward port 80/443 on your router to your host local IP.'}
+                            </p>
+                          </div>
                         )}
                       </div>
-                      <p className="text-[10px] text-[#527470]">
-                        {lang === 'FR'
-                          ? 'Domaine principal utilisé pour le partage de listes, les liens d’invitation et les manifests PWA.'
-                          : 'Primary domain used for sharing lists, invitation links, and PWA manifests.'}
-                      </p>
                     </div>
+                  )}
 
-                    <div className="space-y-1.5">
-                      <label className="font-bold text-[#0D3B37] block text-[11px]">
-                        {lang === 'FR' ? 'Port HTTP Local (PORT)' : 'Local HTTP Port (PORT)'}
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="65535"
-                        value={settings.port}
-                        onChange={(e) => setSettings({ ...settings, port: parseInt(e.target.value, 10) || 3000 })}
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#D5CEBD] bg-[#FAF7EE] focus:bg-white focus:outline-teal-800 text-xs text-[#0D3B37]"
-                      />
-                      <p className="text-[10px] text-[#527470]">
-                        {lang === 'FR' ? 'Port d’écoute interne Node.js (défaut: 3000).' : 'Internal Node.js listening port (default: 3000).'}
-                      </p>
+                  {/* SUB-PANEL C: LOCAL LAN ONLY */}
+                  {selectedHostingMode === 'local_lan' && (
+                    <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-200/80 space-y-3 animate-fade-in">
+                      <div className="flex items-center gap-2">
+                        <Home className="w-4 h-4 text-emerald-700" />
+                        <h4 className="font-bold text-xs text-emerald-950 uppercase tracking-wide">
+                          {lang === 'FR' ? 'Accès Privé Réseau Local (Intranet & Homelab)' : 'Private Local Network Access (Intranet & Homelab)'}
+                        </h4>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="sm:col-span-2 space-y-1.5">
+                          <label className="font-bold text-emerald-950 block text-[11px]">
+                            {lang === 'FR' ? 'URL Locale (APP_URL)' : 'Local Application URL (APP_URL)'}
+                          </label>
+                          <input
+                            type="url"
+                            value={settings.appUrl}
+                            onChange={(e) => setSettings({ ...settings, appUrl: e.target.value })}
+                            placeholder="http://192.168.1.50:3000 ou http://pantryo.local:3000"
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-emerald-200 bg-white focus:outline-emerald-700 text-xs text-emerald-950 shadow-2xs font-mono"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="font-bold text-emerald-950 block text-[11px]">
+                            {lang === 'FR' ? 'Port HTTP Local (PORT)' : 'Local HTTP Port (PORT)'}
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="65535"
+                            value={settings.port}
+                            onChange={(e) => setSettings({ ...settings, port: parseInt(e.target.value, 10) || 3000 })}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-emerald-200 bg-white focus:outline-emerald-700 text-xs text-emerald-950 shadow-2xs font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-white border border-emerald-200 text-xs text-emerald-900 space-y-1">
+                        <div className="font-bold text-[11px]">
+                          {lang === 'FR' ? '💡 Astuce Accès Local :' : '💡 Local Access Tip:'}
+                        </div>
+                        <p className="text-[10px] text-emerald-800 leading-relaxed">
+                          {lang === 'FR'
+                            ? 'Accessible depuis n’importe quel ordinateur, tablette, smartphone ou écran de cuisine tactile connecté au même Wi-Fi en ouvrant l’adresse IP locale ou http://pantryo.local:3000.'
+                            : 'Accessible from any phone, tablet, computer, or kitchen display connected to your home Wi-Fi using the local IP or http://pantryo.local:3000.'}
+                        </p>
+                      </div>
                     </div>
+                  )}
+
+                  {/* Sync Mobile Expo Client API Button */}
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-[#FAF7EE] border border-[#E0D9C8] flex-wrap gap-2">
+                    <div className="space-y-0.5">
+                      <div className="font-bold text-[11px] text-[#0D3B37]">
+                        {lang === 'FR' ? 'Synchronisation Client Mobile Expo' : 'Expo Mobile Client Synchronization'}
+                      </div>
+                      <div className="text-[10px] text-[#527470]">
+                        {lang === 'FR'
+                          ? 'Définit automatiquement le point d’accès API Expo sur le domaine sélectionné.'
+                          : 'Automatically targets the mobile app API endpoint to the selected domain.'}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const base = (settings.appUrl || 'http://localhost:3000').replace(/\/+$/, '');
+                        setSettings({ ...settings, expoPublicApiUrl: `${base}/api/v1/inventory` });
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                    >
+                      <Zap className="w-3.5 h-3.5 text-teal-200" />
+                      <span>{lang === 'FR' ? 'Synchroniser l’API Mobile' : 'Sync Mobile API'}</span>
+                    </button>
                   </div>
                 </div>
 
@@ -2864,62 +3653,12 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                   </div>
                 </div>
 
-                {/* 3. Cloudflare Zero Trust Tunnel */}
-                <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-4">
-                  <div className="flex items-center justify-between pb-2 border-b border-[#F0EBE1]">
-                    <div className="flex items-center gap-2">
-                      <Terminal className="w-4 h-4 text-teal-800" />
-                      <h3 className="font-bold text-[#0D3B37] text-xs uppercase tracking-wider">
-                        {lang === 'FR' ? '3. Tunnel Cloudflare Zero Trust' : '3. Cloudflare Zero Trust Tunnel'}
-                      </h3>
-                    </div>
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        settings.cloudflareTunnelToken
-                          ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                          : 'bg-slate-100 text-slate-600 border border-slate-200'
-                      }`}
-                    >
-                      {settings.cloudflareTunnelToken ? 'Configuré' : 'Optionnel / Inactif'}
-                    </span>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="font-bold text-[#0D3B37] block text-[11px]">
-                      {lang === 'FR'
-                        ? 'Jeton de Tunnel Cloudflare (CLOUDFLARE_TUNNEL_TOKEN)'
-                        : 'Cloudflare Tunnel Token (CLOUDFLARE_TUNNEL_TOKEN)'}
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showTunnelToken ? 'text' : 'password'}
-                        value={settings.cloudflareTunnelToken}
-                        onChange={(e) => setSettings({ ...settings, cloudflareTunnelToken: e.target.value })}
-                        placeholder="eyJhIjoi..."
-                        className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-[#D5CEBD] bg-[#FAF7EE] focus:bg-white focus:outline-teal-800 text-xs font-mono text-[#0D3B37]"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowTunnelToken(!showTunnelToken)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
-                      >
-                        {showTunnelToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                    <p className="text-[10px] text-[#527470]">
-                      {lang === 'FR'
-                        ? 'Permet d’accéder à Pantryo depuis n’importe où via votre domaine sécurisé Cloudflare sans ouverture de ports sur votre box ou pare-feu Proxmox.'
-                        : 'Enables secure remote access to Pantryo through Cloudflare Zero Trust without port forwarding on your router or Proxmox firewall.'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* 4. Expo Mobile Client API Endpoint */}
+                {/* 3. Expo Mobile Client API Endpoint */}
                 <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-4">
                   <div className="flex items-center gap-2 pb-2 border-b border-[#F0EBE1]">
                     <Smartphone className="w-4 h-4 text-teal-800" />
                     <h3 className="font-bold text-[#0D3B37] text-xs uppercase tracking-wider">
-                      {lang === 'FR' ? '4. Application Mobile Expo (React Native)' : '4. Expo Mobile App (React Native)'}
+                      {lang === 'FR' ? '3. Application Mobile Expo (React Native)' : '3. Expo Mobile App (React Native)'}
                     </h3>
                   </div>
 
@@ -2955,12 +3694,12 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                   </div>
                 </div>
 
-                {/* 5. Database & SQLCipher 256-bit Encryption */}
+                {/* 4. Database & SQLCipher 256-bit Encryption */}
                 <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-4">
                   <div className="flex items-center gap-2 pb-2 border-b border-[#F0EBE1]">
                     <Database className="w-4 h-4 text-teal-800" />
                     <h3 className="font-bold text-[#0D3B37] text-xs uppercase tracking-wider">
-                      {lang === 'FR' ? '5. Base de Données & Chiffrement SQLCipher' : '5. Database & SQLCipher Encryption'}
+                      {lang === 'FR' ? '4. Base de Données & Chiffrement SQLCipher' : '4. Database & SQLCipher Encryption'}
                     </h3>
                   </div>
 
@@ -3027,13 +3766,13 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                   </div>
                 </div>
 
-                {/* 6. On-Device Produce Vision Model (399 Classes) */}
+                {/* 5. On-Device Produce Vision Model (399 Classes) */}
                 <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-4">
                   <div className="flex items-center justify-between pb-2 border-b border-[#F0EBE1] flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <Camera className="w-4 h-4 text-teal-800" />
                       <h3 className="font-bold text-[#0D3B37] text-xs uppercase tracking-wider">
-                        {lang === 'FR' ? '6. Modèle IA Produce Vision (399 Classes)' : '6. Produce Vision AI Model (399 Classes)'}
+                        {lang === 'FR' ? '5. Modèle IA Produce Vision (399 Classes)' : '5. Produce Vision AI Model (399 Classes)'}
                       </h3>
                     </div>
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">

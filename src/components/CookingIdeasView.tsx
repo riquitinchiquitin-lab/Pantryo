@@ -41,6 +41,8 @@ import {
 import { InventoryItem, PlannedMeal, MealType } from '../types';
 import { RICARDO_RECIPES, RicardoRecipe, formatRecipeIngredientAmount } from '../data/ricardoRecipes';
 import { AddRecipeModal } from './AddRecipeModal';
+import { GuidedCookingModal } from './GuidedCookingModal';
+import { useCookingSession } from '../contexts/CookingSessionContext';
 import { useLanguage, getDifficultyLocalizedName } from '../utils/i18n';
 import {
   getItemDisplayName,
@@ -70,7 +72,7 @@ interface CookingIdeasViewProps {
   onCookRecipe?: (recipe: {
     title: string;
     ingredients: Array<{ name: string; amount?: string; nameFr?: string; quantity?: number; unit?: string }>;
-  }) => Promise<void> | void;
+  }) => Promise<any> | any;
 }
 
 export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
@@ -81,6 +83,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
   onCookRecipe,
 }) => {
   const { lang, setLang } = useLanguage();
+  const { startCooking } = useCookingSession();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<
     'ALL' | 'CHEFS' | 'RICARDO' | 'TROISFOISPARJOUR' | 'JAMIE' | 'CUSTOM' | 'EXPIRING' | 'FAST'
@@ -89,6 +92,38 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
   const [expandedStepsRecipeId, setExpandedStepsRecipeId] = useState<string | null>(null);
   const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
   const [addedItemsNotice, setAddedItemsNotice] = useState<string | null>(null);
+
+  // Guided Cooking Modal state
+  const [cookedRecipeIds, setCookedRecipeIds] = useState<Set<string>>(new Set());
+  const [cookingToast, setCookingToast] = useState<string | null>(null);
+
+  const handleLaunchCooking = (recipe: RicardoRecipe) => {
+    startCooking(recipe, {
+      onCookRecipe: onCookRecipe || (async () => {}),
+      onAddMissingToGrocery: onAddMissingToGrocery,
+      onRecipeCookedSuccessfully: (recipeTitle, deductions) => {
+        setCookedRecipeIds((prev) => new Set([...prev, recipe.id]));
+        const deductionText =
+          deductions && deductions.length > 0
+            ? deductions
+                .map(
+                  (d) =>
+                    `${d.inventoryItemName}${
+                      d.wasFullyDepleted ? (lang === 'FR' ? ' (épuisé)' : ' (depleted)') : ''
+                    }`
+                )
+                .join(', ')
+            : '';
+        setCookingToast(
+          lang === 'FR'
+            ? `🍳 Recette "${recipeTitle}" cuisinée avec succès ! ${
+                deductionText ? `Déductions : ${deductionText}` : ''
+              }`
+            : `🍳 Recipe "${recipeTitle}" cooked! ${deductionText ? `Deductions: ${deductionText}` : ''}`
+        );
+      },
+    });
+  };
 
   // Quick Meal Plan Modal state
   const [planningRecipe, setPlanningRecipe] = useState<RicardoRecipe | null>(null);
@@ -992,6 +1027,25 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
         </div>
       )}
 
+      {/* Cooking Toast Banner */}
+      {cookingToast && (
+        <div className="p-3.5 bg-emerald-900 text-white rounded-2xl text-xs font-bold flex items-center justify-between shadow-xl animate-fade-in border border-emerald-500/60">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-6 h-6 rounded-full bg-emerald-700 flex items-center justify-center shrink-0">
+              <Utensils className="w-3.5 h-3.5 text-emerald-200" />
+            </div>
+            <span className="truncate">{cookingToast}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setCookingToast(null)}
+            className="ml-2 text-emerald-200 hover:text-white p-1 text-xs font-black cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Subheader with Count, Expand/Collapse Toggle & Context Hint */}
       <div className="flex items-center justify-between text-xs text-[#556D58] px-1">
         <div className="flex items-center gap-1.5">
@@ -1099,13 +1153,13 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                 }
               : detectSafeCookingRule(recipe);
 
-            // MINIMIZED / COMPACT RECIPE VIEW
+            // MINIMIZED / COMPACT RECIPE VIEW - M3 Surface Container
             if (!isExpanded) {
               return (
                 <div
                   key={recipe.id}
                   onClick={() => setExpandedRecipeId(recipe.id)}
-                  className="p-3 sm:p-3.5 rounded-2xl bg-white border border-[#E5DFD0] shadow-2xs hover:shadow-xs transition-all cursor-pointer flex items-center justify-between gap-3 group select-none"
+                  className="p-3 sm:p-3.5 rounded-[16px] bg-[var(--md-sys-color-surface-container-low)] border border-[var(--md-sys-color-outline-variant)] hover:bg-[var(--md-sys-color-surface-container)] hover:border-[var(--md-sys-color-outline)] transition-all cursor-pointer flex items-center justify-between gap-3 group select-none shadow-none"
                 >
                   {/* Left: Thumbnail & Main Info */}
                   <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -1224,11 +1278,29 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                     <button
                       type="button"
                       onClick={(e) => handleOpenPlanMeal(recipe, e)}
-                      className="px-3 py-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold flex items-center gap-1 transition-all active:scale-95 shadow-2xs cursor-pointer"
+                      className="px-2.5 py-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold flex items-center gap-1 transition-all active:scale-95 shadow-2xs cursor-pointer"
                       title={lang === 'FR' ? 'Planifier ce repas' : 'Meal plan this recipe'}
                     >
                       <Calendar className="w-3 h-3" />
                       <span>{lang === 'FR' ? 'Planifier' : 'Plan'}</span>
+                    </button>
+
+                    {/* Cuisiner / Cook Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleLaunchCooking(recipe);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 transition-all active:scale-95 shadow-2xs cursor-pointer ${
+                        cookedRecipeIds.has(recipe.id)
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          : 'bg-emerald-700 hover:bg-emerald-800 text-white'
+                      }`}
+                      title={lang === 'FR' ? 'Cuisiner cette recette (mode interactif)' : 'Cook this recipe (interactive mode)'}
+                    >
+                      <Utensils className="w-3 h-3" />
+                      <span>{cookedRecipeIds.has(recipe.id) ? (lang === 'FR' ? '✓ Cuisiné' : '✓ Cooked') : (lang === 'FR' ? 'Cuisiner' : 'Cook')}</span>
                     </button>
 
                     {/* Expand chevron */}
@@ -1245,11 +1317,11 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
               );
             }
 
-            // EXPANDED DETAILED RECIPE VIEW
+            // EXPANDED DETAILED RECIPE VIEW - M3 Surface Container
             return (
               <div
                 key={recipe.id}
-                className="rounded-3xl bg-white border border-[#E5DFD0] shadow-sm transition-all overflow-hidden group select-none"
+                className="rounded-[20px] bg-[var(--md-sys-color-surface-container-low)] border border-[var(--md-sys-color-outline-variant)] shadow-none transition-all overflow-hidden group select-none"
               >
                 {/* Embedded Video Player if active */}
                 {isVideoPlaying && recipe.youtubeVideoId ? (
@@ -1348,6 +1420,13 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                       </div>
 
                       <div className="flex items-center gap-1.5">
+                        {cookedRecipeIds.has(recipe.id) && (
+                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-bold flex items-center gap-1 shadow-2xs">
+                            <Check className="w-2.5 h-2.5 stroke-[3]" />
+                            <span>{lang === 'FR' ? 'Cuisiné' : 'Cooked'}</span>
+                          </span>
+                        )}
+
                         <span className="px-2.5 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center gap-1 shadow-2xs">
                           <Check className="w-2.5 h-2.5 stroke-[3]" />
                           <span>
@@ -1402,17 +1481,17 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                   </div>
                 )}
 
-                {/* Primary Action Bar: Save to My Recipes, Edit Recipe, & Meal Plan */}
-                <div className="p-3 bg-slate-50 border-b border-[#E5DFD0] flex items-center justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-1.5 flex-wrap">
+                {/* Primary Action Bar: Save to My Recipes, Edit Recipe, & Meal Plan - M3 Styling */}
+                <div className="p-3 bg-[var(--md-sys-color-surface-container)] border-b border-[var(--md-sys-color-outline-variant)] flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
                     {/* Edit Recipe button */}
                     <button
                       type="button"
                       onClick={(e) => handleEditRecipe(recipe, e)}
-                      className="px-3 py-1.5 rounded-xl border border-[#E5DFD0] bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                      className="px-3.5 py-1.5 rounded-full border border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface-container-high)] hover:bg-[var(--md-sys-color-surface-container-highest)] text-[var(--md-sys-color-on-surface)] text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
                       title={lang === 'FR' ? 'Modifier cette recette' : 'Edit this recipe'}
                     >
-                      <Pencil className="w-3 h-3 text-slate-500" />
+                      <Pencil className="w-3.5 h-3.5 text-[var(--md-sys-color-outline)]" />
                       <span>{lang === 'FR' ? 'Modifier' : 'Edit'}</span>
                     </button>
 
@@ -1420,13 +1499,13 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                     <button
                       type="button"
                       onClick={(e) => handleToggleSaveRecipe(recipe, e)}
-                      className={`px-3 py-1.5 rounded-xl border border-[#E5DFD0] text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-2xs ${
+                      className={`px-3.5 py-1.5 rounded-full border text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
                         isSaved
-                          ? 'bg-amber-50 text-amber-900 border-amber-300'
-                          : 'bg-white hover:bg-slate-50 text-slate-700'
+                          ? 'bg-[var(--md-sys-color-secondary-container)] text-[var(--md-sys-color-on-secondary-container)] border-transparent font-semibold'
+                          : 'border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface-container-high)] text-[var(--md-sys-color-on-surface)]'
                       }`}
                     >
-                      <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'fill-amber-600 text-amber-600' : 'text-slate-400'}`} />
+                      <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'fill-[var(--md-sys-color-primary)] text-[var(--md-sys-color-primary)]' : 'text-[var(--md-sys-color-outline)]'}`} />
                       <span>
                         {isSaved
                           ? lang === 'FR' ? '✓ Dans mes recettes' : '✓ In Recipes'
@@ -1438,38 +1517,41 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                     <button
                       type="button"
                       onClick={(e) => handleOpenPlanMeal(recipe, e)}
-                      className="px-3 py-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
+                      className="m3-btn-filled py-1.5 px-3.5 rounded-full text-xs font-semibold cursor-pointer"
+                      title={lang === 'FR' ? 'Planifier ce repas' : 'Meal plan this recipe'}
                     >
                       <Calendar className="w-3.5 h-3.5" />
-                      <span>{lang === 'FR' ? 'Planifier repas' : 'Plan Meal'}</span>
+                      <span>{lang === 'FR' ? 'Planifier' : 'Plan'}</span>
                     </button>
 
-                    {/* Cook Recipe button */}
-                    {onCookRecipe && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const recipeTitle = (lang === 'FR' && recipe.titleFr ? recipe.titleFr : recipe.title);
-                          onCookRecipe({
-                            title: recipeTitle,
-                            ingredients: recipe.ingredients,
-                          });
-                        }}
-                        className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
-                        title={lang === 'FR' ? 'Cuisiner et déduire les ingrédients de la cuisine' : 'Cook and deduct ingredients from inventory'}
-                      >
-                        <Utensils className="w-3.5 h-3.5" />
-                        <span>{lang === 'FR' ? 'Cuisiner' : 'Cook'}</span>
-                      </button>
-                    )}
+                    {/* Cook Recipe button - Interactive Cooking Mode */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleLaunchCooking(recipe);
+                      }}
+                      className={`py-1.5 px-3.5 rounded-full text-xs font-semibold cursor-pointer flex items-center gap-1.5 transition-all active:scale-95 ${
+                        cookedRecipeIds.has(recipe.id)
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs'
+                          : 'm3-btn-tonal text-[var(--md-sys-color-primary)] hover:bg-[var(--md-sys-color-secondary-container)]'
+                      }`}
+                      title={lang === 'FR' ? 'Ouvrir le mode cuisine guidé et déduire les ingrédients' : 'Open interactive guided cooking mode & deduct ingredients'}
+                    >
+                      <Utensils className="w-3.5 h-3.5" />
+                      <span>
+                        {cookedRecipeIds.has(recipe.id)
+                          ? (lang === 'FR' ? '✓ Cuisiné' : '✓ Cooked')
+                          : (lang === 'FR' ? 'Cuisiner' : 'Cook')}
+                      </span>
+                    </button>
                   </div>
 
                   {/* Minimise button */}
                   <button
                     type="button"
                     onClick={() => setExpandedRecipeId(null)}
-                    className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-[#E5DFD0] text-slate-600 text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                    className="px-3.5 py-1.5 rounded-full bg-[var(--md-sys-color-surface-container-high)] hover:bg-[var(--md-sys-color-surface-container-highest)] border border-[var(--md-sys-color-outline-variant)] text-[var(--md-sys-color-on-surface)] text-xs font-medium flex items-center gap-1 transition-all cursor-pointer"
                   >
                     <ChevronUp className="w-3.5 h-3.5" />
                     <span>{lang === 'FR' ? 'Réduire' : 'Minimize'}</span>
@@ -1576,16 +1658,44 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                         <Flame className="w-3.5 h-3.5 text-amber-500" /> {recipe.calories || (recipe.caloriesPerServing ? `${recipe.caloriesPerServing} kcal` : '420 kcal')}
                       </span>
                       {recipe.macrosPerServing && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold bg-[#FAF7EE] text-[#0D3B37] px-2 py-0.5 rounded-full border border-[#E5DFD0] shadow-2xs">
-                          <span className="text-sky-700 font-bold">{recipe.macrosPerServing.proteinGrams}P</span>
-                          <span className="text-slate-300">•</span>
-                          <span className="text-amber-700 font-bold">{recipe.macrosPerServing.carbsGrams}C</span>
-                          <span className="text-slate-300">•</span>
-                          <span className="text-rose-700 font-bold">{recipe.macrosPerServing.fatGrams}F</span>
+                        <span
+                          className="inline-flex items-center gap-1.5 text-[10px] font-medium bg-[#FAF7EE] text-[#0D3B37] px-2.5 py-0.5 rounded-full border border-[#E5DFD0] shadow-2xs select-none"
+                          title={
+                            lang === 'FR'
+                              ? `Macronutriments par portion : ${recipe.macrosPerServing.proteinGrams}g Protéines, ${recipe.macrosPerServing.carbsGrams}g Glucides, ${recipe.macrosPerServing.fatGrams}g Lipides`
+                              : `Macronutrients per serving: ${recipe.macrosPerServing.proteinGrams}g Protein, ${recipe.macrosPerServing.carbsGrams}g Carbs, ${recipe.macrosPerServing.fatGrams}g Fat`
+                          }
+                        >
+                          <span className="flex items-center gap-0.5 text-sky-800 font-semibold" title={lang === 'FR' ? 'Protéines' : 'Protein'}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-sky-500 inline-block" />
+                            <span>{recipe.macrosPerServing.proteinGrams}g</span>
+                            <span className="text-[9px] text-sky-600 font-normal">{lang === 'FR' ? 'Prot' : 'Pro'}</span>
+                          </span>
+                          <span className="text-slate-300 text-[9px]">•</span>
+                          <span className="flex items-center gap-0.5 text-amber-800 font-semibold" title={lang === 'FR' ? 'Glucides' : 'Carbs'}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
+                            <span>{recipe.macrosPerServing.carbsGrams}g</span>
+                            <span className="text-[9px] text-amber-600 font-normal">{lang === 'FR' ? 'Gluc' : 'Carb'}</span>
+                          </span>
+                          <span className="text-slate-300 text-[9px]">•</span>
+                          <span className="flex items-center gap-0.5 text-rose-800 font-semibold" title={lang === 'FR' ? 'Lipides' : 'Fat'}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block" />
+                            <span>{recipe.macrosPerServing.fatGrams}g</span>
+                            <span className="text-[9px] text-rose-600 font-normal">{lang === 'FR' ? 'Lip' : 'Fat'}</span>
+                          </span>
                         </span>
                       )}
                       {recipe.calculationMethod && (
-                        <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs">
+                        <span
+                          className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs select-none"
+                          title={
+                            recipe.calculationMethod === 'AI_ESTIMATED'
+                              ? (lang === 'FR' ? 'Estimation automatique par IA' : 'AI Estimated')
+                              : recipe.calculationMethod === 'DYNAMIC_AGGREGATED'
+                              ? (lang === 'FR' ? 'Calculé selon les ingrédients' : 'Aggregated from ingredients')
+                              : (lang === 'FR' ? 'Personnalisé manuellement' : 'Manual')
+                          }
+                        >
                           {recipe.calculationMethod === 'AI_ESTIMATED' ? 'AI' : recipe.calculationMethod === 'DYNAMIC_AGGREGATED' ? 'Dyn' : 'Manual'}
                         </span>
                       )}
@@ -1963,36 +2073,6 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
         </div>
       )}
 
-      {/* Ricardo Cuisine Quick Search Callout */}
-      <div className="p-4 rounded-3xl bg-white border border-[#D5E1D2] shadow-sm text-center space-y-2">
-        <h4 className="text-xs font-black text-[#1E3022]">
-          {lang === 'FR' ? 'Besoin de plus d\'inspiration culinaire ?' : 'Looking for even more inspiration?'}
-        </h4>
-        <p className="text-[11px] text-[#556D58] max-w-sm mx-auto">
-          {lang === 'FR'
-            ? 'Accédez à plus de 7 000 recettes testées en cuisine sur le site officiel de Ricardo.'
-            : 'Access over 7,000 triple-tested recipes on the official Ricardo Cuisine website.'}
-        </p>
-        <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
-          <a
-            href={lang === 'FR' ? 'https://www.ricardocuisine.com/fr/recettes' : 'https://www.ricardocuisine.com/en/recipes'}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#233527] hover:bg-black text-white rounded-xl text-xs font-black transition-all shadow-xs active:scale-95"
-          >
-            <span>{lang === 'FR' ? 'Explorer ricardocuisine.com' : 'Explore ricardocuisine.com'}</span>
-            <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
-          </a>
-
-          <button
-            onClick={openRecipeAdd}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black transition-all shadow-xs active:scale-95"
-          >
-            <Youtube className="w-3.5 h-3.5" />
-            <span>{lang === 'FR' ? '+ Recette YouTube / Perso' : '+ YouTube / Custom Recipe'}</span>
-          </button>
-        </div>
-      </div>
 
       {/* Hidden file input directly attached to camera shutter */}
       <input

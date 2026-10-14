@@ -919,33 +919,52 @@ export const getLocationLocalizedName = (
 };
 
 /**
- * Single-Button Language Switcher Component
- * Eliminates redundant dual buttons by using a single toggle button (e.g. "FR" when in English, "EN" when in French).
+ * Clear Segmented Language Switcher Component
+ * Displays both FR and EN options clearly.
+ * When in French, FR is highlighted; when in English, EN is highlighted.
+ * Allows instant jumping between French and English modes with one click.
  */
 export const LanguageSwitcher: React.FC<{
   className?: string;
   compact?: boolean;
 }> = ({ className = '', compact = false }) => {
   const { lang, setLang } = useLanguage();
-  const nextLang = lang === 'EN' ? 'FR' : 'EN';
-  const targetLabel = nextLang;
-  const tooltip = lang === 'EN' ? 'Passer en français (FR)' : 'Switch to English (EN)';
 
   return (
-    <button
-      type="button"
-      onClick={() => setLang(nextLang)}
-      className={`px-2.5 py-1.5 rounded-xl bg-white/95 border border-[#E0D9C8] hover:border-teal-700 hover:bg-[#F2ECE0] shadow-2xs text-xs font-bold text-[#0D3B37] transition-all active:scale-95 cursor-pointer shrink-0 flex items-center gap-1.5 ${className}`}
-      title={tooltip}
-      aria-label={tooltip}
+    <div
+      role="group"
+      aria-label={lang === 'FR' ? 'Choisir la langue' : 'Select language'}
+      className={`inline-flex items-center p-0.5 rounded-xl bg-white/95 border border-[#E0D9C8] shadow-2xs shrink-0 select-none ${className}`}
     >
-      <Globe className="w-3.5 h-3.5 text-teal-700 shrink-0" />
-      <span className="font-extrabold text-[#0D3B37] tracking-wide">{targetLabel}</span>
-      {!compact && (
-        <span className="hidden xl:inline text-[11px] text-[#527470] font-medium">
-          {lang === 'EN' ? 'Français' : 'English'}
-        </span>
-      )}
-    </button>
+      <button
+        type="button"
+        onClick={() => setLang('FR')}
+        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+          lang === 'FR'
+            ? 'bg-teal-700 text-white shadow-xs font-black'
+            : 'text-[#527470] hover:text-[#0D3B37] hover:bg-[#F2ECE0]/60'
+        }`}
+        title="Mode Français (FR)"
+        aria-pressed={lang === 'FR'}
+      >
+        <span className="text-xs">🇫🇷</span>
+        <span>FR</span>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setLang('EN')}
+        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+          lang === 'EN'
+            ? 'bg-teal-700 text-white shadow-xs font-black'
+            : 'text-[#527470] hover:text-[#0D3B37] hover:bg-[#F2ECE0]/60'
+        }`}
+        title="English Mode (EN)"
+        aria-pressed={lang === 'EN'}
+      >
+        <span className="text-xs">🇬🇧</span>
+        <span>EN</span>
+      </button>
+    </div>
   );
 };

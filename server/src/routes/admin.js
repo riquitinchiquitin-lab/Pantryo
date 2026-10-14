@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import dns from "dns";
 import { pathToFileURL } from "url";
 import { dbStore } from "../services/dbStore.js";
 import { validatePasswordNist } from "../services/nistPasswordValidator.js";
@@ -341,6 +342,91 @@ router.post("/test-gemini", requireAdmin, async (req, res) => {
       isQuotaExceeded: Boolean(isQuotaExceeded),
       error: friendlyError,
     });
+  }
+});
+
+/**
+ * POST /api/v1/admin/test-domain
+ * Verifies connectivity of a custom domain or Cloudflare endpoint
+ */
+router.post("/test-domain", requireAdmin, async (req, res) => {
+  try {
+    const { domainUrl } = req.body;
+    if (!domainUrl || !domainUrl.trim()) {
+      return res.status(400).json({ error: "Veuillez fournir une URL de domaine à tester." });
+    }
+
+    let targetUrl = domainUrl.trim();
+    if (!/^https?:\/\//i.test(targetUrl)) {
+      targetUrl = `https://${targetUrl}`;
+    }
+
+    const parsed = new URL(targetUrl);
+    let resolvedIp = null;
+
+    // Perform DNS resolution first (if not an IP address or localhost)
+    if (!/^(localhost|127\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)$/i.test(parsed.hostname)) {
+      try {
+        const lookupResult = await dns.promises.lookup(parsed.hostname);
+        resolvedIp = lookupResult.address;
+      } catch (dnsErr) {
+        return res.status(400).json({
+          success: false,
+          hostname: parsed.hostname,
+          error: `Échec de résolution DNS pour '${parsed.hostname}' (${dnsErr.code || dnsErr.message}). Vérifiez que l'enregistrement A ou CNAME chez votre registraire ou Cloudflare est correctement configuré et propagé.`,
+        });
+      }
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    const startTime = Date.now();
+    let response;
+    try {
+      response = await fetch(targetUrl, {
+        method: "HEAD",
+        signal: controller.signal,
+        headers: { "User-Agent": "Pantryo-Domain-Diagnostic/1.0" },
+      });
+    } catch (_) {
+      // Fallback to GET if HEAD method is not allowed by upstream proxy
+      response = await fetch(targetUrl, {
+        method: "GET",
+        signal: controller.signal,
+        headers: { "User-Agent": "Pantryo-Domain-Diagnostic/1.0" },
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    const durationMs = Date.now() - startTime;
+    const isCloudflare =
+      Boolean(response.headers.get("cf-ray")) ||
+      (response.headers.get("server") || "").toLowerCase().includes("cloudflare");
+    const isHttps = parsed.protocol === "https:";
+
+    res.json({
+      success: true,
+      statusCode: response.status,
+      durationMs,
+      targetUrl,
+      hostname: parsed.hostname,
+      resolvedIp,
+      isHttps,
+      isCloudflare,
+      cfRay: response.headers.get("cf-ray") || null,
+      serverHeader: response.headers.get("server") || null,
+      message: isCloudflare
+        ? `Domaine validé avec succès via Cloudflare (Code HTTP ${response.status}, latence ${durationMs}ms, ray: ${response.headers.get("cf-ray") || "OK"}) !`
+        : `Domaine personnalisé accessible avec succès (Code HTTP ${response.status}, latence ${durationMs}ms, serveur: ${response.headers.get("server") || "Reverse Proxy"}) !`,
+    });
+  } catch (err) {
+    const msg =
+      err.name === "AbortError"
+        ? "Délai d'attente dépassé (8s) lors de la tentative de connexion au domaine."
+        : `Échec du test de connectivité: ${err.message}`;
+    res.status(400).json({ success: false, error: msg });
   }
 });
 

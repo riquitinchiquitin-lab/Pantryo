@@ -474,20 +474,20 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#FAF7EE] flex flex-col w-full h-full overflow-hidden text-[#133E3B] animate-fade-in">
-      {/* Header */}
-      <div className="px-5 py-3.5 border-b border-[#E8E2D5] flex items-center justify-between bg-white/90 backdrop-blur-xs shrink-0">
+    <div className="fixed inset-0 z-50 bg-[var(--md-sys-color-surface)] flex flex-col w-full h-full overflow-hidden text-[var(--md-sys-color-on-surface)] animate-fade-in">
+      {/* M3 Modal Header */}
+      <div className="px-5 py-3.5 border-b border-[var(--md-sys-color-outline-variant)] flex items-center justify-between bg-[var(--md-sys-color-surface-container-high)] backdrop-blur-xs shrink-0">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-2xl bg-teal-700 text-white flex items-center justify-center shadow-xs">
+          <div className="w-9 h-9 rounded-full bg-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-primary)] flex items-center justify-center shadow-xs">
             {isEditing ? <Edit3 className="w-4 h-4" /> : <Plus className="w-5 h-5" />}
           </div>
           <div>
-            <h2 className="text-sm sm:text-base font-black text-[#0D3B37]">
+            <h2 className="text-sm sm:text-base font-bold text-[var(--md-sys-color-on-surface)]">
               {isEditing
                 ? (lang === 'FR' ? `Modifier « ${itemToEdit?.name} »` : `Edit "${itemToEdit?.name}"`)
                 : (lang === 'FR' ? 'Ajouter un aliment à la cuisine' : 'Add New Item to Kitchen')}
             </h2>
-            <p className="text-[11px] text-[#527470]">
+            <p className="text-[11px] text-[var(--md-sys-color-on-surface-variant)]">
               {isEditing
                 ? (lang === 'FR' ? 'Modifier quantité, compartiment ou péremption' : 'Modify quantity, location, or expiration')
                 : (lang === 'FR' ? 'Saisie manuelle directe sans numérisation' : 'Direct manual entry without scanning')}
@@ -497,7 +497,7 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
         <button
           type="button"
           onClick={onClose}
-          className="px-3.5 py-1.5 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs"
+          className="px-3.5 py-1.5 rounded-full bg-[var(--md-sys-color-surface-container)] hover:bg-[var(--md-sys-color-surface-container-highest)] text-[var(--md-sys-color-on-surface)] font-medium text-xs flex items-center gap-1.5 transition-all active:scale-95 border border-[var(--md-sys-color-outline-variant)] cursor-pointer"
           title={lang === 'FR' ? 'Quitter' : 'Exit'}
         >
           <X className="w-4 h-4" />
@@ -1002,14 +1002,14 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
             />
           </div>
 
-          {/* Actions */}
-          <div className="pt-3 border-t border-[#E8E2D5] flex items-center justify-between gap-3">
+          {/* Actions - M3 Buttons */}
+          <div className="pt-3 border-t border-[var(--md-sys-color-outline-variant)] flex items-center justify-between gap-3">
             {isEditing ? (
               <button
                 type="button"
                 onClick={handleDelete}
                 disabled={isSubmitting}
-                className="py-2.5 px-3.5 rounded-2xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold flex items-center gap-1.5 transition-colors border border-rose-200 shadow-2xs"
+                className="py-2.5 px-4 rounded-full bg-[var(--md-sys-color-error-container)] text-[var(--md-sys-color-on-error-container)] text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>{lang === 'FR' ? 'Supprimer' : 'Delete'}</span>
@@ -1018,7 +1018,7 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="py-2.5 px-4 rounded-2xl bg-white hover:bg-slate-50 text-slate-600 text-xs font-bold border border-[#D5E1D2] shadow-2xs"
+                className="py-2.5 px-5 rounded-full bg-[var(--md-sys-color-surface-container-high)] text-[var(--md-sys-color-on-surface)] text-xs font-medium border border-[var(--md-sys-color-outline-variant)] cursor-pointer hover:bg-[var(--md-sys-color-surface-container-highest)]"
               >
                 {lang === 'FR' ? 'Annuler' : 'Cancel'}
               </button>
@@ -1027,7 +1027,7 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex-1 py-2.5 px-5 rounded-2xl bg-[#0E766E] hover:bg-[#0B5C56] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition-all active:scale-98 disabled:opacity-50"
+              className="flex-1 m3-btn-filled py-2.5 px-5 rounded-full text-xs font-medium cursor-pointer disabled:opacity-50"
             >
               <Check className="w-4 h-4" />
               <span>

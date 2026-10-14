@@ -120,12 +120,51 @@ read -rp "$(echo -e "${BOLD}Application HTTP Port [${GREEN}${DEFAULT_PORT}${NC}$
 APP_PORT="${INPUT_PORT:-$DEFAULT_PORT}"
 
 # --- SECTION B: Network, Public Domain, Cloudflare & External Integrations ---
-echo -e "\n${CYAN}${BOLD}--- Network, External Domain & Integrations ---${NC}"
+echo -e "\n${CYAN}${BOLD}--- Hosting Mode: Cloudflare Tunnel or Custom Domain ---${NC}"
+echo -e "Choose how you want to expose and run Pantryo:"
+echo -e "  ${BOLD}[1] Cloudflare Zero Trust Tunnel${NC} (Recommended: No router port forwarding, automatic HTTPS, DDoS protection)"
+echo -e "  ${BOLD}[2] Your Own Custom Domain${NC} (Direct DNS / Reverse Proxy: Caddy, Nginx, NPM, Let's Encrypt)"
+echo -e "  ${BOLD}[3] Local Network Only${NC} (Private LAN / mDNS pantryo.local)"
 
-# 6. Public Application URL (e.g. https://pantryo.example.com or http://IP:PORT)
-DEFAULT_APP_URL="${APP_URL:-http://${HOST_IP}:${APP_PORT}}"
-read -rp "$(echo -e "${BOLD}Public Application URL / Domain [${GREEN}${DEFAULT_APP_URL}${NC}${BOLD}]: ${NC}")" INPUT_APP_URL
-APP_URL="${INPUT_APP_URL:-$DEFAULT_APP_URL}"
+DEFAULT_MODE_CHOICE="1"
+if [[ -n "${CLOUDFLARE_TUNNEL_TOKEN:-}" ]]; then
+  DEFAULT_MODE_CHOICE="1"
+elif [[ -n "${APP_URL:-}" ]] && [[ ! "${APP_URL}" =~ (localhost|127\.|192\.168|\.local) ]]; then
+  DEFAULT_MODE_CHOICE="2"
+fi
+
+read -rp "$(echo -e "${BOLD}Select Hosting Mode [1/2/3, default: ${GREEN}${DEFAULT_MODE_CHOICE}${NC}${BOLD}]: ${NC}")" INPUT_MODE_CHOICE
+MODE_CHOICE="${INPUT_MODE_CHOICE:-$DEFAULT_MODE_CHOICE}"
+
+HOSTING_MODE="cloudflare"
+CF_TUNNEL_TOKEN=""
+
+if [[ "$MODE_CHOICE" == "2" ]]; then
+  HOSTING_MODE="custom_domain"
+  echo -e "\n${BLUE}--> Selected: Own Custom Domain (Reverse Proxy)${NC}"
+  DEFAULT_APP_URL="${APP_URL:-https://pantryo.example.com}"
+  read -rp "$(echo -e "${BOLD}Custom Domain URL (e.g. https://pantryo.mydomain.com) [${GREEN}${DEFAULT_APP_URL}${NC}${BOLD}]: ${NC}")" INPUT_APP_URL
+  APP_URL="${INPUT_APP_URL:-$DEFAULT_APP_URL}"
+elif [[ "$MODE_CHOICE" == "3" ]]; then
+  HOSTING_MODE="local_lan"
+  echo -e "\n${GREEN}--> Selected: Local Network (LAN Only)${NC}"
+  APP_URL="http://${HOST_IP}:${APP_PORT}"
+else
+  HOSTING_MODE="cloudflare"
+  echo -e "\n${BLUE}--> Selected: Cloudflare Zero Trust Tunnel${NC}"
+  DEFAULT_APP_URL="${APP_URL:-https://pantryo.yourdomain.com}"
+  read -rp "$(echo -e "${BOLD}Public Cloudflare Hostname / URL [${GREEN}${DEFAULT_APP_URL}${NC}${BOLD}]: ${NC}")" INPUT_APP_URL
+  APP_URL="${INPUT_APP_URL:-$DEFAULT_APP_URL}"
+
+  DEFAULT_CF_TOKEN="${CLOUDFLARE_TUNNEL_TOKEN:-}"
+  if [[ -n "$DEFAULT_CF_TOKEN" ]]; then
+    PROMPT_CF="Cloudflare Zero Trust Tunnel Token [${GREEN}configured from env${NC}${BOLD}]: "
+  else
+    PROMPT_CF="Cloudflare Zero Trust Tunnel Token [${YELLOW}leave blank to configure later in Admin Pane${NC}${BOLD}]: "
+  fi
+  read -rp "$(echo -e "${BOLD}${PROMPT_CF}${NC}")" INPUT_CF_TOKEN
+  CF_TUNNEL_TOKEN="${INPUT_CF_TOKEN:-$DEFAULT_CF_TOKEN}"
+fi
 
 # 7. Google Gemini API Key (Vision OCR & Smart Recipes)
 DEFAULT_GEMINI_KEY="${GEMINI_API_KEY:-}"
@@ -137,17 +176,7 @@ fi
 read -rp "$(echo -e "${BOLD}${PROMPT_GEMINI}${NC}")" INPUT_GEMINI_KEY
 GEMINI_KEY="${INPUT_GEMINI_KEY:-$DEFAULT_GEMINI_KEY}"
 
-# 8. Cloudflare Zero Trust Tunnel Token
-DEFAULT_CF_TOKEN="${CLOUDFLARE_TUNNEL_TOKEN:-}"
-if [[ -n "$DEFAULT_CF_TOKEN" ]]; then
-  PROMPT_CF="Cloudflare Zero Trust Tunnel Token [${GREEN}configured from env${NC}${BOLD}]: "
-else
-  PROMPT_CF="Cloudflare Zero Trust Tunnel Token [${YELLOW}leave blank to skip / configure later${NC}${BOLD}]: "
-fi
-read -rp "$(echo -e "${BOLD}${PROMPT_CF}${NC}")" INPUT_CF_TOKEN
-CF_TUNNEL_TOKEN="${INPUT_CF_TOKEN:-$DEFAULT_CF_TOKEN}"
-
-# 9. Expo Mobile Client API URL
+# 8. Expo Mobile Client API URL
 DEFAULT_EXPO_URL="${EXPO_PUBLIC_API_URL:-${APP_URL}/api/v1/inventory}"
 read -rp "$(echo -e "${BOLD}Expo Mobile Client API URL [${GREEN}${DEFAULT_EXPO_URL}${NC}${BOLD}]: ${NC}")" INPUT_EXPO_URL
 EXPO_API_URL="${INPUT_EXPO_URL:-$DEFAULT_EXPO_URL}"
@@ -220,6 +249,7 @@ PANTRYO_ADMIN_AVATAR="/avatars/chef-cat.svg"
 DB_ENCRYPTION_KEY="${DB_KEY}"
 
 # Application Public Host & Domain
+PANTRYO_HOSTING_MODE="${HOSTING_MODE}"
 APP_URL="${APP_URL}"
 
 # AI Services (Vision OCR, Receipt Scanning, Smart Recipes)

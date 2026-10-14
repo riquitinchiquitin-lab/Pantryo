@@ -10,9 +10,6 @@ import {
   Sparkles,
   ArrowRight,
   RotateCcw,
-  Flame,
-  ChevronDown,
-  ChevronUp,
 } from 'lucide-react';
 import { InventoryItem, SavedGroceryListItem, StorageType } from '../types';
 import { FoodVisualBadge } from './FoodVisualBadge';
@@ -138,35 +135,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
   const [stockSuccessMessage, setStockSuccessMessage] = useState<string | null>(null);
   const [isSavedListsOpen, setIsSavedListsOpen] = useState(false);
   const [savedListsInitialTab, setSavedListsInitialTab] = useState<'saved' | 'saveCurrent'>('saved');
-  const [isSpicesSectionOpen, setIsSpicesSectionOpen] = useState(false);
 
-  // Quick-add popular spices to grocery list
-  const handleQuickAddSpiceToGrocery = (spiceNameEn: string, spiceNameFr: string) => {
-    const chosenName = lang === 'FR' ? spiceNameFr : spiceNameEn;
-    const existingIdx = groceryItems.findIndex(
-      (i) => i.name.toLowerCase() === chosenName.toLowerCase() ||
-             i.name.toLowerCase() === spiceNameEn.toLowerCase() ||
-             i.name.toLowerCase() === spiceNameFr.toLowerCase()
-    );
-    if (existingIdx >= 0) {
-      onUpdateGroceryItems((prev) =>
-        prev.map((item, idx) =>
-          idx === existingIdx ? { ...item, quantity: item.quantity + 1 } : item
-        )
-      );
-    } else {
-      const newItem: GroceryCartItem = {
-        id: `g_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        name: chosenName,
-        category: 'Spices & Seasonings',
-        quantity: 1,
-        unit: 'pot',
-        locationType: 'SPICE_RACK',
-        inCart: false,
-      };
-      onUpdateGroceryItems((prev) => [newItem, ...prev]);
-    }
-  };
 
   // Add items from saved template/list to active grocery run
   const handleAddItemsToCurrentGrocery = (
@@ -431,71 +400,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
         </button>
       </div>
 
-      {/* DEDICATED SPICES & SEASONINGS SECTION IN GROCERY RUN */}
-      <div className="rounded-2xl bg-gradient-to-r from-orange-50 via-[#FFF8ED] to-amber-50 border border-[#FED7AA] overflow-hidden shadow-2xs">
-        <button
-          type="button"
-          onClick={() => setIsSpicesSectionOpen(!isSpicesSectionOpen)}
-          className="w-full p-2.5 sm:p-3 flex items-center justify-between gap-2 text-left cursor-pointer hover:bg-orange-100/40 transition-colors"
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-7 h-7 rounded-xl bg-orange-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-              <Flame className="w-4 h-4" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-black text-orange-950">
-                  {lang === 'FR' ? '🧂 Rayon Épices & Assaisonnements' : '🧂 Spices & Seasonings Aisle'}
-                </span>
-                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-orange-200 text-orange-800">
-                  {lang === 'FR' ? 'Raccourcis 1-clic' : '1-Tap Restock'}
-                </span>
-              </div>
-              <p className="text-[10px] text-orange-800/80 truncate">
-                {lang === 'FR'
-                  ? 'Ajoutez facilement sels, poivres, herbes séchées et épices à votre panier'
-                  : 'Quickly restock whole spices, ground seasonings, herbs & salts'}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0 text-orange-800">
-            {isSpicesSectionOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </div>
-        </button>
 
-        {isSpicesSectionOpen && (
-          <div className="p-3 pt-1 border-t border-orange-200/80 space-y-2 bg-white/70 backdrop-blur-xs">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-900/70">
-              {lang === 'FR' ? 'Indispensables de cuisine :' : 'Kitchen Spice Essentials:'}
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {[
-                { en: 'Sea Salt', fr: 'Sel de mer', icon: '🧂' },
-                { en: 'Black Pepper', fr: 'Poivre noir moulu', icon: '🌶️' },
-                { en: 'Smoked Paprika', fr: 'Paprika fumé', icon: '🏺' },
-                { en: 'Ground Cumin', fr: 'Cumin moulu', icon: '🍂' },
-                { en: 'Dried Oregano', fr: 'Origan séché', icon: '🌿' },
-                { en: 'Garlic Powder', fr: 'Ail en poudre', icon: '🧄' },
-                { en: 'Ground Cinnamon', fr: 'Cannelle moulue', icon: '🪵' },
-                { en: 'Curry Powder', fr: 'Poudre de curry', icon: '🍛' },
-                { en: 'Herbes de Provence', fr: 'Herbes de Provence', icon: '🌱' },
-                { en: 'Chili Flakes', fr: 'Flocons de piment', icon: '🔥' },
-              ].map((sp) => (
-                <button
-                  key={sp.en}
-                  type="button"
-                  onClick={() => handleQuickAddSpiceToGrocery(sp.en, sp.fr)}
-                  className="px-2.5 py-1 rounded-xl text-xs font-bold bg-white hover:bg-orange-50 border border-orange-200 text-orange-950 flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer"
-                >
-                  <span>{sp.icon}</span>
-                  <span>{lang === 'FR' ? sp.fr : sp.en}</span>
-                  <Plus className="w-3 h-3 text-orange-600 ml-0.5" />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
 
       {/* Auto-Restock Suggestion from Expiring Kitchen Items */}
       {expiringItems.length > 0 && (
@@ -538,10 +443,10 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
         </div>
       )}
 
-      {/* Simple Quick Add Form */}
+      {/* M3 Quick Add Form */}
       <form
         onSubmit={addItem}
-        className="p-2.5 sm:p-3 rounded-2xl bg-white border border-[#D5E1D2] shadow-2xs flex items-center gap-2"
+        className="p-2.5 sm:p-3 rounded-[20px] bg-[var(--md-sys-color-surface-container-low)] border border-[var(--md-sys-color-outline-variant)] shadow-none flex items-center gap-2"
       >
         <input
           type="text"
@@ -552,9 +457,9 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
               ? 'Ajouter un article à la liste (ex. Pain, Pommes, Lait)...'
               : 'Add item to list (e.g. Sourdough, Apples, Milk)...'
           }
-          className="flex-1 px-3 py-2 text-xs bg-[#F7FAF6] border border-[#D5E1D2] rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800"
+          className="flex-1 px-3.5 py-2 text-xs bg-[var(--md-sys-color-surface-container-lowest)] border border-[var(--md-sys-color-outline-variant)] rounded-full focus:outline-none focus:ring-2 focus:ring-[var(--md-sys-color-primary-container)] focus:border-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-surface)]"
         />
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
           <input
             type="number"
             min="0.001"
@@ -569,7 +474,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                 setInputQty(Number(num.toFixed(3)));
               }
             }}
-            className="w-12 px-1 py-2 text-xs text-center font-bold bg-[#F7FAF6] border border-[#D5E1D2] rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800"
+            className="w-14 px-1 py-2 text-xs text-center font-bold bg-[var(--md-sys-color-surface-container-lowest)] border border-[var(--md-sys-color-outline-variant)] rounded-full focus:outline-none focus:ring-2 focus:ring-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-surface)]"
             title={lang === 'FR' ? 'Quantité' : 'Quantity'}
           />
           <input
@@ -577,12 +482,12 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
             value={inputUnit}
             onChange={(e) => setInputUnit(e.target.value)}
             placeholder={lang === 'FR' ? 'unités' : 'unit'}
-            className="w-16 px-1.5 py-2 text-xs bg-[#F7FAF6] border border-[#D5E1D2] rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800 text-center"
+            className="w-16 px-1.5 py-2 text-xs bg-[var(--md-sys-color-surface-container-lowest)] border border-[var(--md-sys-color-outline-variant)] rounded-full focus:outline-none focus:ring-2 focus:ring-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-surface)] text-center"
             title={lang === 'FR' ? 'Unité (ex. pack, kg, oz)' : 'Unit (e.g. pack, lbs, oz)'}
           />
           <button
             type="submit"
-            className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center gap-1 shadow-xs transition-all active:scale-95 cursor-pointer"
+            className="m3-btn-filled px-3.5 py-2 rounded-full font-medium text-xs flex items-center gap-1 cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">{lang === 'FR' ? 'Ajouter' : 'Add'}</span>
@@ -590,12 +495,12 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
         </div>
       </form>
 
-      {/* Checklist of Items (Checked one by one - appears crossed when checked) */}
+      {/* Checklist of Items - M3 Surface Containers */}
       <div className="space-y-2">
         {groceryItems.length === 0 ? (
-          <div className="p-8 rounded-2xl bg-white border border-[#D5E1D2] text-center text-[#69826C] space-y-1.5">
-            <ShoppingCart className="w-8 h-8 mx-auto text-[#8FA592] opacity-60 mb-1" />
-            <p className="text-xs font-bold text-[#233527]">
+          <div className="p-8 rounded-[20px] bg-[var(--md-sys-color-surface-container-low)] border border-[var(--md-sys-color-outline-variant)] text-center text-[var(--md-sys-color-on-surface-variant)] space-y-1.5 shadow-none">
+            <ShoppingCart className="w-8 h-8 mx-auto text-[var(--md-sys-color-outline)] opacity-60 mb-1" />
+            <p className="text-xs font-bold text-[var(--md-sys-color-on-surface)]">
               {lang === 'FR' ? 'Votre liste de courses est vide' : 'Your shopping list is empty'}
             </p>
             <p className="text-[11px]">
@@ -609,7 +514,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                 setSavedListsInitialTab('saved');
                 setIsSavedListsOpen(true);
               }}
-              className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-2xs active:scale-95 cursor-pointer"
+              className="mt-2 m3-btn-filled text-xs py-2 px-4 rounded-full font-medium inline-flex items-center gap-1.5 cursor-pointer"
             >
               <BookmarkCheck className="w-3.5 h-3.5" />
               <span>{lang === 'FR' ? 'Charger une Liste de Courses' : 'Load a Shopping List'}</span>
@@ -623,28 +528,28 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
               <div
                 key={item.id}
                 onClick={() => toggleCart(item.id)}
-                className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-2.5 cursor-pointer select-none group ${
+                className={`p-3 rounded-[16px] border transition-all flex items-center justify-between gap-2.5 cursor-pointer select-none group ${
                   item.inCart
-                    ? 'bg-[#F4F8F3] border-[#CDE3CF] opacity-75 shadow-2xs'
-                    : 'bg-white border-[#D5E1D2] shadow-2xs hover:border-emerald-400'
+                    ? 'bg-[var(--md-sys-color-surface-container)] border-[var(--md-sys-color-outline-variant)] opacity-75'
+                    : 'bg-[var(--md-sys-color-surface-container-low)] border-[var(--md-sys-color-outline-variant)] hover:bg-[var(--md-sys-color-surface-container)] hover:border-[var(--md-sys-color-outline)]'
                 }`}
               >
-                {/* Left: Tactile Circular Checkbox & Info */}
+                {/* Left: Tactile M3 Checkbox & Info */}
                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                  {/* Big Touch-Friendly Checkbox */}
+                  {/* M3 Checkbox */}
                   <div
                     title={
                       item.inCart
                         ? (lang === 'FR' ? 'Décocher' : 'Uncheck')
                         : (lang === 'FR' ? 'Cocher (barrer)' : 'Check off (cross out)')
                     }
-                    className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center transition-all shrink-0 active:scale-90 ${
+                    className={`w-6 h-6 rounded-[4px] flex items-center justify-center transition-all shrink-0 active:scale-90 ${
                       item.inCart
-                        ? 'bg-emerald-600 border-2 border-emerald-600 text-white shadow-2xs'
-                        : 'border-2 border-[#CBD9C8] group-hover:border-emerald-500 bg-white'
+                        ? 'bg-[var(--md-sys-color-primary)] text-white shadow-xs'
+                        : 'border-2 border-[var(--md-sys-color-outline)] group-hover:border-[var(--md-sys-color-primary)] bg-[var(--md-sys-color-surface-container-lowest)]'
                     }`}
                   >
-                    {item.inCart && <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" />}
+                    {item.inCart && <Check className="w-4 h-4 stroke-[3]" />}
                   </div>
 
                   <div className={item.inCart ? 'opacity-60 grayscale-[30%]' : ''}>
