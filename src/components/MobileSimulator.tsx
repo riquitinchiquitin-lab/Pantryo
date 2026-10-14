@@ -140,12 +140,14 @@ interface MobileSimulatorProps {
   mode?: 'webapp' | 'frame';
   onInstall?: () => void;
   isInstalled?: boolean;
+  onOpenDocs?: (tab: 'features' | 'proxmox' | 'linux' | 'cloudflare' | 'security') => void;
 }
 
 export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   mode = 'webapp',
   onInstall,
   isInstalled = false,
+  onOpenDocs,
 }) => {
   const { t, lang } = useLanguage();
   const isInstalledEffective = Boolean(isInstalled || isAppInstalledOrStandalone());
@@ -2220,6 +2222,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             isInstalled={isInstalledEffective}
             kitchenName={kitchenName}
             onDeleteMember={handleDeleteUser}
+            onOpenDocs={onOpenDocs}
             onOpenAdmin={(tab = 'backup') => {
               setAdminModalInitialTab(tab);
               if (currentUser.role === 'ADMIN') {

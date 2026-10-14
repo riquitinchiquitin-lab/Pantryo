@@ -144,6 +144,22 @@ app.get("/proxmox-lxc.sh", (req, res) => {
   res.sendFile(path.join(process.cwd(), "proxmox-lxc.sh"));
 });
 
+// Documentation endpoints for GitHub & Homelab runbooks
+app.get(["/README.md", "/readme"], (req, res) => {
+  res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+  res.sendFile(path.join(process.cwd(), "README.md"));
+});
+
+app.get(["/INSTALLATION.md", "/installation", "/install-guide"], (req, res) => {
+  res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+  res.sendFile(path.join(process.cwd(), "INSTALLATION.md"));
+});
+
+app.get(["/FEATURES.md", "/features", "/feature-guide"], (req, res) => {
+  res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+  res.sendFile(path.join(process.cwd(), "FEATURES.md"));
+});
+
 // Universal PWA manifest and service worker headers for installability (dev & prod)
 app.get("/sw.js", (req, res, next) => {
   res.setHeader("Content-Type", "text/javascript; charset=utf-8");

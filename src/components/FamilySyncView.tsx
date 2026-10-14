@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Shield, Clock, Plus, UserCheck, ArrowRightLeft, Key, ShieldAlert, ShieldCheck, Camera, LogOut, Download, Smartphone, CheckCircle2, Edit3, Trash2, X, AlertTriangle, ChefHat, Globe, Cloud } from 'lucide-react';
+import { Users, Shield, Clock, Plus, UserCheck, ArrowRightLeft, Key, ShieldAlert, ShieldCheck, Camera, LogOut, Download, Smartphone, CheckCircle2, Edit3, Trash2, X, AlertTriangle, ChefHat, Globe, Cloud, Sparkles, Server, BookOpen } from 'lucide-react';
 import { User, ActivityLogItem } from '../types';
 import { useLanguage, getLocationLocalizedName } from '../utils/i18n';
 import { Fido2AuthModal } from './Fido2AuthModal';
@@ -10,6 +10,7 @@ interface FamilySyncViewProps {
   onSwitchUser: (user: User) => void;
   members: User[];
   onOpenAdmin?: (tab?: 'backup' | 'users' | 'security' | 'settings') => void;
+  onOpenDocs?: (tab: 'features' | 'proxmox' | 'linux' | 'cloudflare' | 'security') => void;
   onUpdateMember?: (user: User) => void;
   onLogout?: () => void;
   onInstall?: () => void;
@@ -23,6 +24,7 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
   onSwitchUser,
   members,
   onOpenAdmin,
+  onOpenDocs,
   onUpdateMember,
   onLogout,
   onInstall,
@@ -164,6 +166,49 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
             <Globe className="w-3.5 h-3.5" />
             <span>{lang === 'FR' ? 'Gérer le Domaine' : 'Manage Domain'}</span>
           </button>
+        </div>
+      )}
+
+      {/* Feature Showcase & Self-Hosting Documentation Card */}
+      {onOpenDocs && (
+        <div className="p-4 rounded-3xl bg-gradient-to-r from-amber-50/90 to-emerald-50/90 border border-amber-200 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-2xl bg-teal-900 text-amber-300 flex items-center justify-center shrink-0 shadow-2xs">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="font-bold text-sm text-[#0D3B37] truncate">
+                  {lang === 'FR' ? 'Guide d’Auto-Hébergement & Showcase IA' : 'Self-Hosting Guide & AI Showcase'}
+                </h4>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  Proxmox · Pi · Linux
+                </span>
+              </div>
+              <p className="text-xs text-[#39635E] truncate">
+                {lang === 'FR'
+                  ? 'Commandes curl 1-clic pour Proxmox LXC, Raspberry Pi, Docker, Cloudflare et spécifications'
+                  : '1-click curl commands for Proxmox LXC, Raspberry Pi, Docker, Cloudflare and technical specs'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end shrink-0">
+            <button
+              onClick={() => onOpenDocs('features')}
+              className="px-3 py-1.5 rounded-xl bg-white hover:bg-amber-100 text-[#0D3B37] border border-amber-300 font-bold text-xs flex items-center gap-1 transition-transform active:scale-95 shadow-2xs cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+              <span>{lang === 'FR' ? 'Fonctionnalités' : 'Features'}</span>
+            </button>
+            <button
+              onClick={() => onOpenDocs('proxmox')}
+              className="px-3 py-1.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center gap-1 transition-transform active:scale-95 shadow-2xs cursor-pointer"
+            >
+              <Server className="w-3.5 h-3.5 text-orange-400" />
+              <span>{lang === 'FR' ? 'Guide Install' : 'Install Guide'}</span>
+            </button>
+          </div>
         </div>
       )}
 

@@ -1,16 +1,24 @@
 import React, { useState } from 'react';
 import { MobileSimulator } from './components/MobileSimulator';
 import { PantryoLogo } from './components/PantryoLogo';
-import { Share, X, Download, Smartphone, Check, Laptop } from 'lucide-react';
-import { LanguageProvider, useLanguage } from './utils/i18n';
+import { Share, X, Download, Smartphone, Check, Laptop, Sparkles, Server, BookOpen, Terminal, Shield } from 'lucide-react';
+import { LanguageProvider, useLanguage, LanguageSwitcher } from './utils/i18n';
 import { CookingSessionProvider } from './contexts/CookingSessionContext';
 import { usePWAInstall } from './hooks/usePWAInstall';
+import { DocumentationModal } from './components/DocumentationModal';
 
 function AppContent() {
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
   const [showInstallModal, setShowInstallModal] = useState(false);
+  const [showDocModal, setShowDocModal] = useState(false);
+  const [docModalTab, setDocModalTab] = useState<'features' | 'proxmox' | 'linux' | 'cloudflare' | 'security'>('features');
   const [activeTab, setActiveTab] = useState<'ios' | 'android'>(() => (isIOS ? 'ios' : 'android'));
   const { t, lang } = useLanguage();
+
+  const handleOpenDocs = (tab: 'features' | 'proxmox' | 'linux' | 'cloudflare' | 'security') => {
+    setDocModalTab(tab);
+    setShowDocModal(true);
+  };
 
   const handleInstallClick = async () => {
     if (isInstalled) return;
@@ -26,13 +34,84 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-[#FAF7EE] text-[#133E3B] flex flex-col font-sans selection:bg-teal-200">
+      {/* Top Application Header Bar */}
+      <header className="w-full bg-white/90 backdrop-blur-xs border-b border-[#E8E2D5] px-4 sm:px-6 py-2.5 flex items-center justify-between sticky top-0 z-40 shadow-2xs">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleOpenDocs('features')}>
+            <PantryoLogo size={28} />
+            <div className="flex items-baseline gap-1.5">
+              <span className="font-black text-base tracking-tight text-[#0D3B37]">Pantryo</span>
+              <span className="hidden sm:inline-block text-[10px] font-bold uppercase tracking-wider text-teal-800 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200">
+                Self-Hosted OS
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Center / Navigation Links */}
+        <nav className="flex items-center gap-1.5 sm:gap-2">
+          <button
+            onClick={() => handleOpenDocs('features')}
+            className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#FAF7EE] hover:bg-teal-50 border border-[#E0D9C8] hover:border-teal-300 text-xs font-bold text-[#0D3B37] flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-2xs"
+            title={lang === 'FR' ? 'Découvrir toutes les fonctionnalités' : 'Explore all features'}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+            <span className="hidden xs:inline">{lang === 'FR' ? 'Fonctionnalités' : 'Features'}</span>
+          </button>
+
+          <button
+            onClick={() => handleOpenDocs('proxmox')}
+            className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#FAF7EE] hover:bg-orange-50 border border-[#E0D9C8] hover:border-orange-300 text-xs font-bold text-[#0D3B37] flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-2xs"
+            title={lang === 'FR' ? 'Guide d’installation Proxmox VE & Linux' : 'Proxmox VE & Linux Guide'}
+          >
+            <Server className="w-3.5 h-3.5 text-orange-600" />
+            <span className="hidden md:inline">Proxmox & Linux</span>
+            <span className="md:hidden">Install</span>
+          </button>
+
+          <a
+            href="/README.md"
+            target="_blank"
+            rel="noreferrer"
+            className="hidden lg:flex px-3 py-1.5 rounded-xl bg-[#FAF7EE] hover:bg-teal-50 border border-[#E0D9C8] hover:border-teal-300 text-xs font-bold text-[#0D3B37] items-center gap-1.5 transition-all shadow-2xs"
+            title={lang === 'FR' ? 'Consulter le README GitHub' : 'View GitHub README'}
+          >
+            <BookOpen className="w-3.5 h-3.5 text-teal-700" />
+            <span>GitHub Docs</span>
+          </a>
+
+          {!isInstalled && (
+            <button
+              onClick={handleInstallClick}
+              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-xs cursor-pointer"
+              title={lang === 'FR' ? 'Installer l’application sur cet appareil' : 'Install app on this device'}
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{lang === 'FR' ? 'Installer PWA' : 'Install PWA'}</span>
+            </button>
+          )}
+
+          <div className="ml-1 shrink-0">
+            <LanguageSwitcher />
+          </div>
+        </nav>
+      </header>
+
       <main className="flex-1 w-full flex justify-center sm:py-6">
         <MobileSimulator
           mode="webapp"
           onInstall={isInstalled ? undefined : handleInstallClick}
           isInstalled={isInstalled}
+          onOpenDocs={handleOpenDocs}
         />
       </main>
+
+      {/* Interactive Documentation & Self-Hosting Hub Modal */}
+      <DocumentationModal
+        isOpen={showDocModal}
+        onClose={() => setShowDocModal(false)}
+        initialTab={docModalTab}
+      />
 
       {/* PWA Install Guidance Modal (Phone & Desktop Instructions) */}
       {!isInstalled && showInstallModal && (

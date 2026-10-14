@@ -50,6 +50,7 @@ import {
   CheckCheck,
   Cpu,
   Layers,
+  BookOpen,
 } from 'lucide-react';
 import { User, DatabaseStats, DatabaseBackupPackage } from '../types';
 import { useLanguage } from '../utils/i18n';
@@ -4130,6 +4131,46 @@ server {
                       </div>
                     </div>
                   )}
+
+                  {/* Repository Documentation Files Quick Links */}
+                  <div className="pt-3 border-t border-[#F0EBE0] flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-xs text-[#527470]">
+                      <BookOpen className="w-4 h-4 text-teal-700 shrink-0" />
+                      <span className="font-bold text-[#0D3B37]">
+                        {lang === 'FR' ? 'Guides GitHub Détaillés :' : 'Detailed GitHub Runbooks:'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <a
+                        href="/README.md"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-2.5 py-1 rounded-lg bg-[#FAF7EE] hover:bg-teal-50 border border-[#E0D9C8] hover:border-teal-300 text-[11px] font-bold text-[#0D3B37] flex items-center gap-1 transition-all"
+                      >
+                        <span>README.md</span>
+                        <ExternalLink className="w-3 h-3 text-slate-400" />
+                      </a>
+                      <a
+                        href="/INSTALLATION.md"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-2.5 py-1 rounded-lg bg-[#FAF7EE] hover:bg-teal-50 border border-[#E0D9C8] hover:border-teal-300 text-[11px] font-bold text-[#0D3B37] flex items-center gap-1 transition-all"
+                      >
+                        <span>INSTALLATION.md</span>
+                        <ExternalLink className="w-3 h-3 text-slate-400" />
+                      </a>
+                      <a
+                        href="/FEATURES.md"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-2.5 py-1 rounded-lg bg-[#FAF7EE] hover:bg-teal-50 border border-[#E0D9C8] hover:border-teal-300 text-[11px] font-bold text-[#0D3B37] flex items-center gap-1 transition-all"
+                      >
+                        <span>FEATURES.md</span>
+                        <ExternalLink className="w-3 h-3 text-slate-400" />
+                      </a>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Save Button Bar */}
