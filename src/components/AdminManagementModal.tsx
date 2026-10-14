@@ -48,6 +48,8 @@ import {
   Network,
   Zap,
   CheckCheck,
+  Cpu,
+  Layers,
 } from 'lucide-react';
 import { User, DatabaseStats, DatabaseBackupPackage } from '../types';
 import { useLanguage } from '../utils/i18n';
@@ -181,6 +183,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     resolvedIp?: string | null;
   } | null>(null);
   const [copiedSnippetId, setCopiedSnippetId] = useState<string | null>(null);
+  const [installerTab, setInstallerTab] = useState<'linux_rpi' | 'proxmox' | 'docker'>('linux_rpi');
   const [adminKitchenNameInput, setAdminKitchenNameInput] = useState('Your Kitchen');
   const [isSavingAdminKitchenName, setIsSavingAdminKitchenName] = useState(false);
   const [showGeminiKey, setShowGeminiKey] = useState(false);
@@ -1258,7 +1261,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
             }`}
           >
             <Globe className="w-4 h-4" />
-            <span>{lang === 'FR' ? 'Système, Proxmox & Réseau' : 'System, Proxmox & Network'}</span>
+            <span>{lang === 'FR' ? 'Domaines, Cloudflare & Installateur' : 'Domains, Cloudflare & Installer'}</span>
           </button>
         </div>
 
@@ -2689,16 +2692,16 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-sm text-[#0D3B37]">
-                          {lang === 'FR' ? 'Paramètres Système & Proxmox VE' : 'System & Proxmox VE Settings'}
+                          {lang === 'FR' ? 'Paramètres Système, Hébergement & Multi-Appareils' : 'System, Hosting & Multi-Device Settings'}
                         </span>
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 text-teal-800 border border-teal-200">
-                          {lang === 'FR' ? 'Installateur Proxmox Actif' : 'Proxmox Installer Active'}
+                          {lang === 'FR' ? 'Raspberry Pi, Linux & Proxmox' : 'Raspberry Pi, Linux & Proxmox'}
                         </span>
                       </div>
                       <p className="text-[#527470] text-xs mt-0.5">
                         {lang === 'FR'
-                          ? 'Ces valeurs sont demandées lors de l’installation sur Proxmox et modifiables ici à tout moment.'
-                          : 'These values are requested during Proxmox installation and can be modified here at any time.'}
+                          ? 'Gérez votre mode d’accès (Cloudflare ou Propre Domaine), vos clés d’IA, et déployez sur Raspberry Pi ou tout serveur Linux.'
+                          : 'Configure your access mode (Cloudflare or Custom Domain), AI keys, and deploy to Raspberry Pi or any Linux server.'}
                       </p>
                     </div>
                   </div>
@@ -3873,6 +3876,260 @@ server {
                       </div>
                     )}
                   </div>
+                </div>
+
+                {/* 6. Multi-Device Installer & Hardware Compatibility (Raspberry Pi & Universal Linux) */}
+                <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-[#F0EBE1] gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-teal-800 text-white flex items-center justify-center shrink-0">
+                        <Cpu className="w-4 h-4 text-teal-200" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-[#0D3B37] text-xs uppercase tracking-wider">
+                          {lang === 'FR'
+                            ? '6. Déploiement Multi-Appareils : Raspberry Pi, Linux & Proxmox'
+                            : '6. Multi-Device Deployment: Raspberry Pi, Linux & Proxmox'}
+                        </h3>
+                        <p className="text-[11px] text-[#527470]">
+                          {lang === 'FR'
+                            ? 'Le serveur backend s’exécute avec ~120 Mo de RAM sur Raspberry Pi (ARM64/ARM32) et toute distribution Linux.'
+                            : 'The backend server runs with ~120MB RAM on Raspberry Pi (ARM64/ARM32) and all Linux distributions.'}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 text-teal-800 border border-teal-200 self-start sm:self-auto">
+                      {lang === 'FR' ? '🍓 Compatible Raspberry Pi' : '🍓 Raspberry Pi Ready'}
+                    </span>
+                  </div>
+
+                  {/* Installer Selector Tabs */}
+                  <div className="flex items-center gap-1.5 p-1 bg-[#FAF7EE] rounded-xl border border-[#E0D9C8]">
+                    <button
+                      type="button"
+                      onClick={() => setInstallerTab('linux_rpi')}
+                      className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        installerTab === 'linux_rpi'
+                          ? 'bg-white text-teal-900 shadow-2xs border border-[#E0D9C8]'
+                          : 'text-[#527470] hover:text-[#0D3B37]'
+                      }`}
+                    >
+                      <Cpu className="w-3.5 h-3.5 text-teal-700" />
+                      <span>{lang === 'FR' ? 'Raspberry Pi & Linux Universel' : 'Raspberry Pi & Universal Linux'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setInstallerTab('proxmox')}
+                      className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        installerTab === 'proxmox'
+                          ? 'bg-white text-teal-900 shadow-2xs border border-[#E0D9C8]'
+                          : 'text-[#527470] hover:text-[#0D3B37]'
+                      }`}
+                    >
+                      <Server className="w-3.5 h-3.5 text-teal-700" />
+                      <span>{lang === 'FR' ? 'Proxmox VE (LXC)' : 'Proxmox VE (LXC)'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setInstallerTab('docker')}
+                      className={`flex-1 py-2 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        installerTab === 'docker'
+                          ? 'bg-white text-teal-900 shadow-2xs border border-[#E0D9C8]'
+                          : 'text-[#527470] hover:text-[#0D3B37]'
+                      }`}
+                    >
+                      <Layers className="w-3.5 h-3.5 text-teal-700" />
+                      <span>{lang === 'FR' ? 'Docker & Compose' : 'Docker & Compose'}</span>
+                    </button>
+                  </div>
+
+                  {/* SUB-VIEW 1: RASPBERRY PI & UNIVERSAL LINUX */}
+                  {installerTab === 'linux_rpi' && (
+                    <div className="space-y-3 animate-fade-in">
+                      <div className="p-3.5 rounded-xl bg-teal-50/70 border border-teal-200/80 text-[#124E48] space-y-2">
+                        <div className="flex items-center gap-2 font-bold text-xs">
+                          <CheckCircle2 className="w-4 h-4 text-teal-700" />
+                          <span>
+                            {lang === 'FR'
+                              ? 'Script d’Installation Automatique Universel (install.sh)'
+                              : 'Universal Automated Installation Script (install.sh)'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] leading-relaxed">
+                          {lang === 'FR'
+                            ? 'Ce script détecte automatiquement votre matériel (Raspberry Pi 5/4/3/Zero 2W, ARM64, ARMv7, x86_64), configure la mémoire swap si nécessaire pour éviter les dépassements de RAM, installe Node.js 22 LTS, génère la clé SQLCipher 256-bit, vous permet de choisir entre Tunnel Cloudflare ou Propre Domaine, et enregistre un service systemd actif en tâche de fond.'
+                            : 'This script auto-detects your hardware (Raspberry Pi 5/4/3/Zero 2W, ARM64, ARMv7, x86_64), provisions temporary swap on low-RAM SBCs, installs Node.js 22 LTS, generates the 256-bit SQLCipher key, lets you configure Cloudflare Tunnel or Custom Domain, and registers an auto-restarting systemd background service.'}
+                        </p>
+                      </div>
+
+                      {/* 1-Line Curl Command */}
+                      <div className="p-3.5 rounded-xl bg-slate-900 text-slate-100 font-mono text-[11px] space-y-2">
+                        <div className="flex items-center justify-between text-[10px] text-slate-400">
+                          <span className="flex items-center gap-1.5 font-sans font-bold text-teal-300">
+                            <Terminal className="w-3.5 h-3.5" />
+                            {lang === 'FR' ? 'Commande d’Installation en 1 Ligne (Terminal / SSH) :' : '1-Line Installation Command (Terminal / SSH):'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleCopySnippet(
+                                `curl -fsSL ${window.location.origin}/install.sh | sudo bash`,
+                                'install-rpi-cmd'
+                              )
+                            }
+                            className="text-xs text-teal-300 hover:text-white flex items-center gap-1 cursor-pointer"
+                          >
+                            {copiedSnippetId === 'install-rpi-cmd' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                            <span>{copiedSnippetId === 'install-rpi-cmd' ? (lang === 'FR' ? 'Copié !' : 'Copied!') : (lang === 'FR' ? 'Copier' : 'Copy')}</span>
+                          </button>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-black/40 text-emerald-300 select-all break-all border border-slate-800">
+                          curl -fsSL {typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/install.sh | sudo bash
+                        </div>
+                      </div>
+
+                      {/* Hardware Compatibility Badges */}
+                      <div className="p-3.5 rounded-xl bg-[#FAF7EE] border border-[#E0D9C8] space-y-2.5">
+                        <span className="font-bold text-xs text-[#0D3B37] block">
+                          {lang === 'FR' ? 'Distributions & Matériels Testés & Pris en Charge :' : 'Tested & Supported Hardware & Distributions:'}
+                        </span>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                          <div className="p-2 rounded-lg bg-white border border-[#E0D9C8] flex items-center gap-1.5">
+                            <span className="text-base">🍓</span>
+                            <div>
+                              <div className="font-bold text-[#0D3B37]">Raspberry Pi OS</div>
+                              <div className="text-[9px] text-[#527470]">Pi 5, 4, 3, Zero 2W</div>
+                            </div>
+                          </div>
+                          <div className="p-2 rounded-lg bg-white border border-[#E0D9C8] flex items-center gap-1.5">
+                            <span className="text-base">🐧</span>
+                            <div>
+                              <div className="font-bold text-[#0D3B37]">Debian & Ubuntu</div>
+                              <div className="text-[9px] text-[#527470]">11/12 • 22.04/24.04</div>
+                            </div>
+                          </div>
+                          <div className="p-2 rounded-lg bg-white border border-[#E0D9C8] flex items-center gap-1.5">
+                            <span className="text-base">🍊</span>
+                            <div>
+                              <div className="font-bold text-[#0D3B37]">Armbian & DietPi</div>
+                              <div className="text-[9px] text-[#527470]">Orange Pi, NanoPi</div>
+                            </div>
+                          </div>
+                          <div className="p-2 rounded-lg bg-white border border-[#E0D9C8] flex items-center gap-1.5">
+                            <span className="text-base">🎩</span>
+                            <div>
+                              <div className="font-bold text-[#0D3B37]">RHEL & Fedora</div>
+                              <div className="text-[9px] text-[#527470]">Rocky, AlmaLinux, CentOS</div>
+                            </div>
+                          </div>
+                          <div className="p-2 rounded-lg bg-white border border-[#E0D9C8] flex items-center gap-1.5">
+                            <span className="text-base">🏹</span>
+                            <div>
+                              <div className="font-bold text-[#0D3B37]">Arch Linux</div>
+                              <div className="text-[9px] text-[#527470]">Pacman, Manjaro</div>
+                            </div>
+                          </div>
+                          <div className="p-2 rounded-lg bg-white border border-[#E0D9C8] flex items-center gap-1.5">
+                            <span className="text-base">🏔️</span>
+                            <div>
+                              <div className="font-bold text-[#0D3B37]">Alpine Linux</div>
+                              <div className="text-[9px] text-[#527470]">Apk lightweight</div>
+                            </div>
+                          </div>
+                          <div className="p-2 rounded-lg bg-white border border-[#E0D9C8] flex items-center gap-1.5">
+                            <span className="text-base">📦</span>
+                            <div>
+                              <div className="font-bold text-[#0D3B37]">Proxmox VE</div>
+                              <div className="text-[9px] text-[#527470]">LXC & VM 7/8</div>
+                            </div>
+                          </div>
+                          <div className="p-2 rounded-lg bg-white border border-[#E0D9C8] flex items-center gap-1.5">
+                            <span className="text-base">🐳</span>
+                            <div>
+                              <div className="font-bold text-[#0D3B37]">Docker Engine</div>
+                              <div className="text-[9px] text-[#527470]">Compose multi-arch</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SUB-VIEW 2: PROXMOX VE */}
+                  {installerTab === 'proxmox' && (
+                    <div className="space-y-3 animate-fade-in">
+                      <div className="p-3.5 rounded-xl bg-teal-50/70 border border-teal-200/80 text-[#124E48] space-y-1.5">
+                        <div className="font-bold text-xs flex items-center gap-2">
+                          <Server className="w-4 h-4 text-teal-700" />
+                          <span>
+                            {lang === 'FR'
+                              ? 'Création Automatique de Conteneur LXC Dédié sous Proxmox'
+                              : 'Automated Dedicated LXC Container Provisioning on Proxmox VE'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] leading-relaxed">
+                          {lang === 'FR'
+                            ? 'Exécutez cette commande directement dans le shell de votre nœud Proxmox (Host VE). Le script télécharge le template Debian 12 standard, alloue un conteneur non-privilégié sécurisé, configure le réseau et installe Pantryo avec le mode d’accès choisi (Cloudflare ou Domaine).'
+                            : 'Run this command directly in the Proxmox Host VE node shell. The script pulls the official Debian 12 template, provisions an unprivileged container, and sets up Pantryo with your chosen access mode (Cloudflare or Custom Domain).'}
+                        </p>
+                      </div>
+
+                      <div className="p-3.5 rounded-xl bg-slate-900 text-slate-100 font-mono text-[11px] space-y-2">
+                        <div className="flex items-center justify-between text-[10px] text-slate-400">
+                          <span className="text-teal-300 font-sans font-bold flex items-center gap-1.5">
+                            <Terminal className="w-3.5 h-3.5" />
+                            {lang === 'FR' ? 'Shell Nœud Proxmox (PVE Host) :' : 'Proxmox Node Shell (PVE Host):'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleCopySnippet(
+                                `curl -fsSL ${window.location.origin}/install-proxmox.sh | bash`,
+                                'install-pve-cmd'
+                              )
+                            }
+                            className="text-xs text-teal-300 hover:text-white flex items-center gap-1 cursor-pointer"
+                          >
+                            {copiedSnippetId === 'install-pve-cmd' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                            <span>{copiedSnippetId === 'install-pve-cmd' ? (lang === 'FR' ? 'Copié !' : 'Copied!') : (lang === 'FR' ? 'Copier' : 'Copy')}</span>
+                          </button>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-black/40 text-emerald-300 select-all break-all border border-slate-800">
+                          curl -fsSL {typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/install-proxmox.sh | bash
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SUB-VIEW 3: DOCKER & COMPOSE */}
+                  {installerTab === 'docker' && (
+                    <div className="space-y-3 animate-fade-in">
+                      <div className="p-3.5 rounded-xl bg-slate-900 text-slate-100 font-mono text-[11px] space-y-2">
+                        <div className="flex items-center justify-between text-[10px] text-slate-400">
+                          <span className="text-teal-300 font-sans font-bold flex items-center gap-1.5">
+                            <Terminal className="w-3.5 h-3.5" />
+                            {lang === 'FR' ? 'Démarrage Rapide Docker Compose :' : 'Quickstart Docker Compose:'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleCopySnippet(
+                                `docker compose up -d`,
+                                'docker-compose-cmd'
+                              )
+                            }
+                            className="text-xs text-teal-300 hover:text-white flex items-center gap-1 cursor-pointer"
+                          >
+                            {copiedSnippetId === 'docker-compose-cmd' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                            <span>{copiedSnippetId === 'docker-compose-cmd' ? (lang === 'FR' ? 'Copié !' : 'Copied!') : (lang === 'FR' ? 'Copier' : 'Copy')}</span>
+                          </button>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-black/40 text-emerald-300 select-all break-all border border-slate-800">
+                          docker compose up -d
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Save Button Bar */}

@@ -128,6 +128,22 @@ app.use("/api", (req, res) => {
   });
 });
 
+// Universal install scripts for Raspberry Pi, Debian, Ubuntu, Proxmox & Linux distributions
+app.get(["/install.sh", "/install"], (req, res) => {
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  res.sendFile(path.join(process.cwd(), "install.sh"));
+});
+
+app.get(["/install-proxmox.sh", "/proxmox"], (req, res) => {
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  res.sendFile(path.join(process.cwd(), "install-proxmox.sh"));
+});
+
+app.get("/proxmox-lxc.sh", (req, res) => {
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  res.sendFile(path.join(process.cwd(), "proxmox-lxc.sh"));
+});
+
 // Universal PWA manifest and service worker headers for installability (dev & prod)
 app.get("/sw.js", (req, res, next) => {
   res.setHeader("Content-Type", "text/javascript; charset=utf-8");
