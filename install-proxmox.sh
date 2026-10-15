@@ -29,6 +29,80 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
+# Detect if running on Proxmox VE Hypervisor Host
+if command -v pveversion >/dev/null 2>&1; then
+  echo -e "${YELLOW}${BOLD}[Proxmox VE Hypervisor Host Detected]${NC}"
+  echo -e "You are running this command on the Proxmox VE host shell (${CYAN}$(pveversion 2>/dev/null | head -n 1)${NC})."
+  echo -e "Best practice: Deploy Pantryo in a dedicated ${BOLD}Debian 12 LXC Container${NC}."
+  echo ""
+  read -rp "$(echo -e "${BOLD}Would you like to automatically create and deploy an LXC container for Pantryo? [${GREEN}Y/n${NC}${BOLD}]: ${NC}")" PVE_AUTO_LXC
+  PVE_AUTO_LXC="${PVE_AUTO_LXC:-Y}"
+
+  if [[ "$PVE_AUTO_LXC" =~ ^[Yy]$ ]]; then
+    # Auto-find available CTID starting from 200
+    NEXT_ID=200
+    while pct status "$NEXT_ID" >/dev/null 2>&1 || qm status "$NEXT_ID" >/dev/null 2>&1; do
+      NEXT_ID=$((NEXT_ID + 1))
+    done
+
+    read -rp "$(echo -e "${BOLD}Container ID [${GREEN}${NEXT_ID}${NC}${BOLD}]: ${NC}")" CT_ID
+    CT_ID="${CT_ID:-$NEXT_ID}"
+
+    read -rp "$(echo -e "${BOLD}Container Hostname [${GREEN}pantryo${NC}${BOLD}]: ${NC}")" CT_NAME
+    CT_NAME="${CT_NAME:-pantryo}"
+
+    read -rp "$(echo -e "${BOLD}RAM in MB [${GREEN}1024${NC}${BOLD}]: ${NC}")" CT_RAM
+    CT_RAM="${CT_RAM:-1024}"
+
+    read -rp "$(echo -e "${BOLD}Disk Size in GB [${GREEN}8${NC}${BOLD}]: ${NC}")" CT_DISK
+    CT_DISK="${CT_DISK:-8}"
+
+    # Detect storage pool with rootdir support
+    DEFAULT_STORAGE=$(pvesm status -content rootdir 2>/dev/null | awk 'NR>1 {print $1}' | head -n 1 || echo "local-lvm")
+    read -rp "$(echo -e "${BOLD}Storage Pool [${GREEN}${DEFAULT_STORAGE}${NC}${BOLD}]: ${NC}")" CT_STORAGE
+    CT_STORAGE="${CT_STORAGE:-$DEFAULT_STORAGE}"
+
+    echo -e "\n${BLUE}Updating template catalog & preparing Debian 12...${NC}"
+    pveam update || true
+    TMPL_FILE=$(pveam available -section system 2>/dev/null | grep -E "debian-12-standard" | awk '{print $2}' | tail -n 1 || echo "")
+    if [[ -z "$TMPL_FILE" ]]; then
+      TMPL_FILE="debian-12-standard_12.7-1_amd64.tar.zst"
+    fi
+
+    # Check if template already in storage
+    if ! pveam list local 2>/dev/null | grep -q "$TMPL_FILE"; then
+      echo -e "${BLUE}Downloading Debian 12 template (${TMPL_FILE})...${NC}"
+      pveam download local "$TMPL_FILE" || true
+    fi
+
+    echo -e "\n${BLUE}Creating unprivileged LXC container ${CT_ID} (${CT_NAME})...${NC}"
+    pct create "$CT_ID" "local:vztmpl/${TMPL_FILE}" \
+      --hostname "$CT_NAME" \
+      --cores 2 \
+      --memory "$CT_RAM" \
+      --swap 512 \
+      --rootfs "${CT_STORAGE}:${CT_DISK}" \
+      --net0 name=eth0,bridge=vmbr0,ip=dhcp,firewall=1 \
+      --features nesting=1 \
+      --unprivileged 1 \
+      --onboot 1
+
+    echo -e "${BLUE}Starting Container ${CT_ID}...${NC}"
+    pct start "$CT_ID"
+    sleep 4
+
+    CT_IP=$(pct exec "$CT_ID" -- hostname -I 2>/dev/null | awk '{print $1}' || echo "")
+    echo -e "${GREEN}${BOLD}LXC Container ${CT_ID} successfully created!${NC}"
+    if [[ -n "$CT_IP" ]]; then
+      echo -e "Container IP: ${CYAN}${CT_IP}${NC}"
+    fi
+
+    echo -e "\n${CYAN}To enter your new container and complete setup, run:${NC}"
+    echo -e "${BOLD}pct enter ${CT_ID}${NC}\n"
+    exit 0
+  fi
+fi
+
 INSTALL_DIR="${INSTALL_DIR:-$(pwd)}"
 if [[ "$INSTALL_DIR" == "/" ]]; then
   INSTALL_DIR="/opt/pantryo"
