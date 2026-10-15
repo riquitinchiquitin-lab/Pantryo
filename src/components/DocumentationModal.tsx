@@ -70,8 +70,9 @@ export function DocumentationModal({
     }
   };
 
-  const proxmoxCurlCommand = `bash -c "$(curl -fsSL ${currentOrigin}/install-proxmox.sh)"`;
-  const linuxCurlCommand = `curl -fsSL ${currentOrigin}/install.sh | sudo bash`;
+  const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/riquitinchiquitin-lab/Pantryo/main';
+  const proxmoxCurlCommand = `bash -c "$(curl -fsSL ${GITHUB_RAW_BASE}/install-proxmox.sh)"`;
+  const linuxCurlCommand = `curl -fsSL ${GITHUB_RAW_BASE}/install.sh | sudo bash`;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 md:p-6 animate-fade-in overflow-hidden">

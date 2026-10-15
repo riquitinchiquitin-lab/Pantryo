@@ -89,7 +89,7 @@ In the Proxmox VE node shell (PVE 7.x or 8.x), paste the automated 1-line instal
 
 ```bash
 # Automated Proxmox LXC provisioner (Debian 12 Bookworm, unprivileged, 512MB RAM)
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/yjsboily/pantryo/main/install-proxmox.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/riquitinchiquitin-lab/Pantryo/main/install-proxmox.sh)"
 ```
 
 *The installer asks for your desired container ID (default `206`), hostname (`pantryo`), RAM (`1024MB`), and root disk size (`4GB`), downloads the template, and boots Pantryo automatically.*
@@ -100,7 +100,7 @@ Supports **Raspberry Pi OS**, **DietPi**, **Armbian**, **Debian**, **Ubuntu**, *
 
 ```bash
 # Automated multi-distro installer with systemd service & auto-swap tuning
-curl -fsSL https://raw.githubusercontent.com/yjsboily/pantryo/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/riquitinchiquitin-lab/Pantryo/main/install.sh | sudo bash
 ```
 
 *Automatically configures a 1 GB swapfile on low-memory single-board computers (RPi 3B+ / Zero 2W), installs Node.js 22 LTS, sets up systemd auto-restart (`pantryo.service`), and starts the server on port `3000`.*
@@ -114,7 +114,7 @@ version: '3.8'
 
 services:
   pantryo:
-    image: ghcr.io/yjsboily/pantryo:latest
+    image: ghcr.io/riquitinchiquitin-lab/pantryo:latest
     container_name: pantryo
     restart: unless-stopped
     ports:
@@ -144,7 +144,7 @@ docker compose up -d
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/yjsboily/pantryo.git
+git clone https://github.com/riquitinchiquitin-lab/Pantryo.git
 cd pantryo
 
 # 2. Install dependencies

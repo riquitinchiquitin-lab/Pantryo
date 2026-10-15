@@ -54,7 +54,7 @@ Running Pantryo in a lightweight, unprivileged **Linux Container (LXC)** on Prox
 3. Paste and execute the following automated provisioner:
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/yjsboily/pantryo/main/install-proxmox.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/riquitinchiquitin-lab/Pantryo/main/install-proxmox.sh)"
 ```
 
 ### 📋 What the Proxmox Installer Does Automatically
@@ -99,7 +99,7 @@ pct start 206
 pct enter 206
 
 # 4. Inside the LXC container, run the universal Linux installer
-curl -fsSL https://raw.githubusercontent.com/yjsboily/pantryo/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/riquitinchiquitin-lab/Pantryo/main/install.sh | bash
 ```
 
 ---
@@ -119,7 +119,7 @@ The universal installer works across all major Linux distributions:
 Log into your Raspberry Pi or Linux server via SSH, then execute:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/yjsboily/pantryo/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/riquitinchiquitin-lab/Pantryo/main/install.sh | sudo bash
 ```
 
 ### 🧠 Intelligent Single-Board Computer (SBC) Optimizations
@@ -159,7 +159,7 @@ version: '3.8'
 
 services:
   pantryo:
-    image: ghcr.io/yjsboily/pantryo:latest
+    image: ghcr.io/riquitinchiquitin-lab/pantryo:latest
     container_name: pantryo
     restart: unless-stopped
     ports:
@@ -212,7 +212,7 @@ curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt install -y nodejs
 
 # 3. Clone repository
-sudo git clone https://github.com/yjsboily/pantryo.git /opt/pantryo
+sudo git clone https://github.com/riquitinchiquitin-lab/Pantryo.git /opt/pantryo
 cd /opt/pantryo
 
 # 4. Install production & dev dependencies
