@@ -1205,6 +1205,35 @@ Output a JSON array of 3 to 4 recipe objects inside a \`\`\`json\`\`\` code bloc
         ? Math.round((inStockCount / recipe.ingredients.length) * 100)
         : 80;
 
+    let instructionsEn = Array.isArray(recipe.instructionsEn) ? recipe.instructionsEn.filter(s => s && !s.startsWith("Visit http")) : [];
+    let instructionsFr = Array.isArray(recipe.instructionsFr) ? recipe.instructionsFr.filter(s => s && !s.startsWith("Consultez")) : [];
+
+    if (instructionsEn.length === 0 || instructionsFr.length === 0) {
+      const hero = detailedIngredients[0]?.name || recipe.title || "ingredients";
+      const heroFr = detailedIngredients[0]?.nameFr || recipe.titleFr || recipe.title || "ingrédients";
+      const sec = detailedIngredients[1]?.name || "fresh vegetables and seasonings";
+      const secFr = detailedIngredients[1]?.nameFr || "légumes frais et assaisonnements";
+
+      if (instructionsEn.length === 0) {
+        instructionsEn = [
+          `Prepare ${hero} and ${sec}, washing and chopping them into uniform portions.`,
+          "Heat olive oil or butter in a skillet or pot over medium heat.",
+          `Add ${hero} and cook for 6 to 8 minutes until fragrant and golden brown.`,
+          `Stir in ${sec}, cover and simmer gently for 5 to 7 minutes until flavors combine.`,
+          "Season to taste with salt, black pepper, and herbs. Serve warm.",
+        ];
+      }
+      if (instructionsFr.length === 0) {
+        instructionsFr = [
+          `Préparer ${heroFr} et ${secFr}, laver et découper en portions régulières.`,
+          "Faire chauffer un filet d'huile d'olive ou du beurre dans une poêle à feu moyen.",
+          `Ajouter ${heroFr} et faire dorer 6 à 8 minutes jusqu'à belle coloration parfumée.`,
+          `Incorporer ${secFr}, couvrir et laisser mijoter 5 à 7 minutes pour marier les saveurs.`,
+          "Assaisonner selon vos goûts de sel, poivre et herbes. Servir bien chaud.",
+        ];
+      }
+    }
+
     return {
       id: `site_${domain}_${Date.now()}_${idx}`,
       ...recipe,
@@ -1213,6 +1242,8 @@ Output a JSON array of 3 to 4 recipe objects inside a \`\`\`json\`\`\` code bloc
       matchPercentage,
       rescuedIngredients: recipe.rescuedIngredients?.length ? recipe.rescuedIngredients : rescued,
       ingredients: detailedIngredients,
+      instructionsEn,
+      instructionsFr,
       isWebSearch: true,
     };
   });
@@ -2386,8 +2417,24 @@ Each recipe object must have:
                 : expiringItems.slice(0, 2).map((i) => i.name),
               matchPercentage,
               ingredients: checkedIngredients,
-              instructionsEn: r.instructionsEn || [],
-              instructionsFr: r.instructionsFr || [],
+              instructionsEn: Array.isArray(r.instructionsEn) && r.instructionsEn.length > 0
+                ? r.instructionsEn
+                : [
+                    `Prepare ${checkedIngredients[0]?.name || r.title || 'ingredients'}, washing and slicing into neat portions.`,
+                    "Heat olive oil or butter in a skillet or pot over medium-high heat.",
+                    `Cook ${checkedIngredients[0]?.name || 'main ingredients'} until fragrant, golden, and tender (6-8 mins).`,
+                    `Stir in ${checkedIngredients[1]?.name || 'remaining ingredients'}, reduce heat, and simmer gently for 5 minutes.`,
+                    "Season to taste with salt, pepper, and fresh herbs. Serve hot and fresh.",
+                  ],
+              instructionsFr: Array.isArray(r.instructionsFr) && r.instructionsFr.length > 0
+                ? r.instructionsFr
+                : [
+                    `Préparer ${checkedIngredients[0]?.nameFr || r.titleFr || r.title || 'les ingrédients'}, laver et découper soigneusement.`,
+                    "Faire chauffer l'huile d'olive ou le beurre dans une poêle à feu moyen-vif.",
+                    `Faire revenir ${checkedIngredients[0]?.nameFr || 'les ingrédients principaux'} 6 à 8 minutes jusqu'à belle coloration dorée.`,
+                    `Incorporer ${checkedIngredients[1]?.nameFr || 'le reste des ingrédients'}, baisser le feu et laisser mijoter 5 minutes.`,
+                    "Assaisonner de sel, poivre et herbes aromatiques. Servir chaud et savoureux.",
+                  ],
               tags: r.tags || [targetMealType, "Web Recipe", "Zero-Waste"],
               mealType: targetMealType,
               suitableMealTypes: r.suitableMealTypes || [targetMealType],
@@ -2804,4 +2851,195 @@ function generateFallbackWebSuggestions({
       isWebSearch: true,
     },
   ];
+}
+
+/**
+ * Synthesizes complete, delicious, authentic step-by-step cooking instructions
+ * in both English and French for any recipe (from suggestions, web URLs, or scratch).
+ * Uses Gemini AI if available with automatic culinary heuristic fallback.
+ */
+export async function synthesizeCookingSteps({
+  title = "Homemade Recipe",
+  titleFr = "",
+  ingredients = [],
+  mealType = "DINNER",
+  sourceUrl = "",
+  language = "FR",
+  description = "",
+}) {
+  const cleanTitle = title || "Savory Dish";
+  const cleanTitleFr = titleFr || title || "Plat Savoureux";
+
+  const ingNamesEn = (ingredients || [])
+    .map((i) => i.nameEn || i.name || "")
+    .filter(Boolean);
+  const ingNamesFr = (ingredients || [])
+    .map((i) => i.nameFr || i.name || "")
+    .filter(Boolean);
+
+  const apiKey = (process.env.GEMINI_API_KEY || dbStore?.systemSettings?.geminiApiKey || "").trim();
+  const hasGemini = Boolean(apiKey && apiKey.length > 10 && apiKey !== "MY_GEMINI_API_KEY");
+
+  if (hasGemini) {
+    try {
+      const ai = getGeminiClient();
+      const prompt = `You are an expert bilingual chef and culinary instructor.
+Generate 4 to 6 authentic, delicious, step-by-step cooking instructions in BOTH English and French for this recipe:
+
+Recipe Title (EN): ${cleanTitle}
+Recipe Title (FR): ${cleanTitleFr}
+Meal Category: ${mealType}
+${description ? `Description: ${description}` : ""}
+${sourceUrl ? `Source: ${sourceUrl}` : ""}
+Ingredients List: ${ingNamesEn.join(", ") || "Fresh kitchen ingredients"}
+
+Requirements:
+1. Provide realistic culinary instructions with preparation, cooking temperatures, timing, and plating.
+2. Output JSON strictly with:
+{
+  "instructionsEn": ["Step 1...", "Step 2...", "Step 3...", "Step 4...", "Step 5..."],
+  "instructionsFr": ["Étape 1...", "Étape 2...", "Étape 3...", "Étape 4...", "Étape 5..."],
+  "prepTime": "15 mins",
+  "cookTime": "20 mins",
+  "totalTime": "35 mins"
+}`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.8-flash",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          temperature: 0.3,
+        },
+      });
+
+      const text = response.text || "";
+      let clean = text.trim();
+      if (clean.includes("```json")) {
+        clean = clean.split("```json")[1].split("```")[0].trim();
+      } else if (clean.includes("```")) {
+        clean = clean.split("```")[1].split("```")[0].trim();
+      }
+
+      const parsed = JSON.parse(clean);
+      if (
+        Array.isArray(parsed.instructionsEn) &&
+        parsed.instructionsEn.length > 0 &&
+        Array.isArray(parsed.instructionsFr) &&
+        parsed.instructionsFr.length > 0
+      ) {
+        return {
+          success: true,
+          instructionsEn: parsed.instructionsEn,
+          instructionsFr: parsed.instructionsFr,
+          prepTime: parsed.prepTime || "15 mins",
+          cookTime: parsed.cookTime || "25 mins",
+          totalTime: parsed.totalTime || "40 mins",
+        };
+      }
+    } catch (err) {
+      console.warn("[synthesizeCookingSteps] Gemini synthesis warning, falling back to culinary rules:", err.message);
+    }
+  }
+
+  // Culinary rules-based synthesis fallback
+  const heroFr = ingNamesFr[0] || "ingrédients principaux";
+  const heroEn = ingNamesEn[0] || "main ingredients";
+  const secFr = ingNamesFr[1] || "légumes et assaisonnements";
+  const secEn = ingNamesEn[1] || "vegetables and seasonings";
+
+  const lower = cleanTitle.toLowerCase();
+  const isBake = /bake|cake|muffin|bread|pie|tart|gratin|quiche|pizza|cookie|four|gâteau/i.test(lower);
+  const isSoup = /soup|stew|broth|potage|velouté|soupe|mijoté/i.test(lower);
+  const isSalad = /salad|salade|slaw|vinaigrette/i.test(lower);
+  const isPasta = /pasta|spaghetti|penne|linguine|pâtes|lasagn/i.test(lower);
+
+  let stepsEn = [];
+  let stepsFr = [];
+
+  if (isBake) {
+    stepsEn = [
+      "Preheat your oven to 375°F (190°C) and lightly grease or line your baking dish or pan.",
+      `Prepare ${heroEn} and ${secEn}, chopping or measuring them into clean prep bowls.`,
+      "Combine wet and dry ingredients gently in a large mixing bowl until just incorporated.",
+      "Transfer into the prepared dish and bake for 25-30 minutes until golden and cooked through.",
+      "Allow to cool for 5 minutes on a wire rack before slicing and serving.",
+    ];
+    stepsFr = [
+      "Préchauffer le four à 190°C (375°F) et beurrer ou tapisser un plat ou une plaque de cuisson.",
+      `Préparer ${heroFr} et ${secFr}, en les coupant ou les dosant dans des bols de préparation.`,
+      "Mélanger délicatement les ingrédients dans un grand saladier jusqu'à consistance homogène.",
+      "Transférer dans le plat et enfourner 25 à 30 minutes jusqu'à ce que la surface soit dorée et cuite à cœur.",
+      "Laisser tiédir 5 minutes sur une grille avant de découper et servir.",
+    ];
+  } else if (isSoup) {
+    stepsEn = [
+      "Wash and chop all vegetables into bite-sized pieces; mince garlic and fresh herbs.",
+      `Heat a drizzle of olive oil or butter in a large pot over medium heat. Sauté ${heroEn} and aromatics for 5-7 minutes.`,
+      `Add ${secEn} along with broth or water until ingredients are covered. Bring to a gentle boil.`,
+      "Reduce heat to low, cover with a lid, and simmer for 20 minutes until tender and flavorful.",
+      "Season with salt, black pepper, and fresh herbs. Serve piping hot with crusty bread.",
+    ];
+    stepsFr = [
+      "Laver et couper tous les légumes en morceaux réguliers; émincer l'ail et les herbes fraîches.",
+      `Faire chauffer un filet d'huile d'olive ou une noix de beurre dans une marmite. Faire suer ${heroFr} et les aromates 5 à 7 minutes.`,
+      `Ajouter ${secFr} ainsi que le bouillon ou de l'eau pour couvrir les ingrédients. Porter à frémissement.`,
+      "Baisser le feu, couvrir et laisser mijoter 20 minutes jusqu'à ce que les saveurs soient bien développées.",
+      "Ajuster l'assaisonnement avec sel, poivre et herbes. Servir bien chaud accompagné de pain croustillant.",
+    ];
+  } else if (isSalad) {
+    stepsEn = [
+      "Thoroughly wash and spin dry greens and fresh produce.",
+      `Slice or dice ${heroEn} and ${secEn} into uniform, attractive pieces.`,
+      "Whisk together extra virgin olive oil, vinegar or lemon juice, salt, and pepper in a small bowl for the dressing.",
+      "Toss the fresh ingredients together in a large salad bowl with the dressing until evenly coated.",
+      "Garnish with toasted nuts, seeds, or cheese if desired and serve fresh.",
+    ];
+    stepsFr = [
+      "Bien laver et essorer la verdure et les légumes frais.",
+      `Couper ${heroFr} et ${secFr} en morceaux harmonieux et réguliers.`,
+      "Fouetter l'huile d'olive extra vierge avec du vinaigre ou jus de citron, sel et poivre pour la vinaigrette.",
+      "Mélanger délicatement les ingrédients dans un grand saladier avec la vinaigrette pour bien les enrober.",
+      "Garnir de graines, noix grillées ou fromage au choix et servir bien frais.",
+    ];
+  } else if (isPasta) {
+    stepsEn = [
+      "Bring a large pot of salted water to a rolling boil and cook pasta until al dente.",
+      `In a skillet over medium heat, heat olive oil and sauté ${heroEn} with garlic until aromatic.`,
+      `Add ${secEn} and a ladleful of starchy pasta water; simmer gently to create a silky sauce.`,
+      "Drain pasta and toss immediately into the skillet with the sauce over low heat for 1 minute.",
+      "Finish with freshly grated cheese, cracked black pepper, and fresh herbs before serving.",
+    ];
+    stepsFr = [
+      "Porter une grande casserole d'eau salée à ébullition et cuire les pâtes jusqu'à ce qu'elles soient al dente.",
+      `Dans une poêle à feu moyen, chauffer l'huile d'olive et faire revenir ${heroFr} avec l'ail jusqu'à coloration parfumée.`,
+      `Ajouter ${secFr} et une louche d'eau de cuisson des pâtes; laisser frémir pour lier la sauce.`,
+      "Égoutter les pâtes et les verser directement dans la poêle avec la sauce à feu doux pendant 1 minute.",
+      "Garnir de fromage fraîchement râpé, poivre du moulin et herbes fraîches avant de servir.",
+    ];
+  } else {
+    stepsEn = [
+      `Prepare ${heroEn} and ${secEn}, chopping vegetables and seasoning any proteins with salt and pepper.`,
+      "Heat olive oil or butter in a wide skillet or pan over medium-high heat.",
+      `Add ${heroEn} and cook for 6 to 8 minutes, stirring occasionally until golden brown and fragrant.`,
+      `Stir in ${secEn} and lower the heat to medium; cover and simmer for 5 to 7 minutes to meld flavors.`,
+      "Taste and adjust seasoning with salt, pepper, and fresh herbs. Serve immediately warm.",
+    ];
+    stepsFr = [
+      `Préparer ${heroFr} et ${secFr}, émincer les légumes et assaisonner les protéines avec sel et poivre.`,
+      "Faire chauffer l'huile d'olive ou le beurre dans une grande poêle à feu moyen-vif.",
+      `Ajouter ${heroFr} et faire dorer 6 à 8 minutes en remuant de temps en temps jusqu'à belle coloration.`,
+      `Incorporer ${secFr} et réduire le feu à moyen; couvrir et laisser mijoter 5 à 7 minutes pour marier les saveurs.`,
+      "Goûter et rectifier l'assaisonnement en sel, poivre et herbes fraîches. Servir aussitôt bien chaud.",
+    ];
+  }
+
+  return {
+    success: true,
+    instructionsEn: stepsEn,
+    instructionsFr: stepsFr,
+    prepTime: "15 mins",
+    cookTime: "20 mins",
+    totalTime: "35 mins",
+  };
 }

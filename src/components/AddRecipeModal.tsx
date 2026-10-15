@@ -295,6 +295,7 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
   const [inspectedSiteName, setInspectedSiteName] = useState<string | null>(null);
   const [discoveredWebsiteRecipes, setDiscoveredWebsiteRecipes] = useState<any[]>([]);
   const [inspectionNotice, setInspectionNotice] = useState<string | null>(null);
+  const [importingDiscoveredId, setImportingDiscoveredId] = useState<string | null>(null);
 
   // Processing states
   const [isParsing, setIsParsing] = useState(false);
@@ -791,41 +792,144 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
     }
   };
 
-  // Convert a discovered website recipe directly into parsed recipe for 1-click import
-  const handleSelectDiscoveredRecipe = (recipe: any) => {
-    const mapped: RicardoRecipe = {
-      id: recipe.id || `custom_${Date.now()}`,
-      title: recipe.title || 'Imported Recipe',
-      titleFr: recipe.titleFr || recipe.title || 'Recette Importée',
-      ricardoUrlEn: recipe.sourceUrl || '',
-      ricardoUrlFr: recipe.sourceUrl || '',
-      imageUrl:
-        recipe.imageUrl?.trim() ? recipe.imageUrl.trim() : '',
-      time: recipe.totalTime || recipe.cookTime || '30 mins',
-      prepTime: recipe.prepTime || '15 mins',
-      cookTime: recipe.cookTime || '20 mins',
-      servings: recipe.servings || '4 servings',
-      difficulty: (recipe.difficulty as any) || 'Easy',
-      difficultyFr: recipe.difficultyFr || 'Facile',
-      calories: '450 kcal',
-      source: recipe.source || inspectedSiteName || 'Web',
-      isRicardoOfficial: false,
-      isCustom: true,
-      descriptionEn: recipe.descriptionEn || recipe.zeroWasteReason || '',
-      descriptionFr: recipe.descriptionFr || recipe.zeroWasteReason || '',
-      tags: recipe.tags || ['Web Recipe', 'Anti-Gaspillage'],
-      suggestedPantryNeeds: recipe.suggestedPantryNeeds || [],
-      ingredients: (recipe.ingredients || []).map((ing: any, idx: number) =>
+  // Convert a discovered website recipe directly into parsed recipe with full link-parsing mechanics & bilingual steps
+  const handleSelectDiscoveredRecipe = async (recipe: any) => {
+    const recipeUniqueId = recipe.id || recipe.title;
+    setImportingDiscoveredId(recipeUniqueId);
+    setIsParsing(true);
+    setErrorMsg(null);
+    setParsingStep(
+      lang === 'FR'
+        ? `Connexion à ${recipe.source || 'la source culinaire'}...`
+        : `Connecting to ${recipe.source || 'culinary source'}...`
+    );
+
+    const stepTimer1 = setTimeout(() => {
+      setParsingStep(
+        lang === 'FR'
+          ? 'Extraction des ingrédients et étapes bilingues...'
+          : 'Extracting ingredients & bilingual cooking steps...'
+      );
+    }, 700);
+
+    const stepTimer2 = setTimeout(() => {
+      setParsingStep(
+        lang === 'FR'
+          ? 'Zonage garde-manger et préparation de la fiche...'
+          : 'Mapping kitchen storage zones and preparing review...'
+      );
+    }, 1400);
+
+    try {
+      const sourceUrl = recipe.sourceUrl || recipe.ricardoUrlFr || recipe.ricardoUrlEn || '';
+      const hasValidUrl = typeof sourceUrl === 'string' && sourceUrl.startsWith('http');
+
+      let importedRecipeData: any = null;
+
+      if (hasValidUrl) {
+        try {
+          const res = await fetch('/api/v1/recipes/import-url', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              url: sourceUrl.trim(),
+              language: lang,
+              autoTranslate: autoTranslateOnImport,
+              fallbackRecipe: recipe,
+            }),
+          });
+          const data = await res.json();
+          if (res.ok && data.success && data.recipe) {
+            importedRecipeData = data.recipe;
+          }
+        } catch (fetchErr) {
+          console.warn('URL scraper error for discovered recipe, synthesizing steps:', fetchErr);
+        }
+      }
+
+      // Check existing bilingual steps
+      const existingStepsEn = Array.isArray(importedRecipeData?.instructionsEn) && importedRecipeData.instructionsEn.length > 0
+        ? importedRecipeData.instructionsEn
+        : (Array.isArray(recipe.instructionsEn) && recipe.instructionsEn.length > 0 ? recipe.instructionsEn : []);
+      const existingStepsFr = Array.isArray(importedRecipeData?.instructionsFr) && importedRecipeData.instructionsFr.length > 0
+        ? importedRecipeData.instructionsFr
+        : (Array.isArray(recipe.instructionsFr) && recipe.instructionsFr.length > 0 ? recipe.instructionsFr : []);
+
+      let finalStepsEn = existingStepsEn;
+      let finalStepsFr = existingStepsFr;
+
+      // If either instruction language is missing or empty, synthesize via backend
+      if (finalStepsEn.length === 0 || finalStepsFr.length === 0) {
+        try {
+          const synthRes = await fetch('/api/v1/recipes/synthesize-steps', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: recipe.title,
+              titleFr: recipe.titleFr,
+              ingredients: recipe.ingredients || [],
+              sourceUrl: recipe.sourceUrl,
+              language: lang,
+              description: recipe.descriptionEn || recipe.zeroWasteReason,
+            }),
+          });
+          const synthData = await synthRes.json();
+          if (synthData.success) {
+            finalStepsEn = synthData.instructionsEn || finalStepsEn;
+            finalStepsFr = synthData.instructionsFr || finalStepsFr;
+          }
+        } catch (synthErr) {
+          console.warn('Step synthesis request error:', synthErr);
+        }
+      }
+
+      const rawIngredients = importedRecipeData?.ingredients || recipe.ingredients || [];
+      const normalizedIngredients = rawIngredients.map((ing: any, idx: number) =>
         normalizeRecipeIngredient(ing, idx)
-      ),
-      instructionsEn: recipe.instructionsEn || [],
-      instructionsFr: recipe.instructionsFr || [],
-      createdAt: new Date().toISOString(),
-    };
-    setParsedRecipe(normalizeRecipe(mapped));
-    setDiscoveredWebsiteRecipes([]);
-    setInspectedSiteName(null);
-    setInspectionNotice(null);
+      );
+
+      const mapped: RicardoRecipe = {
+        id: recipe.id || `custom_${Date.now()}`,
+        title: importedRecipeData?.title || recipe.title || 'Imported Recipe',
+        titleFr: importedRecipeData?.titleFr || recipe.titleFr || recipe.title || 'Recette Importée',
+        titleEn: importedRecipeData?.titleEn || recipe.title || 'Imported Recipe',
+        ricardoUrlEn: sourceUrl,
+        ricardoUrlFr: sourceUrl,
+        imageUrl: (importedRecipeData?.imageUrl || recipe.imageUrl || '').trim(),
+        time: importedRecipeData?.time || recipe.totalTime || recipe.cookTime || '30 mins',
+        prepTime: importedRecipeData?.prepTime || recipe.prepTime || '15 mins',
+        cookTime: importedRecipeData?.cookTime || recipe.cookTime || '20 mins',
+        servings: importedRecipeData?.servings || recipe.servings || '4 servings',
+        difficulty: (importedRecipeData?.difficulty || recipe.difficulty || 'Easy') as any,
+        difficultyFr: importedRecipeData?.difficultyFr || recipe.difficultyFr || 'Facile',
+        calories: importedRecipeData?.calories || '450 kcal',
+        source: importedRecipeData?.source || recipe.source || inspectedSiteName || 'Web',
+        isRicardoOfficial: false,
+        isCustom: true,
+        descriptionEn: importedRecipeData?.descriptionEn || recipe.descriptionEn || recipe.zeroWasteReason || '',
+        descriptionFr: importedRecipeData?.descriptionFr || recipe.descriptionFr || recipe.zeroWasteReason || '',
+        tags: importedRecipeData?.tags || recipe.tags || ['Web Recipe', 'Anti-Gaspillage'],
+        suggestedPantryNeeds: recipe.suggestedPantryNeeds || [],
+        ingredients: normalizedIngredients,
+        instructionsEn: finalStepsEn,
+        instructionsFr: finalStepsFr,
+        createdAt: new Date().toISOString(),
+      };
+
+      setParsedRecipe(normalizeRecipe(mapped, lang));
+      setDiscoveredWebsiteRecipes([]);
+      setInspectedSiteName(null);
+      setInspectionNotice(null);
+    } catch (err: any) {
+      console.error('Failed to import discovered recipe:', err);
+      setErrorMsg(err.message || 'Error importing recipe');
+    } finally {
+      clearTimeout(stepTimer1);
+      clearTimeout(stepTimer2);
+      setIsParsing(false);
+      setImportingDiscoveredId(null);
+      setParsingStep('');
+    }
   };
 
   const handleToggleWebsite = (id: string) => {
@@ -1446,11 +1550,20 @@ Instructions:
                               </div>
                               <button
                                 type="button"
+                                disabled={isParsing}
                                 onClick={() => handleSelectDiscoveredRecipe(rec)}
-                                className="mt-2.5 px-3 py-1 rounded-lg bg-teal-700 hover:bg-teal-800 text-white text-[11px] font-bold flex items-center gap-1 shadow-2xs transition-colors"
+                                className="mt-2.5 px-3 py-1 rounded-lg bg-teal-700 hover:bg-teal-800 text-white text-[11px] font-bold flex items-center gap-1 shadow-2xs transition-colors disabled:opacity-50 cursor-pointer"
                               >
-                                <Check className="w-3 h-3" />
-                                <span>{lang === 'FR' ? 'Importer cette recette' : 'Import recipe'}</span>
+                                {importingDiscoveredId === (rec.id || rec.title) ? (
+                                  <Sparkles className="w-3 h-3 animate-spin text-teal-200" />
+                                ) : (
+                                  <Check className="w-3 h-3" />
+                                )}
+                                <span>
+                                  {importingDiscoveredId === (rec.id || rec.title)
+                                    ? (lang === 'FR' ? 'Importation...' : 'Importing...')
+                                    : (lang === 'FR' ? 'Importer cette recette' : 'Import recipe')}
+                                </span>
                               </button>
                             </div>
                           </div>

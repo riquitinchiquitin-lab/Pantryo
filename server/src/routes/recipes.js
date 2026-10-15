@@ -7,6 +7,7 @@ import {
   extractYouTubeId,
   generateSmartMealSuggestions,
   lookThroughWebsiteContent,
+  synthesizeCookingSteps,
 } from "../services/geminiRecipeParser.js";
 import { dbStore } from "../services/dbStore.js";
 import { estimateRecipeNutrition } from "../services/nutritionEngine.js";
@@ -228,11 +229,12 @@ router.delete("/custom/:id", (req, res) => {
 
 /**
  * POST /api/v1/recipes/import-url
- * Scrapes and automatically translates a recipe from ANY website URL into French or English
+ * Scrapes and automatically translates a recipe from ANY website URL into French or English.
+ * If scraping fails or has missing/sparse steps, falls back gracefully to AI step synthesis.
  */
 router.post("/import-url", async (req, res) => {
+  const { url, language = "FR", autoTranslate = true, fallbackRecipe } = req.body;
   try {
-    const { url, language = "FR", autoTranslate = true } = req.body;
     if (!url || typeof url !== "string" || !url.startsWith("http")) {
       return res.status(400).json({
         success: false,
@@ -240,18 +242,133 @@ router.post("/import-url", async (req, res) => {
       });
     }
 
-    const result = await parseRecipeFromUrl({
-      url,
-      language,
-      autoTranslate,
-    });
+    let result;
+    try {
+      result = await parseRecipeFromUrl({
+        url,
+        language,
+        autoTranslate,
+      });
+    } catch (parseErr) {
+      console.warn(`[POST /import-url] URL parse error, checking fallback recipe:`, parseErr.message);
+      if (fallbackRecipe) {
+        const steps = await synthesizeCookingSteps({
+          title: fallbackRecipe.title || "Web Recipe",
+          titleFr: fallbackRecipe.titleFr || fallbackRecipe.title,
+          ingredients: fallbackRecipe.ingredients || [],
+          sourceUrl: url,
+          language,
+          description: fallbackRecipe.descriptionEn || fallbackRecipe.zeroWasteReason,
+        });
+        return res.status(200).json({
+          success: true,
+          message: language === "FR" ? "Recette importée et synthétisée avec succès" : "Recipe imported and synthesized successfully",
+          recipe: {
+            ...fallbackRecipe,
+            instructionsEn: steps.instructionsEn,
+            instructionsFr: steps.instructionsFr,
+            time: steps.totalTime || fallbackRecipe.time || "30 mins",
+          },
+        });
+      }
+      throw parseErr;
+    }
+
+    // Ensure resulting recipe has non-empty bilingual instructions
+    if (result && result.recipe) {
+      const rec = result.recipe;
+      const hasStepsEn = Array.isArray(rec.instructionsEn) && rec.instructionsEn.length >= 2;
+      const hasStepsFr = Array.isArray(rec.instructionsFr) && rec.instructionsFr.length >= 2;
+
+      if (!hasStepsEn || !hasStepsFr) {
+        const synthesized = await synthesizeCookingSteps({
+          title: rec.titleEn || rec.title,
+          titleFr: rec.titleFr || rec.title,
+          ingredients: rec.ingredients || [],
+          sourceUrl: url,
+          language,
+          description: rec.descriptionEn || rec.descriptionFr,
+        });
+
+        if (!hasStepsEn) {
+          rec.instructionsEn = synthesized.instructionsEn;
+        }
+        if (!hasStepsFr) {
+          rec.instructionsFr = synthesized.instructionsFr;
+        }
+      }
+    }
 
     return res.status(200).json(result);
   } catch (error) {
     console.error("[Recipes Route] POST /import-url error:", error);
+
+    // If fallbackRecipe is available even after failure, synthesize and succeed
+    if (fallbackRecipe) {
+      try {
+        const steps = await synthesizeCookingSteps({
+          title: fallbackRecipe.title || "Web Recipe",
+          titleFr: fallbackRecipe.titleFr || fallbackRecipe.title,
+          ingredients: fallbackRecipe.ingredients || [],
+          sourceUrl: url,
+          language,
+          description: fallbackRecipe.descriptionEn || fallbackRecipe.zeroWasteReason,
+        });
+        return res.status(200).json({
+          success: true,
+          notice: "Synthesized via AI due to external website blockage",
+          recipe: {
+            ...fallbackRecipe,
+            instructionsEn: steps.instructionsEn,
+            instructionsFr: steps.instructionsFr,
+            time: steps.totalTime || fallbackRecipe.time || "30 mins",
+          },
+        });
+      } catch (synthErr) {
+        console.error("[Recipes Route] Step synthesis fallback error:", synthErr);
+      }
+    }
+
     return res.status(500).json({
       success: false,
       error: "Failed to import recipe from website URL",
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/v1/recipes/synthesize-steps
+ * Generates complete bilingual cooking steps (EN + FR) for any recipe
+ */
+router.post("/synthesize-steps", async (req, res) => {
+  try {
+    const {
+      title,
+      titleFr,
+      ingredients = [],
+      mealType = "DINNER",
+      sourceUrl = "",
+      language = "FR",
+      description = "",
+    } = req.body;
+
+    const result = await synthesizeCookingSteps({
+      title,
+      titleFr,
+      ingredients,
+      mealType,
+      sourceUrl,
+      language,
+      description,
+    });
+
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error("[Recipes Route] POST /synthesize-steps error:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to synthesize cooking steps",
       details: error.message,
     });
   }

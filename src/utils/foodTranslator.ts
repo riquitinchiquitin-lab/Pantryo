@@ -348,6 +348,29 @@ export function ensureBilingualRecipe<T extends Record<string, any>>(recipe: T, 
     }
   }
 
+  // If both instruction arrays are empty, synthesize realistic culinary steps
+  if (instructionsEn.length === 0 && instructionsFr.length === 0) {
+    const firstIng = ingredients[0]?.name || titleEn || 'ingredients';
+    const firstIngFr = ingredients[0]?.nameFr || titleFr || titleEn || 'ingrédients';
+    const secondIng = ingredients[1]?.name || 'aromatics and vegetables';
+    const secondIngFr = ingredients[1]?.nameFr || 'légumes et aromates';
+
+    instructionsEn = [
+      `Prep and wash ${firstIng} and ${secondIng}, cutting into uniform pieces.`,
+      'Heat oil or butter in a skillet or pot over medium heat.',
+      `Cook ${firstIng} until aromatic, tender, and lightly golden (6-8 mins).`,
+      `Add ${secondIng}, reduce heat, cover and simmer gently for 5 minutes.`,
+      'Season to taste with salt, black pepper, and herbs. Serve warm.',
+    ];
+    instructionsFr = [
+      `Préparer et laver ${firstIngFr} et ${secondIngFr}, découper en morceaux réguliers.`,
+      "Faire chauffer l'huile ou le beurre dans une poêle à feu moyen.",
+      `Faire revenir ${firstIngFr} 6 à 8 minutes jusqu'à ce que ce soit doré et tendre.`,
+      `Ajouter ${secondIngFr}, couvrir et laisser mijoter à feu doux 5 minutes.`,
+      'Assaisonner de sel, poivre et herbes au goût. Servir bien chaud.',
+    ];
+  }
+
   // Ensure descriptions
   let descEn = recipe.descriptionEn || recipe.description || '';
   let descFr = recipe.descriptionFr || '';

@@ -42,6 +42,7 @@ import { InventoryItem, PlannedMeal, MealType } from '../types';
 import { RICARDO_RECIPES, RicardoRecipe, formatRecipeIngredientAmount } from '../data/ricardoRecipes';
 import { AddRecipeModal } from './AddRecipeModal';
 import { GuidedCookingModal } from './GuidedCookingModal';
+import { SmartMealSuggestionsModal } from './SmartMealSuggestionsModal';
 import { useCookingSession } from '../contexts/CookingSessionContext';
 import { useLanguage, getDifficultyLocalizedName } from '../utils/i18n';
 import {
@@ -137,6 +138,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
 
   // Add Recipe Modal state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isSmartSuggestionsOpen, setIsSmartSuggestionsOpen] = useState(false);
   const [recipeToEdit, setRecipeToEdit] = useState<RicardoRecipe | null>(null);
   const [addModalInitialTab, setAddModalInitialTab] = useState<'url' | 'youtube' | 'text' | 'photo'>('url');
   const [addModalAutoCam, setAddModalAutoCam] = useState(false);
@@ -750,6 +752,15 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setIsSmartSuggestionsOpen(true)}
+            className="px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs flex items-center gap-1.5 border border-amber-300 active:scale-95 transition-all shadow-2xs cursor-pointer"
+            title={lang === 'FR' ? 'Suggestions de repas anti-gaspillage basées sur vos stocks' : 'Zero-waste meal suggestions from your inventory'}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-600 stroke-[2.5]" />
+            <span>{lang === 'FR' ? 'Idées IA' : 'AI Ideas'}</span>
+          </button>
+
           <button
             onClick={openRecipeScan}
             className="px-3 py-2 rounded-xl bg-white hover:bg-emerald-50 text-emerald-800 font-bold text-xs flex items-center gap-1.5 border border-emerald-300 active:scale-95 transition-all shadow-2xs cursor-pointer"
@@ -2082,6 +2093,41 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
         capture="environment"
         onChange={handleDirectRecipePhotoCaptured}
         className="hidden"
+      />
+
+      {/* Smart Meal Suggestions Modal */}
+      <SmartMealSuggestionsModal
+        isOpen={isSmartSuggestionsOpen}
+        onClose={() => setIsSmartSuggestionsOpen(false)}
+        inventory={items}
+        currentDate={targetDate}
+        initialMealType={targetMealSlot}
+        onPlanMeal={async (params) => {
+          if (onPlanMeal) {
+            await onPlanMeal({
+              householdId: 'default',
+              title: params.title,
+              titleFr: params.titleFr,
+              titleEn: params.titleEn,
+              date: params.date,
+              mealType: params.mealType,
+              servings: params.servings,
+              prepTimeMinutes: params.prepTimeMinutes,
+              notes: params.notes || '',
+              imageUrl: params.imageUrl || '',
+              recipeUrl: params.recipeUrl,
+              isCooked: false,
+              ingredients: params.ingredients,
+            });
+          }
+          setIsSmartSuggestionsOpen(false);
+        }}
+        onImportRecipe={(recipe) => {
+          setIsSmartSuggestionsOpen(false);
+          setRecipeToEdit(recipe);
+          setCapturedRecipePhoto(null);
+          setIsAddModalOpen(true);
+        }}
       />
 
       {/* Add / Edit Recipe Modal */}

@@ -46,6 +46,8 @@ import {
 } from '../services/nutritionEngine';
 import { getCuratedMealPhoto, getFoodSvgFallback, CURATED_FOOD_PHOTOS } from '../utils/curatedFoodImages';
 import { GuidedCookingModal } from './GuidedCookingModal';
+import { AddRecipeModal } from './AddRecipeModal';
+import { RicardoRecipe } from '../data/ricardoRecipes';
 
 function parseLocalDate(dateStr: string): Date {
   const parts = dateStr.split('-');
@@ -152,6 +154,7 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
   // Smart Suggestions Modal State
   const [isSuggestionsModalOpen, setIsSuggestionsModalOpen] = useState(false);
   const [suggestionsInitialSlot, setSuggestionsInitialSlot] = useState<MealType>('DINNER');
+  const [recipeToReview, setRecipeToReview] = useState<RicardoRecipe | null>(null);
 
   // Meal Plan Shopping List Modal State
   const [isShoppingListModalOpen, setIsShoppingListModalOpen] = useState(false);
@@ -2060,7 +2063,29 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
         currentDate={selectedDate}
         initialMealType={suggestionsInitialSlot}
         onPlanMeal={handlePlanSuggestedMeal}
+        onImportRecipe={(recipe) => {
+          setIsSuggestionsModalOpen(false);
+          setRecipeToReview(recipe);
+        }}
       />
+
+      {/* Recipe Review & Edit Modal for Suggested Recipe Imports */}
+      {recipeToReview && (
+        <AddRecipeModal
+          isOpen={Boolean(recipeToReview)}
+          onClose={() => setRecipeToReview(null)}
+          recipeToEdit={recipeToReview}
+          onRecipeSaved={(saved) => {
+            setRecipeToReview(null);
+            setSuccessToast(
+              lang === 'FR'
+                ? `✨ Recette "${saved.title}" enregistrée dans vos recettes !`
+                : `✨ Recipe "${saved.title}" saved to your cookbook!`
+            );
+            setTimeout(() => setSuccessToast(null), 3500);
+          }}
+        />
+      )}
 
       {/* Meal Plan Shopping List Modal with Kitchen Cross-Check */}
       <MealPlanShoppingListModal

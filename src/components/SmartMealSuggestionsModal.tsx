@@ -42,6 +42,7 @@ import {
 } from '../data/recipeWebsites';
 import { getCuratedMealPhoto, getFoodSvgFallback } from '../utils/curatedFoodImages';
 import { getRecipeDisplayTitle } from '../utils/foodTranslator';
+import { normalizeRecipe, normalizeRecipeIngredient } from './AddRecipeModal';
 
 interface SmartMealSuggestionsModalProps {
   isOpen: boolean;
@@ -63,6 +64,7 @@ interface SmartMealSuggestionsModalProps {
     ingredients: PlannedMealIngredient[];
     addMissingToGrocery: boolean;
   }) => Promise<void> | void;
+  onImportRecipe?: (recipe: RicardoRecipe) => void;
 }
 
 const LOCAL_STORAGE_CUSTOM_RECIPES = 'kitchen_komrade_custom_recipes';
@@ -74,6 +76,7 @@ export const SmartMealSuggestionsModal: React.FC<SmartMealSuggestionsModalProps>
   currentDate,
   initialMealType = 'DINNER',
   onPlanMeal,
+  onImportRecipe,
 }) => {
   const { lang } = useLanguage();
 
@@ -110,6 +113,11 @@ export const SmartMealSuggestionsModal: React.FC<SmartMealSuggestionsModalProps>
   const [planningRecipeId, setPlanningRecipeId] = useState<string | null>(null);
   // Track missing items to add to grocery
   const [addMissingToCart, setAddMissingToCart] = useState(true);
+
+  // Track recipe import states
+  const [importingRecipeId, setImportingRecipeId] = useState<string | null>(null);
+  const [importedRecipeIds, setImportedRecipeIds] = useState<Set<string>>(new Set());
+  const [importToast, setImportToast] = useState<string | null>(null);
 
   // Load recipe websites on open
   useEffect(() => {
@@ -509,8 +517,138 @@ export const SmartMealSuggestionsModal: React.FC<SmartMealSuggestionsModalProps>
         (s.titleFr && s.titleFr.toLowerCase().includes(q)) ||
         s.zeroWasteReason.toLowerCase().includes(q) ||
         s.ingredients.some((ing) => ing.name.toLowerCase().includes(q) || (ing.nameFr && ing.nameFr.toLowerCase().includes(q)))
-    );
+      );
   }, [activeTab, allSuggestions, webSuggestions, userRecipeMatches, searchQuery]);
+
+  const handleImportSuggestedRecipe = async (recipe: SmartMealSuggestion) => {
+    setImportingRecipeId(recipe.id);
+    try {
+      const sourceUrl = recipe.sourceUrl || '';
+      const hasValidUrl = typeof sourceUrl === 'string' && sourceUrl.startsWith('http');
+
+      let importedData: any = null;
+      if (hasValidUrl) {
+        try {
+          const res = await fetch('/api/v1/recipes/import-url', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              url: sourceUrl.trim(),
+              language: lang,
+              autoTranslate: true,
+              fallbackRecipe: recipe,
+            }),
+          });
+          const data = await res.json();
+          if (res.ok && data.success && data.recipe) {
+            importedData = data.recipe;
+          }
+        } catch (fetchErr) {
+          console.warn('URL scraper error in SmartMealSuggestionsModal:', fetchErr);
+        }
+      }
+
+      // Check existing bilingual steps
+      const existingStepsEn = Array.isArray(importedData?.instructionsEn) && importedData.instructionsEn.length > 0
+        ? importedData.instructionsEn
+        : (Array.isArray(recipe.instructionsEn) && recipe.instructionsEn.length > 0 ? recipe.instructionsEn : []);
+      const existingStepsFr = Array.isArray(importedData?.instructionsFr) && importedData.instructionsFr.length > 0
+        ? importedData.instructionsFr
+        : (Array.isArray(recipe.instructionsFr) && recipe.instructionsFr.length > 0 ? recipe.instructionsFr : []);
+
+      let finalStepsEn = existingStepsEn;
+      let finalStepsFr = existingStepsFr;
+
+      if (finalStepsEn.length === 0 || finalStepsFr.length === 0) {
+        try {
+          const synthRes = await fetch('/api/v1/recipes/synthesize-steps', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: recipe.title,
+              titleFr: recipe.titleFr,
+              ingredients: recipe.ingredients || [],
+              sourceUrl: recipe.sourceUrl,
+              language: lang,
+              description: recipe.zeroWasteReason,
+            }),
+          });
+          const synthData = await synthRes.json();
+          if (synthData.success) {
+            finalStepsEn = synthData.instructionsEn || finalStepsEn;
+            finalStepsFr = synthData.instructionsFr || finalStepsFr;
+          }
+        } catch (synthErr) {
+          console.warn('Step synthesis request error in SmartMealSuggestionsModal:', synthErr);
+        }
+      }
+
+      const rawIngredients = importedData?.ingredients || recipe.ingredients || [];
+      const normalizedIngredients = rawIngredients.map((ing: any, idx: number) =>
+        normalizeRecipeIngredient(ing, idx)
+      );
+
+      const mapped: RicardoRecipe = {
+        id: recipe.id.startsWith('custom_') ? recipe.id : `custom_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        title: importedData?.title || recipe.title,
+        titleFr: importedData?.titleFr || recipe.titleFr || recipe.title,
+        titleEn: importedData?.titleEn || recipe.title,
+        ricardoUrlEn: sourceUrl,
+        ricardoUrlFr: sourceUrl,
+        imageUrl: (importedData?.imageUrl || recipe.imageUrl || '').trim(),
+        time: importedData?.time || recipe.totalTime || recipe.cookTime || '30 mins',
+        prepTime: importedData?.prepTime || recipe.prepTime || '15 mins',
+        cookTime: importedData?.cookTime || recipe.cookTime || '20 mins',
+        servings: importedData?.servings || recipe.servings || '4 servings',
+        difficulty: (importedData?.difficulty || recipe.difficulty || 'Easy') as any,
+        difficultyFr: (importedData?.difficultyFr || recipe.difficultyFr || 'Facile') as any,
+        calories: importedData?.calories || '450 kcal',
+        source: (importedData?.source || recipe.source || 'Kitchen Rescue') as any,
+        isRicardoOfficial: false,
+        isCustom: true,
+        descriptionEn: importedData?.descriptionEn || recipe.zeroWasteReason || '',
+        descriptionFr: importedData?.descriptionFr || recipe.zeroWasteReason || '',
+        tags: importedData?.tags || recipe.tags || ['Smart Meal', 'Zero-Waste'],
+        suggestedPantryNeeds: [],
+        ingredients: normalizedIngredients,
+        instructionsEn: finalStepsEn,
+        instructionsFr: finalStepsFr,
+        createdAt: new Date().toISOString(),
+      };
+
+      const normalized = normalizeRecipe(mapped, lang);
+      if (!normalized) return;
+
+      if (onImportRecipe) {
+        onImportRecipe(normalized);
+        onClose();
+      } else {
+        // Fallback: save directly to custom recipes in localStorage
+        try {
+          const raw = localStorage.getItem(LOCAL_STORAGE_CUSTOM_RECIPES);
+          const current: RicardoRecipe[] = raw ? JSON.parse(raw) : [];
+          const updated = [normalized, ...current.filter((r) => r.id !== normalized.id)];
+          localStorage.setItem(LOCAL_STORAGE_CUSTOM_RECIPES, JSON.stringify(updated));
+          window.dispatchEvent(new Event('storage'));
+        } catch (e) {
+          console.warn('Failed to save imported recipe to localStorage:', e);
+        }
+
+        setImportedRecipeIds((prev) => new Set([...prev, recipe.id]));
+        setImportToast(
+          lang === 'FR'
+            ? `✨ Recette "${getRecipeDisplayTitle(recipe, 'FR')}" importée avec étapes bilingues !`
+            : `✨ Recipe "${getRecipeDisplayTitle(recipe, 'EN')}" imported with bilingual steps!`
+        );
+        setTimeout(() => setImportToast(null), 4000);
+      }
+    } catch (err: any) {
+      console.error('Import recipe error:', err);
+      setErrorMessage(err.message || 'Failed to import recipe');
+    } finally {
+      setImportingRecipeId(null);
+    }
+  };
 
   const handleSelectAndPlan = async (recipe: SmartMealSuggestion) => {
     setPlanningRecipeId(recipe.id);
@@ -525,6 +663,51 @@ export const SmartMealSuggestionsModal: React.FC<SmartMealSuggestionsModalProps>
           inStock: ing.inStock,
         };
       });
+
+      // Ensure planned meal recipe is also registered in custom recipes with full bilingual instructions
+      try {
+        const raw = localStorage.getItem(LOCAL_STORAGE_CUSTOM_RECIPES);
+        const current: RicardoRecipe[] = raw ? JSON.parse(raw) : [];
+        const alreadyExists = current.some(
+          (r) => r.title === recipe.title || (recipe.titleFr && r.titleFr === recipe.titleFr)
+        );
+        if (!alreadyExists) {
+          const autoSaved: RicardoRecipe = {
+            id: `custom_planned_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+            title: recipe.title,
+            titleFr: recipe.titleFr || recipe.title,
+            titleEn: recipe.title,
+            ricardoUrlEn: recipe.sourceUrl || '',
+            ricardoUrlFr: recipe.sourceUrl || '',
+            imageUrl: (recipe.imageUrl || '').trim(),
+            time: recipe.totalTime || recipe.cookTime || '30 mins',
+            prepTime: recipe.prepTime || '15 mins',
+            cookTime: recipe.cookTime || '20 mins',
+            servings: recipe.servings || '4 servings',
+            difficulty: (recipe.difficulty || 'Easy') as any,
+            difficultyFr: (recipe.difficultyFr || 'Facile') as any,
+            calories: '450 kcal',
+            source: (recipe.source || 'Kitchen Rescue') as any,
+            isRicardoOfficial: false,
+            isCustom: true,
+            descriptionEn: recipe.zeroWasteReason || '',
+            descriptionFr: recipe.zeroWasteReason || '',
+            tags: recipe.tags || ['Smart Meal', 'Planifié'],
+            suggestedPantryNeeds: [],
+            ingredients: recipe.ingredients.map((ing, idx) => normalizeRecipeIngredient(ing, idx)),
+            instructionsEn: recipe.instructionsEn || [],
+            instructionsFr: recipe.instructionsFr || [],
+            createdAt: new Date().toISOString(),
+          };
+          const normalized = normalizeRecipe(autoSaved, lang);
+          if (normalized) {
+            localStorage.setItem(LOCAL_STORAGE_CUSTOM_RECIPES, JSON.stringify([normalized, ...current]));
+            window.dispatchEvent(new Event('storage'));
+          }
+        }
+      } catch (err) {
+        console.warn('Auto-save planned meal recipe error:', err);
+      }
 
       await onPlanMeal({
         title: getRecipeDisplayTitle(recipe, lang),
@@ -598,6 +781,23 @@ export const SmartMealSuggestionsModal: React.FC<SmartMealSuggestionsModalProps>
           <span>{lang === 'FR' ? 'Quitter' : 'Exit'}</span>
         </button>
       </header>
+
+      {/* Success Notification for Recipe Import */}
+      {importToast && (
+        <div className="bg-emerald-600 text-white px-4 py-2 text-xs font-bold flex items-center justify-between shrink-0 animate-fade-in shadow-xs z-10">
+          <div className="flex items-center gap-2">
+            <Check className="w-4 h-4 text-emerald-200 shrink-0" />
+            <span>{importToast}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setImportToast(null)}
+            className="text-white hover:text-emerald-100 p-0.5 cursor-pointer ml-2"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Expandable Expiring Items Drawer */}
       {showExpiringDetails && expiringItems.length > 0 && (
@@ -1256,31 +1456,62 @@ export const SmartMealSuggestionsModal: React.FC<SmartMealSuggestionsModalProps>
                         <button
                           type="button"
                           onClick={() => setExpandedRecipeId(isExpanded ? null : recipe.id)}
-                          className="text-xs font-bold text-[#527470] hover:text-[#0D3B37] flex items-center gap-1"
+                          className="text-xs font-bold text-[#527470] hover:text-[#0D3B37] flex items-center gap-1 cursor-pointer"
                         >
                           <span>{isExpanded ? (lang === 'FR' ? 'Masquer détails' : 'Hide details') : (lang === 'FR' ? 'Voir détails & étapes' : 'View details & steps')}</span>
                           {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                         </button>
 
-                        {/* Primary Selection & Planning Button */}
-                        <button
-                          id={`btn-select-plan-${recipe.id}`}
-                          type="button"
-                          disabled={isPlanning}
-                          onClick={() => handleSelectAndPlan(recipe)}
-                          className="px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 disabled:opacity-60"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>
-                            {isPlanning
-                              ? lang === 'FR'
-                                ? 'Planification...'
-                                : 'Planning...'
-                              : lang === 'FR'
-                              ? `Planifier ce repas (${selectedMealType})`
-                              : `Select & Plan This Meal (${selectedMealType})`}
-                          </span>
-                        </button>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {/* Import to My Recipes button */}
+                          <button
+                            id={`btn-import-recipe-${recipe.id}`}
+                            type="button"
+                            disabled={importingRecipeId === recipe.id || isPlanning}
+                            onClick={() => handleImportSuggestedRecipe(recipe)}
+                            className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer disabled:opacity-60 border ${
+                              importedRecipeIds.has(recipe.id)
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                : 'bg-white hover:bg-slate-50 text-[#0D3B37] border-[#CADBC7]'
+                            }`}
+                            title={lang === 'FR' ? 'Importer avec instructions bilingues dans mes recettes' : 'Import with bilingual cooking instructions to my recipes'}
+                          >
+                            {importingRecipeId === recipe.id ? (
+                              <Sparkles className="w-3.5 h-3.5 animate-spin text-teal-600" />
+                            ) : importedRecipeIds.has(recipe.id) ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            ) : (
+                              <BookOpen className="w-3.5 h-3.5 text-teal-700" />
+                            )}
+                            <span>
+                              {importingRecipeId === recipe.id
+                                ? (lang === 'FR' ? 'Importation...' : 'Importing...')
+                                : importedRecipeIds.has(recipe.id)
+                                ? (lang === 'FR' ? '✓ Dans mes recettes' : '✓ In My Recipes')
+                                : (lang === 'FR' ? 'Importer dans mes recettes' : 'Import to Recipes')}
+                            </span>
+                          </button>
+
+                          {/* Primary Selection & Planning Button */}
+                          <button
+                            id={`btn-select-plan-${recipe.id}`}
+                            type="button"
+                            disabled={isPlanning || importingRecipeId === recipe.id}
+                            onClick={() => handleSelectAndPlan(recipe)}
+                            className="px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 disabled:opacity-60 cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>
+                              {isPlanning
+                                ? lang === 'FR'
+                                  ? 'Planification...'
+                                  : 'Planning...'
+                                : lang === 'FR'
+                                ? `Planifier ce repas (${selectedMealType})`
+                                : `Select & Plan This Meal (${selectedMealType})`}
+                            </span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
