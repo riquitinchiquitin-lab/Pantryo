@@ -229,17 +229,29 @@ else
   done
 fi
 
+# Display SQLCipher 256-bit key in copy-friendly format for password managers
+echo -e "\n${GREEN}${BOLD}========================================================================${NC}"
+echo -e "${GREEN}${BOLD}     🔑 SQLCipher 256-bit Database Encryption Key (AES-256-GCM)        ${NC}"
+echo -e "${GREEN}${BOLD}========================================================================${NC}"
+echo -e "Encryption Key: ${YELLOW}${BOLD}${DB_KEY}${NC}"
+echo -e "${GREEN}► [Copy this key to your Password Manager under 'Pantryo DB Encryption Key']${NC}"
+echo -e "  Saved in:     ${INSTALL_DIR}/.env (DB_ENCRYPTION_KEY)"
+echo -e "${GREEN}========================================================================${NC}\n"
+
 # HTTP Port
 DEFAULT_PORT="${PORT:-3000}"
 read -rp "$(echo -e "${BOLD}Application HTTP Port [${GREEN}${DEFAULT_PORT}${NC}${BOLD}]: ${NC}")" INPUT_PORT
 APP_PORT="${INPUT_PORT:-$DEFAULT_PORT}"
 
-# --- SECTION B: Hosting Mode (Cloudflare vs Custom Domain vs Local LAN) ---
-echo -e "\n${CYAN}${BOLD}--- Hosting Mode: Cloudflare or Custom Domain ---${NC}"
-echo -e "Choose how you want to run and access Pantryo:"
-echo -e "  ${BOLD}[1] Cloudflare Zero Trust Tunnel${NC} (Recommended: No router port forwarding, automatic HTTPS, DDoS protection)"
-echo -e "  ${BOLD}[2] Your Own Custom Domain${NC} (Direct DNS / Reverse Proxy via Caddy, Nginx, NPM, Let's Encrypt)"
-echo -e "  ${BOLD}[3] Local Network Only${NC} (Home LAN IP or mDNS http://pantryo.local:3000 - perfect for Raspberry Pi)"
+# --- SECTION B: Reverse Proxy & Ingress Selection (5 Options + LAN Only) ---
+echo -e "\n${CYAN}${BOLD}--- Reverse Proxy & Ingress Configuration ---${NC}"
+echo -e "Choose your external access / reverse proxy architecture:"
+echo -e "  ${BOLD}[1] Cloudflare Tunnel${NC} (Zero Port-Forwarding, instant HTTPS, DDoS protection)"
+echo -e "  ${BOLD}[2] Caddy${NC} (Automatic HTTPS with Let's Encrypt / ZeroSSL, zero-config renewal)"
+echo -e "  ${BOLD}[3] Nginx & Let's Encrypt (Certbot)${NC} (Native reverse proxy + certbot)"
+echo -e "  ${BOLD}[4] Nginx Proxy Manager (NPM GUI)${NC} (Upstream container configuration + web UI guide)"
+echo -e "  ${BOLD}[5] Traefik v2 / v3${NC} (Dynamic file provider configuration with automatic TLS)"
+echo -e "  ${BOLD}[6] Local Network Only${NC} (Direct HTTP on port ${APP_PORT}, no reverse proxy)"
 
 DEFAULT_MODE_CHOICE="1"
 if [[ -n "${CLOUDFLARE_TUNNEL_TOKEN:-}" ]]; then
@@ -248,38 +260,78 @@ elif [[ -n "${APP_URL:-}" ]] && [[ ! "${APP_URL}" =~ (localhost|127\.|192\.168|\
   DEFAULT_MODE_CHOICE="2"
 fi
 
-read -rp "$(echo -e "${BOLD}Select Hosting Mode [1/2/3, default: ${GREEN}${DEFAULT_MODE_CHOICE}${NC}${BOLD}]: ${NC}")" INPUT_MODE_CHOICE
+read -rp "$(echo -e "${BOLD}Select Reverse Proxy [1-6, default: ${GREEN}${DEFAULT_MODE_CHOICE}${NC}${BOLD}]: ${NC}")" INPUT_MODE_CHOICE
 MODE_CHOICE="${INPUT_MODE_CHOICE:-$DEFAULT_MODE_CHOICE}"
 
 HOSTING_MODE="cloudflare"
 CF_TUNNEL_TOKEN=""
+PROXY_DOMAIN=""
+CERTBOT_EMAIL=""
 
-if [[ "$MODE_CHOICE" == "2" ]]; then
-  HOSTING_MODE="custom_domain"
-  echo -e "\n${PURPLE}--> Selected: Own Custom Domain (Reverse Proxy)${NC}"
-  DEFAULT_APP_URL="${APP_URL:-https://pantryo.example.com}"
-  read -rp "$(echo -e "${BOLD}Custom Domain URL (e.g. https://pantryo.mydomain.com) [${GREEN}${DEFAULT_APP_URL}${NC}${BOLD}]: ${NC}")" INPUT_APP_URL
-  APP_URL="${INPUT_APP_URL:-$DEFAULT_APP_URL}"
-elif [[ "$MODE_CHOICE" == "3" ]]; then
-  HOSTING_MODE="local_lan"
-  echo -e "\n${GREEN}--> Selected: Local Network (LAN Only)${NC}"
-  APP_URL="http://${HOST_IP}:${APP_PORT}"
-else
-  HOSTING_MODE="cloudflare"
-  echo -e "\n${BLUE}--> Selected: Cloudflare Zero Trust Tunnel${NC}"
-  DEFAULT_APP_URL="${APP_URL:-https://pantryo.yourdomain.com}"
-  read -rp "$(echo -e "${BOLD}Public Cloudflare Hostname / URL [${GREEN}${DEFAULT_APP_URL}${NC}${BOLD}]: ${NC}")" INPUT_APP_URL
-  APP_URL="${INPUT_APP_URL:-$DEFAULT_APP_URL}"
-
-  DEFAULT_CF_TOKEN="${CLOUDFLARE_TUNNEL_TOKEN:-}"
-  if [[ -n "$DEFAULT_CF_TOKEN" ]]; then
-    PROMPT_CF="Cloudflare Zero Trust Tunnel Token [${GREEN}configured from env${NC}${BOLD}]: "
-  else
-    PROMPT_CF="Cloudflare Zero Trust Tunnel Token [${YELLOW}leave blank to configure later in Admin Pane${NC}${BOLD}]: "
-  fi
-  read -rp "$(echo -e "${BOLD}${PROMPT_CF}${NC}")" INPUT_CF_TOKEN
-  CF_TUNNEL_TOKEN="${INPUT_CF_TOKEN:-$DEFAULT_CF_TOKEN}"
-fi
+case "$MODE_CHOICE" in
+  2)
+    HOSTING_MODE="caddy"
+    echo -e "\n${BLUE}--> Selected: Caddy (Automatic HTTPS)${NC}"
+    DEFAULT_APP_URL="${APP_URL:-https://pantryo.example.com}"
+    read -rp "$(echo -e "${BOLD}Public Domain Name (e.g. pantryo.mydomain.com) [${GREEN}${DEFAULT_APP_URL#https://}${NC}${BOLD}]: ${NC}")" INPUT_DOMAIN
+    PROXY_DOMAIN="${INPUT_DOMAIN:-${DEFAULT_APP_URL#https://}}"
+    PROXY_DOMAIN="${PROXY_DOMAIN#http://}"
+    PROXY_DOMAIN="${PROXY_DOMAIN%/}"
+    APP_URL="https://${PROXY_DOMAIN}"
+    ;;
+  3)
+    HOSTING_MODE="nginx"
+    echo -e "\n${BLUE}--> Selected: Nginx & Let's Encrypt (Certbot)${NC}"
+    DEFAULT_APP_URL="${APP_URL:-https://pantryo.example.com}"
+    read -rp "$(echo -e "${BOLD}Public Domain Name (e.g. pantryo.mydomain.com) [${GREEN}${DEFAULT_APP_URL#https://}${NC}${BOLD}]: ${NC}")" INPUT_DOMAIN
+    PROXY_DOMAIN="${INPUT_DOMAIN:-${DEFAULT_APP_URL#https://}}"
+    PROXY_DOMAIN="${PROXY_DOMAIN#http://}"
+    PROXY_DOMAIN="${PROXY_DOMAIN%/}"
+    APP_URL="https://${PROXY_DOMAIN}"
+    read -rp "$(echo -e "${BOLD}Admin Email for Let's Encrypt Certificate Expiry [${GREEN}${ADMIN_USERNAME}@${PROXY_DOMAIN}${NC}${BOLD}]: ${NC}")" INPUT_EMAIL
+    CERTBOT_EMAIL="${INPUT_EMAIL:-${ADMIN_USERNAME}@${PROXY_DOMAIN}}"
+    ;;
+  4)
+    HOSTING_MODE="npm"
+    echo -e "\n${BLUE}--> Selected: Nginx Proxy Manager (NPM GUI)${NC}"
+    DEFAULT_APP_URL="${APP_URL:-https://pantryo.example.com}"
+    read -rp "$(echo -e "${BOLD}Configured Domain in NPM (e.g. pantryo.mydomain.com) [${GREEN}${DEFAULT_APP_URL#https://}${NC}${BOLD}]: ${NC}")" INPUT_DOMAIN
+    PROXY_DOMAIN="${INPUT_DOMAIN:-${DEFAULT_APP_URL#https://}}"
+    PROXY_DOMAIN="${PROXY_DOMAIN#http://}"
+    PROXY_DOMAIN="${PROXY_DOMAIN%/}"
+    APP_URL="https://${PROXY_DOMAIN}"
+    ;;
+  5)
+    HOSTING_MODE="traefik"
+    echo -e "\n${BLUE}--> Selected: Traefik v2 / v3 (Dynamic Configuration)${NC}"
+    DEFAULT_APP_URL="${APP_URL:-https://pantryo.example.com}"
+    read -rp "$(echo -e "${BOLD}Public Domain Name (e.g. pantryo.mydomain.com) [${GREEN}${DEFAULT_APP_URL#https://}${NC}${BOLD}]: ${NC}")" INPUT_DOMAIN
+    PROXY_DOMAIN="${INPUT_DOMAIN:-${DEFAULT_APP_URL#https://}}"
+    PROXY_DOMAIN="${PROXY_DOMAIN#http://}"
+    PROXY_DOMAIN="${PROXY_DOMAIN%/}"
+    APP_URL="https://${PROXY_DOMAIN}"
+    ;;
+  6)
+    HOSTING_MODE="local_lan"
+    echo -e "\n${GREEN}--> Selected: Local Network (LAN Only)${NC}"
+    APP_URL="http://${HOST_IP}:${APP_PORT}"
+    ;;
+  *)
+    HOSTING_MODE="cloudflare"
+    echo -e "\n${BLUE}--> Selected: Cloudflare Zero Trust Tunnel${NC}"
+    DEFAULT_APP_URL="${APP_URL:-https://pantryo.yourdomain.com}"
+    read -rp "$(echo -e "${BOLD}Public Cloudflare Hostname / URL [${GREEN}${DEFAULT_APP_URL}${NC}${BOLD}]: ${NC}")" INPUT_APP_URL
+    APP_URL="${INPUT_APP_URL:-$DEFAULT_APP_URL}"
+    DEFAULT_CF_TOKEN="${CLOUDFLARE_TUNNEL_TOKEN:-}"
+    if [[ -n "$DEFAULT_CF_TOKEN" ]]; then
+      PROMPT_CF="Cloudflare Zero Trust Tunnel Token [${GREEN}configured from env${NC}${BOLD}]: "
+    else
+      PROMPT_CF="Cloudflare Zero Trust Tunnel Token [${YELLOW}leave blank to configure later in Admin Pane${NC}${BOLD}]: "
+    fi
+    read -rp "$(echo -e "${BOLD}${PROMPT_CF}${NC}")" INPUT_CF_TOKEN
+    CF_TUNNEL_TOKEN="${INPUT_CF_TOKEN:-$DEFAULT_CF_TOKEN}"
+    ;;
+esac
 
 # Google Gemini API Key
 DEFAULT_GEMINI_KEY="${GEMINI_API_KEY:-}"
@@ -428,20 +480,158 @@ chmod 600 "$INSTALL_DIR/.env"
 echo -e "${GREEN}✓ Environment configuration written to .env (mode 600).${NC}"
 
 # ------------------------------------------------------------------------------
-# 8. Cloudflare Tunnel Daemon (Multi-Architecture Binary)
+# 8. Automated Reverse Proxy & Ingress Provisioning
 # ------------------------------------------------------------------------------
-if [[ -n "$CF_TUNNEL_TOKEN" ]]; then
-  echo -e "\n${CYAN}Configuring Cloudflare Zero Trust Tunnel (cloudflared) for ${CF_ARCH}...${NC}"
-  if ! command -v cloudflared >/dev/null 2>&1; then
-    CF_BIN_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${CF_ARCH}"
-    echo -e "Downloading cloudflared binary from: ${CF_BIN_URL}"
-    curl -fsSL "$CF_BIN_URL" -o /usr/local/bin/cloudflared
-    chmod +x /usr/local/bin/cloudflared
-  fi
+case "$HOSTING_MODE" in
+  caddy)
+    echo -e "\n${CYAN}Configuring Caddy Web Server (Automatic HTTPS)...${NC}"
+    if ! command -v caddy >/dev/null 2>&1; then
+      if [[ "$OS_FAMILY" == "debian" ]]; then
+        apt-get install -y debian-keyring debian-archive-keyring apt-transport-https 2>/dev/null || true
+        curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg --yes 2>/dev/null || true
+        curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null 2>&1 || true
+        apt-get update -y >/dev/null 2>&1 || true
+        apt-get install -y caddy >/dev/null 2>&1 || true
+      elif [[ "$OS_FAMILY" == "rhel" ]]; then
+        dnf install -y 'dnf-command(copr)' 2>/dev/null || true
+        dnf copr enable -y @caddy/caddy 2>/dev/null || true
+        dnf install -y caddy 2>/dev/null || true
+      elif [[ "$OS_FAMILY" == "arch" ]]; then
+        pacman -S --noconfirm caddy 2>/dev/null || true
+      fi
+    fi
+    if command -v caddy >/dev/null 2>&1; then
+      mkdir -p /etc/caddy
+      cat <<EOF > /etc/caddy/Caddyfile
+${PROXY_DOMAIN} {
+    reverse_proxy localhost:${APP_PORT}
+}
+EOF
+      systemctl daemon-reload 2>/dev/null || true
+      systemctl enable caddy 2>/dev/null || true
+      systemctl restart caddy 2>/dev/null || true
+      echo -e "${GREEN}✓ Caddy configured with automatic Let's Encrypt HTTPS for ${PROXY_DOMAIN}.${NC}"
+    else
+      echo -e "${YELLOW}Note: Caddyfile written to /etc/caddy/Caddyfile. Start caddy service once installed.${NC}"
+    fi
+    ;;
+  nginx)
+    echo -e "\n${CYAN}Configuring Nginx Reverse Proxy & Let's Encrypt...${NC}"
+    if [[ "$OS_FAMILY" == "debian" ]]; then
+      apt-get install -y nginx certbot python3-certbot-nginx >/dev/null 2>&1 || true
+    elif [[ "$OS_FAMILY" == "rhel" ]]; then
+      dnf install -y nginx certbot python3-certbot-nginx >/dev/null 2>&1 || true
+    elif [[ "$OS_FAMILY" == "arch" ]]; then
+      pacman -S --noconfirm nginx certbot certbot-nginx >/dev/null 2>&1 || true
+    fi
+    mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled /etc/nginx/conf.d
+    cat <<EOF > /etc/nginx/sites-available/pantryo
+server {
+    listen 80;
+    server_name ${PROXY_DOMAIN};
 
-  if command -v cloudflared >/dev/null 2>&1; then
-    if [ -d /etc/systemd/system ]; then
-      cat <<EOF > /etc/systemd/system/pantryo-tunnel.service
+    client_max_body_size 50M;
+
+    location / {
+        proxy_pass http://127.0.0.1:${APP_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 86400;
+    }
+}
+EOF
+    ln -sf /etc/nginx/sites-available/pantryo /etc/nginx/sites-enabled/pantryo 2>/dev/null || true
+    cp /etc/nginx/sites-available/pantryo /etc/nginx/conf.d/pantryo.conf 2>/dev/null || true
+    rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
+    nginx -t 2>/dev/null && systemctl restart nginx 2>/dev/null || true
+    echo -e "${GREEN}✓ Nginx virtual host configured for ${PROXY_DOMAIN}.${NC}"
+
+    if [[ -n "$CERTBOT_EMAIL" ]] && command -v certbot >/dev/null 2>&1; then
+      echo -e "${CYAN}Requesting Let's Encrypt SSL certificate via Certbot...${NC}"
+      certbot --nginx -d "${PROXY_DOMAIN}" --non-interactive --agree-tos -m "${CERTBOT_EMAIL}" --redirect 2>/dev/null || {
+        echo -e "${YELLOW}Note: Certbot challenge deferred (ensure DNS points to this server, then run: certbot --nginx -d ${PROXY_DOMAIN})${NC}"
+      }
+    fi
+    ;;
+  npm)
+    echo -e "\n${CYAN}Generating Nginx Proxy Manager (NPM GUI) Configuration Guide...${NC}"
+    cat <<EOF > "${INSTALL_DIR}/NPM-CONFIGURATION.txt"
+========================================================================
+             Nginx Proxy Manager (NPM) Configuration Guide              
+========================================================================
+In your Nginx Proxy Manager Web GUI (http://<npm-ip>:81):
+  1. Click "Proxy Hosts" -> "Add Proxy Host"
+  2. Domain Names:             ${PROXY_DOMAIN}
+  3. Scheme:                   http
+  4. Forward Hostname / IP:    ${HOST_IP}
+  5. Forward Port:             ${APP_PORT}
+  6. Cache Assets:             ON
+  7. Block Common Exploits:    ON
+  8. Websockets Support:       ON (Required for real-time receipt status)
+  9. SSL Tab:
+     - SSL Certificate: Request a new SSL Certificate
+     - Force SSL: ON
+     - HTTP/2 Support: ON
+     - HSTS Enabled: ON
+========================================================================
+EOF
+    echo -e "${GREEN}✓ NPM configuration guide saved to ${INSTALL_DIR}/NPM-CONFIGURATION.txt.${NC}"
+    ;;
+  traefik)
+    echo -e "\n${CYAN}Generating Traefik dynamic provider configuration...${NC}"
+    mkdir -p /etc/traefik/dynamic "${INSTALL_DIR}"
+    cat <<EOF > "${INSTALL_DIR}/traefik-pantryo.yml"
+# Traefik v2 / v3 Dynamic Configuration for Pantryo
+http:
+  routers:
+    pantryo-secure:
+      rule: "Host(\`${PROXY_DOMAIN}\`)"
+      entryPoints:
+        - websecure
+      service: pantryo-service
+      tls:
+        certResolver: myresolver
+    pantryo-http:
+      rule: "Host(\`${PROXY_DOMAIN}\`)"
+      entryPoints:
+        - web
+      middlewares:
+        - redirect-to-https
+      service: pantryo-service
+
+  middlewares:
+    redirect-to-https:
+      redirectScheme:
+        scheme: https
+        permanent: true
+
+  services:
+    pantryo-service:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:${APP_PORT}"
+EOF
+    cp "${INSTALL_DIR}/traefik-pantryo.yml" /etc/traefik/dynamic/pantryo.yml 2>/dev/null || true
+    echo -e "${GREEN}✓ Traefik dynamic router config saved to ${INSTALL_DIR}/traefik-pantryo.yml.${NC}"
+    ;;
+  cloudflare)
+    if [[ -n "$CF_TUNNEL_TOKEN" ]]; then
+      echo -e "\n${CYAN}Configuring Cloudflare Zero Trust Tunnel (cloudflared) for ${CF_ARCH}...${NC}"
+      if ! command -v cloudflared >/dev/null 2>&1; then
+        CF_BIN_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${CF_ARCH}"
+        echo -e "Downloading cloudflared binary from: ${CF_BIN_URL}"
+        curl -fsSL "$CF_BIN_URL" -o /usr/local/bin/cloudflared 2>/dev/null || true
+        chmod +x /usr/local/bin/cloudflared 2>/dev/null || true
+      fi
+
+      if command -v cloudflared >/dev/null 2>&1; then
+        if [ -d /etc/systemd/system ]; then
+          cat <<EOF > /etc/systemd/system/pantryo-tunnel.service
 [Unit]
 Description=Cloudflare Zero Trust Tunnel for Pantryo
 After=network.target pantryo.service
@@ -456,13 +646,15 @@ RestartSec=5
 [Install]
 WantedBy=multi-user.target
 EOF
-      systemctl daemon-reload 2>/dev/null || true
-      systemctl enable pantryo-tunnel.service 2>/dev/null || true
-      systemctl restart pantryo-tunnel.service 2>/dev/null || true
-      echo -e "${GREEN}✓ Cloudflare tunnel service 'pantryo-tunnel.service' enabled & active.${NC}"
+          systemctl daemon-reload 2>/dev/null || true
+          systemctl enable pantryo-tunnel.service 2>/dev/null || true
+          systemctl restart pantryo-tunnel.service 2>/dev/null || true
+          echo -e "${GREEN}✓ Cloudflare tunnel service 'pantryo-tunnel.service' enabled & active.${NC}"
+        fi
+      fi
     fi
-  fi
-fi
+    ;;
+esac
 
 # ------------------------------------------------------------------------------
 # 9. Application Dependencies & Production Build
@@ -534,6 +726,12 @@ echo -e "Local LAN URL:       ${CYAN}http://${HOST_IP}:${APP_PORT}${NC}"
 echo -e "Admin Username:      ${GREEN}${BOLD}${ADMIN_USERNAME}${NC}"
 echo -e "Admin Display Name:  ${GREEN}${ADMIN_NAME}${NC}"
 echo -e "Database Storage:    ${GREEN}256-bit AES-GCM SQLCipher SQLite (Local & Fast)${NC}"
+echo -e "SQLCipher DB Key:    ${YELLOW}${DB_KEY}${NC} ${GREEN}(Saved to .env & Password Manager)${NC}"
+if [[ "$HOSTING_MODE" == "npm" ]]; then
+  echo -e "NPM Configuration:   ${CYAN}${INSTALL_DIR}/NPM-CONFIGURATION.txt${NC}"
+elif [[ "$HOSTING_MODE" == "traefik" ]]; then
+  echo -e "Traefik Provider:    ${CYAN}${INSTALL_DIR}/traefik-pantryo.yml${NC}"
+fi
 if [[ -n "$GEMINI_KEY" ]]; then
   echo -e "Gemini AI Engine:    ${GREEN}Configured (Vision & Recipe AI Active)${NC}"
 else

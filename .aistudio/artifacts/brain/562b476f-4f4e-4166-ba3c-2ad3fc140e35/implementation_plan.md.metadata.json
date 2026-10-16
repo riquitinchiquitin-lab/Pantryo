@@ -1,6 +1,6 @@
 {
-  "summary": "Implementation plan for harmonizing suggested recipe imports with link pasting, ensuring complete French and English cooking instructions are generated and reviewed across Website Discovery and Smart Meal Suggestions.",
-  "updatedAt": "2026-10-15T22:40:17.851115703Z",
+  "summary": "Implementation plan for adding container root password configuration, SQLCipher encryption key generation, and interactive selection for all 5 reverse proxy options (Cloudflare Tunnel, Caddy, Nginx & Certbot, Nginx Proxy Manager, Traefik) in the Proxmox and Linux installers.",
+  "updatedAt": "2026-10-15T23:52:15.791457337Z",
   "requestFeedback": true,
   "userFacing": true
 }

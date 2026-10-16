@@ -9,22 +9,64 @@
 
 ---
 
+---
+
 ## 📑 Summary / Sommaire
 
-1. [System Requirements & Sizing / Prérequis Matériels](#system-requirements--sizing)
-2. [Method 1: Proxmox VE (Automated LXC Container)](#1-proxmox-ve-lxc-installation-recommended)
-3. [Method 2: Raspberry Pi & Universal Linux (Bare-Metal / VM)](#2-raspberry-pi--universal-linux-installation)
-4. [Method 3: Docker & Docker Compose](#3-docker--docker-compose-deployment)
-5. [Method 4: Manual Git & Node.js 22 LTS Installation](#4-manual-git--nodejs-22-lts-installation)
-6. [Cloudflare Zero Trust & Reverse Proxy Setup](#5-cloudflare-tunnel--reverse-proxy-configuration)
-   - [Cloudflare Tunnel (Zero Port-Forwarding)](#option-a-cloudflare-zero-trust-tunnel-recommended)
-   - [Caddy (Automatic HTTPS)](#option-b-caddy-reverse-proxy)
-   - [Nginx & Let's Encrypt (Certbot)](#option-c-nginx-reverse-proxy)
-   - [Nginx Proxy Manager (NPM GUI)](#option-d-nginx-proxy-manager-gui)
-   - [Traefik v2 / v3](#option-e-traefik-v2--v3)
-7. [Environment Variables Reference (`.env`)](#6-environment-variables-reference)
-8. [Database Backup & SQLCipher 256-bit Encryption](#7-backup-restore--sqlcipher-encryption)
-9. [Troubleshooting & FAQ / Dépannage](#8-troubleshooting--faq)
+1. [Default Passwords & Zero-Trust Security Model (FAQ)](#default-passwords--zero-trust-security-model)
+2. [System Requirements & Sizing / Prérequis Matériels](#system-requirements--sizing)
+3. [Method 1: Proxmox VE (Automated LXC Container)](#1-proxmox-ve-lxc-installation-recommended)
+4. [Method 2: Raspberry Pi & Universal Linux (Bare-Metal / VM)](#2-raspberry-pi--universal-linux-installation)
+5. [Method 3: Docker & Docker Compose](#3-docker--docker-compose-deployment)
+6. [Method 4: Manual Git & Node.js 22 LTS Installation](#4-manual-git--nodejs-22-lts-installation)
+7. [Reverse Proxy & Remote Ingress (5 Automated Options)](#5-cloudflare-tunnel--reverse-proxy-configuration)
+   - [Option A: Cloudflare Tunnel (Zero Port-Forwarding)](#option-a-cloudflare-zero-trust-tunnel-recommended)
+   - [Option B: Caddy (Automatic HTTPS)](#option-b-caddy-reverse-proxy)
+   - [Option C: Nginx & Let's Encrypt (Certbot)](#option-c-nginx-reverse-proxy)
+   - [Option D: Nginx Proxy Manager (NPM GUI)](#option-d-nginx-proxy-manager-gui)
+   - [Option E: Traefik v2 / v3 (Dynamic Configuration)](#option-e-traefik-v2--v3)
+8. [Environment Variables Reference (`.env`)](#6-environment-variables-reference)
+9. [Database Backup & SQLCipher 256-bit Encryption](#7-backup-restore--sqlcipher-encryption)
+10. [Troubleshooting & FAQ / Dépannage](#8-troubleshooting--faq)
+
+---
+
+## 🔐 Default Passwords & Zero-Trust Security Model
+
+### Where are the default passwords?
+
+> [!IMPORTANT]
+> **Pantryo has NO static default passwords by design.**
+> In strict compliance with **NIST SP 800-63B** digital identity standards and modern zero-trust homelab security, hardcoded credentials (such as `admin` / `admin` or `root` / `root`) are never included. Hardcoded default passwords are the #1 attack vector in self-hosted environments.
+
+All passwords and encryption keys are either **interactively created by you** or **cryptographically generated on the fly** with a copy-paste summary formatted for your password manager:
+
+| Credential Type | Default Value | Provisioning Flow | Where It Is Stored |
+| :--- | :--- | :--- | :--- |
+| **Proxmox Container Root Password** | *None* | Interactive prompt during container creation. Press **Enter** to auto-generate a secure 20-character password, or enter your own. | Set via `pct create --password` / `/etc/shadow`. Save to Bitwarden/1Password. |
+| **SQLCipher Database Encryption Key** | *None* | Auto-generated 64-hex key (256-bit AES-GCM) with copy box for password managers. | `/opt/pantryo/.env` (`DB_ENCRYPTION_KEY`, permissions `chmod 600`). |
+| **Pantryo Web Administrator** | *None* | Interactively prompted during setup (Display Name, Username/Email, min 8-character password). | Stored with Argon2id memory-hard hashing inside encrypted SQLite database. |
+| **Session Secret Key** | *Auto-generated* | Generated via `openssl rand -hex 32`. | `/opt/pantryo/.env` (`SESSION_SECRET`). |
+
+#### 🔑 Saving Credentials to Password Managers (Bitwarden, 1Password, KeePass)
+During both `install-proxmox.sh` and `install.sh`, the terminal displays formatted credential cards:
+```text
+========================================================================
+        🔐 Container Root Credentials for Password Manager             
+========================================================================
+Container ID:            206
+Container Hostname:      pantryo
+Container Root Username: root
+Container Root Password: X9$mK#2pL8vN!4qR7wY0
+► [Auto-generated 20-char password - save in Bitwarden / 1Password / KeePass]
+Container IP Address:    192.168.1.145
+========================================================================
+```
+
+#### 🔄 How to Reset or Audit Passwords
+- **Container Root Password**: On the Proxmox host shell, run `pct enter <CTID>` and then `passwd root`.
+- **Database Encryption Key**: Inspect `/opt/pantryo/.env` (requires root: `sudo cat /opt/pantryo/.env | grep DB_ENCRYPTION_KEY`).
+- **Web Administrator & Settings**: Open the web application, log in, and click the **Admin Pane** (shield icon in the navbar) to audit and update App URLs, Reverse Proxy settings, Gemini AI API keys, or user roles.
 
 ---
 
@@ -347,6 +389,48 @@ sudo certbot --nginx -d pantry.yourdomain.com
    - Request a new SSL Certificate with Let's Encrypt.
    - Check **Force SSL** and **HTTP/2 Support**.
 5. Save.
+
+### Option E: Traefik v2 / v3
+
+Create a dynamic file provider configuration in `/etc/traefik/dynamic/pantryo.yml`:
+
+```yaml
+# Traefik v2 / v3 Dynamic Routing Configuration for Pantryo
+http:
+  routers:
+    pantryo-secure:
+      rule: "Host(`pantry.yourdomain.com`)"
+      entryPoints:
+        - websecure
+      service: pantryo-service
+      tls:
+        certResolver: myresolver # Replace with your Traefik ACME cert resolver
+    pantryo-http:
+      rule: "Host(`pantry.yourdomain.com`)"
+      entryPoints:
+        - web
+      middlewares:
+        - redirect-to-https
+      service: pantryo-service
+
+  middlewares:
+    redirect-to-https:
+      redirectScheme:
+        scheme: https
+        permanent: true
+
+  services:
+    pantryo-service:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:3000"
+```
+
+### Option F: Local Network Only (No Reverse Proxy)
+
+If you only plan to access Pantryo inside your home or via a VPN (WireGuard / Tailscale):
+- Pantryo binds on `0.0.0.0:3000`.
+- Access the web interface directly via `http://<server-ip>:3000` (e.g. `http://192.168.1.145:3000` or `http://pantryo.local:3000`).
 
 ---
 

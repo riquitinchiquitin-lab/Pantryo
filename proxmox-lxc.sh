@@ -58,6 +58,23 @@ STORAGE="${STORAGE:-local-lvm}"
 read -rp "Network Bridge [vmbr0]: " BRIDGE
 BRIDGE="${BRIDGE:-vmbr0}"
 
+# Container Root Password (interactive with secure 20-character auto-generation)
+echo -e "\n${BL}[Container Security & Credentials]${CL}"
+echo -e "You can type a custom root password, or press Enter to auto-generate a secure 20-character password."
+read -rp "Container Root Password [Press Enter to auto-generate 20-char password]: " INPUT_CT_PASSWORD
+
+if [[ -z "$INPUT_CT_PASSWORD" ]]; then
+  if command -v openssl >/dev/null 2>&1; then
+    CT_PASSWORD=$(openssl rand -base64 16 | tr -dc 'a-zA-Z0-9!@#%^&*' | head -c 20)
+  else
+    CT_PASSWORD=$(tr -dc 'a-zA-Z0-9!@#%^&*' </dev/urandom | head -c 20)
+  fi
+  IS_AUTOGEN_CT_PASSWORD=true
+else
+  CT_PASSWORD="$INPUT_CT_PASSWORD"
+  IS_AUTOGEN_CT_PASSWORD=false
+fi
+
 echo -e "\n${BL}[INFO] Downloading Debian 12 LXC template if required...${CL}"
 pveam update
 TEMPLATE=$(pveam available -section system | grep "debian-12-standard" | head -n1 | awk '{print $2}')
@@ -78,27 +95,51 @@ pct create "$CTID" "local:vztmpl/${TEMPLATE}" \
   -memory "$RAM" \
   -swap 512 \
   -rootfs "${STORAGE}:${DISK}" \
-  -net0 "name=eth0,bridge=${BRIDGE},ip=dhcp" \
+  -net0 "name=eth0,bridge=${BRIDGE},ip=dhcp,firewall=1" \
   -ostype debian \
   -unprivileged 1 \
   -features nesting=1 \
+  --password "$CT_PASSWORD" \
   -onboot 1
 
 echo -e "${BL}[INFO] Starting container ${CTID}...${CL}"
 pct start "$CTID"
-sleep 5
+sleep 4
+
+CT_IP=$(pct exec "$CTID" -- hostname -I 2>/dev/null | awk '{print $1}' || echo "")
+
+echo -e "\n${GN}========================================================================${CL}"
+echo -e "${GN}        🔐 Container Root Credentials for Password Manager              ${CL}"
+echo -e "${GN}========================================================================${CL}"
+echo -e "Container ID:            ${BL}${CTID}${CL}"
+echo -e "Container Hostname:      ${BL}${HN}${CL}"
+echo -e "Container Root Username: ${GN}root${CL}"
+echo -e "Container Root Password: ${YW}${CT_PASSWORD}${CL}"
+if [[ "$IS_AUTOGEN_CT_PASSWORD" == "true" ]]; then
+  echo -e "${GN}► [Auto-generated 20-char password - save in Bitwarden / 1Password / KeePass]${CL}"
+fi
+if [[ -n "$CT_IP" ]]; then
+  echo -e "Container IP Address:    ${BL}${CT_IP}${CL}"
+fi
+echo -e "${GN}========================================================================${CL}\n"
 
 echo -e "${BL}[INFO] Launching interactive Pantryo setup inside container...${CL}"
 echo -e "${YW}[INFO] You will now be prompted for your Administrator credentials, 256-bit SQLCipher key,${CL}"
-echo -e "${YW}       App URL, Gemini API Key, Cloudflare Tunnel Token, and Mobile API endpoint.${CL}"
+echo -e "${YW}       Reverse Proxy (Cloudflare, Caddy, Nginx, NPM, Traefik), and Gemini API Key.${CL}"
 echo -e "${YW}       (Remember: all of these values can also be updated anytime inside the web Admin Pane!)${CL}\n"
-pct exec "$CTID" -- bash -c "apt-get update && apt-get install -y git curl ca-certificates"
+pct exec "$CTID" -- bash -c "apt-get update && apt-get install -y git curl ca-certificates sudo"
 pct exec "$CTID" -- bash -c "mkdir -p /opt/pantryo && cd /opt"
-pct exec "$CTID" -- bash -c "git clone https://github.com/pantryo/pantryo.git /opt/pantryo || true"
+pct exec "$CTID" -- bash -c "git clone https://github.com/riquitinchiquitin-lab/Pantryo.git /opt/pantryo || (cd /opt/pantryo && git pull) || true"
 pct exec "$CTID" -- bash -c "cd /opt/pantryo && chmod +x install-proxmox.sh && ./install-proxmox.sh"
 
 echo -e "\n${GN}========================================================================${CL}"
 echo -e "${GN}✓ Proxmox LXC Container ${CTID} created and Pantryo installed successfully!${CL}"
-echo -e "${GN}  Log in with your administrator account and visit the Admin Pane anytime${CL}"
-echo -e "${GN}  to adjust App URL, Cloudflare Tunnel, Gemini Key, or security settings.${CL}"
+echo -e "${GN}========================================================================${CL}"
+echo -e "Container Root Password: ${YW}${CT_PASSWORD}${CL} ${GN}(Copy to Password Manager)${CL}"
+if [[ -n "$CT_IP" ]]; then
+  echo -e "Direct LAN Web URL:      ${BL}http://${CT_IP}:3000${CL}"
+fi
+echo -e "Enter Container Shell:   ${BL}pct enter ${CTID}${CL}"
+echo -e "${GN}Log in with your administrator account and visit the Admin Pane anytime${CL}"
+echo -e "${GN}to adjust App URL, Reverse Proxy, Gemini Key, or security settings.${CL}"
 echo -e "${GN}========================================================================${CL}"

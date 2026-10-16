@@ -44,6 +44,7 @@ export function DocumentationModal({
   const [activeTab, setActiveTab] = useState<'features' | 'proxmox' | 'linux' | 'cloudflare' | 'security'>(initialTab);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [selectedLinuxDistro, setSelectedLinuxDistro] = useState<'rpi' | 'debian_ubuntu' | 'dietpi' | 'fedora' | 'arch'>('rpi');
+  const [selectedProxy, setSelectedProxy] = useState<'cloudflare' | 'caddy' | 'nginx' | 'npm' | 'traefik'>('cloudflare');
 
   if (!isOpen) return null;
 
@@ -157,7 +158,7 @@ export function DocumentationModal({
             }`}
           >
             <Globe className="w-3.5 h-3.5 text-blue-500" />
-            <span>{lang === 'FR' ? '🌐 Cloudflare & Domaines' : '🌐 Cloudflare & Domains'}</span>
+            <span>{lang === 'FR' ? '🌐 Reverse Proxies (5 Choix)' : '🌐 Reverse Proxies (5 Options)'}</span>
           </button>
 
           <button
@@ -405,9 +406,33 @@ export function DocumentationModal({
                     <li>{lang === 'FR' ? 'Connectez-vous à votre interface Proxmox VE (port 8006).' : 'Log in to your Proxmox VE web UI (port 8006).'}</li>
                     <li>{lang === 'FR' ? 'Ouvrez le Shell du serveur hôte.' : 'Open your PVE node shell.'}</li>
                     <li>{lang === 'FR' ? 'Collez la commande ci-dessus et appuyez sur Entrée.' : 'Paste the one-line command above and press Enter.'}</li>
-                    <li>{lang === 'FR' ? 'Répondez aux invites pour le VMID (ex: 206) et la taille de RAM (ex: 1024).' : 'Answer the interactive prompts for Container ID (e.g. 206) and RAM size (e.g. 1024).'}</li>
+                    <li>{lang === 'FR' ? 'Définissez le mot de passe root du conteneur (interactif ou Entrée pour auto-génération sécurisée 20 caractères).' : 'Set the container root password (interactive prompt or press Enter for auto-generated 20-character secure password).'}</li>
+                    <li>{lang === 'FR' ? 'Sélectionnez votre Reverse Proxy parmi les 5 options intégrées (Cloudflare, Caddy, Nginx, NPM, Traefik).' : 'Choose your Reverse Proxy from the 5 built-in options (Cloudflare, Caddy, Nginx, NPM, Traefik).'}</li>
                     <li>{lang === 'FR' ? 'Accédez directement à Pantryo sur http://IP_DU_CONTENEUR:3000.' : 'Access Pantryo immediately at http://LXC_CONTAINER_IP:3000.'}</li>
                   </ol>
+                </div>
+
+                {/* Default Passwords & Password Manager Integration Card */}
+                <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200/80 space-y-3">
+                  <div className="flex items-center gap-2 text-amber-900 font-extrabold text-xs">
+                    <Key className="w-4 h-4 text-amber-700" />
+                    <span>{lang === 'FR' ? '🔐 Où sont les mots de passe par défaut ? (Zéro Valeur par Défaut)' : '🔐 Where are the default passwords? (Zero Default Passwords)'}</span>
+                  </div>
+                  <p className="text-xs text-amber-900/90 leading-relaxed">
+                    {lang === 'FR'
+                      ? 'Par sécurité et conformité NIST SP 800-63B, aucun mot de passe par défaut (ex: admin/admin ou root/root) n’existe dans Pantryo. Lors de la création du conteneur Proxmox, vous pouvez saisir votre mot de passe ou appuyer sur Entrée pour en générer un aléatoire de 20 caractères, puis le copier dans votre gestionnaire de mots de passe (Bitwarden, 1Password, KeePass).'
+                      : 'For homelab security and NIST SP 800-63B compliance, Pantryo has NO static default passwords (no admin/admin or root/root). During Proxmox container creation, you can enter your own or press Enter to auto-generate a 20-character random password ready to save into your password manager (Bitwarden, 1Password, KeePass).'}
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono text-[#0F172A]">
+                    <div className="p-2.5 rounded-lg bg-white border border-amber-200">
+                      <span className="font-bold text-teal-800 block">Root Conteneur LXC:</span>
+                      <span>Invite interactive / 20 car. aléatoire</span>
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-white border border-amber-200">
+                      <span className="font-bold text-teal-800 block">Clé SQLCipher 256 bits:</span>
+                      <span>64 hex auto-générés (AES-256-GCM)</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -615,50 +640,242 @@ export function DocumentationModal({
                 </p>
               </div>
 
-              {/* Cloudflare Tunnel Setup */}
-              <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-3">
-                <div className="flex items-center justify-between">
-                  <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0D3B37] flex items-center gap-1.5">
-                    <Zap className="w-3.5 h-3.5 text-amber-600" />
-                    <span>{lang === 'FR' ? 'Option 1 : Cloudflare Zero Trust Tunnel (Recommandé)' : 'Option 1: Cloudflare Zero Trust Tunnel (Recommended)'}</span>
-                  </h5>
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                    {lang === 'FR' ? 'Zéro Port Ouvert' : 'Zero Open Ports'}
-                  </span>
-                </div>
-
-                <p className="text-xs text-[#527470]">
-                  {lang === 'FR'
-                    ? '1. Créez un compte gratuit sur Cloudflare et ajoutez votre domaine. Dans Zero Trust > Access > Tunnels, créez un tunnel nommé "pantryo".'
-                    : '1. Create a free Cloudflare account, add your domain, and under Zero Trust > Access > Tunnels create a tunnel named "pantryo".'}
-                </p>
-
-                <div className="p-3 rounded-xl bg-[#0F172A] border border-slate-700 font-mono text-[11px] text-emerald-400 space-y-1">
-                  <div className="text-slate-400"># Installez le démon cloudflared sur votre serveur :</div>
-                  <div>curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/keyrings/cloudflare-main.gpg &gt;/dev/null</div>
-                  <div>sudo cloudflared service install &lt;VOTRE_TOKEN_CLOUDFLARE&gt;</div>
-                </div>
-
-                <p className="text-xs text-[#527470]">
-                  {lang === 'FR'
-                    ? '2. Pointez votre sous-domaine (ex: pantry.votredomaine.com) vers le service local HTTP localhost:3000.'
-                    : '2. Route your subdomain (e.g. pantry.yourdomain.com) to local service HTTP localhost:3000.'}
-                </p>
+              {/* 5-Option Reverse Proxy Switcher */}
+              <div className="flex p-1 rounded-2xl bg-[#EFE9DA] border border-[#DCD3C0] gap-1 overflow-x-auto scrollbar-none">
+                <button
+                  onClick={() => setSelectedProxy('cloudflare')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer ${
+                    selectedProxy === 'cloudflare'
+                      ? 'bg-teal-800 text-white shadow-xs'
+                      : 'text-[#3B5B56] hover:bg-white/60'
+                  }`}
+                >
+                  ⚡ Cloudflare Tunnel
+                </button>
+                <button
+                  onClick={() => setSelectedProxy('caddy')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer ${
+                    selectedProxy === 'caddy'
+                      ? 'bg-teal-800 text-white shadow-xs'
+                      : 'text-[#3B5B56] hover:bg-white/60'
+                  }`}
+                >
+                  🔒 Caddy (Auto HTTPS)
+                </button>
+                <button
+                  onClick={() => setSelectedProxy('nginx')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer ${
+                    selectedProxy === 'nginx'
+                      ? 'bg-teal-800 text-white shadow-xs'
+                      : 'text-[#3B5B56] hover:bg-white/60'
+                  }`}
+                >
+                  🛡️ Nginx & Certbot
+                </button>
+                <button
+                  onClick={() => setSelectedProxy('npm')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer ${
+                    selectedProxy === 'npm'
+                      ? 'bg-teal-800 text-white shadow-xs'
+                      : 'text-[#3B5B56] hover:bg-white/60'
+                  }`}
+                >
+                  🖥️ NPM (GUI)
+                </button>
+                <button
+                  onClick={() => setSelectedProxy('traefik')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer ${
+                    selectedProxy === 'traefik'
+                      ? 'bg-teal-800 text-white shadow-xs'
+                      : 'text-[#3B5B56] hover:bg-white/60'
+                  }`}
+                >
+                  🚦 Traefik v2/v3
+                </button>
               </div>
 
-              {/* Reverse Proxy Configurations */}
-              <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-3">
-                <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0D3B37]">
-                  {lang === 'FR' ? 'Option 2 : Caddyfile (SSL Automatique)' : 'Option 2: Caddyfile (Automatic SSL)'}
-                </h5>
+              {/* Option 1: Cloudflare Tunnel */}
+              {selectedProxy === 'cloudflare' && (
+                <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-3 animate-fade-in">
+                  <div className="flex items-center justify-between">
+                    <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0D3B37] flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5 text-amber-600" />
+                      <span>{lang === 'FR' ? 'Cloudflare Zero Trust Tunnel (Recommandé)' : 'Cloudflare Zero Trust Tunnel (Recommended)'}</span>
+                    </h5>
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      {lang === 'FR' ? 'Zéro Port Ouvert' : 'Zero Open Ports'}
+                    </span>
+                  </div>
 
-                <div className="p-3 rounded-xl bg-[#0F172A] border border-slate-700 font-mono text-[11px] text-emerald-400">
-                  <pre className="whitespace-pre-wrap">{`pantry.votredomaine.com {
+                  <p className="text-xs text-[#527470]">
+                    {lang === 'FR'
+                      ? '1. Créez un compte gratuit sur Cloudflare et ajoutez votre domaine. Dans Zero Trust > Access > Tunnels, créez un tunnel nommé "pantryo".'
+                      : '1. Create a free Cloudflare account, add your domain, and under Zero Trust > Access > Tunnels create a tunnel named "pantryo".'}
+                  </p>
+
+                  <div className="p-3 rounded-xl bg-[#0F172A] border border-slate-700 font-mono text-[11px] text-emerald-400 space-y-1 relative group">
+                    <button
+                      onClick={() => copyToClipboard('sudo cloudflared service install <YOUR_TOKEN>', 'cf-install')}
+                      className="absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-teal-700 hover:bg-teal-600 text-white font-sans text-[10px] font-bold flex items-center gap-1"
+                    >
+                      {copiedId === 'cf-install' ? <Check className="w-3 h-3 text-emerald-300" /> : <Copy className="w-3 h-3" />}
+                      <span>{copiedId === 'cf-install' ? 'Copié' : 'Copy'}</span>
+                    </button>
+                    <div className="text-slate-400"># Installez le démon cloudflared sur votre serveur :</div>
+                    <div>curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/keyrings/cloudflare-main.gpg &gt;/dev/null</div>
+                    <div>sudo cloudflared service install &lt;YOUR_TOKEN&gt;</div>
+                  </div>
+
+                  <p className="text-xs text-[#527470]">
+                    {lang === 'FR'
+                      ? '2. Pointez votre sous-domaine (ex: pantry.votredomaine.com) vers le service local HTTP localhost:3000.'
+                      : '2. Route your subdomain (e.g. pantry.yourdomain.com) to local service HTTP localhost:3000.'}
+                  </p>
+                </div>
+              )}
+
+              {/* Option 2: Caddy */}
+              {selectedProxy === 'caddy' && (
+                <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-3 animate-fade-in">
+                  <div className="flex items-center justify-between">
+                    <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0D3B37]">
+                      {lang === 'FR' ? 'Caddyfile (HTTPS Automatique Let’s Encrypt / ZeroSSL)' : 'Caddyfile (Automatic HTTPS via Let’s Encrypt)'}
+                    </h5>
+                    <button
+                      onClick={() => copyToClipboard(`pantry.yourdomain.com {\n    reverse_proxy 127.0.0.1:3000\n    encode gzip zstd\n}`, 'caddy-copy')}
+                      className="px-2.5 py-1 rounded-lg bg-teal-700 hover:bg-teal-600 text-white text-[10px] font-bold flex items-center gap-1"
+                    >
+                      {copiedId === 'caddy-copy' ? <Check className="w-3 h-3 text-emerald-300" /> : <Copy className="w-3 h-3" />}
+                      <span>{copiedId === 'caddy-copy' ? 'Copié' : 'Copy'}</span>
+                    </button>
+                  </div>
+
+                  <p className="text-xs text-[#527470]">
+                    {lang === 'FR'
+                      ? 'Fichier /etc/caddy/Caddyfile - Caddy gère automatiquement l’obtention et le renouvellement des certificats SSL :'
+                      : 'File /etc/caddy/Caddyfile - Caddy automatically issues and renews Let’s Encrypt certificates without cron jobs:'}
+                  </p>
+
+                  <div className="p-3 rounded-xl bg-[#0F172A] border border-slate-700 font-mono text-[11px] text-emerald-400">
+                    <pre className="whitespace-pre-wrap">{`pantry.yourdomain.com {
     reverse_proxy 127.0.0.1:3000
     encode gzip zstd
 }`}</pre>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* Option 3: Nginx & Certbot */}
+              {selectedProxy === 'nginx' && (
+                <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-3 animate-fade-in">
+                  <div className="flex items-center justify-between">
+                    <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0D3B37]">
+                      {lang === 'FR' ? 'Nginx & Let’s Encrypt Certbot' : 'Nginx & Let’s Encrypt Certbot'}
+                    </h5>
+                    <button
+                      onClick={() => copyToClipboard(`server {\n    listen 80;\n    server_name pantry.yourdomain.com;\n    client_max_body_size 50M;\n    location / {\n        proxy_pass http://127.0.0.1:3000;\n        proxy_http_version 1.1;\n        proxy_set_header Upgrade $http_upgrade;\n        proxy_set_header Connection "upgrade";\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n    }\n}`, 'nginx-copy')}
+                      className="px-2.5 py-1 rounded-lg bg-teal-700 hover:bg-teal-600 text-white text-[10px] font-bold flex items-center gap-1"
+                    >
+                      {copiedId === 'nginx-copy' ? <Check className="w-3 h-3 text-emerald-300" /> : <Copy className="w-3 h-3" />}
+                      <span>{copiedId === 'nginx-copy' ? 'Copié' : 'Copy'}</span>
+                    </button>
+                  </div>
+
+                  <p className="text-xs text-[#527470]">
+                    {lang === 'FR'
+                      ? 'Configuration /etc/nginx/sites-available/pantryo (Support WebSockets + streaming receipt OCR inclus) :'
+                      : 'File /etc/nginx/sites-available/pantryo (with WebSockets & receipt streaming support):'}
+                  </p>
+
+                  <div className="p-3 rounded-xl bg-[#0F172A] border border-slate-700 font-mono text-[11px] text-emerald-400">
+                    <pre className="whitespace-pre-wrap">{`server {
+    listen 80;
+    server_name pantry.yourdomain.com;
+    client_max_body_size 50M;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}`}</pre>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg bg-[#FAF7EE] border border-[#E5DFD0] text-xs font-mono text-[#0D3B37]">
+                    sudo certbot --nginx -d pantry.yourdomain.com
+                  </div>
+                </div>
+              )}
+
+              {/* Option 4: NPM GUI */}
+              {selectedProxy === 'npm' && (
+                <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-3 animate-fade-in">
+                  <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0D3B37]">
+                    {lang === 'FR' ? 'Nginx Proxy Manager (Interface Web NPM)' : 'Nginx Proxy Manager (NPM Web GUI)'}
+                  </h5>
+
+                  <p className="text-xs text-[#527470]">
+                    {lang === 'FR'
+                      ? 'Dans l’interface graphique Nginx Proxy Manager (port 81) :'
+                      : 'In your Nginx Proxy Manager dashboard (port 81):'}
+                  </p>
+
+                  <div className="p-3 rounded-xl bg-[#0F172A] border border-slate-700 font-mono text-[11px] text-emerald-400 space-y-1">
+                    <div>1. Proxy Hosts &gt; Add Proxy Host</div>
+                    <div>2. Domain Names: pantry.yourdomain.com</div>
+                    <div>3. Forward Hostname / IP: &lt;IP_DU_CONTENEUR_OU_SERVEUR&gt;</div>
+                    <div>4. Forward Port: 3000</div>
+                    <div>5. Cocher: "Block Common Exploits" et "Websockets Support" (ON)</div>
+                    <div>6. Onglet SSL: Cocher "Request a new SSL Certificate", "Force SSL", "HTTP/2 Support"</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Option 5: Traefik v2 / v3 */}
+              {selectedProxy === 'traefik' && (
+                <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-3 animate-fade-in">
+                  <div className="flex items-center justify-between">
+                    <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0D3B37]">
+                      {lang === 'FR' ? 'Configuration Dynamique Traefik v2 / v3' : 'Traefik v2 / v3 Dynamic Provider'}
+                    </h5>
+                    <button
+                      onClick={() => copyToClipboard(`http:\n  routers:\n    pantryo-secure:\n      rule: "Host(\`pantry.yourdomain.com\`)"\n      entryPoints:\n        - websecure\n      service: pantryo-service\n      tls:\n        certResolver: myresolver\n  services:\n    pantryo-service:\n      loadBalancer:\n        servers:\n          - url: "http://127.0.0.1:3000"`, 'traefik-copy')}
+                      className="px-2.5 py-1 rounded-lg bg-teal-700 hover:bg-teal-600 text-white text-[10px] font-bold flex items-center gap-1"
+                    >
+                      {copiedId === 'traefik-copy' ? <Check className="w-3 h-3 text-emerald-300" /> : <Copy className="w-3 h-3" />}
+                      <span>{copiedId === 'traefik-copy' ? 'Copié' : 'Copy'}</span>
+                    </button>
+                  </div>
+
+                  <p className="text-xs text-[#527470]">
+                    {lang === 'FR'
+                      ? 'Fichier /etc/traefik/dynamic/pantryo.yml :'
+                      : 'File /etc/traefik/dynamic/pantryo.yml :'}
+                  </p>
+
+                  <div className="p-3 rounded-xl bg-[#0F172A] border border-slate-700 font-mono text-[11px] text-emerald-400">
+                    <pre className="whitespace-pre-wrap">{`http:
+  routers:
+    pantryo-secure:
+      rule: "Host(\`pantry.yourdomain.com\`)"
+      entryPoints:
+        - websecure
+      service: pantryo-service
+      tls:
+        certResolver: myresolver
+  services:
+    pantryo-service:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:3000"`}</pre>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
