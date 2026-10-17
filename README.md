@@ -218,6 +218,20 @@ pantry.yourdomain.com {
 }
 ```
 
+### 3. Tailscale Funnel (Zero-Port-Forwarding & Automatic SSL)
+Run inside your Pantryo container:
+```bash
+# 1. Install & configure userspace mode for unprivileged containers
+curl -fsSL https://tailscale.com/install.sh | sh
+echo 'FLAGS="--tun=userspace-networking"' >> /etc/default/tailscaled && systemctl enable --now tailscaled
+
+# 2. Authenticate & expose publicly
+tailscale up --operator=pantryo
+tailscale funnel --bg 3000
+tailscale cert <hostname>.<tailnet>.ts.net
+```
+Ensure your [Tailscale ACLs](https://login.tailscale.com/admin/acls) include `"nodeAttrs": [{"target": ["autogroup:member"], "attr": ["funnel"]}]`.
+
 ---
 
 ## 📱 Progressive Web App & Expo Mobile

@@ -339,25 +339,35 @@ sudo cloudflared service install <YOUR_CLOUDFLARE_TUNNEL_TOKEN>
 
 ---
 
-### Option C: Tailscale Funnel (Zero-Config HTTPS)
+### Option C: Tailscale Funnel (Zero-Config HTTPS & Remote Access)
 
 [Tailscale Funnel](https://tailscale.com/kb/1223/funnel) allows you to route public internet HTTPS traffic (or restricted Tailnet-only traffic) directly to your Pantryo container with automated Let's Encrypt certificates and zero router configuration.
 
-#### 1. Install Tailscale on your Host / Container
+> [!IMPORTANT]
+> **Container vs Host:** Always run Tailscale commands **inside the Pantryo container** (`pct enter <CTID>`), NOT on the Proxmox hypervisor host. Running inside the container connects Tailscale directly to Pantryo running on `localhost:3000`.
+
+#### 1. Install Tailscale inside the Container
 ```bash
 curl -fsSL https://tailscale.com/install.sh | sh
 ```
 
-#### 2. Authenticate the Node
+#### 2. Enable Userspace Mode (Crucial for Unprivileged Containers)
+Unprivileged LXC containers may block `/dev/net/tun` kernel access. Enable Tailscale's high-compatibility userspace mode:
 ```bash
-sudo tailscale up --operator=pantryo
+echo 'FLAGS="--tun=userspace-networking"' >> /etc/default/tailscaled
+systemctl enable --now tailscaled
 ```
-Open the generated authentication URL in your browser and log in with your Tailscale identity.
 
-#### 3. Enable Funnel in Tailscale Admin Console (One-Time Prerequisite)
-Ensure your Tailnet Access Control List (ACL) enables the `funnel` attribute:
+#### 3. Authenticate with your Tailscale Account
+```bash
+tailscale up --operator=pantryo
+```
+Open the generated authentication URL in your browser and approve the machine node.
+
+#### 4. Configure Tailscale Admin Access Controls (One-Time Setup)
+Tailscale requires an ACL policy allowing the `funnel` attribute before it publishes public internet DNS records:
 1. Open [Tailscale Access Controls](https://login.tailscale.com/admin/acls).
-2. Under `nodeAttrs`, ensure `funnel` is permitted for your members:
+2. Ensure `nodeAttrs` contains the `funnel` grant:
 ```json
 "nodeAttrs": [
   {
@@ -366,32 +376,48 @@ Ensure your Tailnet Access Control List (ACL) enables the `funnel` attribute:
   }
 ]
 ```
-3. Ensure **MagicDNS** and **HTTPS Certificates** are enabled under **DNS** settings.
+3. In [Tailscale DNS Settings](https://login.tailscale.com/admin/dns), make sure **MagicDNS** and **HTTPS Certificates** are toggled **ON**.
 
-#### 4. Expose Pantryo via Tailscale Funnel
+#### 5. Expose Pantryo on Port 3000
 Run the background Funnel command targeting port `3000`:
 ```bash
 # Public HTTPS on the internet (accessible anywhere, e.g. at the grocery store):
-sudo tailscale funnel --bg 3000
+tailscale funnel --bg 3000
 
-# OR: Private Tailnet-only access (accessible only by your family's enrolled devices):
-sudo tailscale serve --bg 3000
+# OR: Private Tailnet-only access (accessible only when connected to Tailscale VPN):
+tailscale serve --bg 3000
 ```
 
-#### 5. Verify Status & Configure Environment
-Check your live domain name:
+#### 6. Issue SSL Certificate & Publish Public DNS
+Run this command to force immediate Let's Encrypt certificate issuance and public DNS record publication:
+```bash
+tailscale cert <your-container-hostname>.<your-tailnet-name>.ts.net
+```
+
+#### 7. Verify Status & Access
+Check your live public routing:
 ```bash
 tailscale funnel status
 ```
 Your public URL will look like:
 ```text
-https://pantryo.<your-tailnet-name>.ts.net
+https://pantryo2.<your-tailnet-name>.ts.net
 ```
-In `/opt/pantryo/.env`, set:
-```bash
-APP_URL=https://pantryo.<your-tailnet-name>.ts.net
-```
-Then restart the service: `sudo systemctl restart pantryo.service`. Tailscale automatically manages and renews TLS certificates.
+In `/opt/pantryo/.env`, set `APP_URL=https://pantryo2.<your-tailnet-name>.ts.net` and restart: `systemctl restart pantryo.service`.
+
+#### 📱 Mobile App (PWA) Installation
+When opening your HTTPS URL on your smartphone:
+- **iPhone (Safari)**: Tap the **Share** icon (square with arrow) ➔ **Add to Home Screen**.
+- **Android (Chrome)**: Tap the **three dots** menu ➔ **Add to Home Screen** / **Install app**.
+This enables full-screen application mode, native camera barcode scanning, and instant home inventory access.
+
+#### 🛠️ Tailscale Funnel Troubleshooting
+| Symptom | Cause | Solution |
+| :--- | :--- | :--- |
+| `modprobe: FATAL: module tun not found` | Container lacks `/dev/net/tun` | Run `echo 'FLAGS="--tun=userspace-networking"' >> /etc/default/tailscaled && systemctl restart tailscaled`. |
+| `DNS_PROBE_FINISHED_NXDOMAIN` in browser | Browser or ISP cached negative DNS | Clear Chrome host cache at `chrome://net-internals/#dns` or test in an Incognito / Private window. |
+| `nslookup <domain> 8.8.8.8` returns `No answer` | Tailscale ACL lacks `funnel` attribute | Add `"nodeAttrs": [{"target": ["autogroup:member"], "attr": ["funnel"]}]` to `https://login.tailscale.com/admin/acls` and save. |
+| Status shows `(tailnet only)` | `tailscale serve` was run instead of `funnel` | Run `tailscale funnel --bg 3000` to re-enable public internet routing. |
 
 ---
 

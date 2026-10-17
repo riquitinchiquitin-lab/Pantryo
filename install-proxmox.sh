@@ -105,6 +105,14 @@ if command -v pveversion >/dev/null 2>&1; then
       --password "$CT_PASSWORD" \
       --onboot 1
 
+    # Automatically permit /dev/net/tun device in unprivileged container for Tailscale / WireGuard
+    if [ -f "/etc/pve/lxc/${CT_ID}.conf" ]; then
+      cat <<'EOF_TUN' >> "/etc/pve/lxc/${CT_ID}.conf"
+lxc.cgroup2.devices.allow: c 10:200 rwm
+lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
+EOF_TUN
+    fi
+
     echo -e "${BLUE}Starting Container ${CT_ID}...${NC}"
     pct start "$CT_ID"
     sleep 4
@@ -472,23 +480,31 @@ EOF
     echo -e "\n${GREEN}${BOLD}========================================================================${NC}"
     echo -e "${GREEN}${BOLD}          🛡️ Tailscale Funnel Setup Commands & Instructions            ${NC}"
     echo -e "${GREEN}${BOLD}========================================================================${NC}"
-    echo -e "To route public HTTPS or tailnet traffic to Pantryo on port ${APP_PORT}:"
+    echo -e "IMPORTANT: Run these commands ${BOLD}INSIDE the Container Shell${NC} (not the host)!"
     echo -e ""
-    echo -e "${BOLD}Step 1: Install Tailscale CLI (if not already installed):${NC}"
+    echo -e "${BOLD}Step 1: Install Tailscale inside Container:${NC}"
     echo -e "  ${CYAN}curl -fsSL https://tailscale.com/install.sh | sh${NC}"
     echo -e ""
-    echo -e "${BOLD}Step 2: Authenticate Node with your Tailscale Account:${NC}"
+    echo -e "${BOLD}Step 2: Enable Userspace Mode (if unprivileged container lacks /dev/net/tun):${NC}"
+    echo -e "  ${CYAN}echo 'FLAGS=\"--tun=userspace-networking\"' >> /etc/default/tailscaled${NC}"
+    echo -e "  ${CYAN}systemctl enable --now tailscaled${NC}"
+    echo -e ""
+    echo -e "${BOLD}Step 3: Authenticate with your Tailscale Account:${NC}"
     echo -e "  ${CYAN}tailscale up --operator=pantryo${NC}"
     echo -e "  ► Open the generated login URL in your browser to approve the node."
     echo -e ""
-    echo -e "${BOLD}Step 3: Enable Tailscale Funnel (Public HTTPS with automated SSL):${NC}"
+    echo -e "${BOLD}Step 4: Enable Tailscale Funnel on port ${APP_PORT}:${NC}"
     echo -e "  ${CYAN}tailscale funnel --bg ${APP_PORT}${NC}"
     echo -e "  (Note: For private Tailnet access only without public Internet exposure,"
     echo -e "   run: ${CYAN}tailscale serve --bg ${APP_PORT}${NC})"
     echo -e ""
-    echo -e "${BOLD}Step 4: Tailscale Admin Console Requirement:${NC}"
-    echo -e "  Ensure ${BOLD}Funnel${NC} is allowed in your Tailscale Access Controls (ACL):"
-    echo -e "  https://login.tailscale.com/admin/acls"
+    echo -e "${BOLD}Step 5: Publish Public DNS & Generate SSL Certificate:${NC}"
+    echo -e "  ${CYAN}tailscale cert <your-node-name>.<your-tailnet>.ts.net${NC}"
+    echo -e "  ► This forces Tailscale to publish public DNS records immediately."
+    echo -e ""
+    echo -e "${BOLD}Step 6: Tailscale Admin Console ACL Requirement:${NC}"
+    echo -e "  Ensure ${BOLD}Funnel${NC} is allowed under https://login.tailscale.com/admin/acls:"
+    echo -e "  ${YELLOW}\"nodeAttrs\": [ { \"target\": [\"autogroup:member\"], \"attr\": [\"funnel\"] } ]${NC}"
     echo -e "${GREEN}========================================================================${NC}\n"
     ;;
   local_lan)

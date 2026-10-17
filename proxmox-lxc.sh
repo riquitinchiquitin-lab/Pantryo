@@ -102,6 +102,14 @@ pct create "$CTID" "local:vztmpl/${TEMPLATE}" \
   --password "$CT_PASSWORD" \
   -onboot 1
 
+# Automatically permit /dev/net/tun device in unprivileged container for Tailscale / WireGuard
+if [ -f "/etc/pve/lxc/${CTID}.conf" ]; then
+  cat <<'EOF_TUN' >> "/etc/pve/lxc/${CTID}.conf"
+lxc.cgroup2.devices.allow: c 10:200 rwm
+lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
+EOF_TUN
+fi
+
 echo -e "${BL}[INFO] Starting container ${CTID}...${CL}"
 pct start "$CTID"
 sleep 4
