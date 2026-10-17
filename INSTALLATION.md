@@ -333,9 +333,38 @@ sudo apt update && sudo apt install -y cloudflared
 sudo cloudflared service install <YOUR_CLOUDFLARE_TUNNEL_TOKEN>
 ```
 
-4. In the Cloudflare dashboard, route your public hostname (e.g. `pantryo.yourdomain.com`) to:
+4. In the Cloudflare Zero Trust dashboard (**Networks ➔ Tunnels ➔ Public Hostname**), configure your routing:
+   - **Public Hostname**: e.g., `pantryo` under `yourdomain.com` (creates `https://pantryo.yourdomain.com`)
    - **Service Type**: `HTTP`
-   - **URL**: `localhost:3000`
+   - **URL Configuration Matrix**:
+
+| Deployment Type | Correct Service URL | Why |
+| :--- | :--- | :--- |
+| **Proxmox LXC / Raspberry Pi / Bare Metal Linux** | **`localhost:3000`** *(or `127.0.0.1:3000`)* | `cloudflared` runs directly on the OS and communicates via local loopback. |
+| **Docker / Docker Compose** | **`app:3000`** | `cloudflared` runs as a sibling container in the internal Docker network. |
+
+> [!WARNING]
+> If you set `app:3000` inside a Proxmox LXC container or VM, Cloudflare will fail with `Unable to reach the origin service...app:3000` because `app` only resolves inside Docker networks. Always use `localhost:3000` for LXC and Linux VMs.
+
+#### 5. Verify Tunnel Status & Real-Time Logs
+```bash
+# Check tunnel service status:
+systemctl status pantryo-tunnel.service
+
+# View live tunnel connection events:
+journalctl -u pantryo-tunnel.service -f
+
+# Verify backend application is running on port 3000:
+curl -I http://127.0.0.1:3000
+```
+
+#### 🛠️ Cloudflare Tunnel Troubleshooting
+| Error / Symptom | Root Cause | Fix |
+| :--- | :--- | :--- |
+| `ERR Unable to reach origin ... app:3000` | Hostname set to `app:3000` in LXC/Linux | In Cloudflare Dashboard ➔ Tunnels ➔ Edit Hostname ➔ change URL to `localhost:3000`. |
+| `curl: (7) Failed to connect ... port 443 after 0 ms` | Container lacking IPv6 gateway | Container queried Cloudflare's IPv6 record first without an IPv6 route. Test with `curl -4` or open directly in your phone/PC browser. |
+| `Cloudflare Error 502 Bad Gateway` | `pantryo.service` is stopped | Run `systemctl start pantryo.service` inside the container. |
+| `Cloudflare Error 1033` | Tunnel daemon is offline | Run `systemctl restart pantryo-tunnel.service` and verify token. |
 
 ---
 

@@ -473,6 +473,13 @@ EOF
         systemctl enable pantryo-tunnel.service 2>/dev/null || true
         systemctl restart pantryo-tunnel.service 2>/dev/null || true
         echo -e "${GREEN}✓ Cloudflare tunnel service 'pantryo-tunnel.service' enabled & active.${NC}"
+        echo -e "${CYAN}${BOLD}[Cloudflare Dashboard Configuration]${NC}"
+        echo -e "  In Cloudflare Zero Trust (Networks > Tunnels > Edit > Public Hostnames):"
+        echo -e "  • Service Type: ${BOLD}HTTP${NC}"
+        echo -e "  • Service URL:  ${GREEN}${BOLD}localhost:${APP_PORT}${NC} (or ${GREEN}127.0.0.1:${APP_PORT}${NC})"
+        echo -e "  ⚠️  Do NOT set 'app:${APP_PORT}' (that is only for Docker; in LXC use localhost:${APP_PORT})."
+        echo -e "  • Check tunnel status: ${BOLD}systemctl status pantryo-tunnel.service${NC}"
+        echo -e "  • Live tunnel logs:    ${BOLD}journalctl -u pantryo-tunnel.service -f${NC}\n"
       fi
     fi
     ;;
