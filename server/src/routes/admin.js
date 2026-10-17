@@ -21,38 +21,18 @@ const router = express.Router();
  */
 export function requireAdmin(req, res, next) {
   const authUser = getAuthenticatedUserFromRequest(req);
-  if (authUser) {
-    if (authUser.role === "ADMIN") {
-      req.user = authUser;
-      return next();
-    }
+  if (!authUser) {
+    return res.status(401).json({
+      error: "Administrator authorization required. Access denied. Please provide a valid session token.",
+    });
+  }
+  if (authUser.role !== "ADMIN") {
     return res.status(403).json({
       error: "Administrator authorization required. Current account role is insufficient.",
     });
   }
-
-  // Graceful fallback for authenticated active admin session or local single-admin household
-  const fallbackId = req.headers["x-user-id"] || req.body?.userId;
-  if (fallbackId) {
-    const user = dbStore.users.find(
-      (u) => u.id === fallbackId || u.email?.toLowerCase() === String(fallbackId).toLowerCase()
-    );
-    if (user && user.role === "ADMIN") {
-      req.user = user;
-      return next();
-    }
-  }
-
-  // Default household administrator fallback if request is made locally without explicit token
-  const defaultAdmin = dbStore.users.find((u) => u.role === "ADMIN") || dbStore.users[0];
-  if (defaultAdmin && !req.headers["authorization"] && !req.headers["x-auth-token"]) {
-    req.user = defaultAdmin;
-    return next();
-  }
-
-  return res.status(401).json({
-    error: "Administrator authorization required. Access denied. Please provide a valid session token.",
-  });
+  req.user = authUser;
+  return next();
 }
 
 /**
@@ -60,31 +40,13 @@ export function requireAdmin(req, res, next) {
  */
 export function requireAuth(req, res, next) {
   const authUser = getAuthenticatedUserFromRequest(req);
-  if (authUser) {
-    req.user = authUser;
-    return next();
+  if (!authUser) {
+    return res.status(401).json({
+      error: "Authentication required. Please provide a valid session token.",
+    });
   }
-
-  const fallbackId = req.headers["x-user-id"] || req.body?.userId;
-  if (fallbackId) {
-    const user = dbStore.users.find(
-      (u) => u.id === fallbackId || u.email?.toLowerCase() === String(fallbackId).toLowerCase()
-    );
-    if (user) {
-      req.user = user;
-      return next();
-    }
-  }
-
-  const defaultUser = dbStore.users.find((u) => u.role === "ADMIN") || dbStore.users[0];
-  if (defaultUser && !req.headers["authorization"] && !req.headers["x-auth-token"]) {
-    req.user = defaultUser;
-    return next();
-  }
-
-  return res.status(401).json({
-    error: "Authentication required. Please provide a valid session token.",
-  });
+  req.user = authUser;
+  return next();
 }
 
 /**
@@ -109,7 +71,6 @@ router.get("/public-members", (req, res) => {
   const publicUsers = dbStore.users.map((u) => ({
     id: u.id,
     name: u.name,
-    email: u.email,
     avatarUrl: u.avatarUrl || "/avatars/chef-cat.svg",
     role: u.role,
     fido2Enabled: Boolean(u.fido2Enabled && u.fido2Credentials?.length > 0),
@@ -952,13 +913,28 @@ router.post("/users/:id/complete-setup", async (req, res) => {
  */
 router.post("/users/:id/change-password", async (req, res) => {
   try {
-    const { newPassword } = req.body;
+    const { newPassword, currentPassword } = req.body;
     if (!newPassword) {
       return res.status(400).json({ error: "New password is required" });
     }
 
     const user = dbStore.users.find((u) => u.id === req.params.id);
     if (!user) return res.status(404).json({ error: "User not found" });
+
+    // If account is not in mandatory initial setup mode, verify current password or active admin session
+    if (!user.mustChangePassword) {
+      const authUser = getAuthenticatedUserFromRequest(req);
+      const isCallerAdmin = authUser && authUser.role === "ADMIN";
+      if (!isCallerAdmin) {
+        if (!currentPassword) {
+          return res.status(400).json({ error: "Current password is required to change password." });
+        }
+        const verify = dbStore.authenticateUser(user.email || user.name || user.id, currentPassword);
+        if (!verify.success) {
+          return res.status(401).json({ error: "Current password verification failed." });
+        }
+      }
+    }
 
     // Validate new password against NIST SP 800-63B
     const validation = await validatePasswordNist(newPassword, {

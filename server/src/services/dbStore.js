@@ -54,7 +54,22 @@ export function getActiveServerKey() {
       console.warn("[Pantryo DB] Could not read master key file:", e.message);
     }
   }
-  return "pantryo-master-secret-key-2026-aes256gcm-secure";
+
+  // Generate random 256-bit key on the fly and persist with restrictive 0600 permissions
+  try {
+    const generated = crypto.randomBytes(32).toString("hex");
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 });
+    }
+    fs.writeFileSync(MASTER_KEY_FILE, generated, { encoding: "utf8", mode: 0o600 });
+    customActiveKey = generated;
+    console.log("[Pantryo DB] Generated new cryptographically secure 256-bit master key (mode 0600).");
+    return customActiveKey;
+  } catch (err) {
+    console.error("[Pantryo DB] Failed to persist new master key:", err.message);
+    customActiveKey = crypto.randomBytes(32).toString("hex");
+    return customActiveKey;
+  }
 }
 
 export function setActiveServerKey(newKey) {

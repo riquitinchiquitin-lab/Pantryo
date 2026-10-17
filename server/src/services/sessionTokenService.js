@@ -124,8 +124,12 @@ export function getAuthenticatedUserFromRequest(req) {
     }
   }
 
-  if (!token && req.query && typeof req.query.token === "string") {
-    token = req.query.token.trim();
+  // Also support extracting from secure cookie if headers not provided
+  if (!token && req.headers?.cookie) {
+    const match = req.headers.cookie.match(/(?:^|;\s*)pantryo_session=([^;]+)/);
+    if (match) {
+      token = decodeURIComponent(match[1]).trim();
+    }
   }
 
   if (!token) {

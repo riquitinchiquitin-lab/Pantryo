@@ -192,13 +192,7 @@ router.post("/auth-options", async (req, res) => {
 router.post("/auth-verify", async (req, res) => {
   try {
     const { userId, username, response } = req.body || {};
-    let user = findUser(userId || username);
-    if (!user && req.headers["x-user-id"]) {
-      user = findUser(req.headers["x-user-id"]);
-    }
-    if (!user && dbStore.users.length === 1) {
-      user = dbStore.users[0];
-    }
+    const user = findUser(userId || username);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -206,8 +200,13 @@ router.post("/auth-verify", async (req, res) => {
       return res.status(400).json({ error: "Missing authentication response payload" });
     }
 
-    // Check if it's a simulated token verification
+    // Check if it's a simulated token verification (strictly prohibited in production)
     if (response.id?.startsWith("sim_fido2_")) {
+      if (process.env.NODE_ENV === "production" && process.env.ENABLE_AUTH_SIMULATION !== "true") {
+        return res.status(403).json({
+          error: "Simulated WebAuthn credentials are strictly prohibited in production. Real hardware Passkey or TOTP verification is required.",
+        });
+      }
       const match = (user.fido2Credentials || []).find((c) => c.id === response.id);
       if (!match) {
         return res.status(400).json({ error: "Invalid simulated FIDO2 key" });
@@ -289,17 +288,24 @@ router.post("/verify-recovery-code", async (req, res) => {
  * POST /api/v1/auth/fido2/simulate-enroll
  * Fast virtual enrollment for testing without hardware (prohibited when installed)
  */
-router.post("/simulate-enroll", (req, res) => {
+router.post("/simulate-enroll", requireAuth, (req, res) => {
   try {
-    const isInstalledClient = req.headers["x-pwa-standalone"] === "true" || req.query.installed === "true";
-    if (isInstalledClient) {
+    const isProd = process.env.NODE_ENV === "production";
+    const isSimulationAllowed = process.env.ENABLE_AUTH_SIMULATION === "true";
+    if (isProd && !isSimulationAllowed) {
       return res.status(403).json({
-        error: "Virtual testing bypass is strictly disabled when the application is installed. Real hardware Passkey (Touch ID, Face ID, YubiKey) or 6-digit TOTP code is required.",
+        error: "Virtual testing bypass is disabled in production environments. Real hardware Passkey (Touch ID, Face ID, YubiKey) or 6-digit TOTP code is required.",
       });
     }
 
     const { userId, friendlyName } = req.body;
-    const user = findUser(userId);
+    const targetUserId = userId || req.user.id;
+    // Users can only enroll for themselves unless caller is admin
+    if (req.user.role !== "ADMIN" && req.user.id !== targetUserId) {
+      return res.status(403).json({ error: "Unauthorized enrollment attempt." });
+    }
+
+    const user = findUser(targetUserId);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -323,14 +329,15 @@ router.post("/simulate-enroll", (req, res) => {
 
 /**
  * POST /api/v1/auth/fido2/simulate-auth
- * Fast virtual authentication challenge for sandbox testing (prohibited when installed)
+ * Fast virtual authentication challenge for sandbox testing (strictly prohibited in production)
  */
 router.post("/simulate-auth", (req, res) => {
   try {
-    const isInstalledClient = req.headers["x-pwa-standalone"] === "true" || req.query.installed === "true";
-    if (isInstalledClient) {
+    const isProd = process.env.NODE_ENV === "production";
+    const isSimulationAllowed = process.env.ENABLE_AUTH_SIMULATION === "true";
+    if (isProd && !isSimulationAllowed) {
       return res.status(403).json({
-        error: "Virtual testing bypass is strictly disabled when the application is installed. Real hardware Passkey (Touch ID, Face ID, YubiKey) or 6-digit TOTP code is required.",
+        error: "Virtual testing bypass is strictly disabled in production. Real hardware Passkey (Touch ID, Face ID, YubiKey) or 6-digit TOTP code is required.",
       });
     }
 
