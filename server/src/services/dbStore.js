@@ -962,7 +962,9 @@ class EncryptedDatabaseStore {
 
     const configuredMode = this.systemSettings?.hostingMode || (
       (this.systemSettings?.cloudflareTunnelToken || process.env.CLOUDFLARE_TUNNEL_TOKEN) ? "cloudflare" :
-      (this.systemSettings?.appUrl && !this.systemSettings.appUrl.includes("localhost") && !this.systemSettings.appUrl.includes("127.0.0.1") && !this.systemSettings.appUrl.includes(".local")) ? "custom_domain" : "local_lan"
+      (this.systemSettings?.appUrl && this.systemSettings.appUrl.includes(".ts.net")) ? "tailscale" :
+      (process.env.PANTRYO_HOSTING_MODE === "tailscale_funnel" || process.env.PANTRYO_HOSTING_MODE === "tailscale") ? "tailscale" :
+      (this.systemSettings?.appUrl && !this.systemSettings.appUrl.includes("localhost") && !this.systemSettings.appUrl.includes("127.0.0.1") && !this.systemSettings.appUrl.includes(".local")) ? "tailscale" : "local_lan"
     );
 
     const configuredCustomDomain = this.systemSettings?.customDomain || (

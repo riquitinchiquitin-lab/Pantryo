@@ -125,9 +125,9 @@ echo -e "${GN}==================================================================
 
 echo -e "${BL}[INFO] Launching interactive Pantryo setup inside container...${CL}"
 echo -e "${YW}[INFO] You will now be prompted for your Administrator credentials, 256-bit SQLCipher key,${CL}"
-echo -e "${YW}       Reverse Proxy (Cloudflare, Caddy, Nginx, NPM, Traefik), and Gemini API Key.${CL}"
+echo -e "${YW}       Access Mode (Local LAN, Cloudflare Tunnel, Tailscale Funnel), and Gemini API Key.${CL}"
 echo -e "${YW}       (Remember: all of these values can also be updated anytime inside the web Admin Pane!)${CL}\n"
-pct exec "$CTID" -- bash -c "apt-get update && apt-get install -y git curl ca-certificates sudo"
+pct exec "$CTID" -- bash -c "export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get dist-upgrade -y && apt-get install -y git curl ca-certificates sudo unattended-upgrades"
 pct exec "$CTID" -- bash -c "mkdir -p /opt/pantryo && cd /opt"
 pct exec "$CTID" -- bash -c "git clone https://github.com/riquitinchiquitin-lab/Pantryo.git /opt/pantryo || (cd /opt/pantryo && git pull) || true"
 pct exec "$CTID" -- bash -c "cd /opt/pantryo && chmod +x install-proxmox.sh && ./install-proxmox.sh"

@@ -1,132 +1,76 @@
-# Proxmox LXC & Reverse Proxy Interactive Installer Suite
+# Implementation Plan: Proxmox Script Hardening, Fix Root Build Error & Tailscale Funnel
 
-Comprehensive upgrade to the Pantryo Proxmox VE LXC installer and universal Linux setup scripts, introducing interactive container root password provisioning, auto-generated SQLCipher 256-bit encryption keys for password managers, and a 5-way reverse proxy configuration menu (Cloudflare Tunnel, Caddy, Nginx + Let's Encrypt, Nginx Proxy Manager, Traefik).
-
----
-
-## User Review & Critical Decisions
-
-> [!IMPORTANT]
-> The following choices were confirmed during Phase 1 clarification:
-> - **Container Root Password**: Interactive prompt during container creation with option to press Enter to auto-generate a secure 20-character password, which is then formatted for easy copying into a password manager.
-> - **Reverse Proxy Selection**: Interactive numbered menu during installation presenting all 5 external access / reverse proxy options (Cloudflare Tunnel, Caddy, Nginx & Certbot, NPM, Traefik) plus a LAN-only option.
+Automate all container security hardening directly inside `install-proxmox.sh`, fix the `/root/package.json` missing directory error, streamline ingress options to **Local Network (LAN)**, **Cloudflare Zero Trust Tunnel**, and **Tailscale Funnel** (removing Caddy, Nginx, NPM, and Traefik), and provide comprehensive setup instructions.
 
 ---
 
-## 1. Overview & Core Concept
+## 1. Problem Analysis & Root Cause
 
-When deploying self-hosted software like Pantryo on Proxmox VE or Linux bare-metal, system administrators require seamless onboarding for:
-1. **Container Security & Credentials**: Explicitly setting or securely generating the container's `root` password and SQLite SQLCipher database encryption key, avoiding ambiguous defaults and ensuring credentials can be stored in password managers (Bitwarden, 1Password, KeePass).
-2. **Flexible Ingress / Reverse Proxy**: Every homelab uses different networking infrastructure. Providing pre-configured, battle-tested templates for Cloudflare Zero Trust, Caddy (automatic ACME HTTPS), Nginx with Certbot, Nginx Proxy Manager, and Traefik eliminates manual configuration friction.
+1. **`npm error enoent Could not read package.json: open '/root/package.json'`**:
+   - In `install-proxmox.sh`, line 144 had `INSTALL_DIR="${INSTALL_DIR:-$(pwd)}"`.
+   - When a user executes the 1-line script (`bash -c "$(curl -fsSL ...)"`) in their Proxmox LXC shell as `root`, `pwd` is `/root`.
+   - The script did not clone or extract the Pantryo repository into `/root`, leading `npm install` and `npm run build` at step 4/5 to fail looking for `/root/package.json`.
+   - **Fix**: Guarantee `INSTALL_DIR="/opt/pantryo"`. If `package.json` is not present, install `git` and clone `https://github.com/riquitinchiquitin-lab/Pantryo.git` into `/opt/pantryo`. Always `cd "$INSTALL_DIR"` and verify `package.json` before any npm invocation.
 
----
+2. **Automated Security Hardening**:
+   - The script will now automatically apply all security hardening steps during installation:
+     - Install `unattended-upgrades` and enable daily automated security patching via `/etc/cron.daily/pantryo-security-updates`.
+     - Create a dedicated unprivileged system user (`pantryo`) with `nologin` shell.
+     - Set strict permissions: `chmod 600 /opt/pantryo/.env`, `chmod 700 /opt/pantryo/server/data`, and ownership `pantryo:pantryo`.
+     - Configure `pantryo.service` systemd unit with `User=pantryo`, `Group=pantryo`, and full system sandboxing (`NoNewPrivileges=true`, `PrivateTmp=true`, `ProtectSystem=full`, `ProtectHome=true`, `ProtectKernelTunables=true`, `ProtectControlGroups=true`, `RestrictRealtime=true`, `LockPersonality=true`).
+     - Auto-run `scripts/security-harden-container.sh` to ensure 0 pending OS CVEs.
 
-## 2. User Experience & Wizard Flow
-
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│               Pantryo - Proxmox VE LXC Installer                       │
-│        Smart Kitchen Food Inventory, Receipts & Meal Planning          │
-└────────────────────────────────────────────────────────────────────────┘
-
-[Step 1: Container Provisioning & Credentials]
-  ├─ Container ID [206]: 
-  ├─ Container Hostname [pantryo]: 
-  ├─ RAM Allocation [1024 MB]: 
-  ├─ Disk Allocation [8 GB]: 
-  └─ Container Root Password:
-     [Enter for auto-generated 20-char secure password, or type custom]
-     ► Generated Password:  X9$mK#2pL8vN!4qR7wY0
-     (Displayed in copy-friendly format for password managers)
-
-[Step 2: SQLite SQLCipher 256-bit Encryption Key]
-  ├─ Auto-generated 256-bit AES-GCM Key:
-  │  27f76ac5ffba8d8497dec5374687f317132443edc16e8c624c175e25edf48ea1
-  └─ [Saved to /opt/pantryo/.env as DB_ENCRYPTION_KEY]
-
-[Step 3: Web Admin Account]
-  ├─ Full Name / Display Name [Alex]:
-  ├─ Username [alex]:
-  └─ Password (min 8 chars, NIST SP 800-63B compliant):
-
-[Step 4: Reverse Proxy & Ingress Selection]
-  ┌──────────────────────────────────────────────────────────────┐
-  │ 1) Cloudflare Tunnel (Zero port forwarding, instant HTTPS)   │
-  │ 2) Caddy (Automatic HTTPS via Let's Encrypt / Zero-config)   │
-  │ 3) Nginx & Let's Encrypt Certbot (Native systemd + renewal)  │
-  │ 4) Nginx Proxy Manager (NPM GUI - upstream setup guidelines) │
-  │ 5) Traefik v2 / v3 (Dynamic file provider configuration)     │
-  │ 6) LAN Only (HTTP on port 3000, no reverse proxy)            │
-  └──────────────────────────────────────────────────────────────┘
-  Select option [1-6]: 
-```
+3. **Streamline Ingress Options**:
+   - Remove deprecated options: **Caddy**, **Nginx & Let's Encrypt (Certbot)**, **Nginx Proxy Manager (NPM GUI)**, and **Traefik v2/v3**.
+   - Provide 3 clear options:
+     - **Option 1: Local Network Only (LAN Access)** (`http://<ip>:3000` — zero external exposure, ideal for local-only homelabs).
+     - **Option 2: Cloudflare Zero Trust Tunnel** (Zero port-forwarding, automatic SSL, DDoS protection).
+     - **Option 3: Tailscale Funnel** (Direct zero-config HTTPS via Tailscale Funnel, with automated CLI detection and step-by-step setup commands + auth URL).
 
 ---
 
-## 3. Detailed Component Plan
+## 2. Proposed Changes
 
-### A. Proxmox VE Host Installer (`install-proxmox.sh`)
-- **Proxmox VE Detection**: Recognizes when running directly on the hypervisor host (`pveversion`).
-- **Interactive Container Password**:
-  - Prompts: `Container Root Password [press Enter to auto-generate]:`
-  - Generates high-entropy 20-character password using cryptographic randomness.
-  - Passes `--password "$CT_PASSWORD"` to `pct create`.
-  - Displays summary table with credentials ready for password manager entry.
-- **Auto-Generated SQLCipher Encryption Key**:
-  - Generates 64-character hex key (`openssl rand -hex 32`).
-  - Sets `DB_ENCRYPTION_KEY` in `/opt/pantryo/.env`.
-- **Reverse Proxy Ingress Handler**:
-  - Sub-routine for each selected proxy:
-    - **Cloudflare Tunnel**: Prompts for token, installs `cloudflared`, provisions systemd service.
-    - **Caddy**: Prompts for domain, installs `caddy`, generates `/etc/caddy/Caddyfile` with WebSocket proxying, starts service.
-    - **Nginx & Certbot**: Prompts for domain + email, installs `nginx` + `certbot`, creates virtual host with `/api/` streaming and WebSocket support, runs `certbot --nginx`.
-    - **Nginx Proxy Manager**: Configures Pantryo on port 3000, displays exact NPM proxy host configuration parameters (Host, Port 3000, WebSockets Support enabled, Block Common Exploits).
-    - **Traefik**: Creates `/etc/traefik/dynamic/pantryo.yml` configuration with routers and services.
-    - **LAN Only**: Configures binding on `0.0.0.0:3000`.
+### Shell Installation Scripts
+- **`install-proxmox.sh`**:
+  - Fix working directory and repository cloning: default `INSTALL_DIR="/opt/pantryo"`, clone repo if absent, and cd into it.
+  - Update reverse proxy menu: [1] Local Network Only, [2] Cloudflare Tunnel, [3] Tailscale Funnel.
+  - Add Tailscale Funnel configuration handler: displays step-by-step instructions, detects if `tailscale` is installed (or prompts to run installer), provides the exact `tailscale up` and `tailscale funnel 3000` commands.
+  - Implement unprivileged user creation (`pantryo`), directory ownership, and sandboxed systemd service.
+  - Automatically invoke hardening routines.
+- **`proxmox-lxc.sh`**:
+  - Update banner and description to reflect Local Network, Cloudflare Tunnel, and Tailscale Funnel.
+- **`install.sh`**:
+  - Sync options with `install-proxmox.sh` (Local Network, Cloudflare Tunnel, Tailscale Funnel).
 
-### B. Universal Linux Installer (`install.sh`)
-- Adds matching SQLCipher key display, interactive password manager prompts, and the 5-way reverse proxy configuration menu for bare-metal Debian, Ubuntu, Raspberry Pi, and Arch Linux deployments.
+### Documentation & Runbooks
+- **`INSTALLATION.md`**:
+  - Remove Caddy, Nginx, NPM, and Traefik sections.
+  - Add dedicated **Local Network (LAN Only)** setup section with IP reservation and browser bookmark guidance.
+  - Add comprehensive **Tailscale Funnel** setup guide:
+    - What is Tailscale Funnel & how it routes external HTTPS to Pantryo port 3000.
+    - Prerequisites: Tailscale account, MagicDNS enabled, Funnel enabled in Tailscale Admin Console.
+    - Commands: `curl -fsSL https://tailscale.com/install.sh | sh`, `tailscale up`, `tailscale funnel --bg 3000`.
+    - Generating persistent URLs and configuring `.env` `APP_URL`.
+  - Update Proxmox 1-line installer command and troubleshooting FAQ.
 
-### C. In-App Documentation Modal (`src/components/DocumentationModal.tsx`)
-- Updates the **Proxmox** and **Reverse Proxy** documentation tabs with copyable configuration snippets for all 5 reverse proxies (Cloudflare Tunnel, Caddy Caddyfile, Nginx vhost, NPM guide, and Traefik YAML).
-
-### D. Documentation Files (`INSTALLATION.md` & `README.md`)
-- Detailed step-by-step guides for each reverse proxy architecture.
-- Full documentation on container root password management and SQLCipher database key recovery.
-
----
-
-## 4. Technical Architecture & File Layout
-
-```
-                        ┌───────────────────────────────────────────┐
-                        │ Proxmox VE Host or Linux Terminal         │
-                        └─────────────────────┬─────────────────────┘
-                                              │
-                      curl -fsSL .../install-proxmox.sh | bash
-                                              │
-                         ┌────────────────────▼───────────────────┐
-                         │   install-proxmox.sh / install.sh      │
-                         │                                        │
-                         │  1. Container Root Password Generator  │
-                         │  2. SQLCipher 256-bit Key Generator    │
-                         │  3. Admin Account Provisioner          │
-                         │  4. Reverse Proxy Selector [1-5]       │
-                         └────────────────────┬───────────────────┘
-                                              │
-         ┌───────────────┬────────────────────┼───────────────────┬───────────────┐
-         │               │                    │                   │               │
-         ▼               ▼                    ▼                   ▼               ▼
-   [Cloudflare]      [Caddy]               [Nginx]              [NPM]         [Traefik]
-   cloudflared     /etc/caddy/        /etc/nginx/sites-     NPM upstream     /etc/traefik/
-   systemd svc     Caddyfile          available/pantryo     instructions      dynamic/
-                   auto HTTPS         + certbot renewal                       pantryo.yml
-```
+### In-App UI Guides
+- **`src/components/DocumentationModal.tsx`**:
+  - Update the "Reverse Proxy & Accès Distant" tab:
+    - Replace Caddy/Nginx tabs with **Local Network (LAN)** and **Tailscale Funnel**.
+    - Provide interactive copyable command cards for Tailscale Funnel (`tailscale up`, `tailscale funnel 3000`).
+- **`src/components/AdminManagementModal.tsx`**:
+  - Update the Admin Panel Ingress/Domain configuration tab to guide admins on Local Network, Cloudflare Tunnel, and Tailscale Funnel.
 
 ---
 
-## 5. Verification Plan
+## 3. Verification & Testing
 
-1. **Bash Syntax & Validation**: Run `bash -n install-proxmox.sh` and `bash -n install.sh` to guarantee syntax correctness across Debian/Ubuntu/Proxmox shells.
-2. **Reverse Proxy Configuration Output Testing**: Verify generated Caddyfile, Nginx vhost, Traefik config, and Cloudflare systemd definitions.
-3. **Applet Compilation**: Run `compile_applet` and `lint_applet` to ensure full TypeScript and React build integrity for `DocumentationModal.tsx`.
+1. **Syntax & Shellcheck Validation**:
+   - Run `bash -n install-proxmox.sh`, `bash -n install.sh`, and `bash -n proxmox-lxc.sh` to ensure 0 syntax errors.
+2. **Directory Resolution Test**:
+   - Verify that simulated execution from `/root` clones/pulls to `/opt/pantryo` and locates `package.json`.
+3. **Application Build & Lint**:
+   - Run `compile_applet` to confirm all TypeScript components build cleanly with 0 errors.
+4. **Dev Server Verification**:
+   - Restart dev server and verify in-app DocumentationModal and AdminManagementModal reflect the updated setup options.

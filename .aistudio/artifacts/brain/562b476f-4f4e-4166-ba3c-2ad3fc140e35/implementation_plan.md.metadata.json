@@ -1,6 +1,6 @@
 {
-  "summary": "Implementation plan for adding container root password configuration, SQLCipher encryption key generation, and interactive selection for all 5 reverse proxy options (Cloudflare Tunnel, Caddy, Nginx & Certbot, Nginx Proxy Manager, Traefik) in the Proxmox and Linux installers.",
-  "updatedAt": "2026-10-15T23:52:15.791457337Z",
+  "summary": "Implementation plan for Proxmox script hardening, resolving the /root/package.json build error, trimming install options to Local Network, Cloudflare Tunnel, and Tailscale Funnel, and updating documentation and in-app guides.",
+  "updatedAt": "2026-10-16T13:54:25.336545219Z",
   "requestFeedback": true,
   "userFacing": true
 }

@@ -84,7 +84,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
   onCookRecipe,
 }) => {
   const { lang, setLang } = useLanguage();
-  const { startCooking } = useCookingSession();
+  const { startCooking, activeRecipe, currentStepIndex, resumeCooking } = useCookingSession();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<
     'ALL' | 'CHEFS' | 'RICARDO' | 'TROISFOISPARJOUR' | 'JAMIE' | 'CUSTOM' | 'EXPIRING' | 'FAST'
@@ -1293,26 +1293,41 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                       title={lang === 'FR' ? 'Planifier ce repas' : 'Meal plan this recipe'}
                     >
                       <Calendar className="w-3 h-3" />
-                      <span>{lang === 'FR' ? 'Planifier' : 'Plan'}</span>
+                      <span>{lang === 'FR' ? '+ Planifier' : '+ Plan Meal'}</span>
                     </button>
 
                     {/* Cuisiner / Cook Button */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleLaunchCooking(recipe);
-                      }}
-                      className={`px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 transition-all active:scale-95 shadow-2xs cursor-pointer ${
-                        cookedRecipeIds.has(recipe.id)
-                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                          : 'bg-emerald-700 hover:bg-emerald-800 text-white'
-                      }`}
-                      title={lang === 'FR' ? 'Cuisiner cette recette (mode interactif)' : 'Cook this recipe (interactive mode)'}
-                    >
-                      <Utensils className="w-3 h-3" />
-                      <span>{cookedRecipeIds.has(recipe.id) ? (lang === 'FR' ? '✓ Cuisiné' : '✓ Cooked') : (lang === 'FR' ? 'Cuisiner' : 'Cook')}</span>
-                    </button>
+                    {activeRecipe && (activeRecipe.id === recipe.id || activeRecipe.title.trim().toLowerCase() === recipe.title.trim().toLowerCase()) ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          resumeCooking();
+                        }}
+                        className="px-2.5 py-1.5 rounded-xl text-xs font-black bg-[#004D36] text-[#9DF4C7] border border-[#9DF4C7]/60 hover:bg-[#003827] flex items-center gap-1 transition-all active:scale-95 shadow-xs cursor-pointer ring-1 ring-[#9DF4C7]/40"
+                        title={lang === 'FR' ? 'Reprendre la cuisine (étape exacte)' : 'Resume cooking at exact step'}
+                      >
+                        <Play className="w-3 h-3 fill-current" />
+                        <span>{lang === 'FR' ? `Reprendre (${currentStepIndex + 1})` : `Resume (${currentStepIndex + 1})`}</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleLaunchCooking(recipe);
+                        }}
+                        className={`px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 transition-all active:scale-95 shadow-2xs cursor-pointer ${
+                          cookedRecipeIds.has(recipe.id)
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                            : 'bg-[#004D36] hover:bg-[#003827] text-white'
+                        }`}
+                        title={lang === 'FR' ? 'Cuisiner cette recette (mode interactif)' : 'Cook this recipe (interactive mode)'}
+                      >
+                        <Utensils className="w-3 h-3" />
+                        <span>{cookedRecipeIds.has(recipe.id) ? (lang === 'FR' ? '✓ Cuisiné' : '✓ Cooked') : (lang === 'FR' ? 'Cuisiner' : 'Cook')}</span>
+                      </button>
+                    )}
 
                     {/* Expand chevron */}
                     <button
@@ -1532,30 +1547,47 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                       title={lang === 'FR' ? 'Planifier ce repas' : 'Meal plan this recipe'}
                     >
                       <Calendar className="w-3.5 h-3.5" />
-                      <span>{lang === 'FR' ? 'Planifier' : 'Plan'}</span>
+                      <span>{lang === 'FR' ? '+ Planifier' : '+ Plan Meal'}</span>
                     </button>
 
                     {/* Cook Recipe button - Interactive Cooking Mode */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleLaunchCooking(recipe);
-                      }}
-                      className={`py-1.5 px-3.5 rounded-full text-xs font-semibold cursor-pointer flex items-center gap-1.5 transition-all active:scale-95 ${
-                        cookedRecipeIds.has(recipe.id)
-                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs'
-                          : 'm3-btn-tonal text-[var(--md-sys-color-primary)] hover:bg-[var(--md-sys-color-secondary-container)]'
-                      }`}
-                      title={lang === 'FR' ? 'Ouvrir le mode cuisine guidé et déduire les ingrédients' : 'Open interactive guided cooking mode & deduct ingredients'}
-                    >
-                      <Utensils className="w-3.5 h-3.5" />
-                      <span>
-                        {cookedRecipeIds.has(recipe.id)
-                          ? (lang === 'FR' ? '✓ Cuisiné' : '✓ Cooked')
-                          : (lang === 'FR' ? 'Cuisiner' : 'Cook')}
-                      </span>
-                    </button>
+                    {activeRecipe && (activeRecipe.id === recipe.id || activeRecipe.title.trim().toLowerCase() === recipe.title.trim().toLowerCase()) ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          resumeCooking();
+                        }}
+                        className="py-1.5 px-4 rounded-full text-xs font-black cursor-pointer flex items-center gap-1.5 transition-all active:scale-95 bg-[#004D36] text-[#9DF4C7] border border-[#9DF4C7]/60 hover:bg-[#003827] shadow-xs ring-1 ring-[#9DF4C7]/40"
+                        title={lang === 'FR' ? 'Reprendre la cuisine (étape exacte)' : 'Resume cooking at exact step'}
+                      >
+                        <Play className="w-3.5 h-3.5 fill-current" />
+                        <span>
+                          {lang === 'FR' ? `Reprendre (Étape ${currentStepIndex + 1})` : `Resume (Step ${currentStepIndex + 1})`}
+                        </span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleLaunchCooking(recipe);
+                        }}
+                        className={`py-1.5 px-3.5 rounded-full text-xs font-semibold cursor-pointer flex items-center gap-1.5 transition-all active:scale-95 ${
+                          cookedRecipeIds.has(recipe.id)
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs'
+                            : 'm3-btn-tonal text-[var(--md-sys-color-primary)] hover:bg-[var(--md-sys-color-secondary-container)]'
+                        }`}
+                        title={lang === 'FR' ? 'Ouvrir le mode cuisine guidé et déduire les ingrédients' : 'Open interactive guided cooking mode & deduct ingredients'}
+                      >
+                        <Utensils className="w-3.5 h-3.5" />
+                        <span>
+                          {cookedRecipeIds.has(recipe.id)
+                            ? (lang === 'FR' ? '✓ Cuisiné' : '✓ Cooked')
+                            : (lang === 'FR' ? 'Cuisiner' : 'Cook')}
+                        </span>
+                      </button>
+                    )}
                   </div>
 
                   {/* Minimise button */}

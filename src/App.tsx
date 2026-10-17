@@ -33,7 +33,7 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF7EE] text-[#133E3B] flex flex-col font-sans selection:bg-teal-200">
+    <div className="min-h-screen bg-[#FAF7F2] text-[#111A15] flex flex-col font-sans selection:bg-[#9DF4C7] selection:text-[#002115]">
       <main className="flex-1 w-full flex justify-center sm:py-4">
         <MobileSimulator
           mode="webapp"

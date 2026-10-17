@@ -65,32 +65,122 @@ export interface CookingSessionContextValue {
 
 const CookingSessionContext = createContext<CookingSessionContextValue | null>(null);
 
+const STORAGE_KEY = 'pantryo_active_cooking_session';
+
 export const CookingSessionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [activeRecipe, setActiveRecipe] = useState<CookingRecipeData | null>(null);
+  // Load saved session if exists
+  const initialSession = (() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.activeRecipe) {
+          // If timer was running, calculate elapsed time
+          let adjustedTimer = parsed.timerSeconds || 300;
+          if (parsed.isTimerRunning && parsed.savedAt) {
+            const elapsed = Math.floor((Date.now() - parsed.savedAt) / 1000);
+            adjustedTimer = Math.max(0, adjustedTimer - elapsed);
+          }
+          return {
+            ...parsed,
+            timerSeconds: adjustedTimer,
+            isTimerRunning: parsed.isTimerRunning && adjustedTimer > 0,
+            isTimerFinished: adjustedTimer === 0,
+            completedSteps: new Set<number>(parsed.completedSteps || []),
+          };
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to restore cooking session:', e);
+    }
+    return null;
+  })();
+
+  const [activeRecipe, setActiveRecipe] = useState<CookingRecipeData | null>(
+    initialSession ? initialSession.activeRecipe : null
+  );
   const [isOpen, setIsOpen] = useState(false);
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
-  const [servingsMultiplier, setServingsMultiplier] = useState(1);
+  const [currentStepIndex, setCurrentStepIndexState] = useState<number>(
+    initialSession ? initialSession.currentStepIndex || 0 : 0
+  );
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(
+    initialSession ? initialSession.completedSteps : new Set()
+  );
+  const [servingsMultiplier, setServingsMultiplier] = useState(
+    initialSession ? initialSession.servingsMultiplier || 1 : 1
+  );
   const [viewTab, setViewTab] = useState<'step_by_step' | 'all_steps' | 'ingredients'>('step_by_step');
   const [addedGroceryItems, setAddedGroceryItems] = useState<Set<string>>(new Set());
   const [isCookingCompleted, setIsCookingCompleted] = useState(false);
   const [cookingSummary, setCookingSummary] = useState<any | null>(null);
 
   // Timer state
-  const [timerSeconds, setTimerSeconds] = useState(300);
-  const [initialTimerDuration, setInitialTimerDuration] = useState(300);
-  const [isTimerRunning, setIsTimerRunning] = useState(false);
-  const [isTimerFinished, setIsTimerFinished] = useState(false);
+  const [timerSeconds, setTimerSeconds] = useState<number>(
+    initialSession ? Number(initialSession.timerSeconds) || 300 : 300
+  );
+  const [initialTimerDuration, setInitialTimerDuration] = useState<number>(
+    initialSession ? Number(initialSession.initialTimerDuration) || 300 : 300
+  );
+  const [isTimerRunning, setIsTimerRunning] = useState<boolean>(
+    initialSession ? Boolean(initialSession.isTimerRunning) : false
+  );
+  const [isTimerFinished, setIsTimerFinished] = useState<boolean>(
+    initialSession ? Boolean(initialSession.isTimerFinished) : false
+  );
 
   // Handlers
   const [handlers, setHandlers] = useState<CookingSessionHandlers>({});
+
+  // Wrapper for setCurrentStepIndex to accept number or updater function
+  const setCurrentStepIndex = useCallback((updater: number | ((prev: number) => number)) => {
+    setCurrentStepIndexState((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      return next;
+    });
+  }, []);
+
+  // Save active session to localStorage whenever state changes
+  useEffect(() => {
+    if (!activeRecipe) {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {}
+      return;
+    }
+
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          activeRecipe,
+          currentStepIndex,
+          completedSteps: Array.from(completedSteps),
+          servingsMultiplier,
+          timerSeconds,
+          initialTimerDuration,
+          isTimerRunning,
+          savedAt: Date.now(),
+        })
+      );
+    } catch (e) {
+      console.warn('Failed to persist cooking session:', e);
+    }
+  }, [
+    activeRecipe,
+    currentStepIndex,
+    completedSteps,
+    servingsMultiplier,
+    timerSeconds,
+    initialTimerDuration,
+    isTimerRunning,
+  ]);
 
   // Background Timer countdown effect that keeps running across all pages
   useEffect(() => {
     let interval: number | null = null;
     if (isTimerRunning && timerSeconds > 0) {
       interval = window.setInterval(() => {
-        setTimerSeconds((prev) => {
+        setTimerSeconds((prev: number) => {
           if (prev <= 1) {
             setIsTimerRunning(false);
             setIsTimerFinished(true);
@@ -109,9 +199,23 @@ export const CookingSessionProvider: React.FC<{ children: React.ReactNode }> = (
 
   const startCooking = useCallback(
     (recipe: CookingRecipeData, sessionHandlers?: CookingSessionHandlers) => {
+      // Check if user is already cooking this exact recipe: if so, resume without losing step or timer!
+      if (
+        activeRecipe &&
+        ((recipe.id && activeRecipe.id && recipe.id === activeRecipe.id) ||
+          recipe.title.trim().toLowerCase() === activeRecipe.title.trim().toLowerCase())
+      ) {
+        setIsOpen(true);
+        if (sessionHandlers) {
+          setHandlers((prev) => ({ ...prev, ...sessionHandlers }));
+        }
+        return;
+      }
+
+      // Starting a fresh recipe
       setActiveRecipe(recipe);
       setIsOpen(true);
-      setCurrentStepIndex(0);
+      setCurrentStepIndexState(0);
       setCompletedSteps(new Set());
       setServingsMultiplier(1);
       setViewTab('step_by_step');
@@ -131,16 +235,16 @@ export const CookingSessionProvider: React.FC<{ children: React.ReactNode }> = (
         setHandlers(sessionHandlers);
       }
     },
-    []
+    [activeRecipe]
   );
 
   const minimizeCooking = useCallback(() => {
-    // Leaves full-screen cooking mode so user can look at other pages while timer keeps ticking!
+    // Leaves full-screen cooking mode so user can look at other pages while step index and timer remain active!
     setIsOpen(false);
   }, []);
 
   const resumeCooking = useCallback(() => {
-    // Re-opens full-screen cooking mode immediately
+    // Re-opens full-screen cooking mode immediately at the EXACT step the user was at!
     setIsOpen(true);
   }, []);
 
@@ -148,10 +252,15 @@ export const CookingSessionProvider: React.FC<{ children: React.ReactNode }> = (
     // Complete stop and clear
     setActiveRecipe(null);
     setIsOpen(false);
+    setCurrentStepIndexState(0);
+    setCompletedSteps(new Set());
     setIsTimerRunning(false);
     setIsTimerFinished(false);
     setIsCookingCompleted(false);
     setCookingSummary(null);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {}
   }, []);
 
   const toggleStepCompleted = useCallback((index: number) => {
@@ -203,7 +312,7 @@ export const CookingSessionProvider: React.FC<{ children: React.ReactNode }> = (
   }, []);
 
   const addTimerMinutes = useCallback((deltaSecs: number) => {
-    setTimerSeconds((prev) => {
+    setTimerSeconds((prev: number) => {
       const next = Math.max(0, prev + deltaSecs);
       if (next > 0) setIsTimerFinished(false);
       return next;

@@ -39,6 +39,7 @@ import {
 } from '../utils/foodTranslator';
 import { formatRecipeIngredientAmount } from '../data/ricardoRecipes';
 import { playAudioChime } from '../utils/audioAlert';
+import { useCookingSession } from '../contexts/CookingSessionContext';
 
 export interface CookingRecipeData {
   id?: string;
@@ -103,22 +104,50 @@ export const GuidedCookingModal: React.FC<GuidedCookingModalProps> = ({
   onRecipeCookedSuccessfully,
 }) => {
   const { lang } = useLanguage();
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
-  const [viewTab, setViewTab] = useState<'step_by_step' | 'all_steps' | 'ingredients'>('step_by_step');
-  const [servingsMultiplier, setServingsMultiplier] = useState(1);
-  const [isCookingCompleted, setIsCookingCompleted] = useState(false);
-  const [cookingSummary, setCookingSummary] = useState<CookRecipeOutcome | null>(null);
+
+  // Consume shared cooking session so step index and timers persist across minimize / resume
+  let session: ReturnType<typeof useCookingSession> | null = null;
+  try {
+    session = useCookingSession();
+  } catch {
+    session = null;
+  }
+
+  // Local fallback states if rendered outside CookingSessionProvider
+  const [localStepIndex, setLocalStepIndex] = useState(0);
+  const [localCompletedSteps, setLocalCompletedSteps] = useState<Set<number>>(new Set());
+  const [localViewTab, setLocalViewTab] = useState<'step_by_step' | 'all_steps' | 'ingredients'>('step_by_step');
+  const [localServingsMultiplier, setLocalServingsMultiplier] = useState(1);
+  const [localIsCookingCompleted, setLocalIsCookingCompleted] = useState(false);
+  const [localCookingSummary, setLocalCookingSummary] = useState<CookRecipeOutcome | null>(null);
   const [isDeducting, setIsDeducting] = useState(false);
   const [addedGroceryItems, setAddedGroceryItems] = useState<Set<string>>(new Set());
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Kitchen Timer State
-  const [timerSeconds, setTimerSeconds] = useState(300); // 5 minutes default
-  const [initialTimerDuration, setInitialTimerDuration] = useState(300);
-  const [isTimerRunning, setIsTimerRunning] = useState(false);
-  const [isTimerFinished, setIsTimerFinished] = useState(false);
+  // Timer local fallbacks
+  const [localTimerSeconds, setLocalTimerSeconds] = useState(300);
+  const [localInitialTimerDuration, setLocalInitialTimerDuration] = useState(300);
+  const [localIsTimerRunning, setLocalIsTimerRunning] = useState(false);
+  const [localIsTimerFinished, setLocalIsTimerFinished] = useState(false);
   const timerIntervalRef = useRef<number | null>(null);
+
+  // Synchronized state proxies: always prioritize global session
+  const currentStepIndex = session ? session.currentStepIndex : localStepIndex;
+  const setCurrentStepIndex = session ? session.setCurrentStepIndex : setLocalStepIndex;
+  const completedSteps = session ? session.completedSteps : localCompletedSteps;
+  const viewTab = session ? session.viewTab : localViewTab;
+  const setViewTab = session ? session.setViewTab : setLocalViewTab;
+  const servingsMultiplier = session ? session.servingsMultiplier : localServingsMultiplier;
+  const setServingsMultiplier = session ? session.setServingsMultiplier : setLocalServingsMultiplier;
+  const isCookingCompleted = session ? session.isCookingCompleted : localIsCookingCompleted;
+  const setIsCookingCompleted = session ? session.setCookingCompleted : setLocalIsCookingCompleted;
+  const cookingSummary = session ? session.cookingSummary : localCookingSummary;
+  const setCookingSummary = session ? session.setCookingSummary : setLocalCookingSummary;
+
+  const timerSeconds = session ? session.timerSeconds : localTimerSeconds;
+  const initialTimerDuration = session ? session.initialTimerDuration : localInitialTimerDuration;
+  const isTimerRunning = session ? session.isTimerRunning : localIsTimerRunning;
+  const isTimerFinished = session ? session.isTimerFinished : localIsTimerFinished;
 
   // Handle browser fullscreen
   const toggleFullscreen = () => {
@@ -137,35 +166,44 @@ export const GuidedCookingModal: React.FC<GuidedCookingModalProps> = ({
     return () => document.removeEventListener('fullscreenchange', handler);
   }, []);
 
-  // Reset state when a new recipe is opened
+  // ONLY initialize state when starting a completely NEW/DIFFERENT recipe.
+  // NEVER reset the step index (e.g. Step 3 of 10) or timer when resuming or toggling isOpen!
+  const lastActiveRecipeKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    if (isOpen && recipe) {
-      setCurrentStepIndex(0);
-      setCompletedSteps(new Set());
-      setViewTab('step_by_step');
-      setServingsMultiplier(1);
-      setIsCookingCompleted(false);
-      setCookingSummary(null);
-      setIsDeducting(false);
-      setAddedGroceryItems(new Set());
+    if (recipe) {
+      const recipeKey = recipe.id || recipe.title;
+      if (recipeKey !== lastActiveRecipeKeyRef.current) {
+        lastActiveRecipeKeyRef.current = recipeKey;
+        // Brand new recipe initialized
+        if (!session) {
+          setLocalStepIndex(0);
+          setLocalCompletedSteps(new Set());
+          setLocalViewTab('step_by_step');
+          setLocalServingsMultiplier(1);
+          setLocalIsCookingCompleted(false);
+          setLocalCookingSummary(null);
+          setIsDeducting(false);
+          setAddedGroceryItems(new Set());
 
-      // If recipe has cookTimeMinutes, default the timer to it
-      const defaultMinutes = recipe.cookTimeMinutes && recipe.cookTimeMinutes > 0 ? recipe.cookTimeMinutes : 5;
-      setTimerSeconds(defaultMinutes * 60);
-      setInitialTimerDuration(defaultMinutes * 60);
-      setIsTimerRunning(false);
-      setIsTimerFinished(false);
+          const defaultMinutes = recipe.cookTimeMinutes && recipe.cookTimeMinutes > 0 ? recipe.cookTimeMinutes : 5;
+          setLocalTimerSeconds(defaultMinutes * 60);
+          setLocalInitialTimerDuration(defaultMinutes * 60);
+          setLocalIsTimerRunning(false);
+          setLocalIsTimerFinished(false);
+        }
+      }
     }
-  }, [isOpen, recipe]);
+  }, [recipe, session]);
 
-  // Timer Tick Effect
+  // Fallback Timer Tick Effect (only runs if session is absent; session handles background timer)
   useEffect(() => {
-    if (isTimerRunning && timerSeconds > 0) {
+    if (session) return;
+    if (localIsTimerRunning && localTimerSeconds > 0) {
       timerIntervalRef.current = window.setInterval(() => {
-        setTimerSeconds((prev) => {
+        setLocalTimerSeconds((prev) => {
           if (prev <= 1) {
-            setIsTimerRunning(false);
-            setIsTimerFinished(true);
+            setLocalIsTimerRunning(false);
+            setLocalIsTimerFinished(true);
             playAudioChime('timer');
             return 0;
           }
@@ -184,7 +222,7 @@ export const GuidedCookingModal: React.FC<GuidedCookingModalProps> = ({
         clearInterval(timerIntervalRef.current);
       }
     };
-  }, [isTimerRunning, timerSeconds]);
+  }, [session, localIsTimerRunning, localTimerSeconds]);
 
   const [showExitConfirm, setShowExitConfirm] = useState(false);
 
@@ -251,15 +289,19 @@ export const GuidedCookingModal: React.FC<GuidedCookingModalProps> = ({
 
   // Toggle step completed
   const handleToggleStepCompleted = (index: number) => {
-    setCompletedSteps((prev) => {
-      const next = new Set(prev);
-      if (next.has(index)) {
-        next.delete(index);
-      } else {
-        next.add(index);
-      }
-      return next;
-    });
+    if (session) {
+      session.toggleStepCompleted(index);
+    } else {
+      setLocalCompletedSteps((prev) => {
+        const next = new Set(prev);
+        if (next.has(index)) {
+          next.delete(index);
+        } else {
+          next.add(index);
+        }
+        return next;
+      });
+    }
   };
 
   // Perform actual inventory deduction & finalize cooking
@@ -288,27 +330,71 @@ export const GuidedCookingModal: React.FC<GuidedCookingModalProps> = ({
     }
   };
 
-  // Timer helpers
+  // Timer helpers (proxied to global session or local fallback)
+  const handleToggleTimer = () => {
+    if (session) {
+      session.toggleTimer();
+    } else {
+      if (localTimerSeconds <= 0) {
+        setLocalTimerSeconds(localInitialTimerDuration > 0 ? localInitialTimerDuration : 300);
+        setLocalIsTimerFinished(false);
+      }
+      setLocalIsTimerRunning((prev) => !prev);
+    }
+  };
+
+  const handleStartTimer = () => {
+    if (session) {
+      session.startTimer();
+    } else {
+      if (localTimerSeconds <= 0) {
+        setLocalTimerSeconds(localInitialTimerDuration > 0 ? localInitialTimerDuration : 300);
+        setLocalIsTimerFinished(false);
+      }
+      setLocalIsTimerRunning(true);
+    }
+  };
+
+  const handlePauseTimer = () => {
+    if (session) {
+      session.pauseTimer();
+    } else {
+      setLocalIsTimerRunning(false);
+    }
+  };
+
   const handleSetTimerPreset = (minutes: number) => {
-    setIsTimerRunning(false);
-    setIsTimerFinished(false);
-    const secs = minutes * 60;
-    setTimerSeconds(secs);
-    setInitialTimerDuration(secs);
+    if (session) {
+      session.setTimerDuration(minutes);
+    } else {
+      setLocalIsTimerRunning(false);
+      setLocalIsTimerFinished(false);
+      const secs = Math.max(10, minutes * 60);
+      setLocalTimerSeconds(secs);
+      setLocalInitialTimerDuration(secs);
+    }
   };
 
   const handleAdjustTimer = (deltaSecs: number) => {
-    setTimerSeconds((prev) => {
-      const next = Math.max(0, prev + deltaSecs);
-      if (next > 0) setIsTimerFinished(false);
-      return next;
-    });
+    if (session) {
+      session.addTimerMinutes(deltaSecs);
+    } else {
+      setLocalTimerSeconds((prev: number) => {
+        const next = Math.max(0, prev + deltaSecs);
+        if (next > 0) setLocalIsTimerFinished(false);
+        return next;
+      });
+    }
   };
 
   const handleResetTimer = () => {
-    setIsTimerRunning(false);
-    setIsTimerFinished(false);
-    setTimerSeconds(initialTimerDuration);
+    if (session) {
+      session.resetTimer();
+    } else {
+      setLocalIsTimerRunning(false);
+      setLocalIsTimerFinished(false);
+      setLocalTimerSeconds(localInitialTimerDuration > 0 ? localInitialTimerDuration : 300);
+    }
   };
 
   const formatTime = (secs: number) => {
@@ -519,7 +605,7 @@ export const GuidedCookingModal: React.FC<GuidedCookingModalProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => setIsTimerRunning(!isTimerRunning)}
+                onClick={handleToggleTimer}
                 className="px-3 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black flex items-center gap-1 transition-all cursor-pointer shadow-xs active:scale-95"
               >
                 {isTimerRunning ? (
@@ -575,7 +661,7 @@ export const GuidedCookingModal: React.FC<GuidedCookingModalProps> = ({
 
                 {cookingSummary.deductions.length > 0 ? (
                   <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                    {cookingSummary.deductions.map((d, idx) => (
+                    {cookingSummary.deductions.map((d: any, idx: number) => (
                       <div
                         key={idx}
                         className="flex items-center justify-between text-xs py-1 px-2 rounded-lg bg-[var(--md-sys-color-surface)] border border-[var(--md-sys-color-outline-variant)]"
@@ -712,10 +798,7 @@ export const GuidedCookingModal: React.FC<GuidedCookingModalProps> = ({
                     {/* Play/Pause */}
                     <button
                       type="button"
-                      onClick={() => {
-                        if (timerSeconds === 0) setTimerSeconds(300);
-                        setIsTimerRunning(!isTimerRunning);
-                      }}
+                      onClick={handleToggleTimer}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shadow-xs active:scale-95 ${
                         isTimerRunning
                           ? 'bg-amber-600 hover:bg-amber-700 text-white'
@@ -764,13 +847,13 @@ export const GuidedCookingModal: React.FC<GuidedCookingModalProps> = ({
               {viewTab === 'step_by_step' && (
                 <div className="space-y-4">
                   {/* Stepper Progress Header */}
-                  <div className="flex items-center justify-between text-xs font-bold text-[#556D58]">
-                    <span>
+                  <div className="flex items-center justify-between text-xs font-black text-[#111A15]">
+                    <span className="px-2.5 py-1 rounded-lg bg-[#9DF4C7] text-[#002115] shadow-2xs font-black">
                       {lang === 'FR'
                         ? `Étape ${currentStepIndex + 1} sur ${steps.length}`
                         : `Step ${currentStepIndex + 1} of ${steps.length}`}
                     </span>
-                    <span className="text-[11px] text-emerald-800">
+                    <span className="text-xs font-bold text-[#004D36]">
                       {completedSteps.size} / {steps.length} {lang === 'FR' ? 'complétées' : 'completed'}
                     </span>
                   </div>
@@ -782,12 +865,12 @@ export const GuidedCookingModal: React.FC<GuidedCookingModalProps> = ({
                         key={idx}
                         type="button"
                         onClick={() => setCurrentStepIndex(idx)}
-                        className={`h-2 rounded-full transition-all flex-1 min-w-[20px] cursor-pointer ${
+                        className={`h-2.5 rounded-full transition-all flex-1 min-w-[20px] cursor-pointer ${
                           idx === currentStepIndex
-                            ? 'bg-emerald-600 h-2.5 shadow-xs'
+                            ? 'bg-[#004D36] h-3 shadow-xs ring-2 ring-[#9DF4C7]'
                             : completedSteps.has(idx)
-                            ? 'bg-emerald-300'
-                            : 'bg-[var(--md-sys-color-surface-container-high)]'
+                            ? 'bg-[#9DF4C7] border border-[#004D36]/30'
+                            : 'bg-[#DCD3C5]'
                         }`}
                         title={`Étape ${idx + 1}`}
                       />
@@ -795,13 +878,13 @@ export const GuidedCookingModal: React.FC<GuidedCookingModalProps> = ({
                   </div>
 
                   {/* Active Step Large Card */}
-                  <div className="p-4 sm:p-5 rounded-2xl bg-[var(--md-sys-color-surface-container-low)] border border-[var(--md-sys-color-outline-variant)] shadow-sm space-y-3">
+                  <div className="p-4 sm:p-5 rounded-2xl bg-[var(--md-sys-color-surface-container-low)] border-2 border-[var(--md-sys-color-outline-variant)] shadow-sm space-y-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-2">
-                        <span className="w-7 h-7 rounded-full bg-emerald-700 text-white font-black text-xs flex items-center justify-center shrink-0 shadow-2xs">
+                        <span className="w-8 h-8 rounded-full bg-[#004D36] text-white font-black text-sm flex items-center justify-center shrink-0 shadow-xs ring-2 ring-[#9DF4C7]/60">
                           {currentStepIndex + 1}
                         </span>
-                        <span className="font-extrabold text-sm text-[#0D3B37]">
+                        <span className="font-black text-base text-[#111A15]">
                           {lang === 'FR' ? 'Instruction :' : 'Instruction:'}
                         </span>
                       </div>
@@ -811,8 +894,8 @@ export const GuidedCookingModal: React.FC<GuidedCookingModalProps> = ({
                         onClick={() => handleToggleStepCompleted(currentStepIndex)}
                         className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                           completedSteps.has(currentStepIndex)
-                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                            : 'bg-[var(--md-sys-color-surface)] border border-[var(--md-sys-color-outline-variant)] text-[var(--md-sys-color-on-surface)]'
+                            ? 'bg-[#9DF4C7] text-[#002115] border border-[#004D36]/50 shadow-2xs font-black'
+                            : 'bg-[var(--md-sys-color-surface)] border border-[var(--md-sys-color-outline)] text-[var(--md-sys-color-on-surface)]'
                         }`}
                       >
                         <Check className="w-3.5 h-3.5" />
@@ -825,7 +908,7 @@ export const GuidedCookingModal: React.FC<GuidedCookingModalProps> = ({
                     </div>
 
                     {/* Step Instruction Text - Large & clear for kitchen reading */}
-                    <p className="text-sm sm:text-base text-[#1E3022] font-medium leading-relaxed bg-[var(--md-sys-color-surface)] p-4 rounded-xl border border-[var(--md-sys-color-outline-variant)] shadow-2xs">
+                    <p className="text-base sm:text-lg text-[#111A15] font-semibold leading-relaxed bg-[var(--md-sys-color-surface)] p-4 sm:p-5 rounded-xl border border-[var(--md-sys-color-outline-variant)] shadow-2xs">
                       {currentStep}
                     </p>
 

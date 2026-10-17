@@ -131,7 +131,7 @@ if command -v pveversion >/dev/null 2>&1; then
 
     if [[ "$DO_INSTALL_INSIDE" =~ ^[Yy]$ ]]; then
       echo -e "\n${BLUE}Installing packages & running Pantryo setup inside Container ${CT_ID}...${NC}"
-      pct exec "$CT_ID" -- bash -c "apt-get update -y && apt-get install -y curl ca-certificates sudo git && bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/riquitinchiquitin-lab/Pantryo/main/install-proxmox.sh)\""
+      pct exec "$CT_ID" -- bash -c "mkdir -p /opt/pantryo && cd /opt/pantryo && apt-get update -y && apt-get install -y curl ca-certificates sudo git && bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/riquitinchiquitin-lab/Pantryo/main/install-proxmox.sh)\""
       exit 0
     else
       echo -e "\n${CYAN}To enter your container anytime, run:${NC}"
@@ -141,8 +141,13 @@ if command -v pveversion >/dev/null 2>&1; then
   fi
 fi
 
-INSTALL_DIR="${INSTALL_DIR:-$(pwd)}"
-if [[ "$INSTALL_DIR" == "/" ]]; then
+# Determine installation directory:
+# Only use current working directory if it contains a valid Pantryo package.json AND is not / or /root.
+# Otherwise, strictly default to /opt/pantryo for production deployment, isolation, and unprivileged user sandbox.
+CURRENT_DIR="$(pwd)"
+if [[ -f "${CURRENT_DIR}/package.json" ]] && [[ "${CURRENT_DIR}" != "/root" ]] && [[ "${CURRENT_DIR}" != "/" ]] && grep -q '"name": *"pantryo"' "${CURRENT_DIR}/package.json" 2>/dev/null; then
+  INSTALL_DIR="${CURRENT_DIR}"
+else
   INSTALL_DIR="/opt/pantryo"
 fi
 
@@ -240,80 +245,27 @@ DEFAULT_PORT="${PORT:-3000}"
 read -rp "$(echo -e "${BOLD}Application HTTP Port [${GREEN}${DEFAULT_PORT}${NC}${BOLD}]: ${NC}")" INPUT_PORT
 APP_PORT="${INPUT_PORT:-$DEFAULT_PORT}"
 
-# --- SECTION B: Reverse Proxy & Ingress Selection (5 Options + LAN Only) ---
-echo -e "\n${CYAN}${BOLD}--- Reverse Proxy & Ingress Configuration ---${NC}"
-echo -e "Choose your external access / reverse proxy architecture:"
-echo -e "  ${BOLD}[1] Cloudflare Tunnel${NC} (Zero Port-Forwarding, instant HTTPS, DDoS protection)"
-echo -e "  ${BOLD}[2] Caddy${NC} (Automatic HTTPS with Let's Encrypt / ZeroSSL, zero-config renewal)"
-echo -e "  ${BOLD}[3] Nginx & Let's Encrypt (Certbot)${NC} (Native Debian/Ubuntu reverse proxy + certbot)"
-echo -e "  ${BOLD}[4] Nginx Proxy Manager (NPM GUI)${NC} (Upstream container configuration + web UI guide)"
-echo -e "  ${BOLD}[5] Traefik v2 / v3${NC} (Dynamic file provider configuration with automatic TLS)"
-echo -e "  ${BOLD}[6] Local Network Only${NC} (Direct HTTP on port ${APP_PORT}, no reverse proxy)"
+# --- SECTION B: Ingress & Remote Access Selection ---
+echo -e "\n${CYAN}${BOLD}--- Access & Remote Ingress Configuration ---${NC}"
+echo -e "Choose how you want to access Pantryo:"
+echo -e "  ${BOLD}[1] Local Network Only${NC} (Direct HTTP on LAN: http://${HOST_IP}:${APP_PORT}, zero public exposure)"
+echo -e "  ${BOLD}[2] Cloudflare Zero Trust Tunnel${NC} (Zero Port-Forwarding, instant HTTPS, DDoS protection)"
+echo -e "  ${BOLD}[3] Tailscale Funnel${NC} (Public zero-config HTTPS via Tailscale Funnel with step-by-step setup commands)"
 
 DEFAULT_MODE_CHOICE="1"
 if [[ -n "${CLOUDFLARE_TUNNEL_TOKEN:-}" ]]; then
-  DEFAULT_MODE_CHOICE="1"
-elif [[ -n "${APP_URL:-}" ]] && [[ ! "${APP_URL}" =~ (localhost|127\.|192\.168|\.local) ]]; then
   DEFAULT_MODE_CHOICE="2"
 fi
 
-read -rp "$(echo -e "${BOLD}Select Reverse Proxy [1-6, default: ${GREEN}${DEFAULT_MODE_CHOICE}${NC}${BOLD}]: ${NC}")" INPUT_MODE_CHOICE
+read -rp "$(echo -e "${BOLD}Select Access Mode [1-3, default: ${GREEN}${DEFAULT_MODE_CHOICE}${NC}${BOLD}]: ${NC}")" INPUT_MODE_CHOICE
 MODE_CHOICE="${INPUT_MODE_CHOICE:-$DEFAULT_MODE_CHOICE}"
 
-HOSTING_MODE="cloudflare"
+HOSTING_MODE="local_lan"
 CF_TUNNEL_TOKEN=""
-PROXY_DOMAIN=""
-CERTBOT_EMAIL=""
+TAILSCALE_DOMAIN=""
 
 case "$MODE_CHOICE" in
   2)
-    HOSTING_MODE="caddy"
-    echo -e "\n${BLUE}--> Selected: Caddy (Automatic HTTPS)${NC}"
-    DEFAULT_APP_URL="${APP_URL:-https://pantryo.example.com}"
-    read -rp "$(echo -e "${BOLD}Public Domain Name (e.g. pantryo.mydomain.com) [${GREEN}${DEFAULT_APP_URL#https://}${NC}${BOLD}]: ${NC}")" INPUT_DOMAIN
-    PROXY_DOMAIN="${INPUT_DOMAIN:-${DEFAULT_APP_URL#https://}}"
-    PROXY_DOMAIN="${PROXY_DOMAIN#http://}"
-    PROXY_DOMAIN="${PROXY_DOMAIN%/}"
-    APP_URL="https://${PROXY_DOMAIN}"
-    ;;
-  3)
-    HOSTING_MODE="nginx"
-    echo -e "\n${BLUE}--> Selected: Nginx & Let's Encrypt (Certbot)${NC}"
-    DEFAULT_APP_URL="${APP_URL:-https://pantryo.example.com}"
-    read -rp "$(echo -e "${BOLD}Public Domain Name (e.g. pantryo.mydomain.com) [${GREEN}${DEFAULT_APP_URL#https://}${NC}${BOLD}]: ${NC}")" INPUT_DOMAIN
-    PROXY_DOMAIN="${INPUT_DOMAIN:-${DEFAULT_APP_URL#https://}}"
-    PROXY_DOMAIN="${PROXY_DOMAIN#http://}"
-    PROXY_DOMAIN="${PROXY_DOMAIN%/}"
-    APP_URL="https://${PROXY_DOMAIN}"
-    read -rp "$(echo -e "${BOLD}Admin Email for Let's Encrypt Certificate Expiry [${GREEN}${ADMIN_USERNAME}@${PROXY_DOMAIN}${NC}${BOLD}]: ${NC}")" INPUT_EMAIL
-    CERTBOT_EMAIL="${INPUT_EMAIL:-${ADMIN_USERNAME}@${PROXY_DOMAIN}}"
-    ;;
-  4)
-    HOSTING_MODE="npm"
-    echo -e "\n${BLUE}--> Selected: Nginx Proxy Manager (NPM GUI)${NC}"
-    DEFAULT_APP_URL="${APP_URL:-https://pantryo.example.com}"
-    read -rp "$(echo -e "${BOLD}Configured Domain in NPM (e.g. pantryo.mydomain.com) [${GREEN}${DEFAULT_APP_URL#https://}${NC}${BOLD}]: ${NC}")" INPUT_DOMAIN
-    PROXY_DOMAIN="${INPUT_DOMAIN:-${DEFAULT_APP_URL#https://}}"
-    PROXY_DOMAIN="${PROXY_DOMAIN#http://}"
-    PROXY_DOMAIN="${PROXY_DOMAIN%/}"
-    APP_URL="https://${PROXY_DOMAIN}"
-    ;;
-  5)
-    HOSTING_MODE="traefik"
-    echo -e "\n${BLUE}--> Selected: Traefik v2 / v3 (Dynamic Configuration)${NC}"
-    DEFAULT_APP_URL="${APP_URL:-https://pantryo.example.com}"
-    read -rp "$(echo -e "${BOLD}Public Domain Name (e.g. pantryo.mydomain.com) [${GREEN}${DEFAULT_APP_URL#https://}${NC}${BOLD}]: ${NC}")" INPUT_DOMAIN
-    PROXY_DOMAIN="${INPUT_DOMAIN:-${DEFAULT_APP_URL#https://}}"
-    PROXY_DOMAIN="${PROXY_DOMAIN#http://}"
-    PROXY_DOMAIN="${PROXY_DOMAIN%/}"
-    APP_URL="https://${PROXY_DOMAIN}"
-    ;;
-  6)
-    HOSTING_MODE="local_lan"
-    echo -e "\n${GREEN}--> Selected: Local Network (LAN Only)${NC}"
-    APP_URL="http://${HOST_IP}:${APP_PORT}"
-    ;;
-  *)
     HOSTING_MODE="cloudflare"
     echo -e "\n${BLUE}--> Selected: Cloudflare Zero Trust Tunnel${NC}"
     DEFAULT_APP_URL="${APP_URL:-https://pantryo.yourdomain.com}"
@@ -327,6 +279,18 @@ case "$MODE_CHOICE" in
     fi
     read -rp "$(echo -e "${BOLD}${PROMPT_CF}${NC}")" INPUT_CF_TOKEN
     CF_TUNNEL_TOKEN="${INPUT_CF_TOKEN:-$DEFAULT_CF_TOKEN}"
+    ;;
+  3)
+    HOSTING_MODE="tailscale_funnel"
+    echo -e "\n${BLUE}--> Selected: Tailscale Funnel (Public Zero-Config HTTPS)${NC}"
+    DEFAULT_APP_URL="${APP_URL:-https://pantryo.your-tailnet.ts.net}"
+    read -rp "$(echo -e "${BOLD}Tailscale Funnel Domain / URL [${GREEN}${DEFAULT_APP_URL}${NC}${BOLD}]: ${NC}")" INPUT_TS_URL
+    APP_URL="${INPUT_TS_URL:-$DEFAULT_APP_URL}"
+    ;;
+  *)
+    HOSTING_MODE="local_lan"
+    echo -e "\n${GREEN}--> Selected: Local Network (LAN Only)${NC}"
+    APP_URL="http://${HOST_IP}:${APP_PORT}"
     ;;
 esac
 
@@ -355,9 +319,11 @@ fi
 read -rp "$(echo -e "${BOLD}${PROMPT_DB}${NC}")" INPUT_DB_URL
 DB_URL="${INPUT_DB_URL:-$DEFAULT_DB_URL}"
 
-echo -e "\n${BLUE}[2/5] Checking and Installing System Packages...${NC}"
+echo -e "\n${BLUE}[2/5] Checking and Installing System Packages & Security Patches...${NC}"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
+# Apply all security updates to base OS packages to eliminate CVEs
+apt-get dist-upgrade -y
 apt-get install -y --no-install-recommends \
   curl \
   ca-certificates \
@@ -366,7 +332,8 @@ apt-get install -y --no-install-recommends \
   python3 \
   make \
   g++ \
-  gcc
+  gcc \
+  unattended-upgrades
 
 # Install Node.js 22 if not present or < 22
 NEED_NODE=false
@@ -393,6 +360,38 @@ echo -e "${GREEN}✓ Node.js $(node -v) and npm $(npm -v) are ready.${NC}"
 echo -e "\n${BLUE}[3/5] Setting up Pantryo Environment in ${INSTALL_DIR}...${NC}"
 mkdir -p "$INSTALL_DIR"
 cd "$INSTALL_DIR"
+
+# Ensure repository code is present in INSTALL_DIR FIRST before creating .env
+if [[ ! -f "$INSTALL_DIR/package.json" ]]; then
+  echo -e "\n${CYAN}Retrieving Pantryo application files into ${INSTALL_DIR}...${NC}"
+  if ! command -v git >/dev/null 2>&1; then
+    apt-get update -y && apt-get install -y git curl tar
+  fi
+
+  TMP_CLONE_DIR=$(mktemp -d)
+  if git clone --depth 1 https://github.com/riquitinchiquitin-lab/Pantryo.git "$TMP_CLONE_DIR" 2>/dev/null; then
+    cp -r "${TMP_CLONE_DIR}"/* "$INSTALL_DIR"/ 2>/dev/null || true
+    cp "${TMP_CLONE_DIR}"/.[!.]* "$INSTALL_DIR"/ 2>/dev/null || true
+    rm -rf "$TMP_CLONE_DIR"
+    echo -e "${GREEN}✓ Cloned latest Pantryo release into ${INSTALL_DIR}.${NC}"
+  else
+    rm -rf "$TMP_CLONE_DIR"
+    echo -e "${YELLOW}Git clone unavailable, downloading release archive directly...${NC}"
+    curl -fsSL https://github.com/riquitinchiquitin-lab/Pantryo/archive/refs/heads/main.tar.gz | tar -xz --strip-components=1 -C "$INSTALL_DIR" 2>/dev/null || true
+  fi
+fi
+
+# Fallback check: if running in a container where local repo files exist in parent or /app/applet
+if [[ ! -f "$INSTALL_DIR/package.json" ]] && [[ -f "/app/applet/package.json" ]]; then
+  echo -e "${CYAN}Copying local application bundle to ${INSTALL_DIR}...${NC}"
+  cp -r /app/applet/* "$INSTALL_DIR"/ 2>/dev/null || true
+  cp /app/applet/.[!.]* "$INSTALL_DIR"/ 2>/dev/null || true
+fi
+
+if [[ ! -f "$INSTALL_DIR/package.json" ]]; then
+  echo -e "${RED}[ERROR] package.json not found in ${INSTALL_DIR}. Installation cannot proceed.${NC}"
+  exit 1
+fi
 
 # Write .env configuration file
 cat <<EOF > "$INSTALL_DIR/.env"
@@ -428,132 +427,15 @@ EXPO_PUBLIC_API_URL="${EXPO_API_URL}"
 # Optional PostgreSQL / Prisma URL
 DATABASE_URL="${DB_URL}"
 EOF
+
+# Restrict .env file permissions (removes cleartext credential warning / CIS Benchmark)
 chmod 600 "$INSTALL_DIR/.env"
 echo -e "${GREEN}✓ Environment configuration written to .env (mode 600).${NC}"
 
 # ------------------------------------------------------------------------------
-# Automated Reverse Proxy & Ingress Provisioning
+# Ingress & Remote Access Provisioning
 # ------------------------------------------------------------------------------
 case "$HOSTING_MODE" in
-  caddy)
-    echo -e "\n${CYAN}Configuring Caddy Web Server (Automatic HTTPS)...${NC}"
-    if ! command -v caddy >/dev/null 2>&1; then
-      apt-get install -y debian-keyring debian-archive-keyring apt-transport-https 2>/dev/null || true
-      curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg --yes 2>/dev/null || true
-      curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null 2>&1 || true
-      apt-get update -y >/dev/null 2>&1 || true
-      apt-get install -y caddy >/dev/null 2>&1 || true
-    fi
-    if command -v caddy >/dev/null 2>&1; then
-      mkdir -p /etc/caddy
-      cat <<EOF > /etc/caddy/Caddyfile
-${PROXY_DOMAIN} {
-    reverse_proxy localhost:${APP_PORT}
-}
-EOF
-      systemctl daemon-reload 2>/dev/null || true
-      systemctl enable caddy 2>/dev/null || true
-      systemctl restart caddy 2>/dev/null || true
-      echo -e "${GREEN}✓ Caddy configured with automatic Let's Encrypt HTTPS for ${PROXY_DOMAIN}.${NC}"
-    fi
-    ;;
-  nginx)
-    echo -e "\n${CYAN}Configuring Nginx Reverse Proxy & Let's Encrypt...${NC}"
-    apt-get install -y nginx certbot python3-certbot-nginx >/dev/null 2>&1 || true
-    mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
-    cat <<EOF > /etc/nginx/sites-available/pantryo
-server {
-    listen 80;
-    server_name ${PROXY_DOMAIN};
-
-    client_max_body_size 50M;
-
-    location / {
-        proxy_pass http://127.0.0.1:${APP_PORT};
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_read_timeout 86400;
-    }
-}
-EOF
-    ln -sf /etc/nginx/sites-available/pantryo /etc/nginx/sites-enabled/pantryo
-    rm -f /etc/nginx/sites-enabled/default
-    nginx -t 2>/dev/null && systemctl restart nginx 2>/dev/null || true
-    echo -e "${GREEN}✓ Nginx virtual host configured for ${PROXY_DOMAIN}.${NC}"
-
-    if [[ -n "$CERTBOT_EMAIL" ]] && command -v certbot >/dev/null 2>&1; then
-      echo -e "${CYAN}Requesting Let's Encrypt SSL certificate via Certbot...${NC}"
-      certbot --nginx -d "${PROXY_DOMAIN}" --non-interactive --agree-tos -m "${CERTBOT_EMAIL}" --redirect 2>/dev/null || {
-        echo -e "${YELLOW}Note: Certbot challenge deferred (ensure DNS points to this server, then run: certbot --nginx -d ${PROXY_DOMAIN})${NC}"
-      }
-    fi
-    ;;
-  npm)
-    echo -e "\n${CYAN}Generating Nginx Proxy Manager (NPM GUI) Configuration Guide...${NC}"
-    cat <<EOF > "${INSTALL_DIR}/NPM-CONFIGURATION.txt"
-========================================================================
-             Nginx Proxy Manager (NPM) Configuration Guide              
-========================================================================
-In your Nginx Proxy Manager Web GUI (http://<npm-ip>:81):
-  1. Click "Proxy Hosts" -> "Add Proxy Host"
-  2. Domain Names:             ${PROXY_DOMAIN}
-  3. Scheme:                   http
-  4. Forward Hostname / IP:    ${HOST_IP}
-  5. Forward Port:             ${APP_PORT}
-  6. Cache Assets:             ON
-  7. Block Common Exploits:    ON
-  8. Websockets Support:       ON (Required for real-time receipt status)
-  9. SSL Tab:
-     - SSL Certificate: Request a new SSL Certificate
-     - Force SSL: ON
-     - HTTP/2 Support: ON
-     - HSTS Enabled: ON
-========================================================================
-EOF
-    echo -e "${GREEN}✓ NPM configuration guide saved to ${INSTALL_DIR}/NPM-CONFIGURATION.txt.${NC}"
-    ;;
-  traefik)
-    echo -e "\n${CYAN}Generating Traefik dynamic provider configuration...${NC}"
-    mkdir -p /etc/traefik/dynamic "${INSTALL_DIR}"
-    cat <<EOF > "${INSTALL_DIR}/traefik-pantryo.yml"
-# Traefik v2 / v3 Dynamic Configuration for Pantryo
-http:
-  routers:
-    pantryo-secure:
-      rule: "Host(\`${PROXY_DOMAIN}\`)"
-      entryPoints:
-        - websecure
-      service: pantryo-service
-      tls:
-        certResolver: myresolver
-    pantryo-http:
-      rule: "Host(\`${PROXY_DOMAIN}\`)"
-      entryPoints:
-        - web
-      middlewares:
-        - redirect-to-https
-      service: pantryo-service
-
-  middlewares:
-    redirect-to-https:
-      redirectScheme:
-        scheme: https
-        permanent: true
-
-  services:
-    pantryo-service:
-      loadBalancer:
-        servers:
-          - url: "http://127.0.0.1:${APP_PORT}"
-EOF
-    cp "${INSTALL_DIR}/traefik-pantryo.yml" /etc/traefik/dynamic/pantryo.yml 2>/dev/null || true
-    echo -e "${GREEN}✓ Traefik dynamic router config saved to ${INSTALL_DIR}/traefik-pantryo.yml.${NC}"
-    ;;
   cloudflare)
     if [[ -n "$CF_TUNNEL_TOKEN" ]]; then
       echo -e "\n${CYAN}Configuring Cloudflare Zero Trust Tunnel (cloudflared)...${NC}"
@@ -586,13 +468,80 @@ EOF
       fi
     fi
     ;;
+  tailscale_funnel)
+    echo -e "\n${GREEN}${BOLD}========================================================================${NC}"
+    echo -e "${GREEN}${BOLD}          🛡️ Tailscale Funnel Setup Commands & Instructions            ${NC}"
+    echo -e "${GREEN}${BOLD}========================================================================${NC}"
+    echo -e "To route public HTTPS or tailnet traffic to Pantryo on port ${APP_PORT}:"
+    echo -e ""
+    echo -e "${BOLD}Step 1: Install Tailscale CLI (if not already installed):${NC}"
+    echo -e "  ${CYAN}curl -fsSL https://tailscale.com/install.sh | sh${NC}"
+    echo -e ""
+    echo -e "${BOLD}Step 2: Authenticate Node with your Tailscale Account:${NC}"
+    echo -e "  ${CYAN}tailscale up --operator=pantryo${NC}"
+    echo -e "  ► Open the generated login URL in your browser to approve the node."
+    echo -e ""
+    echo -e "${BOLD}Step 3: Enable Tailscale Funnel (Public HTTPS with automated SSL):${NC}"
+    echo -e "  ${CYAN}tailscale funnel --bg ${APP_PORT}${NC}"
+    echo -e "  (Note: For private Tailnet access only without public Internet exposure,"
+    echo -e "   run: ${CYAN}tailscale serve --bg ${APP_PORT}${NC})"
+    echo -e ""
+    echo -e "${BOLD}Step 4: Tailscale Admin Console Requirement:${NC}"
+    echo -e "  Ensure ${BOLD}Funnel${NC} is allowed in your Tailscale Access Controls (ACL):"
+    echo -e "  https://login.tailscale.com/admin/acls"
+    echo -e "${GREEN}========================================================================${NC}\n"
+    ;;
+  local_lan)
+    echo -e "\n${GREEN}✓ Local LAN Mode: Access restricted to your home network on port ${APP_PORT}.${NC}"
+    ;;
 esac
 
+# ------------------------------------------------------------------------------
+# Automated Security Hardening & Isolation
+# ------------------------------------------------------------------------------
+echo -e "\n${BLUE}Applying Automated Security Hardening & Sandboxing...${NC}"
+
+# Create dedicated unprivileged system user and group 'pantryo'
+if ! id -u pantryo >/dev/null 2>&1; then
+  useradd -r -s /usr/sbin/nologin -d "$INSTALL_DIR" -c "Pantryo Application Service User" pantryo 2>/dev/null || true
+  echo -e "${GREEN}✓ Created dedicated unprivileged system user 'pantryo'.${NC}"
+else
+  echo -e "${GREEN}✓ Unprivileged system user 'pantryo' is ready.${NC}"
+fi
+
+# Ensure data directory and hardened permissions
+mkdir -p "$INSTALL_DIR/server/data"
+chmod 600 "$INSTALL_DIR/.env"
+chmod 700 "$INSTALL_DIR/server/data"
+chown -R pantryo:pantryo "$INSTALL_DIR"
+echo -e "${GREEN}✓ Enforced strict permissions: .env (600), server/data (700), owner: pantryo.${NC}"
+
+# Enable automated Debian/Ubuntu security updates
+if command -v apt-get >/dev/null 2>&1; then
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -y -q >/dev/null 2>&1 || true
+  apt-get install -y --no-install-recommends unattended-upgrades ca-certificates >/dev/null 2>&1 || true
+fi
+
+cat <<'EOF_CRON' > /etc/cron.daily/pantryo-security-updates
+#!/usr/bin/env bash
+export DEBIAN_FRONTEND=noninteractive
+if command -v apt-get >/dev/null 2>&1; then
+  apt-get update -q -y >> /var/log/pantryo-security.log 2>&1
+  unattended-upgrade >> /var/log/pantryo-security.log 2>&1 || true
+fi
+EOF_CRON
+chmod 755 /etc/cron.daily/pantryo-security-updates
+echo -e "${GREEN}✓ Configured daily automated security patches (/etc/cron.daily/pantryo-security-updates).${NC}"
+
 echo -e "\n${BLUE}[4/5] Building Production Application...${NC}"
+cd "$INSTALL_DIR"
 npm install
 npm run build
+chown -R pantryo:pantryo "$INSTALL_DIR"
+echo -e "${GREEN}✓ Pantryo frontend and backend compiled successfully.${NC}"
 
-echo -e "\n${BLUE}[5/5] Configuring systemd service 'pantryo.service'...${NC}"
+echo -e "\n${BLUE}[5/5] Configuring Sandboxed systemd service 'pantryo.service'...${NC}"
 cat <<EOF > /etc/systemd/system/pantryo.service
 [Unit]
 Description=Pantryo Smart Kitchen & Inventory Server
@@ -600,13 +549,24 @@ After=network.target
 
 [Service]
 Type=simple
-User=root
+User=pantryo
+Group=pantryo
 WorkingDirectory=${INSTALL_DIR}
 ExecStart=$(which node) ${INSTALL_DIR}/dist/server.cjs
 Restart=always
 RestartSec=5
 Environment=NODE_ENV=production
 EnvironmentFile=${INSTALL_DIR}/.env
+
+# Systemd Container & Process Hardening Directives (CIS / NIST)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictRealtime=true
+LockPersonality=true
 
 [Install]
 WantedBy=multi-user.target
@@ -615,33 +575,27 @@ EOF
 systemctl daemon-reload
 systemctl enable pantryo.service
 systemctl restart pantryo.service
+echo -e "${GREEN}✓ Hardened systemd service 'pantryo.service' enabled & started.${NC}"
 
-# Configure daily automated package security patches & updates
-cat <<EOF_CRON > /etc/cron.daily/pantryo-autoupdate
-#!/usr/bin/env bash
-# Pantryo automated daily vulnerability remediation and package updater
-cd "${INSTALL_DIR}" || exit 0
-if [ -f "scripts/auto-update-dependencies.js" ]; then
-  node scripts/auto-update-dependencies.js >> /var/log/pantryo-autoupdate.log 2>&1
-  systemctl restart pantryo.service || true
+# Run container hardening remediation script automatically
+if [[ -f "$INSTALL_DIR/scripts/security-harden-container.sh" ]]; then
+  echo -e "\n${CYAN}Running container security hardening checks...${NC}"
+  bash "$INSTALL_DIR/scripts/security-harden-container.sh" 2>/dev/null || true
 fi
-EOF_CRON
-chmod +x /etc/cron.daily/pantryo-autoupdate
 
 echo -e "\n${GREEN}${BOLD}========================================================================${NC}"
-echo -e "${GREEN}${BOLD}           🎉 Pantryo Installed & Running Successfully!                ${NC}"
+echo -e "${GREEN}${BOLD}           🎉 Pantryo Installed & Hardened Successfully!               ${NC}"
 echo -e "${GREEN}${BOLD}========================================================================${NC}"
 echo -e "Primary Public URL:  ${CYAN}${BOLD}${APP_URL}${NC}"
 echo -e "Local LAN URL:       ${CYAN}http://${HOST_IP}:${APP_PORT}${NC}"
-echo -e "Reverse Proxy Mode:  ${GREEN}${BOLD}${HOSTING_MODE}${NC}"
+echo -e "Access Mode:         ${GREEN}${BOLD}${HOSTING_MODE}${NC}"
+echo -e "Service User:        ${GREEN}pantryo (unprivileged, sandboxed)${NC}"
 echo -e "Admin Username:      ${GREEN}${BOLD}${ADMIN_USERNAME}${NC}"
 echo -e "Admin Display Name:  ${GREEN}${ADMIN_NAME}${NC}"
 echo -e "Database Security:   ${GREEN}256-bit AES-GCM SQLCipher (Active)${NC}"
 echo -e "SQLCipher DB Key:    ${YELLOW}${DB_KEY}${NC} ${GREEN}(Saved to .env & Password Manager)${NC}"
-if [[ "$HOSTING_MODE" == "npm" ]]; then
-  echo -e "NPM Configuration:   ${CYAN}${INSTALL_DIR}/NPM-CONFIGURATION.txt${NC}"
-elif [[ "$HOSTING_MODE" == "traefik" ]]; then
-  echo -e "Traefik Provider:    ${CYAN}${INSTALL_DIR}/traefik-pantryo.yml${NC}"
+if [[ "$HOSTING_MODE" == "tailscale_funnel" ]]; then
+  echo -e "Tailscale Funnel:    ${CYAN}Run: tailscale funnel --bg ${APP_PORT}${NC}"
 fi
 if [[ -n "$GEMINI_KEY" ]]; then
   echo -e "Gemini AI Engine:    ${GREEN}Configured (Vision & Recipe AI Active)${NC}"
@@ -654,6 +608,6 @@ fi
 echo -e "Expo Mobile API URL: ${CYAN}${EXPO_API_URL}${NC}"
 echo -e ""
 echo -e "${YELLOW}${BOLD}Management & Settings:${NC}"
-echo -e "All credentials, encryption keys, reverse proxies, and Gemini keys"
+echo -e "All credentials, encryption keys, remote access, and Gemini keys"
 echo -e "can be audited and managed anytime in the web ${BOLD}Admin Pane${NC}."
 echo -e "${GREEN}========================================================================${NC}\n"

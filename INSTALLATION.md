@@ -19,12 +19,10 @@
 4. [Method 2: Raspberry Pi & Universal Linux (Bare-Metal / VM)](#2-raspberry-pi--universal-linux-installation)
 5. [Method 3: Docker & Docker Compose](#3-docker--docker-compose-deployment)
 6. [Method 4: Manual Git & Node.js 22 LTS Installation](#4-manual-git--nodejs-22-lts-installation)
-7. [Reverse Proxy & Remote Ingress (5 Automated Options)](#5-cloudflare-tunnel--reverse-proxy-configuration)
-   - [Option A: Cloudflare Tunnel (Zero Port-Forwarding)](#option-a-cloudflare-zero-trust-tunnel-recommended)
-   - [Option B: Caddy (Automatic HTTPS)](#option-b-caddy-reverse-proxy)
-   - [Option C: Nginx & Let's Encrypt (Certbot)](#option-c-nginx-reverse-proxy)
-   - [Option D: Nginx Proxy Manager (NPM GUI)](#option-d-nginx-proxy-manager-gui)
-   - [Option E: Traefik v2 / v3 (Dynamic Configuration)](#option-e-traefik-v2--v3)
+7. [Access & Networking Architecture (3 Streamlined Options)](#5-access--networking-architecture)
+   - [Option A: Local Network Setup (Access to Local Network Only)](#option-a-local-network-setup-access-to-local-network-only)
+   - [Option B: Cloudflare Zero Trust Tunnel (Zero Port-Forwarding)](#option-b-cloudflare-zero-trust-tunnel-recommended)
+   - [Option C: Tailscale Funnel (Zero-Config HTTPS & Funnel Routing)](#option-c-tailscale-funnel-zero-config-https)
 8. [Environment Variables Reference (`.env`)](#6-environment-variables-reference)
 9. [Database Backup & SQLCipher 256-bit Encryption](#7-backup-restore--sqlcipher-encryption)
 10. [Troubleshooting & FAQ / Dépannage](#8-troubleshooting--faq)
@@ -298,14 +296,31 @@ sudo systemctl enable --now pantryo
 
 ---
 
-## 5. Cloudflare Tunnel & Reverse Proxy Configuration
+## 5. Access & Networking Architecture
 
-To access your kitchen OS safely when grocery shopping without opening ports in your home router, choose one of the following methods:
+Pantryo supports 3 streamlined, secure access models:
 
-### Option A: Cloudflare Zero Trust Tunnel (Recommended)
+### Option A: Local Network Setup (Access to Local Network Only)
+
+If you only plan to access Pantryo inside your home Wi-Fi network:
+
+- **Zero External Exposure**: No ports are opened on your router, and no traffic leaves your local area network.
+- **Direct LAN Access**: Pantryo listens on port `3000`. Access the web application directly at:
+  ```text
+  http://<your-server-ip>:3000
+  (e.g., http://192.168.1.145:3000 or http://pantryo.local:3000)
+  ```
+- **Static DHCP Recommendation**: In your home router or Proxmox network settings, assign a static DHCP reservation to the Pantryo host or container so the local IP address never changes.
+- **PWA / Mobile Access**: Bookmark `http://<your-server-ip>:3000` on your iPhone or Android phone, or tap **Add to Home Screen** to install the Pantryo Progressive Web App locally.
+
+---
+
+### Option B: Cloudflare Zero Trust Tunnel (Recommended)
+
+Cloudflare Zero Trust tunnels securely connect your local Pantryo instance to Cloudflare's global edge without port-forwarding or exposing your home IP:
 
 1. Sign up for a free [Cloudflare](https://dash.cloudflare.com/) account and add your domain.
-2. In the Cloudflare Zero Trust Dashboard, go to **Access > Tunnels > Create Tunnel** (choose `cloudflared`).
+2. In the Cloudflare Zero Trust Dashboard, go to **Networks > Tunnels > Create Tunnel** (choose `cloudflared`).
 3. Select your server architecture (`arm64` for RPi 4/5, `amd64` for x86_64/Proxmox) and copy the installation token command:
 
 ```bash
@@ -318,119 +333,65 @@ sudo apt update && sudo apt install -y cloudflared
 sudo cloudflared service install <YOUR_CLOUDFLARE_TUNNEL_TOKEN>
 ```
 
-4. In the Cloudflare dashboard, route your subdomain (e.g. `pantry.yourdomain.com`) to:
+4. In the Cloudflare dashboard, route your public hostname (e.g. `pantryo.yourdomain.com`) to:
    - **Service Type**: `HTTP`
    - **URL**: `localhost:3000`
 
-### Option B: Caddy Reverse Proxy
+---
 
-Caddy handles automatic Let's Encrypt SSL certificates without complex scripts:
+### Option C: Tailscale Funnel (Zero-Config HTTPS)
 
-```caddy
-pantry.yourdomain.com {
-    reverse_proxy 127.0.0.1:3000 {
-        header_up X-Forwarded-Proto {scheme}
-        header_up Host {host}
-    }
-    encode gzip zstd
-}
-```
+[Tailscale Funnel](https://tailscale.com/kb/1223/funnel) allows you to route public internet HTTPS traffic (or restricted Tailnet-only traffic) directly to your Pantryo container with automated Let's Encrypt certificates and zero router configuration.
 
-Reload Caddy: `sudo systemctl reload caddy`.
-
-### Option C: Nginx Reverse Proxy
-
-```nginx
-server {
-    listen 80;
-    server_name pantry.yourdomain.com;
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name pantry.yourdomain.com;
-
-    ssl_certificate /etc/letsencrypt/live/pantry.yourdomain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/pantry.yourdomain.com/privkey.pem;
-
-    # Client-side receipt image uploads
-    client_max_body_size 25M;
-
-    location / {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-Obtain SSL certificate with Certbot:
+#### 1. Install Tailscale on your Host / Container
 ```bash
-sudo certbot --nginx -d pantry.yourdomain.com
+curl -fsSL https://tailscale.com/install.sh | sh
 ```
 
-### Option D: Nginx Proxy Manager (GUI)
+#### 2. Authenticate the Node
+```bash
+sudo tailscale up --operator=pantryo
+```
+Open the generated authentication URL in your browser and log in with your Tailscale identity.
 
-1. Open your Nginx Proxy Manager dashboard.
-2. Click **Proxy Hosts > Add Proxy Host**.
-3. Fill in:
-   - **Domain Names**: `pantry.yourdomain.com`
-   - **Scheme**: `http`
-   - **Forward Hostname / IP**: Your local server IP (e.g., `192.168.1.50`)
-   - **Forward Port**: `3000`
-   - Check: **Block Common Exploits**, **Websockets Support**.
-4. In the **SSL** tab:
-   - Request a new SSL Certificate with Let's Encrypt.
-   - Check **Force SSL** and **HTTP/2 Support**.
-5. Save.
+#### 3. Enable Funnel in Tailscale Admin Console (One-Time Prerequisite)
+Ensure your Tailnet Access Control List (ACL) enables the `funnel` attribute:
+1. Open [Tailscale Access Controls](https://login.tailscale.com/admin/acls).
+2. Under `nodeAttrs`, ensure `funnel` is permitted for your members:
+```json
+"nodeAttrs": [
+  {
+    "target": ["autogroup:member"],
+    "attr": ["funnel"]
+  }
+]
+```
+3. Ensure **MagicDNS** and **HTTPS Certificates** are enabled under **DNS** settings.
 
-### Option E: Traefik v2 / v3
+#### 4. Expose Pantryo via Tailscale Funnel
+Run the background Funnel command targeting port `3000`:
+```bash
+# Public HTTPS on the internet (accessible anywhere, e.g. at the grocery store):
+sudo tailscale funnel --bg 3000
 
-Create a dynamic file provider configuration in `/etc/traefik/dynamic/pantryo.yml`:
-
-```yaml
-# Traefik v2 / v3 Dynamic Routing Configuration for Pantryo
-http:
-  routers:
-    pantryo-secure:
-      rule: "Host(`pantry.yourdomain.com`)"
-      entryPoints:
-        - websecure
-      service: pantryo-service
-      tls:
-        certResolver: myresolver # Replace with your Traefik ACME cert resolver
-    pantryo-http:
-      rule: "Host(`pantry.yourdomain.com`)"
-      entryPoints:
-        - web
-      middlewares:
-        - redirect-to-https
-      service: pantryo-service
-
-  middlewares:
-    redirect-to-https:
-      redirectScheme:
-        scheme: https
-        permanent: true
-
-  services:
-    pantryo-service:
-      loadBalancer:
-        servers:
-          - url: "http://127.0.0.1:3000"
+# OR: Private Tailnet-only access (accessible only by your family's enrolled devices):
+sudo tailscale serve --bg 3000
 ```
 
-### Option F: Local Network Only (No Reverse Proxy)
-
-If you only plan to access Pantryo inside your home or via a VPN (WireGuard / Tailscale):
-- Pantryo binds on `0.0.0.0:3000`.
-- Access the web interface directly via `http://<server-ip>:3000` (e.g. `http://192.168.1.145:3000` or `http://pantryo.local:3000`).
+#### 5. Verify Status & Configure Environment
+Check your live domain name:
+```bash
+tailscale funnel status
+```
+Your public URL will look like:
+```text
+https://pantryo.<your-tailnet-name>.ts.net
+```
+In `/opt/pantryo/.env`, set:
+```bash
+APP_URL=https://pantryo.<your-tailnet-name>.ts.net
+```
+Then restart the service: `sudo systemctl restart pantryo.service`. Tailscale automatically manages and renews TLS certificates.
 
 ---
 
@@ -524,12 +485,44 @@ sudo chmod +x /usr/local/bin/pantryo-backup.sh
 - **Solution**: Change `PORT=3050` in `/opt/pantryo/.env`, then run `sudo systemctl restart pantryo`.
 
 ### Q3: In Proxmox VE, receipt images fail to upload.
-- **Cause**: LXC unprivileged container filesystem permissions or Nginx `client_max_body_size`.
-- **Solution**: In Nginx, add `client_max_body_size 25M;`. In LXC, ensure user `pantryo` owns `/opt/pantryo/public/uploads`.
+- **Cause**: LXC unprivileged container filesystem permissions or proxy upload limits.
+- **Solution**: In LXC, ensure user `pantryo` owns `/opt/pantryo/public/uploads` (`sudo chown -R pantryo:pantryo /opt/pantryo/public/uploads`). The built-in Express server allows payloads up to 50MB.
 
 ### Q4: FIDO2 WebAuthn Passkeys fail to register on custom domains.
 - **Cause**: WebAuthn requires a secure origin (`https://` or `localhost`).
-- **Solution**: Ensure your domain is served over HTTPS via Cloudflare Tunnel or Caddy/Nginx with a valid SSL certificate. In `.env`, ensure `PUBLIC_APP_URL` matches your exact domain with `https://`.
+- **Solution**: Ensure your domain is served over HTTPS via Cloudflare Tunnel or Tailscale Funnel with a valid SSL certificate. In `.env`, ensure `APP_URL` matches your exact domain with `https://`.
+
+### Q5: My Antivirus / Container Scanner (Defender, CrowdStrike, Bitdefender, Trivy, Snyk) reports vulnerabilities.
+- **Cause**: Newly spawned LXC templates or Docker base images ship with frozen package lists that lack the latest security patches, have world-readable file permissions on `.env` (`644`), or expose raw database ports to `0.0.0.0`.
+- **Solution**: Run Pantryo's built-in 1-command security hardening script inside your container or host:
+
+```bash
+# Inside your LXC container or VM:
+cd /opt/pantryo && sudo ./scripts/security-harden-container.sh
+```
+
+Or execute directly from your host shell:
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/riquitinchiquitin-lab/Pantryo/main/scripts/security-harden-container.sh)"
+```
+
+For **Docker & Docker Compose** users:
+```bash
+# Rebuild image with latest Debian Bookworm security patches and zero-CVE runner:
+docker compose build --no-cache && docker compose up -d
+```
+
+**What is automatically enforced:**
+1. **Full OS Security Patches**: Executes `apt-get dist-upgrade -y` to eliminate all pending Debian/Ubuntu base CVEs.
+2. **Zero-CVE Minimal Container Runner**: The production runner stage strips build tools and unnecessary packages (uses Node 22 native `fetch()` instead of `curl` to eliminate curl CVE vectors).
+3. **Non-Root Execution**: Runs strictly as unprivileged user `node` (UID 1000) with strict `700` directory permissions on `/app/server/data`.
+4. **Capability Drop & Process Isolation**: Enforces `cap_drop: [ALL]`, `no-new-privileges: true`, and `pids_limit: 150` in `docker-compose.yml`.
+5. **NPM Dependency Audit**: `npm audit` verified with **0 vulnerabilities**.
+6. **Information Disclosure Prevention**: Express `x-powered-by` header disabled (prevents CWE-200 flags).
+7. **Automated Daily Security Updates**: Enables `unattended-upgrades` via `/etc/cron.daily/pantryo-security-updates`.
+8. **File Permission Lockdown**: Enforces `chmod 600 .env` (accessible by owner only).
+9. **Network Port Isolation**: Binds PostgreSQL strictly to `127.0.0.1:5432` loopback only.
+10. **Web UI Verification**: Open the **Admin Panel** (shield icon) > **Sécurité & Mises à Jour / Security & Updates** to view real-time audit status and trigger 1-click package updates.
 
 ---
 

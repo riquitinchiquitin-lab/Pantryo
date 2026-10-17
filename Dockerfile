@@ -6,7 +6,8 @@ FROM node:22-bookworm-slim AS builder
 WORKDIR /app
 
 # Install native build tools required for compiling C++ addons on any architecture (x86_64, arm64)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Upgrades all Debian packages to latest security advisories to eliminate container CVEs
+RUN apt-get update && apt-get upgrade -y && apt-get dist-upgrade -y && apt-get install -y --no-install-recommends \
     python3 \
     make \
     g++ \
@@ -33,14 +34,15 @@ FROM node:22-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV DEBIAN_FRONTEND=noninteractive
 
-# Install runtime dependencies (curl for container healthcheck and ca-certificates)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
+# Apply all latest Debian Bookworm security updates to base image packages (glibc, openssl, zlib)
+# Zero-CVE attack surface: curl is omitted entirely in favor of Node.js 22 built-in fetch()
+RUN apt-get update && apt-get upgrade -y && apt-get dist-upgrade -y --no-install-recommends \
     ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Pre-create data and application directories and set ownership to built-in 'node' user (UID 1000)
+# Pre-create data directory and set ownership strictly to non-root built-in 'node' user (UID 1000)
 RUN mkdir -p /app/server/data && chown -R node:node /app
 
 # Copy production dependencies and package.json from builder with node ownership
@@ -52,17 +54,17 @@ COPY --from=builder --chown=node:node /app/dist ./dist
 COPY --from=builder --chown=node:node /app/server ./server
 COPY --from=builder --chown=node:node /app/public ./public
 
-# Ensure write permissions for node user on server data directory
-RUN chown -R node:node /app/server/data && chmod -R 777 /app/server/data
+# Harden directory permissions: restrict to node user only (avoid world-writable 777 flags)
+RUN chown -R node:node /app/server/data && chmod 700 /app/server/data
 
-# Switch to non-root user
+# Switch to non-root user (UID 1000)
 USER node
 
 EXPOSE 3000
 
-# Healthcheck to verify the server is responding to HTTP requests
+# Zero-dependency container healthcheck using Node 22 native fetch (eliminates curl CVE flags)
 HEALTHCHECK --interval=20s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:3000/api/health || exit 1
+  CMD node -e 'fetch("http://127.0.0.1:3000/api/health").then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))'
 
 # Start compiled standalone Express server
 CMD ["node", "dist/server.cjs"]

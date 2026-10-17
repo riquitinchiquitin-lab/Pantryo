@@ -26,7 +26,10 @@ const app = express();
 const server = http.createServer(app);
 const PORT = 3000;
 
-// Trust reverse proxy headers from Cloudflare Tunnel
+// Security hardening: Prevent information disclosure of server framework (CWE-200)
+app.disable("x-powered-by");
+
+// Trust reverse proxy headers from Cloudflare Tunnel / Nginx / Caddy
 app.set("trust proxy", true);
 
 // Baseline HTTP Protective Security Headers (SEC-05)
@@ -34,6 +37,8 @@ app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "SAMEORIGIN");
   res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader("X-DNS-Prefetch-Control", "off");
+  res.setHeader("X-Download-Options", "noopen");
   res.setHeader("X-Permitted-Cross-Domain-Policies", "none");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("Permissions-Policy", "camera=(self), microphone=(), geolocation=()");
@@ -43,7 +48,7 @@ app.use((req, res, next) => {
     "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https: ws: wss:; object-src 'none'; base-uri 'self'; form-action 'self';"
   );
   if (req.secure || req.headers["x-forwarded-proto"] === "https") {
-    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
   }
   next();
 });

@@ -63,12 +63,12 @@ export const ActiveCookingBar: React.FC = () => {
       >
         <div
           onClick={resumeCooking}
-          className={`group relative p-3 sm:p-3.5 rounded-2xl bg-[var(--md-sys-color-surface-container-highest,#1e293b)] text-white shadow-2xl border transition-all cursor-pointer select-none backdrop-blur-md flex items-center justify-between gap-3 ${
+          className={`group relative p-3 sm:p-3.5 rounded-2xl text-white shadow-2xl border transition-all cursor-pointer select-none backdrop-blur-md flex items-center justify-between gap-3 ${
             isTimerFinished
-              ? 'border-rose-500 bg-rose-950/95 ring-2 ring-rose-400/50'
+              ? 'border-rose-400 bg-[#3B0D11] ring-2 ring-rose-400/60'
               : isTimerRunning
-              ? 'border-emerald-500/70 bg-slate-900/95 ring-2 ring-emerald-500/30'
-              : 'border-slate-700 bg-slate-900/95'
+              ? 'border-emerald-400/80 bg-[#003827] ring-2 ring-emerald-400/40'
+              : 'border-[#1C4E3D] bg-[#002B1E]'
           }`}
         >
           {/* Left: Chef Hat + Recipe Title & Current Step */}
@@ -78,8 +78,8 @@ export const ActiveCookingBar: React.FC = () => {
                 isTimerFinished
                   ? 'bg-rose-500 text-white animate-bounce'
                   : isTimerRunning
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-teal-700 text-white'
+                  ? 'bg-[#004D36] text-[#9DF4C7] border border-[#9DF4C7]/50'
+                  : 'bg-[#0A4130] text-emerald-200'
               }`}
             >
               {isTimerFinished ? (
@@ -91,14 +91,14 @@ export const ActiveCookingBar: React.FC = () => {
 
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.2 rounded-md bg-white/10 text-emerald-300">
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#9DF4C7] text-[#002115] shadow-2xs">
                   {lang === 'FR' ? `Étape ${currentStepNum}/${totalSteps}` : `Step ${currentStepNum}/${totalSteps}`}
                 </span>
-                <span className="text-[11px] text-slate-300 hidden xs:inline">
-                  {lang === 'FR' ? 'Cuisine active' : 'Cooking in progress'}
+                <span className="text-[11px] text-[#A3D9C4] font-medium hidden xs:inline">
+                  {lang === 'FR' ? 'En cours' : 'In progress'}
                 </span>
               </div>
-              <h4 className="text-xs sm:text-sm font-bold text-white truncate drop-shadow-xs">
+              <h4 className="text-xs sm:text-sm font-black text-white truncate drop-shadow-xs mt-0.5">
                 {localizedTitle}
               </h4>
             </div>
@@ -112,11 +112,11 @@ export const ActiveCookingBar: React.FC = () => {
                 isTimerFinished
                   ? 'bg-rose-600 text-white animate-pulse'
                   : isTimerRunning
-                  ? 'bg-emerald-900/90 text-emerald-200 border border-emerald-500/60'
-                  : 'bg-slate-800 text-slate-300 border border-slate-700'
+                  ? 'bg-[#002318] text-[#9DF4C7] border border-[#9DF4C7]/60'
+                  : 'bg-[#0F2F24] text-emerald-300 border border-emerald-800'
               }`}
             >
-              <TimerIcon className={`w-3.5 h-3.5 shrink-0 ${isTimerRunning ? 'text-emerald-300 animate-spin' : ''}`} />
+              <TimerIcon className={`w-3.5 h-3.5 shrink-0 ${isTimerRunning ? 'text-[#9DF4C7] animate-spin' : ''}`} />
               <span className="tracking-wider">{formatTime(timerSeconds)}</span>
             </div>
 
@@ -144,21 +144,21 @@ export const ActiveCookingBar: React.FC = () => {
           </div>
 
           {/* Right: Expand / Resume Button & Exit Button */}
-          <div className="flex items-center gap-1 shrink-0 pl-1 border-l border-white/10">
+          <div className="flex items-center gap-1 shrink-0 pl-1 border-l border-white/15">
             <button
               type="button"
               onClick={resumeCooking}
-              className="px-2.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs flex items-center gap-1 transition-all active:scale-95 shadow-xs cursor-pointer"
-              title={lang === 'FR' ? 'Agrandir en plein écran' : 'Resume in full screen'}
+              className="px-3 py-1.5 rounded-xl bg-[#004D36] hover:bg-[#006044] text-[#FFFFFF] font-black text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-md border border-[#9DF4C7]/60 cursor-pointer"
+              title={lang === 'FR' ? 'Reprendre la cuisine (revenir à l’étape exacte)' : 'Resume cooking at exact step'}
             >
-              <Maximize2 className="w-3.5 h-3.5" />
+              <Maximize2 className="w-3.5 h-3.5 text-[#9DF4C7]" />
               <span className="hidden sm:inline font-bold">{lang === 'FR' ? 'Reprendre' : 'Resume'}</span>
             </button>
 
             <button
               type="button"
               onClick={handleExitClick}
-              className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 active:scale-95 transition-all cursor-pointer"
+              className="p-1.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/15 active:scale-95 transition-all cursor-pointer"
               title={lang === 'FR' ? 'Quitter la recette' : 'Exit recipe'}
               aria-label={lang === 'FR' ? 'Quitter' : 'Exit'}
             >

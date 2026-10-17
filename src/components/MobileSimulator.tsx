@@ -2341,7 +2341,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-extrabold text-[#0D3B37]">
-                    {lang === 'FR' ? 'Planifier un repas dans l\'agenda' : 'Plan a Meal in Calendar'}
+                    {lang === 'FR' ? '+ Planifier un repas dans l\'agenda' : '+ Plan Meal in Calendar'}
                   </p>
                   <p className="text-xs text-[#527470]">
                     {lang === 'FR'
@@ -2460,12 +2460,12 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         </div>
       )}
 
-      {/* M3 Navigation Bar (Visible on Mobile & Tablet Mode) */}
+      {/* M3 Navigation Bar with Center-Docked Round FAB (Mobile & Tablet Mode) */}
       <nav
         aria-label="Bottom Navigation"
-        className="xl:hidden fixed bottom-0 inset-x-0 h-20 bg-[var(--md-sys-color-surface-container)]/98 backdrop-blur-md border-t border-[var(--md-sys-color-outline-variant)]/40 shadow-none pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom,0.75rem))] px-2 z-30 flex items-center"
+        className="xl:hidden fixed bottom-0 inset-x-0 h-20 bg-[var(--md-sys-color-surface-container)]/98 backdrop-blur-md border-t border-[var(--md-sys-color-outline-variant)] shadow-sm pt-1 pb-[max(0.75rem,env(safe-area-inset-bottom,0.75rem))] px-2 z-30 flex items-center"
       >
-        <div className="w-full max-w-lg md:max-w-2xl mx-auto flex items-center justify-around">
+        <div className="w-full max-w-lg md:max-w-2xl mx-auto grid grid-cols-5 items-center">
           {/* Destination 1: Kitchen / Inventory */}
           <button
             type="button"
@@ -2473,10 +2473,10 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               setIsAddMenuOpen(false);
               setActiveNav('home');
             }}
-            className="flex-1 flex flex-col items-center justify-center py-1 cursor-pointer transition-all select-none"
+            className="flex flex-col items-center justify-center py-1 cursor-pointer transition-all select-none"
           >
             <div
-              className={`w-16 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+              className={`w-14 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
                 activeNav === 'home'
                   ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)]'
                   : 'text-[var(--md-sys-color-on-surface-variant)] hover:bg-[var(--md-sys-color-surface-container-high)]/60'
@@ -2486,7 +2486,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             </div>
             <span
               className={`text-[11px] tracking-tight leading-none mt-1 truncate max-w-full text-center ${
-                activeNav === 'home' ? 'font-bold text-[var(--md-sys-color-on-surface)]' : 'font-medium text-[var(--md-sys-color-on-surface-variant)]'
+                activeNav === 'home' ? 'font-black text-[var(--md-sys-color-on-surface)]' : 'font-medium text-[var(--md-sys-color-on-surface-variant)]'
               }`}
             >
               {t('bottom_home')}
@@ -2500,11 +2500,11 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               setIsAddMenuOpen(false);
               setActiveNav('meals');
             }}
-            className="flex-1 flex flex-col items-center justify-center py-1 cursor-pointer transition-all select-none"
+            className="flex flex-col items-center justify-center py-1 cursor-pointer transition-all select-none"
           >
             <div className="relative">
               <div
-                className={`w-16 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+                className={`w-14 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
                   activeNav === 'meals'
                     ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)]'
                     : 'text-[var(--md-sys-color-on-surface-variant)] hover:bg-[var(--md-sys-color-surface-container-high)]/60'
@@ -2513,19 +2513,40 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 <CalendarDays className="w-5 h-5 shrink-0" />
               </div>
               {plannedMeals.length > 0 && (
-                <span className="absolute top-1 right-3 px-1 min-w-4 h-4 bg-[var(--md-sys-color-primary)] text-white rounded-full text-[9px] font-bold flex items-center justify-center">
+                <span className="absolute top-1 right-2 px-1 min-w-4 h-4 bg-[var(--md-sys-color-primary)] text-white rounded-full text-[9px] font-bold flex items-center justify-center">
                   {plannedMeals.length}
                 </span>
               )}
             </div>
             <span
               className={`text-[11px] tracking-tight leading-none mt-1 truncate max-w-full text-center ${
-                activeNav === 'meals' ? 'font-bold text-[var(--md-sys-color-on-surface)]' : 'font-medium text-[var(--md-sys-color-on-surface-variant)]'
+                activeNav === 'meals' ? 'font-black text-[var(--md-sys-color-on-surface)]' : 'font-medium text-[var(--md-sys-color-on-surface-variant)]'
               }`}
             >
               {t('bottom_meals')}
             </span>
           </button>
+
+          {/* Center-Docked Material 3 Circular Add Button */}
+          <div className="flex flex-col items-center justify-center -translate-y-4">
+            <button
+              type="button"
+              id="center-bottom-round-add-btn"
+              onClick={() => setIsAddMenuOpen((prev) => !prev)}
+              className={`w-14 h-14 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-[var(--md-sys-elevation-3)] hover:shadow-[var(--md-sys-elevation-4)] active:scale-95 border-4 border-[var(--md-sys-color-surface)] ring-1 ring-[var(--md-sys-color-outline-variant)]/60 ${
+                isAddMenuOpen
+                  ? 'bg-[var(--md-sys-color-error)] text-white rotate-45'
+                  : 'bg-[var(--md-sys-color-primary)] text-white hover:brightness-110'
+              }`}
+              aria-label={lang === 'FR' ? 'Ajouter un aliment' : 'Add Item'}
+              title={lang === 'FR' ? 'Ajouter un aliment' : 'Add Item'}
+            >
+              <Plus className="w-7 h-7 stroke-[2.75] transition-transform duration-200" />
+            </button>
+            <span className="text-[10px] font-bold text-[var(--md-sys-color-on-surface)] mt-0.5 tracking-tight">
+              {lang === 'FR' ? 'Ajouter' : 'Add'}
+            </span>
+          </div>
 
           {/* Destination 3: Grocery */}
           <button
@@ -2534,11 +2555,11 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               setIsAddMenuOpen(false);
               setActiveNav('grocery');
             }}
-            className="flex-1 flex flex-col items-center justify-center py-1 cursor-pointer transition-all select-none"
+            className="flex flex-col items-center justify-center py-1 cursor-pointer transition-all select-none"
           >
             <div className="relative">
               <div
-                className={`w-16 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+                className={`w-14 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
                   activeNav === 'grocery'
                     ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)]'
                     : 'text-[var(--md-sys-color-on-surface-variant)] hover:bg-[var(--md-sys-color-surface-container-high)]/60'
@@ -2547,14 +2568,14 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 <ShoppingCart className="w-5 h-5 shrink-0" />
               </div>
               {groceryItems.filter((i) => i.inCart).length > 0 && (
-                <span className="absolute top-1 right-3 px-1 min-w-4 h-4 bg-[var(--md-sys-color-primary)] text-white rounded-full text-[9px] font-bold flex items-center justify-center">
+                <span className="absolute top-1 right-2 px-1 min-w-4 h-4 bg-[var(--md-sys-color-primary)] text-white rounded-full text-[9px] font-bold flex items-center justify-center">
                   {groceryItems.filter((i) => i.inCart).length}
                 </span>
               )}
             </div>
             <span
               className={`text-[11px] tracking-tight leading-none mt-1 truncate max-w-full text-center ${
-                activeNav === 'grocery' ? 'font-bold text-[var(--md-sys-color-on-surface)]' : 'font-medium text-[var(--md-sys-color-on-surface-variant)]'
+                activeNav === 'grocery' ? 'font-black text-[var(--md-sys-color-on-surface)]' : 'font-medium text-[var(--md-sys-color-on-surface-variant)]'
               }`}
             >
               {t('bottom_grocery')}
@@ -2568,10 +2589,10 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               setIsAddMenuOpen(false);
               setActiveNav('cooking');
             }}
-            className="flex-1 flex flex-col items-center justify-center py-1 cursor-pointer transition-all select-none"
+            className="flex flex-col items-center justify-center py-1 cursor-pointer transition-all select-none"
           >
             <div
-              className={`w-16 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+              className={`w-14 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
                 activeNav === 'cooking'
                   ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)]'
                   : 'text-[var(--md-sys-color-on-surface-variant)] hover:bg-[var(--md-sys-color-surface-container-high)]/60'
@@ -2581,73 +2602,35 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             </div>
             <span
               className={`text-[11px] tracking-tight leading-none mt-1 truncate max-w-full text-center ${
-                activeNav === 'cooking' ? 'font-bold text-[var(--md-sys-color-on-surface)]' : 'font-medium text-[var(--md-sys-color-on-surface-variant)]'
+                activeNav === 'cooking' ? 'font-black text-[var(--md-sys-color-on-surface)]' : 'font-medium text-[var(--md-sys-color-on-surface-variant)]'
               }`}
             >
               {t('bottom_cooking')}
             </span>
           </button>
-
-          {/* Destination 5: Family & Sync */}
-          <button
-            type="button"
-            onClick={() => {
-              setIsAddMenuOpen(false);
-              setActiveNav('sync');
-            }}
-            className="flex-1 flex flex-col items-center justify-center py-1 cursor-pointer transition-all select-none"
-          >
-            <div
-              className={`w-16 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
-                activeNav === 'sync'
-                  ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)]'
-                  : 'text-[var(--md-sys-color-on-surface-variant)] hover:bg-[var(--md-sys-color-surface-container-high)]/60'
-              }`}
-            >
-              <Users className="w-5 h-5 shrink-0" />
-            </div>
-            <span
-              className={`text-[11px] tracking-tight leading-none mt-1 truncate max-w-full text-center ${
-                activeNav === 'sync' ? 'font-bold text-[var(--md-sys-color-on-surface)]' : 'font-medium text-[var(--md-sys-color-on-surface-variant)]'
-              }`}
-            >
-              {lang === 'FR' ? 'Famille' : 'Family'}
-            </span>
-          </button>
         </div>
       </nav>
 
-      {/* Mobile Floating M3 Extended FAB */}
-      <div className="xl:hidden fixed bottom-24 right-4 z-40">
+      {/* Desktop Center-Bottom Round Add Button */}
+      <div className="hidden xl:flex fixed bottom-6 left-1/2 -translate-x-1/2 z-40 items-center justify-center">
         <button
           type="button"
-          id="mobile-floating-extended-fab"
+          id="desktop-center-bottom-round-add-btn"
           onClick={() => setIsAddMenuOpen((prev) => !prev)}
-          className={`m3-extended-fab flex items-center gap-2 px-4 py-3 shadow-[var(--md-sys-elevation-2)] hover:shadow-[var(--md-sys-elevation-3)] active:scale-95 transition-all cursor-pointer font-medium text-xs ${
-            isAddMenuOpen ? 'bg-[var(--md-sys-color-error-container)] text-[var(--md-sys-color-on-error-container)]' : ''
+          className={`h-14 px-6 rounded-full flex items-center gap-2.5 transition-all cursor-pointer shadow-[var(--md-sys-elevation-3)] hover:shadow-[var(--md-sys-elevation-4)] active:scale-95 border-2 border-white/80 ring-2 ring-emerald-950/20 ${
+            isAddMenuOpen
+              ? 'bg-[var(--md-sys-color-error)] text-white'
+              : 'bg-[var(--md-sys-color-primary)] text-white hover:brightness-110'
           }`}
           aria-label={lang === 'FR' ? 'Ajouter un aliment' : 'Add Item'}
           title={lang === 'FR' ? 'Ajouter un aliment' : 'Add Item'}
         >
-          <Plus className={`w-5 h-5 stroke-[2.5] transition-transform ${isAddMenuOpen ? 'rotate-45' : ''}`} />
-          <span>{lang === 'FR' ? 'Ajouter' : 'Add Item'}</span>
-        </button>
-      </div>
-
-      {/* Desktop Floating M3 Extended FAB */}
-      <div className="hidden xl:flex fixed bottom-8 right-8 z-40 items-center gap-2">
-        <button
-          type="button"
-          id="desktop-floating-extended-fab"
-          onClick={() => setIsAddMenuOpen((prev) => !prev)}
-          className={`m3-extended-fab flex items-center gap-2.5 px-5 py-3.5 shadow-[var(--md-sys-elevation-2)] hover:shadow-[var(--md-sys-elevation-3)] active:scale-95 transition-all cursor-pointer font-medium text-sm ${
-            isAddMenuOpen ? 'bg-[var(--md-sys-color-error-container)] text-[var(--md-sys-color-on-error-container)]' : ''
-          }`}
-          aria-label={lang === 'FR' ? 'Ajouter un aliment' : 'Add Item'}
-          title={lang === 'FR' ? 'Ajouter un aliment' : 'Add Item'}
-        >
-          <Plus className={`w-5 h-5 stroke-[2.5] transition-transform ${isAddMenuOpen ? 'rotate-45' : ''}`} />
-          <span>{lang === 'FR' ? 'Ajouter un aliment' : 'Add Item'}</span>
+          <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+            <Plus className={`w-5 h-5 stroke-[2.75] transition-transform duration-200 ${isAddMenuOpen ? 'rotate-45' : ''}`} />
+          </div>
+          <span className="font-bold text-sm tracking-wide">
+            {lang === 'FR' ? 'Ajouter un aliment' : '+ Add Item'}
+          </span>
         </button>
       </div>
 

@@ -10,6 +10,7 @@ import {
   Clock,
   Utensils,
   ChefHat,
+  Play,
   Trash2,
   Edit2,
   Sparkles,
@@ -97,7 +98,7 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
 
   const todayStr = useMemo(() => formatLocalDate(new Date()), []);
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
-  const { startCooking } = useCookingSession();
+  const { startCooking, activeRecipe, currentStepIndex, resumeCooking } = useCookingSession();
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
 
   const handleLaunchMealCooking = (meal: PlannedMeal) => {
@@ -983,10 +984,10 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
           </button>
           <button
             onClick={() => handleOpenAddModal('DINNER')}
-            className="px-3 py-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold flex items-center gap-1 shadow-2xs transition-all active:scale-95"
+            className="px-3 py-1.5 rounded-xl bg-[#004D36] hover:bg-[#003827] text-white text-xs font-bold flex items-center gap-1 shadow-2xs transition-all active:scale-95 cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>{lang === 'FR' ? 'Planifier Manuel' : 'Plan Manual'}</span>
+            <span>{lang === 'FR' ? '+ Planifier un repas' : '+ Plan Meal'}</span>
           </button>
         </div>
       </div>
@@ -1322,10 +1323,10 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                   <button
                     type="button"
                     onClick={() => handleOpenAddModal(type)}
-                    className="py-2.5 px-3 rounded-2xl bg-[#FAF7EE] hover:bg-[#F3EFE3] border border-[#E5DFD0] text-center text-xs font-bold text-[#0D3B37] transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
+                    className="py-2.5 px-3 rounded-2xl bg-[#FAF7F2] hover:bg-[#EFE9DF] border border-[var(--md-sys-color-outline-variant)] text-center text-xs font-bold text-[#111A15] transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
                   >
-                    <Plus className="w-3.5 h-3.5 text-slate-500" />
-                    <span>{lang === 'FR' ? `Planifier manuellement` : `Plan manually`}</span>
+                    <Plus className="w-3.5 h-3.5 text-[#004D36]" />
+                    <span>{lang === 'FR' ? '+ Planifier un repas' : '+ Plan Meal'}</span>
                   </button>
                 </div>
               ) : (
@@ -1542,15 +1543,27 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                                   )}
                                 </button>
 
-                                <button
-                                  type="button"
-                                  onClick={() => handleLaunchMealCooking(meal)}
-                                  className="px-2 py-1 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-all cursor-pointer shadow-2xs flex items-center gap-1"
-                                  title={lang === 'FR' ? 'Mode cuisine guidé avec minuteur' : 'Guided cooking mode with timer'}
-                                >
-                                  <ChefHat className="w-3 h-3 text-emerald-600" />
-                                  <span className="hidden sm:inline">{lang === 'FR' ? 'Cuisiner' : 'Cook'}</span>
-                                </button>
+                                {activeRecipe && (activeRecipe.id === meal.id || activeRecipe.title.trim().toLowerCase() === meal.title.trim().toLowerCase()) ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => resumeCooking()}
+                                    className="px-2 py-1 rounded-xl text-xs font-black text-[#002115] bg-[#9DF4C7] hover:bg-[#86E4B3] border border-[#004D36]/40 transition-all cursor-pointer shadow-xs flex items-center gap-1"
+                                    title={lang === 'FR' ? 'Reprendre la cuisine (étape exacte)' : 'Resume cooking at exact step'}
+                                  >
+                                    <Play className="w-3 h-3 fill-current text-[#004D36]" />
+                                    <span>{lang === 'FR' ? `Reprendre (${currentStepIndex + 1})` : `Resume (${currentStepIndex + 1})`}</span>
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleLaunchMealCooking(meal)}
+                                    className="px-2 py-1 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-all cursor-pointer shadow-2xs flex items-center gap-1"
+                                    title={lang === 'FR' ? 'Mode cuisine guidé avec minuteur' : 'Guided cooking mode with timer'}
+                                  >
+                                    <ChefHat className="w-3 h-3 text-emerald-600" />
+                                    <span className="hidden sm:inline">{lang === 'FR' ? 'Cuisiner' : 'Cook'}</span>
+                                  </button>
+                                )}
                               </div>
 
                               {hasMissingIngredients && onAddIngredientsToGrocery && (

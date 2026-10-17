@@ -44,7 +44,7 @@ export function DocumentationModal({
   const [activeTab, setActiveTab] = useState<'features' | 'proxmox' | 'linux' | 'cloudflare' | 'security'>(initialTab);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [selectedLinuxDistro, setSelectedLinuxDistro] = useState<'rpi' | 'debian_ubuntu' | 'dietpi' | 'fedora' | 'arch'>('rpi');
-  const [selectedProxy, setSelectedProxy] = useState<'cloudflare' | 'caddy' | 'nginx' | 'npm' | 'traefik'>('cloudflare');
+  const [selectedProxy, setSelectedProxy] = useState<'local_lan' | 'cloudflare' | 'tailscale'>('local_lan');
 
   if (!isOpen) return null;
 
@@ -407,7 +407,7 @@ export function DocumentationModal({
                     <li>{lang === 'FR' ? 'Ouvrez le Shell du serveur hôte.' : 'Open your PVE node shell.'}</li>
                     <li>{lang === 'FR' ? 'Collez la commande ci-dessus et appuyez sur Entrée.' : 'Paste the one-line command above and press Enter.'}</li>
                     <li>{lang === 'FR' ? 'Définissez le mot de passe root du conteneur (interactif ou Entrée pour auto-génération sécurisée 20 caractères).' : 'Set the container root password (interactive prompt or press Enter for auto-generated 20-character secure password).'}</li>
-                    <li>{lang === 'FR' ? 'Sélectionnez votre Reverse Proxy parmi les 5 options intégrées (Cloudflare, Caddy, Nginx, NPM, Traefik).' : 'Choose your Reverse Proxy from the 5 built-in options (Cloudflare, Caddy, Nginx, NPM, Traefik).'}</li>
+                    <li>{lang === 'FR' ? 'Sélectionnez votre mode d\'accès réseau (Réseau Local LAN, Cloudflare Tunnel, ou Tailscale Funnel).' : 'Choose your access architecture (Local LAN, Cloudflare Tunnel, or Tailscale Funnel).'}</li>
                     <li>{lang === 'FR' ? 'Accédez directement à Pantryo sur http://IP_DU_CONTENEUR:3000.' : 'Access Pantryo immediately at http://LXC_CONTAINER_IP:3000.'}</li>
                   </ol>
                 </div>
@@ -635,16 +635,26 @@ export function DocumentationModal({
 
                 <p className="text-xs text-[#3A5D57] leading-relaxed">
                   {lang === 'FR'
-                    ? 'Vous pouvez exposer Pantryo à votre famille sans jamais ouvrir de port sur votre box Internet grâce à un tunnel Cloudflare Zero Trust, ou utiliser votre propre nom de domaine avec Caddy ou Nginx.'
-                    : 'Expose Pantryo to your family without opening router ports using a Cloudflare Zero Trust Tunnel, or point your custom domain via Caddy or Nginx with automatic Let’s Encrypt certificates.'}
+                    ? 'Choisissez l’architecture d’accès adaptée à votre foyer : réseau local Wi-Fi sans exposition externe, tunnel Cloudflare Zero Trust chiffré, ou Tailscale Funnel avec HTTPS automatique.'
+                    : 'Choose the ingress architecture suited for your household: local Wi-Fi with zero external exposure, an outbound Cloudflare Zero Trust tunnel, or Tailscale Funnel with automated HTTPS.'}
                 </p>
               </div>
 
-              {/* 5-Option Reverse Proxy Switcher */}
+              {/* 3-Option Access Architecture Switcher */}
               <div className="flex p-1 rounded-2xl bg-[#EFE9DA] border border-[#DCD3C0] gap-1 overflow-x-auto scrollbar-none">
                 <button
+                  onClick={() => setSelectedProxy('local_lan')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer ${
+                    selectedProxy === 'local_lan'
+                      ? 'bg-teal-800 text-white shadow-xs'
+                      : 'text-[#3B5B56] hover:bg-white/60'
+                  }`}
+                >
+                  🏠 {lang === 'FR' ? 'Réseau Local (LAN)' : 'Local Network (LAN)'}
+                </button>
+                <button
                   onClick={() => setSelectedProxy('cloudflare')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer ${
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer ${
                     selectedProxy === 'cloudflare'
                       ? 'bg-teal-800 text-white shadow-xs'
                       : 'text-[#3B5B56] hover:bg-white/60'
@@ -653,48 +663,67 @@ export function DocumentationModal({
                   ⚡ Cloudflare Tunnel
                 </button>
                 <button
-                  onClick={() => setSelectedProxy('caddy')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer ${
-                    selectedProxy === 'caddy'
+                  onClick={() => setSelectedProxy('tailscale')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer ${
+                    selectedProxy === 'tailscale'
                       ? 'bg-teal-800 text-white shadow-xs'
                       : 'text-[#3B5B56] hover:bg-white/60'
                   }`}
                 >
-                  🔒 Caddy (Auto HTTPS)
-                </button>
-                <button
-                  onClick={() => setSelectedProxy('nginx')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer ${
-                    selectedProxy === 'nginx'
-                      ? 'bg-teal-800 text-white shadow-xs'
-                      : 'text-[#3B5B56] hover:bg-white/60'
-                  }`}
-                >
-                  🛡️ Nginx & Certbot
-                </button>
-                <button
-                  onClick={() => setSelectedProxy('npm')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer ${
-                    selectedProxy === 'npm'
-                      ? 'bg-teal-800 text-white shadow-xs'
-                      : 'text-[#3B5B56] hover:bg-white/60'
-                  }`}
-                >
-                  🖥️ NPM (GUI)
-                </button>
-                <button
-                  onClick={() => setSelectedProxy('traefik')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer ${
-                    selectedProxy === 'traefik'
-                      ? 'bg-teal-800 text-white shadow-xs'
-                      : 'text-[#3B5B56] hover:bg-white/60'
-                  }`}
-                >
-                  🚦 Traefik v2/v3
+                  🛡️ Tailscale Funnel
                 </button>
               </div>
 
-              {/* Option 1: Cloudflare Tunnel */}
+              {/* Option 1: Local Network (LAN Only) */}
+              {selectedProxy === 'local_lan' && (
+                <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-4 animate-fade-in">
+                  <div className="flex items-center justify-between">
+                    <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0D3B37] flex items-center gap-1.5">
+                      <Server className="w-3.5 h-3.5 text-teal-700" />
+                      <span>{lang === 'FR' ? 'Accès Local Uniquement (Réseau Domestique LAN)' : 'Local Network Setup (LAN Only)'}</span>
+                    </h5>
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                      {lang === 'FR' ? 'Zéro Exposition Internet' : 'Zero Internet Exposure'}
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-[#527470]">
+                    {lang === 'FR'
+                      ? 'Idéal si vous souhaitez que Pantryo reste strictement confiné à votre réseau Wi-Fi ou accessible via votre VPN domestique (WireGuard) :'
+                      : 'Ideal if you want Pantryo strictly confined to your home Wi-Fi or accessed remotely through a personal WireGuard/Tailnet VPN:'}
+                  </p>
+
+                  <div className="p-4 rounded-xl bg-[#FAF7EE] border border-[#E5DFD0] space-y-2 text-xs text-[#0D3B37]">
+                    <div className="font-bold">
+                      {lang === 'FR' ? '1. URL d’accès direct sur votre réseau local :' : '1. Direct LAN browser URL:'}
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-[#0F172A] border border-slate-700 font-mono text-[11px] text-emerald-400 flex items-center justify-between">
+                      <span>http://&lt;IP_DE_VOTRE_SERVEUR&gt;:3000</span>
+                      <button
+                        onClick={() => copyToClipboard('http://192.168.1.145:3000', 'lan-url')}
+                        className="px-2 py-0.5 rounded bg-teal-700 hover:bg-teal-600 text-white font-sans text-[10px]"
+                      >
+                        {copiedId === 'lan-url' ? 'Copié' : 'Copy'}
+                      </button>
+                    </div>
+                    <div className="text-[11px] text-[#527470]">
+                      {lang === 'FR'
+                        ? 'Exemple : http://192.168.1.145:3000 ou http://pantryo.local:3000'
+                        : 'Example: http://192.168.1.145:3000 or http://pantryo.local:3000'}
+                    </div>
+                    <div className="font-bold pt-1">
+                      {lang === 'FR' ? '2. Conseil d’adressage IP fixe (DHCP Statut) :' : '2. Static DHCP reservation:'}
+                    </div>
+                    <div className="text-[11px] text-[#527470]">
+                      {lang === 'FR'
+                        ? 'Dans les paramètres de votre routeur ou box internet, associez une adresse IP statique à votre conteneur/serveur pour éviter tout changement d’adresse.'
+                        : 'In your home router settings, assign a permanent static DHCP lease to your Pantryo host or container MAC address.'}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Option 2: Cloudflare Tunnel */}
               {selectedProxy === 'cloudflare' && (
                 <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-3 animate-fade-in">
                   <div className="flex items-center justify-between">
@@ -734,145 +763,54 @@ export function DocumentationModal({
                 </div>
               )}
 
-              {/* Option 2: Caddy */}
-              {selectedProxy === 'caddy' && (
-                <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-3 animate-fade-in">
+              {/* Option 3: Tailscale Funnel */}
+              {selectedProxy === 'tailscale' && (
+                <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-4 animate-fade-in">
                   <div className="flex items-center justify-between">
-                    <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0D3B37]">
-                      {lang === 'FR' ? 'Caddyfile (HTTPS Automatique Let’s Encrypt / ZeroSSL)' : 'Caddyfile (Automatic HTTPS via Let’s Encrypt)'}
+                    <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0D3B37] flex items-center gap-1.5">
+                      <Shield className="w-3.5 h-3.5 text-teal-700" />
+                      <span>{lang === 'FR' ? 'Tailscale Funnel (HTTPS Automatique Sans Configuration)' : 'Tailscale Funnel (Zero-Config HTTPS)'}</span>
                     </h5>
+                    <span className="text-[10px] font-bold text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200">
+                      {lang === 'FR' ? 'SSL Automatique Let’s Encrypt' : 'Auto Let’s Encrypt SSL'}
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-[#527470]">
+                    {lang === 'FR'
+                      ? 'Tailscale Funnel permet d’exposer votre port local 3000 sur Internet avec un certificat SSL Let’s Encrypt officiel et un domaine https://pantryo.tailnet.ts.net sans ouvrir de port :'
+                      : 'Tailscale Funnel routes public HTTPS traffic to your local port 3000 using automated Let’s Encrypt certificates on your https://pantryo.tailnet.ts.net domain:'}
+                  </p>
+
+                  <div className="p-3.5 rounded-xl bg-[#0F172A] border border-slate-700 font-mono text-[11px] text-emerald-400 space-y-2 relative">
                     <button
-                      onClick={() => copyToClipboard(`pantry.yourdomain.com {\n    reverse_proxy 127.0.0.1:3000\n    encode gzip zstd\n}`, 'caddy-copy')}
-                      className="px-2.5 py-1 rounded-lg bg-teal-700 hover:bg-teal-600 text-white text-[10px] font-bold flex items-center gap-1"
+                      onClick={() => copyToClipboard('curl -fsSL https://tailscale.com/install.sh | sh\nsudo tailscale up --operator=pantryo\nsudo tailscale funnel --bg 3000', 'ts-copy')}
+                      className="absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-teal-700 hover:bg-teal-600 text-white font-sans text-[10px] font-bold flex items-center gap-1"
                     >
-                      {copiedId === 'caddy-copy' ? <Check className="w-3 h-3 text-emerald-300" /> : <Copy className="w-3 h-3" />}
-                      <span>{copiedId === 'caddy-copy' ? 'Copié' : 'Copy'}</span>
+                      {copiedId === 'ts-copy' ? <Check className="w-3 h-3 text-emerald-300" /> : <Copy className="w-3 h-3" />}
+                      <span>{copiedId === 'ts-copy' ? 'Copié' : 'Copy'}</span>
                     </button>
+                    <div className="text-slate-400"># 1. Installer Tailscale :</div>
+                    <div>curl -fsSL https://tailscale.com/install.sh | sh</div>
+                    <div className="text-slate-400 pt-1"># 2. Authentifier le nœud :</div>
+                    <div>sudo tailscale up --operator=pantryo</div>
+                    <div className="text-slate-400 pt-1"># 3. Activer Funnel (HTTPS Public sur port 3000) :</div>
+                    <div>sudo tailscale funnel --bg 3000</div>
                   </div>
 
-                  <p className="text-xs text-[#527470]">
-                    {lang === 'FR'
-                      ? 'Fichier /etc/caddy/Caddyfile - Caddy gère automatiquement l’obtention et le renouvellement des certificats SSL :'
-                      : 'File /etc/caddy/Caddyfile - Caddy automatically issues and renews Let’s Encrypt certificates without cron jobs:'}
-                  </p>
-
-                  <div className="p-3 rounded-xl bg-[#0F172A] border border-slate-700 font-mono text-[11px] text-emerald-400">
-                    <pre className="whitespace-pre-wrap">{`pantry.yourdomain.com {
-    reverse_proxy 127.0.0.1:3000
-    encode gzip zstd
-}`}</pre>
-                  </div>
-                </div>
-              )}
-
-              {/* Option 3: Nginx & Certbot */}
-              {selectedProxy === 'nginx' && (
-                <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-3 animate-fade-in">
-                  <div className="flex items-center justify-between">
-                    <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0D3B37]">
-                      {lang === 'FR' ? 'Nginx & Let’s Encrypt Certbot' : 'Nginx & Let’s Encrypt Certbot'}
-                    </h5>
-                    <button
-                      onClick={() => copyToClipboard(`server {\n    listen 80;\n    server_name pantry.yourdomain.com;\n    client_max_body_size 50M;\n    location / {\n        proxy_pass http://127.0.0.1:3000;\n        proxy_http_version 1.1;\n        proxy_set_header Upgrade $http_upgrade;\n        proxy_set_header Connection "upgrade";\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n    }\n}`, 'nginx-copy')}
-                      className="px-2.5 py-1 rounded-lg bg-teal-700 hover:bg-teal-600 text-white text-[10px] font-bold flex items-center gap-1"
-                    >
-                      {copiedId === 'nginx-copy' ? <Check className="w-3 h-3 text-emerald-300" /> : <Copy className="w-3 h-3" />}
-                      <span>{copiedId === 'nginx-copy' ? 'Copié' : 'Copy'}</span>
-                    </button>
-                  </div>
-
-                  <p className="text-xs text-[#527470]">
-                    {lang === 'FR'
-                      ? 'Configuration /etc/nginx/sites-available/pantryo (Support WebSockets + streaming receipt OCR inclus) :'
-                      : 'File /etc/nginx/sites-available/pantryo (with WebSockets & receipt streaming support):'}
-                  </p>
-
-                  <div className="p-3 rounded-xl bg-[#0F172A] border border-slate-700 font-mono text-[11px] text-emerald-400">
-                    <pre className="whitespace-pre-wrap">{`server {
-    listen 80;
-    server_name pantry.yourdomain.com;
-    client_max_body_size 50M;
-
-    location / {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}`}</pre>
-                  </div>
-
-                  <div className="p-2.5 rounded-lg bg-[#FAF7EE] border border-[#E5DFD0] text-xs font-mono text-[#0D3B37]">
-                    sudo certbot --nginx -d pantry.yourdomain.com
-                  </div>
-                </div>
-              )}
-
-              {/* Option 4: NPM GUI */}
-              {selectedProxy === 'npm' && (
-                <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-3 animate-fade-in">
-                  <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0D3B37]">
-                    {lang === 'FR' ? 'Nginx Proxy Manager (Interface Web NPM)' : 'Nginx Proxy Manager (NPM Web GUI)'}
-                  </h5>
-
-                  <p className="text-xs text-[#527470]">
-                    {lang === 'FR'
-                      ? 'Dans l’interface graphique Nginx Proxy Manager (port 81) :'
-                      : 'In your Nginx Proxy Manager dashboard (port 81):'}
-                  </p>
-
-                  <div className="p-3 rounded-xl bg-[#0F172A] border border-slate-700 font-mono text-[11px] text-emerald-400 space-y-1">
-                    <div>1. Proxy Hosts &gt; Add Proxy Host</div>
-                    <div>2. Domain Names: pantry.yourdomain.com</div>
-                    <div>3. Forward Hostname / IP: &lt;IP_DU_CONTENEUR_OU_SERVEUR&gt;</div>
-                    <div>4. Forward Port: 3000</div>
-                    <div>5. Cocher: "Block Common Exploits" et "Websockets Support" (ON)</div>
-                    <div>6. Onglet SSL: Cocher "Request a new SSL Certificate", "Force SSL", "HTTP/2 Support"</div>
-                  </div>
-                </div>
-              )}
-
-              {/* Option 5: Traefik v2 / v3 */}
-              {selectedProxy === 'traefik' && (
-                <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-3 animate-fade-in">
-                  <div className="flex items-center justify-between">
-                    <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0D3B37]">
-                      {lang === 'FR' ? 'Configuration Dynamique Traefik v2 / v3' : 'Traefik v2 / v3 Dynamic Provider'}
-                    </h5>
-                    <button
-                      onClick={() => copyToClipboard(`http:\n  routers:\n    pantryo-secure:\n      rule: "Host(\`pantry.yourdomain.com\`)"\n      entryPoints:\n        - websecure\n      service: pantryo-service\n      tls:\n        certResolver: myresolver\n  services:\n    pantryo-service:\n      loadBalancer:\n        servers:\n          - url: "http://127.0.0.1:3000"`, 'traefik-copy')}
-                      className="px-2.5 py-1 rounded-lg bg-teal-700 hover:bg-teal-600 text-white text-[10px] font-bold flex items-center gap-1"
-                    >
-                      {copiedId === 'traefik-copy' ? <Check className="w-3 h-3 text-emerald-300" /> : <Copy className="w-3 h-3" />}
-                      <span>{copiedId === 'traefik-copy' ? 'Copié' : 'Copy'}</span>
-                    </button>
-                  </div>
-
-                  <p className="text-xs text-[#527470]">
-                    {lang === 'FR'
-                      ? 'Fichier /etc/traefik/dynamic/pantryo.yml :'
-                      : 'File /etc/traefik/dynamic/pantryo.yml :'}
-                  </p>
-
-                  <div className="p-3 rounded-xl bg-[#0F172A] border border-slate-700 font-mono text-[11px] text-emerald-400">
-                    <pre className="whitespace-pre-wrap">{`http:
-  routers:
-    pantryo-secure:
-      rule: "Host(\`pantry.yourdomain.com\`)"
-      entryPoints:
-        - websecure
-      service: pantryo-service
-      tls:
-        certResolver: myresolver
-  services:
-    pantryo-service:
-      loadBalancer:
-        servers:
-          - url: "http://127.0.0.1:3000"`}</pre>
+                  <div className="p-3 rounded-xl bg-teal-50/80 border border-teal-200 text-xs text-[#0D3B37] space-y-1">
+                    <div className="font-bold flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-teal-700" />
+                      <span>{lang === 'FR' ? 'Accès réservé au Tailnet familial (sans exposition publique) :' : 'Family Tailnet-Only mode (no public internet exposure):'}</span>
+                    </div>
+                    <div className="text-[11px] text-[#527470]">
+                      {lang === 'FR'
+                        ? 'Si vous préférez que seuls les appareils connectés à votre compte Tailscale puissent ouvrir Pantryo, exécutez simplement :'
+                        : 'If you want only devices logged into your Tailnet to access Pantryo, run:'}
+                    </div>
+                    <div className="font-mono text-[11px] font-bold text-teal-900 bg-white/80 p-1.5 rounded border border-teal-300">
+                      sudo tailscale serve --bg 3000
+                    </div>
                   </div>
                 </div>
               )}

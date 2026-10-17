@@ -148,13 +148,13 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
                   {lang === 'FR' ? 'Hébergement, Domaine & Cloudflare' : 'Hosting, Domain & Cloudflare'}
                 </h4>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
-                  {lang === 'FR' ? 'Propre Domaine ou Cloudflare' : 'Custom Domain or Cloudflare'}
+                  {lang === 'FR' ? 'Cloudflare, Tailscale ou LAN' : 'Cloudflare, Tailscale or LAN'}
                 </span>
               </div>
               <p className="text-xs text-[#39635E] truncate">
                 {lang === 'FR'
-                  ? 'Exécutez Pantryo sur votre domaine propre (Nginx/Caddy) ou via un tunnel Cloudflare'
-                  : 'Run Pantryo on your custom domain (Nginx/Caddy) or via a Cloudflare tunnel'}
+                  ? 'Exécutez Pantryo sur votre réseau local, via Cloudflare Zero Trust ou Tailscale Funnel'
+                  : 'Run Pantryo on your local LAN, via Cloudflare Zero Trust, or with Tailscale Funnel'}
               </p>
             </div>
           </div>

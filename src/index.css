@@ -7,37 +7,37 @@
     --sab: env(safe-area-inset-bottom, 0px);
     --sal: env(safe-area-inset-left, 0px);
 
-    /* Material 3 Color Roles: Culinary Green & Sage Tonal Palette */
-    --md-sys-color-primary: #236A4E;
+    /* Material 3 Color Roles: High-Contrast Deep Forest Emerald & Warm Sand Palette */
+    --md-sys-color-primary: #004D36;
     --md-sys-color-on-primary: #FFFFFF;
-    --md-sys-color-primary-container: #B0F1CD;
-    --md-sys-color-on-primary-container: #002114;
+    --md-sys-color-primary-container: #9DF4C7;
+    --md-sys-color-on-primary-container: #002115;
 
-    --md-sys-color-secondary: #4E6356;
+    --md-sys-color-secondary: #224233;
     --md-sys-color-on-secondary: #FFFFFF;
-    --md-sys-color-secondary-container: #D1E8D7;
-    --md-sys-color-on-secondary-container: #0C1F15;
+    --md-sys-color-secondary-container: #CEE9DC;
+    --md-sys-color-on-secondary-container: #0A2217;
 
-    --md-sys-color-tertiary: #3B6471;
+    --md-sys-color-tertiary: #16465B;
     --md-sys-color-on-tertiary: #FFFFFF;
-    --md-sys-color-tertiary-container: #BFE9F8;
-    --md-sys-color-on-tertiary-container: #001F2A;
+    --md-sys-color-tertiary-container: #BFE5F7;
+    --md-sys-color-on-tertiary-container: #001E2A;
 
-    --md-sys-color-surface: #F6FAF4;
-    --md-sys-color-surface-dim: #D6DBD4;
-    --md-sys-color-surface-bright: #F6FAF4;
-    --md-sys-color-on-surface: #181D19;
-    --md-sys-color-on-surface-variant: #414942;
+    --md-sys-color-surface: #FAF7F2;
+    --md-sys-color-surface-dim: #E8E2D7;
+    --md-sys-color-surface-bright: #FAF7F2;
+    --md-sys-color-on-surface: #111A15;
+    --md-sys-color-on-surface-variant: #28352E;
 
     /* Material 3 Tonal Surface Containers */
     --md-sys-color-surface-container-lowest: #FFFFFF;
-    --md-sys-color-surface-container-low: #F0F5EE;
-    --md-sys-color-surface-container: #EAEFE8;
-    --md-sys-color-surface-container-high: #E4E9E2;
-    --md-sys-color-surface-container-highest: #DFE4DC;
+    --md-sys-color-surface-container-low: #F5EFE6;
+    --md-sys-color-surface-container: #EFE9DF;
+    --md-sys-color-surface-container-high: #E4DDD1;
+    --md-sys-color-surface-container-highest: #DBD3C5;
 
-    --md-sys-color-outline: #707973;
-    --md-sys-color-outline-variant: #BFC9C1;
+    --md-sys-color-outline: #5C6B61;
+    --md-sys-color-outline-variant: #C8D3CA;
 
     --md-sys-color-error: #BA1A1A;
     --md-sys-color-on-error: #FFFFFF;
@@ -47,7 +47,8 @@
     /* Material 3 Elevation Shadows */
     --md-sys-elevation-1: 0px 1px 3px 1px rgba(0, 0, 0, 0.08), 0px 1px 2px 0px rgba(0, 0, 0, 0.12);
     --md-sys-elevation-2: 0px 2px 6px 2px rgba(0, 0, 0, 0.08), 0px 1px 2px 0px rgba(0, 0, 0, 0.14);
-    --md-sys-elevation-3: 0px 1px 3px 0px rgba(0, 0, 0, 0.16), 0px 4px 8px 3px rgba(0, 0, 0, 0.08);
+    --md-sys-elevation-3: 0px 1px 3px 0px rgba(0, 0, 0, 0.16), 0px 4px 8px 3px rgba(0, 0, 0, 0.12);
+    --md-sys-elevation-4: 0px 2px 4px -1px rgba(0, 0, 0, 0.2), 0px 4px 5px 0px rgba(0, 0, 0, 0.14), 0px 1px 10px 0px rgba(0, 0, 0, 0.12);
   }
 
   html,

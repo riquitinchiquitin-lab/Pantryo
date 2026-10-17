@@ -145,9 +145,9 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     geminiApiKey: string;
     hasGeminiKey: boolean;
     isGoogleManagedKey?: boolean;
-    hostingMode?: 'cloudflare' | 'custom_domain' | 'local_lan';
+    hostingMode?: 'cloudflare' | 'tailscale' | 'custom_domain' | 'local_lan';
     customDomain?: string;
-    reverseProxyType?: 'caddy' | 'nginx' | 'npm' | 'traefik' | 'dns';
+    reverseProxyType?: 'tailscale' | 'caddy' | 'nginx' | 'npm' | 'traefik' | 'dns';
     cloudflareTunnelToken: string;
     hasTunnelToken: boolean;
     expoPublicApiUrl: string;
@@ -163,7 +163,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     hasGeminiKey: false,
     hostingMode: 'cloudflare',
     customDomain: '',
-    reverseProxyType: 'caddy',
+    reverseProxyType: 'tailscale',
     cloudflareTunnelToken: '',
     hasTunnelToken: false,
     expoPublicApiUrl: '',
@@ -172,8 +172,8 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     dbEncryptionKey: '',
     nodeEnv: 'production',
   });
-  const [selectedHostingMode, setSelectedHostingMode] = useState<'cloudflare' | 'custom_domain' | 'local_lan'>('cloudflare');
-  const [selectedReverseProxy, setSelectedReverseProxy] = useState<'caddy' | 'nginx' | 'npm' | 'traefik' | 'dns'>('caddy');
+  const [selectedHostingMode, setSelectedHostingMode] = useState<'cloudflare' | 'tailscale' | 'custom_domain' | 'local_lan'>('cloudflare');
+  const [selectedReverseProxy, setSelectedReverseProxy] = useState<'tailscale' | 'caddy' | 'nginx' | 'npm' | 'traefik' | 'dns'>('tailscale');
   const [isTestingDomain, setIsTestingDomain] = useState(false);
   const [domainTestResult, setDomainTestResult] = useState<{
     success: boolean;
@@ -425,11 +425,13 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
         const data = await res.json();
         setSettings(data);
         if (data.hostingMode) {
-          setSelectedHostingMode(data.hostingMode);
+          setSelectedHostingMode(data.hostingMode === 'tailscale_funnel' ? 'tailscale' : data.hostingMode);
         } else if (data.hasTunnelToken || (data.cloudflareTunnelToken && !data.cloudflareTunnelToken.includes('••••'))) {
           setSelectedHostingMode('cloudflare');
+        } else if (data.appUrl && data.appUrl.includes('.ts.net')) {
+          setSelectedHostingMode('tailscale');
         } else if (data.appUrl && !data.appUrl.includes('localhost') && !data.appUrl.includes('127.0.0.1') && !data.appUrl.includes('.local')) {
-          setSelectedHostingMode('custom_domain');
+          setSelectedHostingMode('tailscale');
         } else {
           setSelectedHostingMode('local_lan');
         }
@@ -2894,15 +2896,15 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                       </div>
                     </button>
 
-                    {/* Card 2: Custom Domain */}
+                    {/* Card 2: Tailscale Funnel */}
                     <button
                       type="button"
                       onClick={() => {
-                        setSelectedHostingMode('custom_domain');
-                        setSettings({ ...settings, hostingMode: 'custom_domain' });
+                        setSelectedHostingMode('tailscale');
+                        setSettings({ ...settings, hostingMode: 'tailscale' });
                       }}
                       className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-3 ${
-                        selectedHostingMode === 'custom_domain'
+                        selectedHostingMode === 'tailscale'
                           ? 'bg-purple-50/70 border-purple-500 shadow-xs ring-2 ring-purple-500/20'
                           : 'bg-[#FAF7EE] border-[#E0D9C8] hover:bg-white hover:border-purple-300'
                       }`}
@@ -2910,24 +2912,24 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
                           <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0">
-                            <Globe className="w-4 h-4" />
+                            <Shield className="w-4 h-4" />
                           </div>
                           <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-purple-100 text-purple-800 border border-purple-200">
-                            {lang === 'FR' ? 'Contrôle Total' : 'Full Control'}
+                            {lang === 'FR' ? 'SSL Automatique' : 'Zero-Config HTTPS'}
                           </span>
                         </div>
                         <div className="font-bold text-xs text-[#0D3B37]">
-                          {lang === 'FR' ? 'Mon Propre Domaine' : 'My Own Custom Domain'}
+                          Tailscale Funnel
                         </div>
                         <p className="text-[10px] text-[#527470] leading-snug">
                           {lang === 'FR'
-                            ? 'Votre domaine (pantryo.domaine.fr) avec Caddy, Nginx, NPM ou Traefik et certificats Let’s Encrypt.'
-                            : 'Your domain (pantryo.domain.com) with Caddy, Nginx, NPM, or Traefik & Let’s Encrypt SSL.'}
+                            ? 'Accès public chiffré HTTPS (https://pantryo.tailnet.ts.net) ou accès privé Tailnet sans ouvrir de port.'
+                            : 'Public encrypted HTTPS (https://pantryo.tailnet.ts.net) or private Tailnet access without port forwarding.'}
                         </p>
                       </div>
                       <div className="flex items-center gap-1.5 text-[10px] font-bold text-purple-700">
-                        <div className={`w-2 h-2 rounded-full ${selectedHostingMode === 'custom_domain' ? 'bg-purple-600 animate-pulse' : 'bg-slate-300'}`} />
-                        <span>{selectedHostingMode === 'custom_domain' ? (lang === 'FR' ? 'Mode Sélectionné' : 'Selected Mode') : (lang === 'FR' ? 'Activer ce mode' : 'Select mode')}</span>
+                        <div className={`w-2 h-2 rounded-full ${selectedHostingMode === 'tailscale' ? 'bg-purple-600 animate-pulse' : 'bg-slate-300'}`} />
+                        <span>{selectedHostingMode === 'tailscale' ? (lang === 'FR' ? 'Mode Sélectionné' : 'Selected Mode') : (lang === 'FR' ? 'Activer ce mode' : 'Select mode')}</span>
                       </div>
                     </button>
 
@@ -3171,19 +3173,25 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                     </div>
                   )}
 
-                  {/* SUB-PANEL B: CUSTOM DOMAIN & REVERSE PROXY */}
-                  {selectedHostingMode === 'custom_domain' && (
+                  {/* SUB-PANEL B: TAILSCALE FUNNEL */}
+                  {(selectedHostingMode === 'tailscale' || selectedHostingMode === 'custom_domain') && (
                     <div className="p-4 rounded-2xl bg-purple-50/50 border border-purple-200/80 space-y-4 animate-fade-in">
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <div className="flex items-center gap-2">
-                          <Globe className="w-4 h-4 text-purple-700" />
+                          <Shield className="w-4 h-4 text-purple-700" />
                           <h4 className="font-bold text-xs text-purple-950 uppercase tracking-wide">
-                            {lang === 'FR' ? 'Configuration de Votre Propre Domaine & Reverse Proxy' : 'Custom Domain & Reverse Proxy Setup'}
+                            {lang === 'FR' ? 'Configuration Tailscale Funnel (HTTPS Automatique)' : 'Tailscale Funnel Setup (Zero-Config HTTPS)'}
                           </h4>
                         </div>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-900 border border-purple-200">
-                          {lang === 'FR' ? 'Let’s Encrypt / Certbot / Caddy' : 'Let’s Encrypt / Certbot / Caddy'}
-                        </span>
+                        <a
+                          href="https://login.tailscale.com/admin/acls"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-[11px] flex items-center gap-1.5 transition-colors shadow-2xs"
+                        >
+                          <span>{lang === 'FR' ? 'Console ACL Tailscale' : 'Tailscale ACL Console'}</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
                       </div>
 
                       {/* Domain URL & HTTP Port input */}
@@ -3191,15 +3199,15 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                         <div className="sm:col-span-2 space-y-1.5">
                           <label className="font-bold text-purple-950 block text-[11px]">
                             {lang === 'FR'
-                              ? 'Nom de Domaine Personnalisé (APP_URL)'
-                              : 'Custom Domain URL (APP_URL)'}
+                              ? 'Nom d’hôte Tailscale Funnel (APP_URL)'
+                              : 'Tailscale Funnel Hostname (APP_URL)'}
                           </label>
                           <div className="flex gap-2">
                             <input
                               type="url"
                               value={settings.appUrl}
                               onChange={(e) => setSettings({ ...settings, appUrl: e.target.value })}
-                              placeholder="https://pantryo.votre-domaine.com"
+                              placeholder="https://pantryo.votre-tailnet.ts.net"
                               className="flex-1 px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white focus:outline-purple-700 text-xs text-purple-950 shadow-2xs font-semibold"
                             />
                             <button
@@ -3213,13 +3221,13 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                               ) : (
                                 <CheckCircle2 className="w-3.5 h-3.5" />
                               )}
-                              <span>{lang === 'FR' ? 'Tester Domaine' : 'Test Domain'}</span>
+                              <span>{lang === 'FR' ? 'Tester Connectivité' : 'Test Endpoint'}</span>
                             </button>
                           </div>
                           <p className="text-[10px] text-purple-900/80">
                             {lang === 'FR'
-                              ? 'URL publique configurée dans vos DNS pointant vers votre serveur ou reverse proxy.'
-                              : 'Public URL configured in your registrar DNS pointing to your host or reverse proxy.'}
+                              ? 'Votre URL publique fournie par Tailscale Funnel (ex: https://pantryo.tailnet-xyz.ts.net).'
+                              : 'Your public URL generated by Tailscale Funnel (e.g. https://pantryo.tailnet-xyz.ts.net).'}
                           </p>
                         </div>
 
@@ -3273,219 +3281,103 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                         </div>
                       )}
 
-                      {/* Reverse Proxy Config Generator */}
-                      <div className="space-y-2 pt-2 border-t border-purple-200/60">
-                        <div className="flex items-center justify-between flex-wrap gap-2">
-                          <span className="font-bold text-xs text-purple-950">
-                            {lang === 'FR' ? 'Générateur de Configuration Reverse Proxy' : 'Reverse Proxy Configuration Generator'}
-                          </span>
-                          <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-purple-200 text-[11px] font-bold">
-                            {(['caddy', 'nginx', 'npm', 'traefik', 'dns'] as const).map((mode) => (
-                              <button
-                                key={mode}
-                                type="button"
-                                onClick={() => setSelectedReverseProxy(mode)}
-                                className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
-                                  selectedReverseProxy === mode
-                                    ? 'bg-purple-700 text-white shadow-2xs'
-                                    : 'text-purple-900 hover:bg-purple-50'
-                                }`}
-                              >
-                                {mode === 'caddy'
-                                  ? 'Caddy'
-                                  : mode === 'nginx'
-                                  ? 'Nginx'
-                                  : mode === 'npm'
-                                  ? 'NPM (GUI)'
-                                  : mode === 'traefik'
-                                  ? 'Traefik'
-                                  : 'DNS A/CNAME'}
-                              </button>
-                            ))}
+                      {/* Step-by-Step Tailscale Funnel Setup Commands */}
+                      <div className="space-y-3 pt-2 border-t border-purple-200/60">
+                        <span className="font-bold text-xs text-purple-950 block">
+                          {lang === 'FR'
+                            ? 'Commandes d’activation Tailscale Funnel sur votre serveur :'
+                            : 'Step-by-Step Tailscale Funnel Commands for your Server:'}
+                        </span>
+
+                        {/* Step 1 */}
+                        <div className="p-3 rounded-xl bg-slate-900 text-slate-100 text-[11px] space-y-1.5 font-mono">
+                          <div className="flex items-center justify-between text-[10px] text-slate-400 font-sans">
+                            <span className="font-bold text-purple-300">
+                              {lang === 'FR' ? 'Étape 1 : Installer le CLI Tailscale' : 'Step 1: Install Tailscale CLI'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleCopySnippet('curl -fsSL https://tailscale.com/install.sh | sh', 'ts-install')}
+                              className="text-xs text-teal-300 hover:text-white flex items-center gap-1 cursor-pointer font-mono"
+                            >
+                              {copiedSnippetId === 'ts-install' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                              <span>{copiedSnippetId === 'ts-install' ? (lang === 'FR' ? 'Copié !' : 'Copied!') : (lang === 'FR' ? 'Copier' : 'Copy')}</span>
+                            </button>
+                          </div>
+                          <div className="text-emerald-400 select-all">
+                            curl -fsSL https://tailscale.com/install.sh | sh
                           </div>
                         </div>
 
-                        {/* CADDY TAB */}
-                        {selectedReverseProxy === 'caddy' && (
-                          <div className="p-3.5 rounded-xl bg-slate-900 text-slate-100 font-mono text-[11px] space-y-2">
-                            <div className="flex items-center justify-between text-[10px] text-slate-400">
-                              <span># Caddyfile (SSL Let's Encrypt automatique sans configuration)</span>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleCopySnippet(
-                                    `${(settings.appUrl || 'pantryo.votre-domaine.com').replace(/^https?:\/\//i, '').replace(/:\d+$/, '').replace(/\/.*$/, '')} {\n    reverse_proxy 127.0.0.1:${settings.port || 3000}\n}`,
-                                    'caddy-config'
-                                  )
-                                }
-                                className="text-xs text-teal-300 hover:text-white flex items-center gap-1 cursor-pointer"
-                              >
-                                {copiedSnippetId === 'caddy-config' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                                <span>{copiedSnippetId === 'caddy-config' ? (lang === 'FR' ? 'Copié !' : 'Copied!') : (lang === 'FR' ? 'Copier' : 'Copy')}</span>
-                              </button>
-                            </div>
-                            <pre className="text-emerald-300 whitespace-pre-wrap select-all">
-{`${(settings.appUrl || 'pantryo.votre-domaine.com').replace(/^https?:\/\//i, '').replace(/:\d+$/, '').replace(/\/.*$/, '')} {
-    reverse_proxy 127.0.0.1:${settings.port || 3000}
-}`}
-                            </pre>
-                            <p className="text-[10px] text-slate-400 font-sans">
-                              {lang === 'FR'
-                                ? '✓ Caddy gère automatiquement l’obtention et le renouvellement de vos certificats SSL Let’s Encrypt.'
-                                : '✓ Caddy automatically provisions and renews Let’s Encrypt HTTPS certificates.'}
-                            </p>
+                        {/* Step 2 */}
+                        <div className="p-3 rounded-xl bg-slate-900 text-slate-100 text-[11px] space-y-1.5 font-mono">
+                          <div className="flex items-center justify-between text-[10px] text-slate-400 font-sans">
+                            <span className="font-bold text-purple-300">
+                              {lang === 'FR' ? 'Étape 2 : Authentifier la Machine (Lien URL)' : 'Step 2: Authenticate Machine (Auth URL)'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleCopySnippet('sudo tailscale up --operator=pantryo', 'ts-up')}
+                              className="text-xs text-teal-300 hover:text-white flex items-center gap-1 cursor-pointer font-mono"
+                            >
+                              {copiedSnippetId === 'ts-up' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                              <span>{copiedSnippetId === 'ts-up' ? (lang === 'FR' ? 'Copié !' : 'Copied!') : (lang === 'FR' ? 'Copier' : 'Copy')}</span>
+                            </button>
                           </div>
-                        )}
-
-                        {/* NGINX TAB */}
-                        {selectedReverseProxy === 'nginx' && (
-                          <div className="p-3.5 rounded-xl bg-slate-900 text-slate-100 font-mono text-[11px] space-y-2">
-                            <div className="flex items-center justify-between text-[10px] text-slate-400">
-                              <span># /etc/nginx/sites-available/pantryo</span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const host = (settings.appUrl || 'pantryo.votre-domaine.com').replace(/^https?:\/\//i, '').replace(/:\d+$/, '').replace(/\/.*$/, '');
-                                  handleCopySnippet(
-                                    `server {\n    listen 80;\n    server_name ${host};\n    return 301 https://$host$request_uri;\n}\n\nserver {\n    listen 443 ssl http2;\n    server_name ${host};\n\n    # Certbot SSL\n    ssl_certificate /etc/letsencrypt/live/${host}/fullchain.pem;\n    ssl_certificate_key /etc/letsencrypt/live/${host}/privkey.pem;\n\n    location / {\n        proxy_pass http://127.0.0.1:${settings.port || 3000};\n        proxy_http_version 1.1;\n        proxy_set_header Upgrade $http_upgrade;\n        proxy_set_header Connection "upgrade";\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n        client_max_body_size 50M;\n    }\n}`,
-                                    'nginx-config'
-                                  );
-                                }}
-                                className="text-xs text-teal-300 hover:text-white flex items-center gap-1 cursor-pointer"
-                              >
-                                {copiedSnippetId === 'nginx-config' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                                <span>{copiedSnippetId === 'nginx-config' ? (lang === 'FR' ? 'Copié !' : 'Copied!') : (lang === 'FR' ? 'Copier' : 'Copy')}</span>
-                              </button>
-                            </div>
-                            <pre className="text-purple-300 whitespace-pre-wrap select-all max-h-48 overflow-y-auto">
-{`server {
-    listen 80;
-    server_name ${(settings.appUrl || 'pantryo.votre-domaine.com').replace(/^https?:\/\//i, '').replace(/:\d+$/, '').replace(/\/.*$/, '')};
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name ${(settings.appUrl || 'pantryo.votre-domaine.com').replace(/^https?:\/\//i, '').replace(/:\d+$/, '').replace(/\/.*$/, '')};
-
-    # ssl_certificate /etc/letsencrypt/live/.../fullchain.pem;
-    # ssl_certificate_key /etc/letsencrypt/live/.../privkey.pem;
-
-    location / {
-        proxy_pass http://127.0.0.1:${settings.port || 3000};
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        client_max_body_size 50M;
-    }
-}`}
-                            </pre>
-                            <p className="text-[10px] text-slate-400 font-sans">
-                              {lang === 'FR'
-                                ? 'Activez les certificats SSL avec Certbot : certbot --nginx -d ' + (settings.appUrl || 'pantryo.votre-domaine.com').replace(/^https?:\/\//i, '').replace(/:\d+$/, '').replace(/\/.*$/, '')
-                                : 'Enable free SSL with Certbot: certbot --nginx -d ' + (settings.appUrl || 'pantryo.votre-domaine.com').replace(/^https?:\/\//i, '').replace(/:\d+$/, '').replace(/\/.*$/, '')}
-                            </p>
+                          <div className="text-emerald-400 select-all">
+                            sudo tailscale up --operator=pantryo
                           </div>
-                        )}
+                          <p className="text-[10px] text-slate-400 font-sans">
+                            {lang === 'FR'
+                              ? '► Ouvrez le lien d’authentification affiché dans le terminal pour approuver le conteneur dans votre Tailnet.'
+                              : '► Open the generated authentication URL in your browser to approve the container in your Tailnet.'}
+                          </p>
+                        </div>
 
-                        {/* NPM TAB */}
-                        {selectedReverseProxy === 'npm' && (
-                          <div className="p-3.5 rounded-xl bg-slate-900 text-slate-100 text-[11px] space-y-2">
-                            <div className="font-bold text-amber-300 text-xs">
-                              {lang === 'FR' ? 'Paramétrage dans Nginx Proxy Manager (Interface Web) :' : 'Nginx Proxy Manager (Web GUI) Setup:'}
-                            </div>
-                            <div className="space-y-1 text-slate-300 text-[11px] leading-relaxed">
-                              <div>1. Onglet <strong>Details</strong> :</div>
-                              <ul className="list-disc pl-5 text-[10px] text-slate-400 space-y-0.5">
-                                <li>Domain Names: <strong className="text-white font-mono">{(settings.appUrl || 'pantryo.votre-domaine.com').replace(/^https?:\/\//i, '').replace(/:\d+$/, '').replace(/\/.*$/, '')}</strong></li>
-                                <li>Scheme: <strong className="text-white font-mono">http</strong></li>
-                                <li>Forward Hostname / IP: <strong className="text-white font-mono">127.0.0.1</strong> (ou IP du conteneur Proxmox)</li>
-                                <li>Forward Port: <strong className="text-white font-mono">{settings.port || 3000}</strong></li>
-                                <li>Cocher : <strong className="text-emerald-400">Websockets Support</strong> & <strong className="text-emerald-400">Block Common Exploits</strong></li>
-                              </ul>
-                              <div>2. Onglet <strong>SSL</strong> :</div>
-                              <ul className="list-disc pl-5 text-[10px] text-slate-400 space-y-0.5">
-                                <li>Sélectionner : <strong className="text-white">Request a new SSL Certificate</strong></li>
-                                <li>Cocher : <strong className="text-emerald-400">Force SSL</strong> & <strong className="text-emerald-400">HTTP/2 Support</strong></li>
-                              </ul>
+                        {/* Step 3 */}
+                        <div className="p-3 rounded-xl bg-slate-900 text-slate-100 text-[11px] space-y-1.5 font-mono">
+                          <div className="flex items-center justify-between text-[10px] text-slate-400 font-sans">
+                            <span className="font-bold text-purple-300">
+                              {lang === 'FR' ? 'Étape 3 : Démarrer Tailscale Funnel (HTTPS Public)' : 'Step 3: Start Tailscale Funnel (Public HTTPS)'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleCopySnippet(`sudo tailscale funnel --bg ${settings.port || 3000}`, 'ts-funnel')}
+                              className="text-xs text-teal-300 hover:text-white flex items-center gap-1 cursor-pointer font-mono"
+                            >
+                              {copiedSnippetId === 'ts-funnel' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                              <span>{copiedSnippetId === 'ts-funnel' ? (lang === 'FR' ? 'Copié !' : 'Copied!') : (lang === 'FR' ? 'Copier' : 'Copy')}</span>
+                            </button>
+                          </div>
+                          <div className="text-emerald-400 select-all">
+                            sudo tailscale funnel --bg {settings.port || 3000}
+                          </div>
+                          <p className="text-[10px] text-slate-400 font-sans">
+                            {lang === 'FR'
+                              ? `Expose votre port local ${settings.port || 3000} sur Internet avec un certificat Let's Encrypt automatique sans ouvrir de port box.`
+                              : `Routes public HTTPS traffic to port ${settings.port || 3000} with zero port forwarding using automated Let's Encrypt.`}
+                          </p>
+                          <div className="pt-2 border-t border-slate-800 text-[10px] text-slate-400 font-sans">
+                            {lang === 'FR'
+                              ? 'Option Réseau Privé : pour limiter l’accès uniquement à vos appareils connectés à votre compte Tailscale, utilisez :'
+                              : 'Private Tailnet Option: to restrict access only to devices logged into your Tailscale account, use:'}
+                            <div className="text-amber-300 font-mono mt-1 select-all">
+                              sudo tailscale serve --bg {settings.port || 3000}
                             </div>
                           </div>
-                        )}
+                        </div>
 
-                        {/* TRAEFIK TAB */}
-                        {selectedReverseProxy === 'traefik' && (
-                          <div className="p-3.5 rounded-xl bg-slate-900 text-slate-100 font-mono text-[11px] space-y-2">
-                            <div className="flex items-center justify-between text-[10px] text-slate-400">
-                              <span># Labels Docker Traefik v2/v3</span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const host = (settings.appUrl || 'pantryo.votre-domaine.com').replace(/^https?:\/\//i, '').replace(/:\d+$/, '').replace(/\/.*$/, '');
-                                  handleCopySnippet(
-                                    `labels:\n  - "traefik.enable=true"\n  - "traefik.http.routers.pantryo.rule=Host(\`${host}\`)"\n  - "traefik.http.routers.pantryo.entrypoints=websecure"\n  - "traefik.http.routers.pantryo.tls.certresolver=myresolver"\n  - "traefik.http.services.pantryo.loadbalancer.server.port=${settings.port || 3000}"`,
-                                    'traefik-config'
-                                  );
-                                }}
-                                className="text-xs text-teal-300 hover:text-white flex items-center gap-1 cursor-pointer"
-                              >
-                                {copiedSnippetId === 'traefik-config' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                                <span>{copiedSnippetId === 'traefik-config' ? (lang === 'FR' ? 'Copié !' : 'Copied!') : (lang === 'FR' ? 'Copier' : 'Copy')}</span>
-                              </button>
-                            </div>
-                            <pre className="text-blue-300 whitespace-pre-wrap select-all">
-{`labels:
-  - "traefik.enable=true"
-  - "traefik.http.routers.pantryo.rule=Host(\`${(settings.appUrl || 'pantryo.votre-domaine.com').replace(/^https?:\/\//i, '').replace(/:\d+$/, '').replace(/\/.*$/, '')}\`)"
-  - "traefik.http.routers.pantryo.entrypoints=websecure"
-  - "traefik.http.routers.pantryo.tls.certresolver=myresolver"
-  - "traefik.http.services.pantryo.loadbalancer.server.port=${settings.port || 3000}"`}
-                            </pre>
-                          </div>
-                        )}
-
-                        {/* DNS A/CNAME TAB */}
-                        {selectedReverseProxy === 'dns' && (
-                          <div className="p-3.5 rounded-xl bg-slate-900 text-slate-100 text-[11px] space-y-2">
-                            <div className="font-bold text-teal-300 text-xs">
-                              {lang === 'FR' ? 'Configuration DNS chez votre bureau d’enregistrement (OVH, Namecheap, etc.) :' : 'DNS Record Configuration at your Registrar:'}
-                            </div>
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-left font-mono text-[10px] text-slate-300 border border-slate-700">
-                                <thead>
-                                  <tr className="bg-slate-800 text-slate-200">
-                                    <th className="p-2 border border-slate-700">Type</th>
-                                    <th className="p-2 border border-slate-700">Hôte / Nom</th>
-                                    <th className="p-2 border border-slate-700">Valeur / Cible</th>
-                                    <th className="p-2 border border-slate-700">TTL</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  <tr>
-                                    <td className="p-2 border border-slate-700 font-bold text-amber-400">A</td>
-                                    <td className="p-2 border border-slate-700">pantryo</td>
-                                    <td className="p-2 border border-slate-700">&lt;Votre IP Publique Box / VPS&gt;</td>
-                                    <td className="p-2 border border-slate-700">Auto (ou 3600)</td>
-                                  </tr>
-                                  <tr>
-                                    <td className="p-2 border border-slate-700 font-bold text-blue-400">CNAME</td>
-                                    <td className="p-2 border border-slate-700">pantryo</td>
-                                    <td className="p-2 border border-slate-700">&lt;votre-ddns.duckdns.org&gt;</td>
-                                    <td className="p-2 border border-slate-700">Auto (ou 3600)</td>
-                                  </tr>
-                                </tbody>
-                              </table>
-                            </div>
-                            <p className="text-[10px] text-slate-400">
-                              {lang === 'FR'
-                                ? 'Pour une connexion directe sans reverse proxy, ouvrez le port 80/443 sur votre box et redirigez vers le port local.'
-                                : 'For direct connections, forward port 80/443 on your router to your host local IP.'}
-                            </p>
-                          </div>
-                        )}
+                        {/* Step 4 */}
+                        <div className="p-3 rounded-xl bg-purple-100/70 border border-purple-200 text-purple-950 text-[11px] space-y-1">
+                          <span className="font-bold block">
+                            {lang === 'FR' ? 'Étape 4 : Autoriser Funnel dans la console Tailscale (ACL)' : 'Step 4: Enable Funnel in Tailscale Access Controls (ACL)'}
+                          </span>
+                          <p className="text-[10px] text-purple-900 leading-relaxed">
+                            {lang === 'FR'
+                              ? 'Dans la console d’administration Tailscale (https://login.tailscale.com/admin/acls), assurez-vous que la directive "nodeAttrs" autorise "funnel" pour vos appareils de test ou serveurs.'
+                              : 'In your Tailscale admin console (https://login.tailscale.com/admin/acls), ensure the "nodeAttrs" section grants the "funnel" attribute to your Pantryo node.'}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   )}
