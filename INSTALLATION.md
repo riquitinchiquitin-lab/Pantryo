@@ -296,7 +296,56 @@ sudo systemctl enable --now pantryo
 
 ---
 
-## 5. Access & Networking Architecture
+## 5. Updating Pantryo on Proxmox VE (LXC or VM)
+
+Pantryo preserves your encrypted SQLite database (`/opt/pantryo/server/data/pantryo.sqlite`) and your configuration (`/opt/pantryo/.env`) safely across updates.
+
+### Method 1: Automated 1-Click Update (Inside LXC Console)
+
+Log into your LXC container console or SSH and run:
+
+```bash
+cd /opt/pantryo && sudo ./update.sh
+```
+
+Or run the update directly from the **Proxmox Node Host Shell** (replace `<CT_ID>` with your container number, e.g. `105`):
+
+```bash
+pct exec <CT_ID> -- bash -c "cd /opt/pantryo && ./update.sh"
+```
+
+### Method 2: Manual Step-by-Step Update
+
+If you prefer to inspect each command manually:
+
+```bash
+# 1. Navigate to application folder
+cd /opt/pantryo
+
+# 2. Pull latest code (preserves .env and server/data/)
+git pull --rebase || git pull
+
+# 3. Install new dependencies & recompile native SQLite bindings
+npm install --no-audit
+
+# 4. Build production bundle (Vite frontend + esbuild server)
+npm run build
+
+# 5. Fix permissions for the unprivileged system user
+sudo chown -R pantryo:pantryo /opt/pantryo
+sudo chmod 700 /opt/pantryo/server/data
+sudo chmod 600 /opt/pantryo/.env
+
+# 6. Restart the systemd service
+sudo systemctl restart pantryo
+
+# 7. Verify the service is active and running
+systemctl status pantryo
+```
+
+---
+
+## 6. Access & Networking Architecture
 
 Pantryo supports 3 streamlined, secure access models:
 
@@ -450,7 +499,7 @@ This enables full-screen application mode, native camera barcode scanning, and i
 
 ---
 
-## 6. Environment Variables Reference
+## 7. Environment Variables Reference
 
 Copy `.env.example` to `.env` and configure according to your infrastructure:
 
@@ -488,7 +537,7 @@ EXPO_PUBLIC_API_URL=https://pantry.yourdomain.com
 
 ---
 
-## 7. Backup, Restore & SQLCipher Encryption
+## 8. Backup, Restore & SQLCipher Encryption
 
 ### 🔒 Verifying Database Encryption
 
@@ -530,7 +579,7 @@ sudo chmod +x /usr/local/bin/pantryo-backup.sh
 
 ---
 
-## 8. Troubleshooting & FAQ
+## 9. Troubleshooting & FAQ
 
 ### Q1: The server crashes during `npm install` on Raspberry Pi 3B+ / Zero 2W.
 - **Cause**: Node.js ran out of RAM when compiling native bindings.

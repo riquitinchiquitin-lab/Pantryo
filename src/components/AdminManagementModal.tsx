@@ -58,7 +58,6 @@ import { Fido2SecurityPanel } from './Fido2SecurityPanel';
 import { NistPasswordValidator } from './NistPasswordValidator';
 import { generatePassphrase } from '../utils/nistPassword';
 import { ChangeAvatarModal, CARTOON_AVATARS } from './ChangeAvatarModal';
-import { PWAInstallButton } from './PWAInstallButton';
 import {
   generateDatabaseEncryptionKey,
   isValid256BitKey,
@@ -110,6 +109,7 @@ interface AdminManagementModalProps {
   onUserChange?: (user: User) => void;
   onDatabaseRestored?: () => void;
   onNavigateToAppTab?: (tab: 'home' | 'meals' | 'grocery' | 'cooking' | 'sync') => void;
+  onOpenDocs?: (tab: 'features' | 'proxmox' | 'linux' | 'cloudflare' | 'security') => void;
 }
 
 const FALLBACK_ADMIN_USER: User = {
@@ -131,6 +131,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
   onUserChange,
   onDatabaseRestored,
   onNavigateToAppTab,
+  onOpenDocs,
 }) => {
   const { lang } = useLanguage();
   const [activeTab, setActiveTab] = useState<'backup' | 'users' | 'security' | 'settings'>(initialTab);
@@ -1088,104 +1089,26 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
       className="fixed inset-0 z-50 bg-[#FAF7EE] text-[#133E3B] flex flex-col w-full h-full overflow-hidden animate-fade-in"
     >
       <div className="flex flex-col w-full h-full overflow-hidden">
-        {/* Top Header */}
-        <div className="px-5 sm:px-8 py-4 bg-white border-b border-[#E8E2D5] flex items-center justify-between shrink-0">
+        {/* Top Header - Simplified with title and single Close button */}
+        <div className="px-5 sm:px-8 py-3.5 bg-white border-b border-[#E8E2D5] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-teal-800 text-white flex items-center justify-center shadow-sm shrink-0">
-              <ShieldCheck className="w-6 h-6" />
+            <div className="w-9 h-9 rounded-xl bg-teal-800 text-white flex items-center justify-center shadow-xs shrink-0">
+              <ShieldCheck className="w-5 h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base sm:text-lg font-black tracking-tight text-[#0D3B37]">
-                  {lang === 'FR' ? 'Console d’Administration & Sauvegarde' : 'App & Database Administration'}
-                </h2>
-              </div>
-              <p className="text-xs text-[#527470]">
-                {lang === 'FR'
-                  ? 'Gestion de la base de données chiffrée, sauvegardes et comptes du foyer'
-                  : 'Encrypted storage management, database backups & household access'}
-              </p>
-            </div>
+            <h2 className="text-base font-black tracking-tight text-[#0D3B37]">
+              {lang === 'FR' ? 'Administration' : 'Administration'}
+            </h2>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onClose}
-              className="px-3.5 py-1.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-sm cursor-pointer"
-              title={lang === 'FR' ? 'Retourner à l’application' : 'Return to Pantryo App'}
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span className="hidden sm:inline">{lang === 'FR' ? 'Retour à l’app' : 'Back to App'}</span>
-              <span className="sm:hidden">{lang === 'FR' ? 'Retour' : 'Back'}</span>
-            </button>
-
-            <button
-              onClick={onClose}
-              className="px-3.5 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
-              title={lang === 'FR' ? 'Fermer / Quitter' : 'Close / Exit'}
-            >
-              <X className="w-4 h-4" />
-              <span>{lang === 'FR' ? 'Quitter' : 'Exit'}</span>
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 border border-slate-200 cursor-pointer"
+            title={lang === 'FR' ? 'Fermer' : 'Close'}
+          >
+            <X className="w-4 h-4" />
+            <span>{lang === 'FR' ? 'Fermer' : 'Close'}</span>
+          </button>
         </div>
-
-        {/* Pantryo App Tabs Quick Bar - seamless jump back to app views */}
-        {onNavigateToAppTab && (
-          <div className="px-5 sm:px-8 py-2 bg-[#F6F2E8] border-b border-[#E8E2D5] flex items-center justify-between gap-2 overflow-x-auto text-xs shrink-0">
-            <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#527470] whitespace-nowrap shrink-0">
-              <span className="hidden sm:inline">{lang === 'FR' ? 'Accès direct aux onglets :' : 'Direct access to tabs:'}</span>
-              <span className="sm:hidden">{lang === 'FR' ? 'Onglets :' : 'Tabs:'}</span>
-            </div>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                type="button"
-                onClick={() => onNavigateToAppTab('home')}
-                className="px-2.5 py-1 rounded-lg bg-white hover:bg-teal-50 hover:text-teal-900 text-[#0D3B37] border border-[#D5CEBD] font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap shadow-2xs"
-                title={lang === 'FR' ? 'Aller à l’inventaire' : 'Go to Inventory'}
-              >
-                <Home className="w-3 h-3 text-teal-700" />
-                <span>{lang === 'FR' ? 'Inventaire' : 'Inventory'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => onNavigateToAppTab('meals')}
-                className="px-2.5 py-1 rounded-lg bg-white hover:bg-teal-50 hover:text-teal-900 text-[#0D3B37] border border-[#D5CEBD] font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap shadow-2xs"
-                title={lang === 'FR' ? 'Aller au planning repas' : 'Go to Meals'}
-              >
-                <CalendarDays className="w-3 h-3 text-indigo-600" />
-                <span>{lang === 'FR' ? 'Repas' : 'Meals'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => onNavigateToAppTab('grocery')}
-                className="px-2.5 py-1 rounded-lg bg-white hover:bg-teal-50 hover:text-teal-900 text-[#0D3B37] border border-[#D5CEBD] font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap shadow-2xs"
-                title={lang === 'FR' ? 'Aller à l’épicerie' : 'Go to Grocery'}
-              >
-                <ShoppingCart className="w-3 h-3 text-teal-700" />
-                <span>{lang === 'FR' ? 'Épicerie' : 'Grocery'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => onNavigateToAppTab('cooking')}
-                className="px-2.5 py-1 rounded-lg bg-white hover:bg-teal-50 hover:text-teal-900 text-[#0D3B37] border border-[#D5CEBD] font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap shadow-2xs"
-                title={lang === 'FR' ? 'Aller aux idées cuisine' : 'Go to Cooking Ideas'}
-              >
-                <ChefHat className="w-3 h-3 text-teal-700" />
-                <span>{lang === 'FR' ? 'Idées Recettes' : 'Cooking'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => onNavigateToAppTab('sync')}
-                className="px-2.5 py-1 rounded-lg bg-white hover:bg-teal-50 hover:text-teal-900 text-[#0D3B37] border border-[#D5CEBD] font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap shadow-2xs"
-                title={lang === 'FR' ? 'Aller à la famille' : 'Go to Family'}
-              >
-                <Users className="w-3 h-3 text-teal-700" />
-                <span>{lang === 'FR' ? 'Famille' : 'Family'}</span>
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Global Toast / Feedback */}
         {statusMessage && (
@@ -1343,11 +1266,6 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                           {lang === 'FR' ? 'Par installation' : 'Per installation'}
                         </span>
                       </h3>
-                      <p className="text-xs text-[#527470]">
-                        {lang === 'FR'
-                          ? `Base de données SQLite chiffrée page par page avec SQLCipher. Installation ID : ${stats?.encryption?.installationId || stats?.sqlite?.installationId || 'inst_locale'}`
-                          : `SQLite database encrypted page-by-page with SQLCipher. Installation ID: ${stats?.encryption?.installationId || stats?.sqlite?.installationId || 'inst_local'}`}
-                      </p>
                     </div>
                   </div>
 
@@ -1414,56 +1332,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                 </div>
               </div>
 
-              {/* Progressive Web App (PWA) Android & iOS Installation Status Card */}
-              <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-4">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-800 flex items-center justify-center shrink-0">
-                      <Smartphone className="w-5 h-5 text-teal-700" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-sm text-[#0D3B37] flex items-center gap-2">
-                        <span>
-                          {lang === 'FR'
-                            ? 'Application Mobile & PWA (Android & iOS)'
-                            : 'Mobile Web App & PWA (Android & iOS)'}
-                        </span>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800">
-                          {lang === 'FR' ? 'Compatible Android & iOS' : 'Android & iOS Ready'}
-                        </span>
-                      </h3>
-                      <p className="text-xs text-[#527470]">
-                        {lang === 'FR'
-                          ? 'Pantryo peut être installée comme une véritable application native sur votre écran d’accueil avec accès hors-ligne, icônes adaptatives et notifications.'
-                          : 'Pantryo can be installed directly to your home screen as a standalone application on Android (Chrome) and iOS (Safari).'}
-                      </p>
-                    </div>
-                  </div>
 
-                  <PWAInstallButton variant="pill" />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 text-xs">
-                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                    <p className="font-bold text-slate-800 text-[11px]">Android (WebAPK)</p>
-                    <p className="text-slate-600 text-[10px] mt-0.5">
-                      {lang === 'FR' ? 'Icône adaptative masquable 512x512 & installation en 1 clic' : '512x512 maskable adaptive icon & 1-tap installation'}
-                    </p>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                    <p className="font-bold text-slate-800 text-[11px]">iOS (Safari Home Screen)</p>
-                    <p className="text-slate-600 text-[10px] mt-0.5">
-                      {lang === 'FR' ? 'Apple touch icon 180x180 & affichage plein écran sans barre' : '180x180 apple-touch-icon & standalone fullscreen display'}
-                    </p>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                    <p className="font-bold text-slate-800 text-[11px]">Service Worker</p>
-                    <p className="text-slate-600 text-[10px] mt-0.5">
-                      {lang === 'FR' ? 'Gestionnaire actif avec mise en cache locale des assets' : 'Active worker with local asset precaching'}
-                    </p>
-                  </div>
-                </div>
-              </div>
 
               {/* Grid: 2 Columns for Export & Import */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -4100,7 +3969,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
           )}
         </div>
 
-        {/* Modal Footer */}
+        {/* Modal Footer with small Documentation Link & single Close button */}
         <div className="px-6 py-3.5 bg-white border-t border-[#E8E2D5] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 text-xs text-[#527470]">
             <Shield className="w-4 h-4 text-teal-700" />
@@ -4110,19 +3979,38 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
+            {onOpenDocs ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenDocs('proxmox');
+                }}
+                className="px-3 py-1.5 rounded-xl bg-[#FAF7EE] hover:bg-teal-50 border border-[#D5CEBD] hover:border-teal-300 text-xs font-bold text-[#0D3B37] flex items-center gap-1.5 transition-colors cursor-pointer"
+                title={lang === 'FR' ? 'Guide d’auto-hébergement et documentation' : 'Self-hosting runbook & documentation'}
+              >
+                <BookOpen className="w-3.5 h-3.5 text-teal-700" />
+                <span>{lang === 'FR' ? 'Documentation' : 'Documentation'}</span>
+              </button>
+            ) : (
+              <a
+                href="/INSTALLATION.md"
+                target="_blank"
+                rel="noreferrer"
+                className="px-3 py-1.5 rounded-xl bg-[#FAF7EE] hover:bg-teal-50 border border-[#D5CEBD] hover:border-teal-300 text-xs font-bold text-[#0D3B37] flex items-center gap-1.5 transition-colors"
+              >
+                <BookOpen className="w-3.5 h-3.5 text-teal-700" />
+                <span>{lang === 'FR' ? 'Documentation' : 'Documentation'}</span>
+              </a>
+            )}
+
             <button
               onClick={onClose}
               className="px-4 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs shadow-xs transition-transform active:scale-95 flex items-center gap-1.5 cursor-pointer"
             >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>{lang === 'FR' ? 'Retour à la cuisine' : 'Back to Kitchen'}</span>
-            </button>
-            <button
-              onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-[#FAF7EE] hover:bg-[#EFEAE0] text-[#0D3B37] font-bold text-xs border border-[#D5CEBD] transition-colors cursor-pointer"
-            >
-              {lang === 'FR' ? 'Fermer la console' : 'Close Console'}
+              <X className="w-3.5 h-3.5" />
+              <span>{lang === 'FR' ? 'Fermer' : 'Close'}</span>
             </button>
           </div>
         </div>
