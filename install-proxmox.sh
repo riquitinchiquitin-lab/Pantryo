@@ -46,28 +46,38 @@ if command -v pveversion >/dev/null 2>&1; then
     done
 
     read -rp "$(echo -e "${BOLD}Container ID [${GREEN}${NEXT_ID}${NC}${BOLD}]: ${NC}")" CT_ID
-    CT_ID="${CT_ID:-$NEXT_ID}"
+    if [[ -z "$CT_ID" || "$CT_ID" =~ ^[Yy]([Ee][Ss])?$ || ! "$CT_ID" =~ ^[0-9]+$ ]]; then
+      CT_ID="$NEXT_ID"
+    fi
 
     read -rp "$(echo -e "${BOLD}Container Hostname [${GREEN}pantryo${NC}${BOLD}]: ${NC}")" CT_NAME
-    CT_NAME="${CT_NAME:-pantryo}"
+    if [[ -z "$CT_NAME" || "$CT_NAME" =~ ^[Yy]([Ee][Ss])?$ ]]; then
+      CT_NAME="pantryo"
+    fi
 
     read -rp "$(echo -e "${BOLD}RAM in MB [${GREEN}1024${NC}${BOLD}]: ${NC}")" CT_RAM
-    CT_RAM="${CT_RAM:-1024}"
+    if [[ -z "$CT_RAM" || "$CT_RAM" =~ ^[Yy]([Ee][Ss])?$ || ! "$CT_RAM" =~ ^[0-9]+$ ]]; then
+      CT_RAM="1024"
+    fi
 
     read -rp "$(echo -e "${BOLD}Disk Size in GB [${GREEN}8${NC}${BOLD}]: ${NC}")" CT_DISK
-    CT_DISK="${CT_DISK:-8}"
+    if [[ -z "$CT_DISK" || "$CT_DISK" =~ ^[Yy]([Ee][Ss])?$ || ! "$CT_DISK" =~ ^[0-9]+$ ]]; then
+      CT_DISK="8"
+    fi
 
     # Detect storage pool with rootdir support
     DEFAULT_STORAGE=$(pvesm status -content rootdir 2>/dev/null | awk 'NR>1 {print $1}' | head -n 1 || echo "local-lvm")
     read -rp "$(echo -e "${BOLD}Storage Pool [${GREEN}${DEFAULT_STORAGE}${NC}${BOLD}]: ${NC}")" CT_STORAGE
-    CT_STORAGE="${CT_STORAGE:-$DEFAULT_STORAGE}"
+    if [[ -z "$CT_STORAGE" || "$CT_STORAGE" =~ ^[Yy]([Ee][Ss])?$ ]]; then
+      CT_STORAGE="$DEFAULT_STORAGE"
+    fi
 
     # Container Root Password (interactive + auto-generation)
     echo -e "\n${CYAN}${BOLD}--- Container Root Password ---${NC}"
     echo -e "You can type a custom root password, or press Enter to auto-generate a secure 20-character password."
     read -rp "$(echo -e "${BOLD}Container Root Password [${GREEN}Press Enter to auto-generate secure 20-char password${NC}${BOLD}]: ${NC}")" INPUT_CT_PASSWORD
 
-    if [[ -z "$INPUT_CT_PASSWORD" ]]; then
+    if [[ -z "$INPUT_CT_PASSWORD" || "$INPUT_CT_PASSWORD" =~ ^[Yy]([Ee][Ss])?$ ]]; then
       if command -v openssl >/dev/null 2>&1; then
         CT_PASSWORD=$(openssl rand -base64 16 | tr -dc 'a-zA-Z0-9!@#%^&*' | head -c 20)
       else

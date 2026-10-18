@@ -38,32 +38,46 @@ echo -e "This script will create a dedicated Debian 12 LXC container and launch 
 # Container configurations
 NEXTID=$(pvesh get /cluster/nextid)
 read -rp "Container ID [${NEXTID}]: " CTID
-CTID="${CTID:-$NEXTID}"
+if [[ -z "$CTID" || "$CTID" =~ ^[Yy]([Ee][Ss])?$ || ! "$CTID" =~ ^[0-9]+$ ]]; then
+  CTID="$NEXTID"
+fi
 
 read -rp "Hostname [pantryo]: " HN
-HN="${HN:-pantryo}"
+if [[ -z "$HN" || "$HN" =~ ^[Yy]([Ee][Ss])?$ ]]; then
+  HN="pantryo"
+fi
 
 read -rp "Disk Size in GB [10]: " DISK
-DISK="${DISK:-10}"
+if [[ -z "$DISK" || "$DISK" =~ ^[Yy]([Ee][Ss])?$ || ! "$DISK" =~ ^[0-9]+$ ]]; then
+  DISK="10"
+fi
 
 read -rp "RAM in MB [2048]: " RAM
-RAM="${RAM:-2048}"
+if [[ -z "$RAM" || "$RAM" =~ ^[Yy]([Ee][Ss])?$ || ! "$RAM" =~ ^[0-9]+$ ]]; then
+  RAM="2048"
+fi
 
 read -rp "CPU Cores [2]: " CORES
-CORES="${CORES:-2}"
+if [[ -z "$CORES" || "$CORES" =~ ^[Yy]([Ee][Ss])?$ || ! "$CORES" =~ ^[0-9]+$ ]]; then
+  CORES="2"
+fi
 
 read -rp "Storage Pool [local-lvm]: " STORAGE
-STORAGE="${STORAGE:-local-lvm}"
+if [[ -z "$STORAGE" || "$STORAGE" =~ ^[Yy]([Ee][Ss])?$ ]]; then
+  STORAGE="local-lvm"
+fi
 
 read -rp "Network Bridge [vmbr0]: " BRIDGE
-BRIDGE="${BRIDGE:-vmbr0}"
+if [[ -z "$BRIDGE" || "$BRIDGE" =~ ^[Yy]([Ee][Ss])?$ ]]; then
+  BRIDGE="vmbr0"
+fi
 
 # Container Root Password (interactive with secure 20-character auto-generation)
 echo -e "\n${BL}[Container Security & Credentials]${CL}"
 echo -e "You can type a custom root password, or press Enter to auto-generate a secure 20-character password."
 read -rp "Container Root Password [Press Enter to auto-generate 20-char password]: " INPUT_CT_PASSWORD
 
-if [[ -z "$INPUT_CT_PASSWORD" ]]; then
+if [[ -z "$INPUT_CT_PASSWORD" || "$INPUT_CT_PASSWORD" =~ ^[Yy]([Ee][Ss])?$ ]]; then
   if command -v openssl >/dev/null 2>&1; then
     CT_PASSWORD=$(openssl rand -base64 16 | tr -dc 'a-zA-Z0-9!@#%^&*' | head -c 20)
   else
