@@ -29,8 +29,16 @@ if [ -d ".git" ]; then
   git fetch --all --tags
   git reset --hard origin/main || git pull --rebase
 else
-  echo -e "\n${CYAN}1/4: Fetching latest release bundle...${NC}"
-  curl -fsSL https://github.com/riquitinchiquitin-lab/Pantryo/archive/refs/heads/main.tar.gz | tar -xz --strip-components=1 -C "$INSTALL_DIR"
+  echo -e "\n${CYAN}1/4: Initializing git repository link...${NC}"
+  git init
+  git remote add origin https://github.com/riquitinchiquitin-lab/Pantryo.git 2>/dev/null || git remote set-url origin https://github.com/riquitinchiquitin-lab/Pantryo.git
+  if git fetch --depth 1 origin main 2>/dev/null; then
+    git reset --hard origin/main
+    echo -e "${GREEN}✓ Git repository connected and updated to origin/main.${NC}"
+  else
+    echo -e "${YELLOW}Git remote fetch failed, falling back to release tarball...${NC}"
+    curl -fsSL https://github.com/riquitinchiquitin-lab/Pantryo/archive/refs/heads/main.tar.gz | tar -xz --strip-components=1 -C "$INSTALL_DIR"
+  fi
 fi
 
 # 2. Install dependencies & rebuild better-sqlite3-multiple-ciphers
