@@ -5,14 +5,12 @@ services:
       dockerfile: Dockerfile
     container_name: pantryo_app
     restart: unless-stopped
+    user: "1000:1000"
+    read_only: false
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    cap_add:
-      - CHOWN
-      - SETUID
-      - SETGID
     pids_limit: 150
     tmpfs:
       - /tmp:mode=1777,size=64M

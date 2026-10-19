@@ -19,13 +19,15 @@
 4. [Method 2: Raspberry Pi & Universal Linux (Bare-Metal / VM)](#2-raspberry-pi--universal-linux-installation)
 5. [Method 3: Docker & Docker Compose](#3-docker--docker-compose-deployment)
 6. [Method 4: Manual Git & Node.js 22 LTS Installation](#4-manual-git--nodejs-22-lts-installation)
-7. [Access & Networking Architecture (3 Streamlined Options)](#5-access--networking-architecture)
+7. [Updating Pantryo on Proxmox VE (LXC or VM)](#5-updating-pantryo-on-proxmox-ve-lxc-or-vm)
+8. [Access & Networking Architecture (3 Streamlined Options)](#6-access--networking-architecture)
    - [Option A: Local Network Setup (Access to Local Network Only)](#option-a-local-network-setup-access-to-local-network-only)
    - [Option B: Cloudflare Zero Trust Tunnel (Zero Port-Forwarding)](#option-b-cloudflare-zero-trust-tunnel-recommended)
    - [Option C: Tailscale Funnel (Zero-Config HTTPS & Funnel Routing)](#option-c-tailscale-funnel-zero-config-https)
-8. [Environment Variables Reference (`.env`)](#6-environment-variables-reference)
-9. [Database Backup & SQLCipher 256-bit Encryption](#7-backup-restore--sqlcipher-encryption)
-10. [Troubleshooting & FAQ / Dépannage](#8-troubleshooting--faq)
+9. [Environment Variables Reference (`.env`)](#7-environment-variables-reference)
+10. [Database Backup & SQLCipher 256-bit Encryption](#8-backup-restore--sqlcipher-encryption)
+11. [Security Hardening Standards & CIS/OWASP Compliance](#9-security-hardening-standards--cisowasp-compliance)
+12. [Troubleshooting & FAQ / Dépannage](#10-troubleshooting--faq)
 
 ---
 
@@ -579,7 +581,70 @@ sudo chmod +x /usr/local/bin/pantryo-backup.sh
 
 ---
 
-## 9. Troubleshooting & FAQ
+## 9. Security Hardening Standards & CIS/OWASP Compliance
+
+Pantryo is engineered to meet top authority security benchmarks for homelab, container, and enterprise environments:
+
+### Benchmarks Enforced
+
+1. **CIS Debian Linux 12 Benchmark**:
+   - **Secret Protection**: Strict `0600` permissions on `.env` (owner read/write only).
+   - **Database Isolation**: Strict `0700` permissions on `/opt/pantryo/server/data`.
+   - **Kernel Sysctl Hardening**: Protected hardlinks (`fs.protected_hardlinks=1`), symlinks (`fs.protected_symlinks=1`), disabled core dumps for SUID (`fs.suid_dumpable=0`), and reverse path filtering (`rp_filter=1`).
+   - **Process Sandboxing**: Systemd sandboxing with `NoNewPrivileges=true`, `PrivateTmp=true`, `ProtectSystem=full`, `ProtectHome=true`, `ProtectKernelTunables=true`, and `ProtectControlGroups=true`.
+
+2. **OWASP Docker Security Cheat Sheet**:
+   - **Non-Root Execution**: Runs under unprivileged user `node` (UID 1000 in Docker) or `pantryo` (in LXC/Linux).
+   - **Capability Stripping**: Drops all Linux capabilities (`cap_drop: [ALL]`).
+   - **No New Privileges**: Blocks privilege escalation (`no-new-privileges: true`).
+   - **Resource & Process Limits**: Enforces `pids_limit: 150` to prevent fork-bomb Denial of Service attacks.
+   - **Minimal Attack Surface**: Production container runner omits compilers (gcc, g++, make, python3) and curl.
+
+3. **Debian Official Securing Manual**:
+   - **Automated Security Updates**: Configured via Debian `unattended-upgrades` running daily at `/etc/cron.daily/pantryo-security-updates`.
+   - **Package Supply Chain**: Verified with `npm audit` for zero high or critical CVEs.
+
+4. **Proxmox VE LXC Hardening**:
+   - **Unprivileged Containers**: Proxmox LXC containers are created with `unprivileged: 1`. Root inside the container is remapped to an unprivileged host UID (`100000+`), isolating the hypervisor kernel.
+   - **AppArmor Enforced**: Containers run under the Proxmox AppArmor profile (`lxc-container-default`).
+
+---
+
+### In-App Compliance Audit & 1-Click Hardening
+
+Open the **Admin Panel** (shield icon in the navbar) > **Sécurité, FIDO2 & Audit CIS** to view the live **10-Point Compliance Matrix**.
+You can trigger real-time audits or apply 1-click permission lockdowns directly from the web interface.
+
+### Running the Terminal Security Hardening Script
+
+To audit and harden your LXC container or host from the terminal:
+
+```bash
+# Inside your LXC container or VM:
+cd /opt/pantryo && sudo ./scripts/security-harden-container.sh
+
+# Or run read-only audit without changes:
+cd /opt/pantryo && ./scripts/security-harden-container.sh --audit
+```
+
+---
+
+### Automated Package & Dependency Updates
+
+Pantryo includes an automated dual-scope update lifecycle engine:
+- **Scope**: Updates both **npm application dependencies** (`npm update`, `npm audit fix`) and **Debian OS system packages** (`apt-get upgrade`, `unattended-upgrades`).
+- **Schedule**: Automatically runs on **server startup** (with 24h debounce) and via **daily cron** (`/etc/cron.daily/pantryo-security-updates` at 04:00).
+- **Semver Protection**: Minor and patch versions are upgraded automatically with build verification; major version releases (e.g. breaking API changes) are surfaced in the in-app Admin Panel as advisories to prevent breaking changes.
+
+#### Running the Full Dual-Scope Update Manually:
+```bash
+# Update Debian system packages and npm dependencies with build verification:
+cd /opt/pantryo && sudo ./scripts/auto-update-all.sh
+```
+
+---
+
+## 10. Troubleshooting & FAQ
 
 ### Q1: The server crashes during `npm install` on Raspberry Pi 3B+ / Zero 2W.
 - **Cause**: Node.js ran out of RAM when compiling native bindings.

@@ -2,6 +2,8 @@ import "dotenv/config";
 import express from "express";
 import http from "http";
 import path from "path";
+import fs from "fs";
+import { pathToFileURL } from "url";
 import inventoryRouter from "./server/src/routes/inventory.js";
 import recipesRouter from "./server/src/routes/recipes.js";
 import adminRouter from "./server/src/routes/admin.js";
@@ -234,7 +236,56 @@ async function startServer() {
 
   server.listen(PORT, "0.0.0.0", () => {
     console.log(`[Kitchen Komrade] Server running on http://0.0.0.0:${PORT}`);
+    initAutomatedUpdateScheduler();
   });
+}
+
+/**
+ * Automated Dependency & System Package Lifecycle Service
+ * Runs on startup (with 24h debounce) and recurring daily (every 24h).
+ */
+function initAutomatedUpdateScheduler() {
+  const statusFile = path.join(process.cwd(), "server", "data", "dependency-status.json");
+  const DAY_IN_MS = 24 * 60 * 60 * 1000;
+
+  async function checkAndUpdate() {
+    try {
+      let shouldRun = true;
+      if (fs.existsSync(statusFile)) {
+        try {
+          const content = JSON.parse(fs.readFileSync(statusFile, "utf8"));
+          if (content.timestamp) {
+            const lastRun = new Date(content.timestamp).getTime();
+            if (Date.now() - lastRun < DAY_IN_MS) {
+              shouldRun = false;
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (shouldRun) {
+        console.log("[Pantryo Auto-Update] Running scheduled background dependency & package check...");
+        const updateScript = path.join(process.cwd(), "scripts", "auto-update-dependencies.js");
+        if (fs.existsSync(updateScript)) {
+          const { runAutoUpdate } = await import(pathToFileURL(updateScript).href);
+          await runAutoUpdate({ skipBuild: true });
+          console.log("[Pantryo Auto-Update] Background dependency check completed.");
+        }
+      }
+    } catch (err: any) {
+      console.warn("[Pantryo Auto-Update] Background check notice:", err?.message || err);
+    }
+  }
+
+  // Delay startup check by 20s to allow server to boot and become responsive first
+  setTimeout(() => {
+    checkAndUpdate();
+  }, 20000);
+
+  // Recurring 24-hour interval
+  setInterval(() => {
+    checkAndUpdate();
+  }, DAY_IN_MS);
 }
 
 startServer();

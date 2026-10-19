@@ -563,6 +563,9 @@ if command -v apt-get >/dev/null 2>&1; then
   apt-get update -q -y >> /var/log/pantryo-security.log 2>&1
   unattended-upgrade >> /var/log/pantryo-security.log 2>&1 || true
 fi
+if [[ -f "/opt/pantryo/scripts/auto-update-dependencies.js" ]]; then
+  cd /opt/pantryo && node scripts/auto-update-dependencies.js >> /var/log/pantryo-security.log 2>&1 || true
+fi
 EOF_CRON
 chmod 755 /etc/cron.daily/pantryo-security-updates
 echo -e "${GREEN}✓ Configured daily automated security patches (/etc/cron.daily/pantryo-security-updates).${NC}"
@@ -591,7 +594,7 @@ RestartSec=5
 Environment=NODE_ENV=production
 EnvironmentFile=${INSTALL_DIR}/.env
 
-# Systemd Container & Process Hardening Directives (CIS / NIST)
+# Systemd Container & Process Hardening Directives (CIS / NIST / OWASP)
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
@@ -600,6 +603,7 @@ ProtectKernelTunables=true
 ProtectControlGroups=true
 RestrictRealtime=true
 LockPersonality=true
+TasksMax=150
 
 [Install]
 WantedBy=multi-user.target
