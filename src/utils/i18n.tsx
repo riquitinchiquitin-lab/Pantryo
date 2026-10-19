@@ -543,7 +543,15 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (saved === 'FR' || saved === 'EN') {
         return saved;
       }
-      // Default to French as primary language for the household app
+      // Auto-detect browser/system language
+      if (typeof navigator !== 'undefined' && navigator.language) {
+        const navLang = navigator.language.toLowerCase();
+        if (navLang.startsWith('fr')) {
+          return 'FR';
+        } else if (navLang.startsWith('en')) {
+          return 'EN';
+        }
+      }
       return 'FR';
     } catch {
       // ignore
@@ -929,6 +937,46 @@ export const LanguageSwitcher: React.FC<{
   compact?: boolean;
 }> = ({ className = '', compact = false }) => {
   const { lang, setLang } = useLanguage();
+
+  if (compact) {
+    return (
+      <div
+        role="group"
+        aria-label={lang === 'FR' ? 'Changer de langue (FR/EN)' : 'Change language (FR/EN)'}
+        className={`inline-flex items-center p-0.5 rounded-full bg-[var(--md-sys-color-surface-container)] border border-[var(--md-sys-color-outline-variant)]/70 shadow-2xs shrink-0 select-none ${className}`}
+      >
+        <button
+          type="button"
+          onClick={() => setLang('FR')}
+          className={`px-2 py-1 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1 active:scale-95 ${
+            lang === 'FR'
+              ? 'bg-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-primary)] shadow-xs'
+              : 'text-[var(--md-sys-color-on-surface-variant)] hover:text-[var(--md-sys-color-on-surface)] hover:bg-[var(--md-sys-color-surface-container-high)]'
+          }`}
+          title="Mode Français (FR)"
+          aria-pressed={lang === 'FR'}
+        >
+          <span className="text-[11px] leading-none">🇫🇷</span>
+          <span className="text-[11px] font-bold tracking-tight">FR</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setLang('EN')}
+          className={`px-2 py-1 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1 active:scale-95 ${
+            lang === 'EN'
+              ? 'bg-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-primary)] shadow-xs'
+              : 'text-[var(--md-sys-color-on-surface-variant)] hover:text-[var(--md-sys-color-on-surface)] hover:bg-[var(--md-sys-color-surface-container-high)]'
+          }`}
+          title="English Mode (EN)"
+          aria-pressed={lang === 'EN'}
+        >
+          <span className="text-[11px] leading-none">🇬🇧</span>
+          <span className="text-[11px] font-bold tracking-tight">EN</span>
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div

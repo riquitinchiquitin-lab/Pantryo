@@ -77,6 +77,7 @@ import {
   getCategoryLocalizedName,
   getSubcategoryLocalizedName,
   getLocationLocalizedName,
+  LanguageSwitcher,
 } from '../utils/i18n';
 import { getItemDisplayName, formatLocalizedQuantityUnit } from '../utils/foodTranslator';
 
@@ -1228,8 +1229,11 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             </button>
           </nav>
 
-          {/* 3. Right: Action Bar & User Profile */}
+          {/* 3. Right: Action Bar, Language Switcher & User Profile */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto">
+            {/* Global Omnipresent Language Switcher (EN / FR) */}
+            <LanguageSwitcher compact />
+
             {/* Camera Scanner Button (1-Tap from any tab) */}
             <button
               type="button"

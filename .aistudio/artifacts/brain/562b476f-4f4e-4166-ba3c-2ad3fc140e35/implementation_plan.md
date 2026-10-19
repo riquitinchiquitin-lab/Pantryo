@@ -1,113 +1,105 @@
-# Automated Dependency & System Package Lifecycle Architecture
+# Global Language Switcher & iOS Mobile Zoom Prevention
 
-Continuous, automated update framework for Pantryo, keeping both npm application dependencies and Debian OS packages current, resilient against breaking changes, and audited against security advisories.
+Integrate an omnipresent EN/FR language toggle directly into the top navigation header on all screens, auto-detect device language on initial launch with persistent local storage, and eliminate iOS Safari auto-zooming issues by enforcing the 16px input font threshold and locking mobile viewport scaling.
 
----
-
-### User Confirmed Decisions
+## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> The following parameters were confirmed during the interactive interview:
-> - **Package Scope**: Both **npm application dependencies** and **Debian OS system packages** will be continuously updated.
-> - **Upgrade Aggressiveness**: **Auto-update minor and patch versions** automatically (within semver constraints and security advisories), with **major version alerts & notifications** surfaced in the admin panel to prevent breaking changes.
-> - **Update Trigger & Schedule**: Automated execution via **daily background cron** and **on server startup** (with idempotency to avoid redundant builds).
+> All key product and architectural decisions have been clarified and confirmed:
+
+- **Confirmed Decision 1 (Language Switcher Location)**: Placed in the top navigation header bar across all screens (both mobile viewports and desktop), making language switching accessible with 1 tap at all times.
+- **Confirmed Decision 2 (iOS Zoom Prevention Approach)**: Fix input focus auto-zoom by enforcing a 16px font-size minimum on mobile touch inputs, set `-webkit-text-size-adjust: 100%`, and lock the mobile viewport scale (`maximum-scale=1.0, user-scalable=no, viewport-fit=cover`).
+- **Confirmed Decision 3 (Default Language Detection)**: Auto-detect the browser/system language (`navigator.language`) on first launch (defaulting to French if French locale, otherwise English), and persist explicit user toggles across sessions in `localStorage`.
 
 ---
 
-### 1. Overview & Core Concept
+## 1. Overview & Core Concept
 
-Pantryo runs across self-hosted Proxmox LXCs, universal Linux VMs, and Docker environments. Keeping all dependencies updated is vital for defense against CVEs, performance optimizations, and API compatibility.
-
-This implementation provides:
-1. **Dual-Scope Auto-Update Engine**:
-   - **npm Application Dependencies**: Automated `npm update` and `npm audit fix`, keeping packages at latest minor/patch semver releases while verifying build integrity.
-   - **Debian System Packages**: Automated `apt-get update` and `unattended-upgrades` for the host and container base OS (glibc, OpenSSL, ca-certificates).
-2. **Dual-Trigger Execution**:
-   - **On Server Startup**: A non-blocking background initialization check that verifies dependency freshness and patches any critical CVEs if not checked within the past 24 hours.
-   - **Daily Automated Schedule**: Configured both via `/etc/cron.daily/pantryo-security-updates` (system-level) and an internal 24-hour scheduler in Node.js (for standalone container environments).
-3. **Major Version Detection & Admin Visibility**:
-   - Real-time `npm outdated` evaluation that categorizes updates into **Applied Minor/Patch** vs. **Available Major Releases**.
-   - Admin UI dashboard showing package status, last automated update timestamp, and 1-click on-demand manual update.
+- **What It Does**: 
+  1. Adds a visible, tactile **EN / FR** toggle button in the primary top app header across all views (Inventory, Meals, Grocery, Recipes, Family, and Modals).
+  2. Resolves the long-standing iOS Safari issue where opening the app or tapping input fields causes Safari to uncontrollably zoom in and distort layout boundaries.
+  3. Intelligently respects the user's phone locale on their very first visit while remembering any manual switch between French and English.
+- **Target Audience**: Bilingual household members and mobile homelab users accessing Pantryo on iPhones, iPads, and touch devices.
+- **Key Value**: Fluid bilingual usability with no hunting through sub-menus, and a rock-solid native app feel on iOS Safari and Home Screen PWAs with zero unwanted zoom or viewport drift.
 
 ---
 
-### 2. User Experience & Visual Design
+## 2. User Experience & Visual Design
 
-Following the **SaaS & Dashboard Design Guidelines** (`frontend-design` constitution):
-- **Location**: Admin Management Suite (`Sécurité, FIDO2 & Audit CIS` / `Maintenance & Mises à Jour` tab).
-- **Status Cards**: High-density flat card showing:
-  - **Automated Update Status**: Active indicator (Daily at 04:00 + On Startup).
-  - **npm Dependencies Health**: Count of up-to-date packages and 0 critical/high CVEs.
-  - **Major Version Advisory**: Uncluttered badge showing major releases available (e.g., Motion v14, Vite PWA v2) with semver change notes.
-  - **Debian OS Package Health**: Status of unattended-upgrades.
-- **Actions**:
-  - `Update Packages Now` (with live spinner and build verification output).
-  - Monospace CLI command snippet for terminal sysadmins: `sudo ./scripts/auto-update-all.sh`.
+### Top Navigation Bar & Language Switcher
+- **Header Placement**: Positioned in Zone 3 (Right Action Bar) of the top app bar in `MobileSimulator.tsx`, adjacent to the Quick Add and Camera Scanner buttons.
+- **Styling & Touch Ergonomics**:
+  - Compact segmented pill design conforming to Material 3 tokens.
+  - Active locale (e.g., `FR` or `EN`) highlighted in high-contrast emerald (`bg-teal-700 text-white shadow-xs font-bold`) with subtle flag emoji indicators (`🇫🇷 FR` / `🇬🇧 EN`).
+  - Inactive locale styled in muted teal-slate (`text-[#527470] hover:text-[#0D3B37] hover:bg-[#F2ECE0]/60`).
+  - Tap target meets mobile accessibility standards ($\ge 44\text{px}$ touch hitbox).
+  - Instant reactive translation across all active tabs, item cards, recipe lists, and modal titles without page reloads.
 
----
-
-### 3. Key Product Decisions & Trade-Offs
-
-- **Decision 1: Safe Semver Auto-Update vs. Unconstrained Breaking Updates**
-  - *Chosen Approach*: Automatically upgrade all patch (`~`) and minor (`^`) releases and security fixes (`npm audit fix`). Detect major breaking changes via `npm outdated` and surface them in the Admin Panel with manual upgrade controls.
-  - *Why*: Direct automatic installation of major version bumps (like Vite 5 to 6 or better-sqlite3 12 to 13) can silently introduce breaking API changes that take down household kitchen servers.
-- **Decision 2: Startup Background Check with 24-Hour Idempotency Cooldown**
-  - *Chosen Approach*: On server launch (`server.ts`), check `lastUpdateTimestamp` stored in `server/data/update-status.json`. If older than 24 hours (or first run), execute in background without blocking server boot or HTTP request listening.
-  - *Why*: Guarantees instant server startup and port 3000 responsiveness while ensuring freshly restarted containers automatically pull security patches.
-- **Decision 3: Unified Script (`scripts/auto-update-all.sh`)**
-  - *Chosen Approach*: Create a single executable script that coordinates Debian apt updates, unattended-upgrades, npm update, and build verification.
+### iOS Viewport & Touch Ergonomic Optimization
+- **Scale Stabilization**:
+  - `index.html` viewport updated to: `width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover`.
+  - Disables iOS Safari double-tap gesture zooming and elastic viewport expansion while keeping smooth scrolling.
+- **Input Font Threshold**:
+  - CSS rule applied to all `<input>`, `<select>`, and `<textarea>` elements on screens $\le 820\text{px}$ guaranteeing `font-size: 16px !important`.
+  - Prevents WebKit's automatic text magnification trigger on focus.
+- **Text Size Adjust**:
+  - Enforced `-webkit-text-size-adjust: 100%` and `text-size-adjust: 100%` on `html` and `body` to prevent iOS orientation change scaling bugs.
 
 ---
 
-### 4. Technical Architecture & File Flow
+## 3. Key Product Decisions & Trade-Offs
+
+- **Decision 1: Viewport Lock vs Pinch Zoom**
+  - *Chosen Approach*: Lock mobile viewport scale with `maximum-scale=1.0, user-scalable=no, viewport-fit=cover`.
+  - *Why*: Pantryo is designed as a standalone touch PWA with its own responsive typography, bento grid layout, and bottom sheet dialogs. Uncontrolled pinch zooming breaks the bottom navigation bar and creates horizontal scroll spill.
+  - *Alternatives Considered*: Allowing pinch zoom was rejected because iOS Safari frequently misinterprets rapid double-taps on item cards as zoom gestures.
+
+- **Decision 2: Header-Level Language Switcher vs Settings Menu**
+  - *Chosen Approach*: Direct header integration with compact footprint.
+  - *Why*: Users frequently cook recipes or check groceries in either language or share devices between household members; burying language options inside deep modal menus causes friction.
+
+- **Decision 3: Device Locale Detection with LocalStorage Precedence**
+  - *Chosen Approach*: Check `localStorage` first; if empty, inspect `navigator.language` (if starts with `fr`, choose `FR`, otherwise `EN`); persist any user click immediately.
+  - *Why*: Gives new visitors a seamless zero-configuration experience in their native language while never overwriting an explicit preference.
+
+---
+
+## 4. Technical Architecture & Data Strategy
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                       AUTOMATED UPDATE SCHEDULER                            │
-│  - System Cron: /etc/cron.daily/pantryo-security-updates                    │
-│  - Server Startup: non-blocking background check with 24h debounce          │
-│  - In-App Manual: POST /api/v1/admin/security/auto-update                   │
-└──────────────────────────────────────┬──────────────────────────────────────┘
-                                       │
-┌──────────────────────────────────────▼──────────────────────────────────────┐
-│                    UNIFIED UPDATE ENGINE (dual-scope)                       │
-│                                                                             │
-│  ┌─────────────────────────────────────┐  ┌──────────────────────────────┐  │
-│  │       DEBIAN SYSTEM PACKAGES        │  │   NPM APPLICATION PACKAGES   │  │
-│  │ - apt-get update -q                 │  │ - npm update (minor/patch)   │  │
-│  │ - unattended-upgrades               │  │ - npm audit fix (security)   │  │
-│  │ - debsums verification              │  │ - npm outdated (major alerts)│  │
-│  └──────────────────┬──────────────────┘  └──────────────┬───────────────┘  │
-│                     │                                    │                  │
-│  ┌──────────────────▼────────────────────────────────────▼───────────────┐  │
-│  │                      VERIFICATION & PERSISTENCE                       │  │
-│  │  - npm run build (guarantees zero compilation regressions)            │  │
-│  │  - Save status to server/data/update-status.json                      │  │
-│  └──────────────────────────────────┬────────────────────────────────────┘  │
-└─────────────────────────────────────┼───────────────────────────────────────┘
-                                       │
-┌──────────────────────────────────────▼──────────────────────────────────────┐
-│               IN-APP ADMIN VISIBILITY & CONTROLS (React)                    │
-│  - Displays automated update schedule, last run time, & pending majors      │
-│  - 1-click "Update Packages Now" button with realtime feedback              │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                        Top Navigation Bar                       │
+│  ┌───────────────┐     ┌────────────────┐    ┌────────────────┐ │
+│  │ Pantryo Logo  │     │ Main Nav Links │    │ [FR | EN] 📷 + │ │
+│  └───────────────┘     └────────────────┘    └───────┬────────┘ │
+└──────────────────────────────────────────────────────┼──────────┘
+                                                       │
+                                        useLanguage() Context
+                                                       │
+                      ┌────────────────────────────────┴────────────────────────────────┐
+                      ▼                                                                 ▼
+         ┌─────────────────────────┐                                       ┌─────────────────────────┐
+         │     localStorage        │                                       │   navigator.language    │
+         │ ('pantryo_language_pref')│                                      │    (Fallback initial)   │
+         └─────────────────────────┘                                       └─────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│                  iOS Safari Zoom Suppression Layer              │
+│                                                                 │
+│  • index.html: <meta name="viewport" content="...max-scale=1"> │
+│  • index.css: -webkit-text-size-adjust: 100%                   │
+│  • index.css: @media (max-width: 820px) { input: 16px }        │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
----
-
-### 5. Implementation Steps
-
-1. **Enhance Auto-Update Scripts (`scripts/auto-update-dependencies.js` & `scripts/auto-update-all.sh`)**:
-   - Update `scripts/auto-update-dependencies.js` to parse `npm outdated` and report minor/patch updates applied and major versions available.
-   - Create unified `scripts/auto-update-all.sh` that checks/updates Debian OS packages and runs the Node.js dependency updater with build verification.
-2. **Server Background Startup & Daily Interval (`server.ts`)**:
-   - Add non-blocking background startup routine that checks `update-status.json`.
-   - Set up daily background interval (24h) to ensure standalone containers without host cron run updates.
-3. **Backend API Endpoints (`server/src/routes/admin.js`)**:
-   - Enhance `GET /api/v1/admin/security/audit` to return detailed package freshness (latest versions, minor updates applied, major alerts).
-   - Ensure `POST /api/v1/admin/security/auto-update` executes the unified script and returns real-time progress.
-4. **Admin UI Updates (`src/components/AdminManagementModal.tsx`)**:
-   - Surface the automated update status, major release alerts, and last update timestamp with clear badges and French/English localization.
-5. **Install & Crontab Updates (`install-proxmox.sh` & `INSTALLATION.md`)**:
-   - Ensure the daily cron job executes `scripts/auto-update-all.sh`.
-   - Document automated update mechanisms and commands.
+### Component & File Mapping:
+1. `index.html`:
+   - Update viewport meta tag for strict 1.0 scale lock and `viewport-fit=cover`.
+2. `src/index.css`:
+   - Add `-webkit-text-size-adjust: 100%` and `text-size-adjust: 100%` to `html, body`.
+   - Add responsive 16px input font-size guarantee for mobile/touch screens ($\le 820\text{px}$).
+3. `src/utils/i18n.tsx`:
+   - Enhance `LanguageProvider` initialization to inspect `navigator.language` on first visit.
+   - Refine `LanguageSwitcher` to support compact header presentation (`compact={true}`).
+4. `src/components/MobileSimulator.tsx`:
+   - Add `LanguageSwitcher` directly to Zone 3 of the sticky top app header.

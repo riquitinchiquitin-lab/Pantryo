@@ -60,6 +60,8 @@
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-y: none;
     -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
     font-family: 'Roboto', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   }
 
@@ -69,6 +71,15 @@
   textarea,
   a {
     touch-action: manipulation;
+  }
+
+  /* Prevent iOS Safari auto-zoom on input focus */
+  @media screen and (max-width: 768px) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
   }
 
   /* Smooth horizontal and vertical scrolling across touchscreens */

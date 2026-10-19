@@ -1,6 +1,6 @@
 {
-  "summary": "Implementation plan for automated, continuous package and dependency updates covering both npm application packages and Debian OS packages on a daily schedule and server startup, with safe minor/patch auto-upgrades and major version alerts.",
-  "updatedAt": "2026-10-19T21:33:39.295721324Z",
+  "summary": "Implementation plan for integrating an omnipresent EN/FR language switcher into the top navigation header across all screens, detecting browser language with persistent storage, and eliminating iOS Safari auto-zooming via viewport scale locking and mobile input font threshold enforcement.",
+  "updatedAt": "2026-10-19T22:34:48.254914051Z",
   "requestFeedback": true,
   "userFacing": true
 }
