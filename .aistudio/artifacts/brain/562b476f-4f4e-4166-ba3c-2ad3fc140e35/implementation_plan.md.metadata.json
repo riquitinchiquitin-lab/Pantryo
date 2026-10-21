@@ -1,6 +1,6 @@
 {
-  "summary":  "Implementation plan for replacing all browser popups (window.alert and window.confirm) with an integrated Material 3 alert system: bottom floating toast notifications with auto-dismiss for alerts/notices, and an embedded bottom sheet card with Confirm/Cancel for destructive actions and confirmations.",
-  "updatedAt":  "2026-10-21T21:44:18.356951138Z",
+  "summary":  "Redesign recipe cards into a two-row culinary card with a larger appetizing image, full readable title without aggressive truncation, clean unboxed stock indicators, and an ergonomic bottom action bar.",
+  "updatedAt":  "2026-10-21T22:57:52.617609668Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

@@ -1176,18 +1176,20 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                 }
               : detectSafeCookingRule(recipe);
 
-            // MINIMIZED / COMPACT RECIPE VIEW - M3 Surface Container
+            // MINIMIZED / COMPACT RECIPE VIEW - Two-row culinary card layout
             if (!isExpanded) {
               return (
                 <div
                   key={recipe.id}
-                  onClick={() => setExpandedRecipeId(recipe.id)}
-                  className="p-3 sm:p-3.5 rounded-[16px] bg-[var(--md-sys-color-surface-container-low)] border border-[var(--md-sys-color-outline-variant)] hover:bg-[var(--md-sys-color-surface-container)] hover:border-[var(--md-sys-color-outline)] transition-all cursor-pointer flex items-center justify-between gap-3 group select-none shadow-none"
+                  className="p-3.5 sm:p-4 rounded-[20px] bg-white border border-[#E5DFD0] hover:border-emerald-700/30 hover:shadow-sm transition-all group select-none shadow-2xs"
                 >
-                  {/* Left: Thumbnail & Main Info */}
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                  {/* Row 1: Larger Thumbnail & Rich Info (Clickable to Expand) */}
+                  <div
+                    onClick={() => setExpandedRecipeId(recipe.id)}
+                    className="flex items-start gap-3.5 sm:gap-4 cursor-pointer"
+                  >
                     {/* Recipe Thumbnail */}
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl overflow-hidden bg-[#FAF7EE] shrink-0 relative border border-[#E5DFD0] flex items-center justify-center shadow-2xs">
+                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden bg-[#FAF7EE] shrink-0 relative border border-[#E5DFD0] flex items-center justify-center shadow-2xs group-hover:scale-[1.02] transition-transform">
                       {(() => {
                         const photo = recipe.imageUrl?.trim()
                           ? recipe.imageUrl
@@ -1211,60 +1213,91 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                         );
                       })()}
                       {recipe.isRicardoOfficial ? (
-                        <span className="absolute bottom-0 left-0 px-1 py-0.2 bg-rose-700 text-[8px] font-black text-white leading-none rounded-tr-md">
+                        <span className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-rose-700 text-[8px] font-black text-white leading-none rounded-md shadow-2xs tracking-wider">
                           RICARDO
                         </span>
                       ) : isYoutube ? (
-                        <span className="absolute bottom-0 left-0 p-0.5 bg-rose-600 text-white rounded-tr-md">
-                          <Youtube className="w-2.5 h-2.5" />
+                        <span className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-rose-600 text-[8px] font-bold text-white leading-none rounded-md shadow-2xs flex items-center gap-0.5">
+                          <Youtube className="w-2.5 h-2.5 text-white" />
+                          <span>VIDEO</span>
                         </span>
                       ) : null}
+                      {cookedRecipeIds.has(recipe.id) && (
+                        <span className="absolute top-1 right-1 px-1.5 py-0.5 bg-emerald-600 text-white rounded-md text-[9px] font-black shadow-2xs flex items-center gap-0.5">
+                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        </span>
+                      )}
                     </div>
 
                     {/* Text Info */}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                        {recipe.authorName ? (
-                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-teal-50 text-teal-800 border border-teal-200">
-                            {recipe.authorName}
-                          </span>
-                        ) : recipe.isRicardoOfficial ? (
-                          <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[9px] font-bold">
-                            Ricardo
-                          </span>
-                        ) : null}
+                    <div className="min-w-0 flex-1 flex flex-col justify-between self-stretch py-0.5">
+                      <div>
+                        {/* Kicker: Author / Source and Unboxed In-Stock Indicator */}
+                        <div className="flex items-center gap-2 text-[11px] font-semibold text-[#527470] mb-1 flex-wrap">
+                          {recipe.authorName ? (
+                            <span className="text-teal-900 font-extrabold uppercase tracking-wider text-[10px]">
+                              {recipe.authorName}
+                            </span>
+                          ) : recipe.isRicardoOfficial ? (
+                            <span className="text-rose-700 font-extrabold text-[10px] tracking-wide">
+                              Ricardo
+                            </span>
+                          ) : isYoutube ? (
+                            <span className="text-rose-600 font-extrabold text-[10px] flex items-center gap-1">
+                              <Youtube className="w-3 h-3 text-rose-600 inline" />
+                              <span>YouTube</span>
+                            </span>
+                          ) : (
+                            <span className="text-teal-800 font-bold text-[10px]">
+                              {lang === 'FR' ? 'Recette Maison' : 'Home Recipe'}
+                            </span>
+                          )}
 
-                        {/* Status Flag */}
-                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold flex items-center gap-1 border ${
-                          matchPercentage >= 100
-                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                            : matchPercentage >= 50
-                            ? 'bg-amber-50 text-amber-800 border-amber-200'
-                            : 'bg-slate-50 text-slate-700 border-slate-200'
-                        }`}>
-                          <Check className="w-2.5 h-2.5 stroke-[3]" />
-                          <span>
-                            {matchPercentage}% {lang === 'FR' ? 'en stock' : 'in stock'}
+                          <span className="text-slate-300" aria-hidden="true">·</span>
+
+                          {/* Clean unboxed stock match text with colored indicator */}
+                          <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold ${
+                            matchPercentage >= 100
+                              ? 'text-emerald-700'
+                              : matchPercentage >= 50
+                              ? 'text-amber-700'
+                              : 'text-slate-500'
+                          }`}>
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${
+                              matchPercentage >= 100
+                                ? 'bg-emerald-600'
+                                : matchPercentage >= 50
+                                ? 'bg-amber-500'
+                                : 'bg-slate-400'
+                            }`} />
+                            <span>
+                              {matchPercentage}% {lang === 'FR' ? 'en stock' : 'in stock'}
+                            </span>
                           </span>
-                        </span>
+                        </div>
+
+                        {/* Title - Line clamp 2 so titles never get cut off to 8 letters */}
+                        <h3 className="font-extrabold text-sm sm:text-base text-[#0D3B37] leading-snug line-clamp-2 group-hover:text-emerald-950 transition-colors">
+                          {title}
+                        </h3>
                       </div>
 
-                      <h3 className="font-extrabold text-xs sm:text-sm text-[#0D3B37] truncate leading-tight">
-                        {title}
-                      </h3>
-
-                      <div className="flex items-center gap-2 text-[10px] font-medium text-[#527470] mt-1 flex-wrap">
-                        <span className="flex items-center gap-0.5">
-                          <Clock className="w-2.5 h-2.5 text-teal-700" />
+                      {/* Clean Inline Metadata */}
+                      <div className="flex items-center gap-2 text-xs font-medium text-[#527470] mt-1.5 flex-wrap">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-teal-700" />
                           <span>{recipe.time}</span>
                         </span>
-                        <span>•</span>
-                        <span>{recipe.servings}</span>
+                        <span className="text-slate-300" aria-hidden="true">·</span>
+                        <span className="flex items-center gap-1">
+                          <Utensils className="w-3.5 h-3.5 text-teal-700" />
+                          <span>{recipe.servings}</span>
+                        </span>
                         {safeRule && (
                           <>
-                            <span>•</span>
-                            <span className="inline-flex items-center gap-0.5 font-bold text-amber-900 bg-amber-50 px-1.5 py-0.2 rounded-full border border-amber-200">
-                              <Thermometer className="w-2.5 h-2.5 text-amber-600" />
+                            <span className="text-slate-300" aria-hidden="true">·</span>
+                            <span className="inline-flex items-center gap-1 font-semibold text-amber-800">
+                              <Thermometer className="w-3.5 h-3.5 text-amber-600" />
                               <span>{safeRule.minTempC}°C</span>
                             </span>
                           </>
@@ -1273,82 +1306,92 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Right: Action Triggers "Plan" or "Fav" */}
-                  <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                    {/* Fav */}
-                    <button
-                      type="button"
-                      onClick={(e) => handleToggleSaveRecipe(recipe, e)}
-                      className={`p-2 rounded-xl border border-[#E5DFD0] transition-all cursor-pointer shadow-2xs ${
-                        isSaved
-                          ? 'bg-amber-50 text-amber-900 border-amber-200'
-                          : 'bg-white hover:bg-slate-50 text-slate-500 hover:text-[#0D3B37]'
-                      }`}
-                      title={
-                        isSaved
-                          ? lang === 'FR'
-                            ? 'Dans Mes Recettes (Cliquer pour retirer)'
-                            : 'In My Recipes (Click to remove)'
-                          : lang === 'FR'
-                          ? 'Sauvegarder en Favori'
-                          : 'Save as Favorite'
-                      }
-                    >
-                      <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'fill-amber-600 text-amber-600' : ''}`} />
-                    </button>
+                  {/* Hairline Divider */}
+                  <div className="border-t border-[#E5DFD0]/70 my-2.5 sm:my-3" />
 
-                    {/* Plan */}
-                    <button
-                      type="button"
-                      onClick={(e) => handleOpenPlanMeal(recipe, e)}
-                      className="px-2.5 py-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold flex items-center gap-1 transition-all active:scale-95 shadow-2xs cursor-pointer"
-                      title={lang === 'FR' ? 'Planifier ce repas' : 'Meal plan this recipe'}
-                    >
-                      <Calendar className="w-3 h-3" />
-                      <span>{lang === 'FR' ? '+ Planifier' : '+ Plan Meal'}</span>
-                    </button>
-
-                    {/* Cuisiner / Cook Button */}
-                    {activeRecipe && (activeRecipe.id === recipe.id || activeRecipe.title.trim().toLowerCase() === recipe.title.trim().toLowerCase()) ? (
+                  {/* Row 2: Bottom Action Bar */}
+                  <div
+                    className="flex items-center justify-between gap-2 pt-0.5 flex-wrap sm:flex-nowrap"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* Left Actions: Fav Bookmark & Quick Buttons */}
+                    <div className="flex items-center gap-2 flex-wrap min-w-0">
+                      {/* Bookmark Toggle */}
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          resumeCooking();
-                        }}
-                        className="px-2.5 py-1.5 rounded-xl text-xs font-black bg-[#004D36] text-[#9DF4C7] border border-[#9DF4C7]/60 hover:bg-[#003827] flex items-center gap-1 transition-all active:scale-95 shadow-xs cursor-pointer ring-1 ring-[#9DF4C7]/40"
-                        title={lang === 'FR' ? 'Reprendre la cuisine (étape exacte)' : 'Resume cooking at exact step'}
-                      >
-                        <Play className="w-3 h-3 fill-current" />
-                        <span>{lang === 'FR' ? `Reprendre (${currentStepIndex + 1})` : `Resume (${currentStepIndex + 1})`}</span>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleLaunchCooking(recipe);
-                        }}
-                        className={`px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 transition-all active:scale-95 shadow-2xs cursor-pointer ${
-                          cookedRecipeIds.has(recipe.id)
-                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                            : 'bg-[#004D36] hover:bg-[#003827] text-white'
+                        onClick={(e) => handleToggleSaveRecipe(recipe, e)}
+                        className={`h-9 w-9 rounded-xl border transition-all cursor-pointer flex items-center justify-center shrink-0 active:scale-95 ${
+                          isSaved
+                            ? 'bg-amber-50 text-amber-900 border-amber-300 shadow-2xs'
+                            : 'bg-white hover:bg-slate-50 text-slate-500 hover:text-[#0D3B37] border-[#E5DFD0]'
                         }`}
-                        title={lang === 'FR' ? 'Cuisiner cette recette (mode interactif)' : 'Cook this recipe (interactive mode)'}
+                        title={
+                          isSaved
+                            ? lang === 'FR'
+                              ? 'Dans Mes Recettes (Cliquer pour retirer)'
+                              : 'In My Recipes (Click to remove)'
+                            : lang === 'FR'
+                            ? 'Sauvegarder en Favori'
+                            : 'Save as Favorite'
+                        }
                       >
-                        <Utensils className="w-3 h-3" />
-                        <span>{cookedRecipeIds.has(recipe.id) ? (lang === 'FR' ? '✓ Cuisiné' : '✓ Cooked') : (lang === 'FR' ? 'Cuisiner' : 'Cook')}</span>
+                        <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-amber-600 text-amber-600' : ''}`} />
                       </button>
-                    )}
 
-                    {/* Expand chevron */}
+                      {/* Plan Meal CTA */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleOpenPlanMeal(recipe, e)}
+                        className="h-9 px-3 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-900 border border-teal-200/90 text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer whitespace-nowrap"
+                        title={lang === 'FR' ? 'Planifier ce repas' : 'Meal plan this recipe'}
+                      >
+                        <Calendar className="w-3.5 h-3.5 text-teal-700" />
+                        <span>{lang === 'FR' ? '+ Planifier' : '+ Plan Meal'}</span>
+                      </button>
+
+                      {/* Cook / Resume Primary Action */}
+                      {activeRecipe && (activeRecipe.id === recipe.id || activeRecipe.title.trim().toLowerCase() === recipe.title.trim().toLowerCase()) ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            resumeCooking();
+                          }}
+                          className="h-9 px-3.5 rounded-xl text-xs font-black bg-[#004D36] text-[#9DF4C7] border border-[#9DF4C7]/60 hover:bg-[#003827] flex items-center gap-1.5 transition-all active:scale-95 shadow-xs cursor-pointer ring-1 ring-[#9DF4C7]/40 whitespace-nowrap"
+                          title={lang === 'FR' ? 'Reprendre la cuisine (étape exacte)' : 'Resume cooking at exact step'}
+                        >
+                          <Play className="w-3.5 h-3.5 fill-current" />
+                          <span>{lang === 'FR' ? `Reprendre (${currentStepIndex + 1})` : `Resume (${currentStepIndex + 1})`}</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleLaunchCooking(recipe);
+                          }}
+                          className={`h-9 px-3.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer whitespace-nowrap ${
+                            cookedRecipeIds.has(recipe.id)
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              : 'bg-[#004D36] hover:bg-[#003827] text-white'
+                          }`}
+                          title={lang === 'FR' ? 'Cuisiner cette recette (mode interactif)' : 'Cook this recipe (interactive mode)'}
+                        >
+                          <Utensils className="w-3.5 h-3.5" />
+                          <span>{cookedRecipeIds.has(recipe.id) ? (lang === 'FR' ? '✓ Cuisiné' : '✓ Cooked') : (lang === 'FR' ? 'Cuisiner' : 'Cook')}</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Right Action: Details Disclosure Toggle */}
                     <button
                       type="button"
                       onClick={() => setExpandedRecipeId(recipe.id)}
-                      className="p-1 text-slate-400 hover:text-slate-700 rounded-lg transition-colors cursor-pointer"
+                      className="h-9 px-3 rounded-xl bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-950 border border-[#E5DFD0] text-xs font-semibold flex items-center gap-1 transition-all active:scale-95 cursor-pointer shrink-0 shadow-2xs"
                       title={lang === 'FR' ? 'Afficher les détails de la recette' : 'Show recipe details'}
                     >
-                      <ChevronDown className="w-4 h-4" />
+                      <span>{lang === 'FR' ? 'Détails' : 'Details'}</span>
+                      <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
                     </button>
                   </div>
                 </div>
@@ -1459,14 +1502,20 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
 
                       <div className="flex items-center gap-1.5">
                         {cookedRecipeIds.has(recipe.id) && (
-                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-bold flex items-center gap-1 shadow-2xs">
+                          <span className="px-2.5 py-1 rounded-xl bg-emerald-600/90 backdrop-blur-xs text-white text-[10px] font-bold flex items-center gap-1 shadow-2xs border border-emerald-400/40">
                             <Check className="w-2.5 h-2.5 stroke-[3]" />
                             <span>{lang === 'FR' ? 'Cuisiné' : 'Cooked'}</span>
                           </span>
                         )}
 
-                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center gap-1 shadow-2xs">
-                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        <span className="px-2.5 py-1 rounded-xl bg-black/40 backdrop-blur-md text-white text-[11px] font-bold flex items-center gap-1.5 shadow-2xs border border-white/20">
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${
+                            matchPercentage >= 100
+                              ? 'bg-emerald-400'
+                              : matchPercentage >= 50
+                              ? 'bg-amber-400'
+                              : 'bg-slate-300'
+                          }`} />
                           <span>
                             {matchPercentage}% {lang === 'FR' ? 'en stock' : 'in stock'}
                           </span>
