@@ -419,7 +419,6 @@ cat <<EOF > "$INSTALL_DIR/.env"
 # All values can be viewed and updated anytime inside the web Admin Pane.
 
 PORT=${APP_PORT}
-NODE_ENV=production
 
 # Primary Administrator
 PANTRYO_ADMIN_NAME="${ADMIN_NAME}"

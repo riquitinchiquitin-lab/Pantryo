@@ -33,6 +33,11 @@ fi
 
 cd "$APP_DIR"
 
+# Normalize .env: Remove legacy NODE_ENV from .env to eliminate Vite build warnings
+if [[ -f "${APP_DIR}/.env" ]]; then
+  sed -i '/^NODE_ENV=/d' "${APP_DIR}/.env" 2>/dev/null || true
+fi
+
 # ------------------------------------------------------------------------------
 # 1. Debian Linux OS System Packages Update
 # ------------------------------------------------------------------------------
@@ -59,15 +64,16 @@ else
 fi
 
 # ------------------------------------------------------------------------------
-# 2. Node.js & npm Application Dependencies Update
+# 2. Node.js & npm Application Dependencies Update (All Scopes & Native Addons)
 # ------------------------------------------------------------------------------
-echo -e "\n${BLUE}[2/2] Updating npm Application Dependencies (Safe Semver + Security)...${NC}"
+echo -e "\n${BLUE}[2/2] Updating npm Application Dependencies (All Scopes + Native Addons)...${NC}"
 if [[ -f "${APP_DIR}/scripts/auto-update-dependencies.js" ]]; then
-  node "${APP_DIR}/scripts/auto-update-dependencies.js"
+  node "${APP_DIR}/scripts/auto-update-dependencies.js" "$@"
 else
-  echo -e "  Running standard npm update..."
-  npm update
-  npm audit fix || true
+  echo -e "  Running standard npm update across all scopes..."
+  npm update --include=dev
+  npm audit fix --include=dev || true
+  npm rebuild better-sqlite3-multiple-ciphers || true
   npm run build
 fi
 

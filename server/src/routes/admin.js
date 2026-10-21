@@ -460,9 +460,10 @@ router.get("/security/audit", requireAdmin, async (req, res) => {
  */
 router.post("/security/auto-update", requireAdmin, async (req, res) => {
   try {
+    const { upgradeMajor, packages } = req.body || {};
     const scriptPath = path.resolve(process.cwd(), "scripts/auto-update-dependencies.js");
     const { runAutoUpdate } = await import(pathToFileURL(scriptPath).href);
-    const result = await runAutoUpdate();
+    const result = await runAutoUpdate({ upgradeMajor: Boolean(upgradeMajor), packages });
     res.json(result);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
