@@ -45,6 +45,7 @@ import { GuidedCookingModal } from './GuidedCookingModal';
 import { SmartMealSuggestionsModal } from './SmartMealSuggestionsModal';
 import { useCookingSession } from '../contexts/CookingSessionContext';
 import { useLanguage, getDifficultyLocalizedName } from '../utils/i18n';
+import { useAlertToast } from '../contexts/AlertToastContext';
 import {
   getItemDisplayName,
   getRecipeDisplayTitle,
@@ -84,6 +85,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
   onCookRecipe,
 }) => {
   const { lang, setLang } = useLanguage();
+  const { confirmAction, showToast } = useAlertToast();
   const { startCooking, activeRecipe, currentStepIndex, resumeCooking } = useCookingSession();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<
@@ -319,13 +321,17 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
   };
 
   const handleDeleteCustomRecipe = async (recipeId: string, title: string) => {
-    if (
-      !window.confirm(
+    const confirmed = await confirmAction({
+      title: lang === 'FR' ? 'Supprimer la recette ?' : 'Delete recipe?',
+      message:
         lang === 'FR'
-          ? `Supprimer la recette "${title}" ?`
-          : `Delete recipe "${title}"?`
-      )
-    ) {
+          ? `Voulez-vous vraiment supprimer la recette « ${title} » ?`
+          : `Are you sure you want to delete the recipe "${title}"?`,
+      confirmLabel: lang === 'FR' ? 'Supprimer' : 'Delete',
+      cancelLabel: lang === 'FR' ? 'Annuler' : 'Cancel',
+      variant: 'danger',
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -344,6 +350,12 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
 
     try {
       await fetch(`/api/v1/recipes/custom/${recipeId}`, { method: 'DELETE' });
+      showToast(
+        lang === 'FR'
+          ? `Recette « ${title} » supprimée.`
+          : `Recipe "${title}" deleted.`,
+        'success'
+      );
     } catch (e) {
       console.warn('Backend delete recipe failed', e);
     }

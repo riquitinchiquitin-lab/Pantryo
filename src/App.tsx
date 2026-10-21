@@ -4,6 +4,7 @@ import { PantryoLogo } from './components/PantryoLogo';
 import { Share, X, Download, Smartphone, Check, Laptop } from 'lucide-react';
 import { LanguageProvider, useLanguage } from './utils/i18n';
 import { CookingSessionProvider } from './contexts/CookingSessionContext';
+import { AlertToastProvider } from './contexts/AlertToastContext';
 import { usePWAInstall } from './hooks/usePWAInstall';
 import { DocumentationModal } from './components/DocumentationModal';
 
@@ -265,9 +266,11 @@ function AppContent() {
 export default function App() {
   return (
     <LanguageProvider>
-      <CookingSessionProvider>
-        <AppContent />
-      </CookingSessionProvider>
+      <AlertToastProvider>
+        <CookingSessionProvider>
+          <AppContent />
+        </CookingSessionProvider>
+      </AlertToastProvider>
     </LanguageProvider>
   );
 }

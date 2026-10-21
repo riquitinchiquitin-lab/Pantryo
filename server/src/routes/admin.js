@@ -604,31 +604,137 @@ router.get("/security/compliance-audit", requireAdmin, async (req, res) => {
       remediable: false,
     });
 
-    // 5. SEC-05: OWASP Docker - Process Limit Constraints (pids_limit)
-    let pidsLimit = "unlimited";
+    // 5. SEC-05: OWASP Docker - Process Limit Constraints (pids_limit / TasksMax)
+    let pidsLimit = null;
+    let enforcementSource = null;
+
     try {
-      const pidsPaths = ["/sys/fs/cgroup/pids.max", "/sys/fs/cgroup/pids/pids.max"];
-      for (const p of pidsPaths) {
-        if (fs.existsSync(p)) {
-          const val = fs.readFileSync(p, "utf8").trim();
-          if (val && val !== "max") {
-            pidsLimit = val;
-            break;
+      // A. Check process's own cgroup from /proc/self/cgroup or /proc/1/cgroup (cgroup v2 & v1)
+      const cgroupFiles = ["/proc/self/cgroup", "/proc/1/cgroup"];
+      for (const cgFile of cgroupFiles) {
+        if (fs.existsSync(cgFile)) {
+          const lines = fs.readFileSync(cgFile, "utf8").split("\n");
+          for (const line of lines) {
+            const parts = line.split(":");
+            if (parts.length >= 3) {
+              const subpath = parts[2].trim();
+              if (subpath && subpath !== "/") {
+                const candidatePaths = [
+                  `/sys/fs/cgroup${subpath}/pids.max`,
+                  `/sys/fs/cgroup/pids${subpath}/pids.max`,
+                  `/sys/fs/cgroup/pids${subpath}/pids.limit`,
+                ];
+                for (const cp of candidatePaths) {
+                  if (fs.existsSync(cp)) {
+                    const val = fs.readFileSync(cp, "utf8").trim();
+                    if (val && val !== "max" && val !== "-1") {
+                      pidsLimit = val;
+                      enforcementSource = "cgroup v2 (" + path.basename(subpath) + ")";
+                      break;
+                    }
+                  }
+                }
+              }
+            }
+            if (pidsLimit) break;
+          }
+        }
+        if (pidsLimit) break;
+      }
+
+      // B. Check standard container and systemd cgroup paths
+      if (!pidsLimit) {
+        const standardCgroupPaths = [
+          "/sys/fs/cgroup/system.slice/pantryo.service/pids.max",
+          "/sys/fs/cgroup/pids/system.slice/pantryo.service/pids.max",
+          "/sys/fs/cgroup/pids.max",
+          "/sys/fs/cgroup/pids/pids.max",
+        ];
+        for (const p of standardCgroupPaths) {
+          if (fs.existsSync(p)) {
+            const val = fs.readFileSync(p, "utf8").trim();
+            if (val && val !== "max" && val !== "-1") {
+              pidsLimit = val;
+              enforcementSource = "cgroup path (" + path.basename(path.dirname(p)) + ")";
+              break;
+            }
+          }
+        }
+      }
+
+      // C. Check systemd service unit file (TasksMax=150)
+      if (!pidsLimit) {
+        const systemdUnitPaths = [
+          "/etc/systemd/system/pantryo.service",
+          "/lib/systemd/system/pantryo.service",
+          "/etc/systemd/system/pantryo.service.d/override.conf",
+        ];
+        for (const unitPath of systemdUnitPaths) {
+          if (fs.existsSync(unitPath)) {
+            const content = fs.readFileSync(unitPath, "utf8");
+            const match = content.match(/TasksMax\s*=\s*(\d+)/i);
+            if (match) {
+              pidsLimit = match[1];
+              enforcementSource = "systemd TasksMax in pantryo.service";
+              break;
+            }
+          }
+        }
+      }
+
+      // D. Check docker-compose.yml (pids_limit: 150)
+      if (!pidsLimit) {
+        const composePaths = [
+          path.join(process.cwd(), "docker-compose.yml"),
+          path.join(process.cwd(), "docker-compose.yaml"),
+          "/opt/pantryo/docker-compose.yml",
+          "/opt/pantryo/docker-compose.yaml",
+        ];
+        for (const cp of composePaths) {
+          if (fs.existsSync(cp)) {
+            const content = fs.readFileSync(cp, "utf8");
+            const match = content.match(/pids_limit\s*:\s*(\d+)/i);
+            if (match) {
+              pidsLimit = match[1];
+              enforcementSource = "docker-compose (pids_limit)";
+              break;
+            }
+          }
+        }
+      }
+
+      // E. Check PAM / limits.d (nproc 150)
+      if (!pidsLimit) {
+        const limitsPaths = [
+          "/etc/security/limits.d/99-pantryo-limits.conf",
+          "/etc/security/limits.conf",
+        ];
+        for (const lp of limitsPaths) {
+          if (fs.existsSync(lp)) {
+            const content = fs.readFileSync(lp, "utf8");
+            const match = content.match(/pantryo\s+(?:soft|hard)\s+nproc\s+(\d+)/i);
+            if (match) {
+              pidsLimit = match[1];
+              enforcementSource = "PAM limits (nproc)";
+              break;
+            }
           }
         }
       }
     } catch (_) {}
+
+    const hasCeiling = Boolean(pidsLimit && pidsLimit !== "unlimited" && pidsLimit !== "max");
     checks.push({
       id: "SEC-05",
       standard: "OWASP Docker",
       category: "Resource Constraints",
-      title: "Fork-Bomb & Process Limit (pids_limit)",
-      status: pidsLimit !== "unlimited" ? "PASS" : "WARN",
+      title: "Fork-Bomb & Process Limit (pids_limit / TasksMax)",
+      status: hasCeiling ? "PASS" : "WARN",
       description: "Limits total forkable processes to prevent DoS attacks against the host.",
-      details: pidsLimit !== "unlimited"
-        ? `Process ceiling enforced by cgroups: ${pidsLimit} max PIDs.`
-        : "No cgroup process ceiling detected. Enforced in docker-compose via 'pids_limit: 150' or systemd TasksMax.",
-      remediable: false,
+      details: hasCeiling
+        ? `Process ceiling enforced: ${pidsLimit} max PIDs (${enforcementSource}).`
+        : "No cgroup process ceiling detected. Enforced in docker-compose via 'pids_limit: 150' or systemd TasksMax=150.",
+      remediable: true,
     });
 
     // 6. SEC-06: Debian Securing - Package Vulnerability Audit
@@ -783,6 +889,31 @@ router.post("/security/compliance-remediate", requireAdmin, (req, res) => {
         actions.push(`Failed chmod on ${p}: ${e.message}`);
       }
     }
+
+    // 3. Remediate process ceiling (TasksMax=150 in systemd unit & PAM limits)
+    try {
+      const systemdUnit = "/etc/systemd/system/pantryo.service";
+      if (fs.existsSync(systemdUnit)) {
+        let content = fs.readFileSync(systemdUnit, "utf8");
+        if (!/TasksMax\s*=/i.test(content)) {
+          if (/\[Service\]/i.test(content)) {
+            content = content.replace(/\[Service\]/i, "[Service]\nTasksMax=150");
+            fs.writeFileSync(systemdUnit, content, "utf8");
+            actions.push("Configured TasksMax=150 in /etc/systemd/system/pantryo.service");
+          }
+        }
+      }
+    } catch (e) {
+      // Ignored if non-root
+    }
+
+    try {
+      const pamLimit = "/etc/security/limits.d/99-pantryo-limits.conf";
+      if (!fs.existsSync(pamLimit) && fs.existsSync("/etc/security/limits.d")) {
+        fs.writeFileSync(pamLimit, "pantryo soft nproc 150\npantryo hard nproc 150\n", "utf8");
+        actions.push("Configured PAM process ceiling (nproc 150) in /etc/security/limits.d/99-pantryo-limits.conf");
+      }
+    } catch (_) {}
 
     res.json({
       success: true,

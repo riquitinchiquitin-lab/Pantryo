@@ -1,6 +1,6 @@
 {
-  "summary": "Implementation plan for integrating an omnipresent EN/FR language switcher into the top navigation header across all screens, detecting browser language with persistent storage, and eliminating iOS Safari auto-zooming via viewport scale locking and mobile input font threshold enforcement.",
-  "updatedAt": "2026-10-19T22:34:48.254914051Z",
-  "requestFeedback": true,
-  "userFacing": true
+  "summary":  "Implementation plan for replacing all browser popups (window.alert and window.confirm) with an integrated Material 3 alert system: bottom floating toast notifications with auto-dismiss for alerts/notices, and an embedded bottom sheet card with Confirm/Cancel for destructive actions and confirmations.",
+  "updatedAt":  "2026-10-21T21:44:18.356951138Z",
+  "requestFeedback":  true,
+  "userFacing":  true
 }

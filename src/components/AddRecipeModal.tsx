@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { RicardoRecipe } from '../data/ricardoRecipes';
 import { useLanguage } from '../utils/i18n';
+import { useAlertToast } from '../contexts/AlertToastContext';
 import {
   ensureBilingualRecipe,
   getRecipeDisplayTitle,
@@ -260,6 +261,7 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
 }) => {
   const { lang: globalLang } = useLanguage();
   const lang = propLang || globalLang;
+  const { confirmAction, showToast } = useAlertToast();
 
   // Tabs: url, youtube, text, photo
   const [activeTab, setActiveTab] = useState<'url' | 'youtube' | 'text' | 'photo'>(initialTab);
@@ -2093,8 +2095,18 @@ Instructions:
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (window.confirm(lang === 'FR' ? 'Voulez-vous réinitialiser et saisir une nouvelle source de recette ?' : 'Do you want to discard this and enter a new recipe source?')) {
+                  onClick={async () => {
+                    const confirmed = await confirmAction({
+                      title: lang === 'FR' ? 'Changer de source ?' : 'Change Source?',
+                      message:
+                        lang === 'FR'
+                          ? 'Voulez-vous réinitialiser et saisir une nouvelle source de recette ?'
+                          : 'Do you want to discard this and enter a new recipe source?',
+                      confirmLabel: lang === 'FR' ? 'Réinitialiser' : 'Discard',
+                      cancelLabel: lang === 'FR' ? 'Annuler' : 'Cancel',
+                      variant: 'warning',
+                    });
+                    if (confirmed) {
                       setParsedRecipe(null);
                     }
                   }}

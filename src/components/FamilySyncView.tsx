@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Users, Shield, Clock, Plus, UserCheck, ArrowRightLeft, Key, ShieldAlert, ShieldCheck, Camera, LogOut, Download, Smartphone, CheckCircle2, Edit3, Trash2, X, AlertTriangle, ChefHat, Globe, Cloud, Sparkles, Server, BookOpen } from 'lucide-react';
 import { User, ActivityLogItem } from '../types';
 import { useLanguage, getLocationLocalizedName, LanguageSwitcher } from '../utils/i18n';
+import { useAlertToast } from '../contexts/AlertToastContext';
 import { Fido2AuthModal } from './Fido2AuthModal';
 import { ChangeAvatarModal } from './ChangeAvatarModal';
 
@@ -33,8 +34,7 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
   onDeleteMember,
 }) => {
   const { t, lang } = useLanguage();
-  const [userToDelete, setUserToDelete] = useState<User | null>(null);
-  const [isDeletingUser, setIsDeletingUser] = useState(false);
+  const { confirmAction, showToast } = useAlertToast();
   const [authModal, setAuthModal] = useState<{
     isOpen: boolean;
     targetUser: User | null;
@@ -246,9 +246,24 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
                         {onDeleteMember && members.length > 1 && (
                           <button
                             type="button"
-                            onClick={(e) => {
+                            onClick={async (e) => {
                               e.stopPropagation();
-                              setUserToDelete(member);
+                              const confirmed = await confirmAction({
+                                title: lang === 'FR' ? `Supprimer "${member.name}" ?` : `Delete "${member.name}"?`,
+                                message:
+                                  lang === 'FR'
+                                    ? 'Ce membre sera définitivement retiré du foyer. Les articles ajoutés resteront dans la cuisine.'
+                                    : 'This member will be permanently removed from this household. Items added will remain in the kitchen.',
+                                confirmLabel: lang === 'FR' ? 'Supprimer' : 'Delete',
+                                cancelLabel: lang === 'FR' ? 'Annuler' : 'Cancel',
+                                variant: 'danger',
+                              });
+                              if (!confirmed || !onDeleteMember) return;
+                              await onDeleteMember(member);
+                              showToast(
+                                lang === 'FR' ? `Membre "${member.name}" supprimé.` : `Member "${member.name}" removed.`,
+                                'success'
+                              );
                             }}
                             className="p-1 rounded-lg text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                             title={lang === 'FR' ? `Supprimer ${member.name}` : `Delete ${member.name}`}
@@ -431,66 +446,6 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
         </div>
       </div>
 
-      {/* Delete User Confirmation Modal */}
-      {userToDelete && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-3xl border border-[#D5E1D2] max-w-sm w-full p-5 shadow-2xl space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
-                <Trash2 className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="font-extrabold text-sm text-slate-900">
-                  {lang === 'FR' ? `Supprimer "${userToDelete.name}" ?` : `Delete "${userToDelete.name}"?`}
-                </h3>
-                <p className="text-xs text-slate-500">
-                  {lang === 'FR'
-                    ? 'Ce membre sera définitivement retiré du foyer.'
-                    : 'This member will be permanently removed from this household.'}
-                </p>
-              </div>
-            </div>
-
-            <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-              <p className="text-[11px] leading-tight">
-                {lang === 'FR'
-                  ? 'Les articles ajoutés par cet utilisateur resteront dans la cuisine. Cette action ne peut pas être annulée.'
-                  : 'Items previously added by this member will remain in the kitchen. This action cannot be undone.'}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => setUserToDelete(null)}
-                disabled={isDeletingUser}
-                className="flex-1 py-2.5 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs cursor-pointer transition-colors"
-              >
-                {lang === 'FR' ? 'Annuler' : 'Cancel'}
-              </button>
-              <button
-                type="button"
-                disabled={isDeletingUser}
-                onClick={async () => {
-                  if (!onDeleteMember || !userToDelete) return;
-                  setIsDeletingUser(true);
-                  try {
-                    await onDeleteMember(userToDelete);
-                    setUserToDelete(null);
-                  } finally {
-                    setIsDeletingUser(false);
-                  }
-                }}
-                className="flex-1 py-2.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs shadow-xs cursor-pointer transition-colors active:scale-95 flex items-center justify-center gap-1.5"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>{isDeletingUser ? '...' : (lang === 'FR' ? 'Supprimer' : 'Delete')}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

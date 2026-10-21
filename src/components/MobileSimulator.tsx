@@ -79,6 +79,7 @@ import {
   getLocationLocalizedName,
   LanguageSwitcher,
 } from '../utils/i18n';
+import { useAlertToast } from '../contexts/AlertToastContext';
 import { getItemDisplayName, formatLocalizedQuantityUnit } from '../utils/foodTranslator';
 
 const INITIAL_GROCERY_ITEMS: GroceryCartItem[] = [];
@@ -342,7 +343,10 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   const [filterLeftoversOnly, setFilterLeftoversOnly] = useState(false);
   const [itemToEdit, setItemToEdit] = useState<InventoryItem | null>(null);
   const [defrostingId, setDefrostingId] = useState<string | null>(null);
-  const [bannerNotice, setBannerNotice] = useState<string | null>(null);
+  const { confirmAction, showToast } = useAlertToast();
+  const setBannerNotice = (msg: string | null) => {
+    if (msg) showToast(msg, 'success');
+  };
   const [bentoViewMode, setBentoViewMode] = useState<'grid' | 'list'>('list');
   const [isBentoCompact, setIsBentoCompact] = useState<boolean>(true);
   const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(new Set());
@@ -943,11 +947,17 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   };
 
   const handleDeleteItem = async (itemId: string, itemName?: string) => {
-    const confirmMsg =
-      lang === 'FR'
-        ? `Retirer "${itemName || 'cet article'}" de votre cuisine ?`
-        : `Remove "${itemName || 'this item'}" from your kitchen?`;
-    if (!window.confirm(confirmMsg)) return;
+    const confirmed = await confirmAction({
+      title: lang === 'FR' ? 'Retirer cet aliment ?' : 'Remove this item?',
+      message:
+        lang === 'FR'
+          ? `Voulez-vous vraiment retirer « ${itemName || 'cet article'} » de votre cuisine ?`
+          : `Are you sure you want to remove "${itemName || 'this item'}" from your kitchen?`,
+      confirmLabel: lang === 'FR' ? 'Retirer' : 'Remove',
+      cancelLabel: lang === 'FR' ? 'Annuler' : 'Cancel',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
       const res = await fetch(`/api/v1/inventory/item/${encodeURIComponent(itemId)}`, {
         method: 'DELETE',
@@ -955,15 +965,19 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
       const data = await res.json();
       if (data.success) {
         setItems((prev) => prev.filter((i) => i.id !== itemId));
-        setBannerNotice(
+        showToast(
           lang === 'FR'
-            ? `"${itemName || 'Article'}" retiré de l'inventaire.`
-            : `Removed "${itemName || 'Item'}" from inventory.`
+            ? `« ${itemName || 'Article'} » a été retiré de l'inventaire.`
+            : `Removed "${itemName || 'Item'}" from inventory.`,
+          'success'
         );
-        setTimeout(() => setBannerNotice(null), 3000);
       }
     } catch (err) {
       console.error('Delete item failed:', err);
+      showToast(
+        lang === 'FR' ? "Échec de suppression de l'aliment." : 'Failed to delete item.',
+        'error'
+      );
     }
   };
 
@@ -1264,14 +1278,6 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
 
           </div>
         </div>
-
-        {/* Global Notice */}
-        {bannerNotice && (
-          <div className="mt-2 py-1.5 px-3 rounded-xl bg-teal-50 text-teal-900 border border-teal-200 text-xs font-bold flex items-center gap-2 shadow-2xs animate-fade-in">
-            <Check className="w-4 h-4 text-teal-600 shrink-0 stroke-[3]" />
-            <span className="truncate">{bannerNotice}</span>
-          </div>
-        )}
       </header>
 
       {/* Main Scrollable View */}

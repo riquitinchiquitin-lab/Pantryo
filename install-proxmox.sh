@@ -115,11 +115,12 @@ if command -v pveversion >/dev/null 2>&1; then
       --password "$CT_PASSWORD" \
       --onboot 1
 
-    # Automatically permit /dev/net/tun device in unprivileged container for Tailscale / WireGuard
+    # Automatically configure device permissions and cgroup2 process limit (150 max PIDs)
     if [ -f "/etc/pve/lxc/${CT_ID}.conf" ]; then
       cat <<'EOF_TUN' >> "/etc/pve/lxc/${CT_ID}.conf"
 lxc.cgroup2.devices.allow: c 10:200 rwm
 lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
+lxc.cgroup2.pids.max: 150
 EOF_TUN
     fi
 

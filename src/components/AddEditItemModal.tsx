@@ -28,6 +28,7 @@ import { useLanguage, getCategoryLocalizedName, getSubcategoryLocalizedName } fr
 import { ScrollableRow } from './ScrollableRow';
 import { estimateSmartShelfLife } from '../utils/smartExpirationRules';
 import { getBilingualNames, translateFoodItem } from '../utils/foodTranslator';
+import { useAlertToast } from '../contexts/AlertToastContext';
 
 interface AddEditItemModalProps {
   isOpen: boolean;
@@ -141,6 +142,7 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
   defaultLocationType,
 }) => {
   const { t, lang } = useLanguage();
+  const { confirmAction, showToast } = useAlertToast();
   const isEditing = Boolean(itemToEdit);
 
   // Helper to format date YYYY-MM-DD
@@ -445,11 +447,17 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
 
   const handleDelete = async () => {
     if (!itemToEdit || !onDeleted) return;
-    const confirmMsg =
-      lang === 'FR'
-        ? `Voulez-vous vraiment retirer « ${itemToEdit.name} » de votre cuisine ?`
-        : `Are you sure you want to remove "${itemToEdit.name}" from your kitchen?`;
-    if (!window.confirm(confirmMsg)) {
+    const confirmed = await confirmAction({
+      title: lang === 'FR' ? 'Retirer cet aliment ?' : 'Remove this item?',
+      message:
+        lang === 'FR'
+          ? `Voulez-vous vraiment retirer « ${itemToEdit.name} » de votre cuisine ?`
+          : `Are you sure you want to remove "${itemToEdit.name}" from your kitchen?`,
+      confirmLabel: lang === 'FR' ? 'Retirer' : 'Remove',
+      cancelLabel: lang === 'FR' ? 'Annuler' : 'Cancel',
+      variant: 'danger',
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -463,9 +471,18 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
         throw new Error(data.error || (lang === 'FR' ? "Échec de suppression de l'aliment." : 'Failed to delete item.'));
       }
       onDeleted(itemToEdit.id);
+      showToast(
+        lang === 'FR'
+          ? `« ${itemToEdit.name} » retiré de votre cuisine.`
+          : `"${itemToEdit.name}" removed from your kitchen.`,
+        'success'
+      );
       onClose();
     } catch (err: any) {
-      alert(`${lang === 'FR' ? 'Erreur lors de la suppression :' : 'Error removing item:'} ${err.message}`);
+      showToast(
+        `${lang === 'FR' ? 'Erreur lors de la suppression :' : 'Error removing item:'} ${err.message}`,
+        'error'
+      );
     } finally {
       setIsSubmitting(false);
     }

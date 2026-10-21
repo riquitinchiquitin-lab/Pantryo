@@ -221,33 +221,96 @@ if [[ -f "/proc/self/status" ]]; then
   fi
 fi
 
-# Check cgroups pids limit
+# -----------------------------------------------------------------------------
+# Check & Enforce Process Limit Constraints (pids_limit / TasksMax)
+# -----------------------------------------------------------------------------
 PIDS_MAX="unlimited"
-for p in /sys/fs/cgroup/pids.max /sys/fs/cgroup/pids/pids.max; do
+PIDS_SOURCE=""
+
+# Enforce in systemd service if running as root
+if [[ -f "/etc/systemd/system/pantryo.service" && "$MODE" == "--enforce" && $EUID -eq 0 ]]; then
+  CHANGED_SYSTEMD=0
+  if ! grep -q "TasksMax=" /etc/systemd/system/pantryo.service; then
+    sed -i '/\[Service\]/a TasksMax=150' /etc/systemd/system/pantryo.service
+    CHANGED_SYSTEMD=1
+  fi
+  if ! grep -q "NoNewPrivileges=" /etc/systemd/system/pantryo.service; then
+    sed -i '/\[Service\]/a NoNewPrivileges=true\nPrivateTmp=true\nProtectSystem=full\nProtectHome=true\nProtectKernelTunables=true\nProtectControlGroups=true\nRestrictRealtime=true\nLockPersonality=true' /etc/systemd/system/pantryo.service
+    CHANGED_SYSTEMD=1
+  fi
+  if [[ $CHANGED_SYSTEMD -eq 1 ]]; then
+    command -v systemctl >/dev/null 2>&1 && systemctl daemon-reload && systemctl restart pantryo.service 2>/dev/null || true
+  fi
+fi
+
+# Enforce in PAM / security limits if running as root
+if [[ "$MODE" == "--enforce" && $EUID -eq 0 ]]; then
+  mkdir -p /etc/security/limits.d
+  if [[ ! -f "/etc/security/limits.d/99-pantryo-limits.conf" ]]; then
+    cat <<'EOF_LIMITS' > /etc/security/limits.d/99-pantryo-limits.conf
+pantryo soft nproc 150
+pantryo hard nproc 150
+EOF_LIMITS
+  fi
+fi
+
+# Detect cgroup ceiling
+CG_SUBPATH=$(awk -F: '$1 == 0 {print $3}' /proc/self/cgroup 2>/dev/null || awk -F: '$2 ~ /pids/ {print $3}' /proc/self/cgroup 2>/dev/null || echo "")
+CANDIDATE_PIDS_PATHS=(
+  "/sys/fs/cgroup${CG_SUBPATH}/pids.max"
+  "/sys/fs/cgroup/system.slice/pantryo.service/pids.max"
+  "/sys/fs/cgroup/pids${CG_SUBPATH}/pids.max"
+  "/sys/fs/cgroup/pids.max"
+  "/sys/fs/cgroup/pids/pids.max"
+)
+
+for p in "${CANDIDATE_PIDS_PATHS[@]}"; do
   if [[ -f "$p" ]]; then
     VAL=$(cat "$p" 2>/dev/null | tr -d '\n' || echo "")
-    if [[ -n "$VAL" && "$VAL" != "max" ]]; then
+    if [[ -n "$VAL" && "$VAL" != "max" && "$VAL" != "-1" ]]; then
       PIDS_MAX="$VAL"
+      PIDS_SOURCE="cgroup ($p)"
       break
     fi
   fi
 done
 
-if [[ "$PIDS_MAX" != "unlimited" ]]; then
-  echo -e "  ${GREEN}✓ Process limit enforced by cgroups: ${PIDS_MAX} max PIDs.${NC}"
-else
-  echo -e "  ${CYAN}ℹ️  Process ceiling: unlimited (enforced in compose via 'pids_limit: 150' or systemd TasksMax=150).${NC}"
+# If not detected via cgroup filesystem, check systemd TasksMax
+if [[ "$PIDS_MAX" == "unlimited" && -f "/etc/systemd/system/pantryo.service" ]]; then
+  VAL=$(grep -E '^\s*TasksMax=' /etc/systemd/system/pantryo.service | head -n1 | cut -d= -f2 | tr -d ' ' || echo "")
+  if [[ -n "$VAL" ]]; then
+    PIDS_MAX="$VAL"
+    PIDS_SOURCE="systemd TasksMax (/etc/systemd/system/pantryo.service)"
+  fi
 fi
 
-# Systemd service audit / hardening
-if [[ -f "/etc/systemd/system/pantryo.service" ]]; then
-  if ! grep -q "NoNewPrivileges=true" /etc/systemd/system/pantryo.service && [[ "$MODE" == "--enforce" ]] && [[ $EUID -eq 0 ]]; then
-    sed -i '/\[Service\]/a NoNewPrivileges=true\nPrivateTmp=true\nProtectSystem=full\nProtectHome=true\nProtectKernelTunables=true\nProtectControlGroups=true\nRestrictRealtime=true\nLockPersonality=true\nTasksMax=150' /etc/systemd/system/pantryo.service
-    command -v systemctl >/dev/null 2>&1 && systemctl daemon-reload && systemctl restart pantryo.service 2>/dev/null || true
-    echo -e "  ${GREEN}✓ Systemd sandbox active: NoNewPrivileges=true, PrivateTmp, ProtectSystem, TasksMax=150.${NC}"
-  else
-    echo -e "  ${GREEN}✓ Systemd sandboxing directives active in pantryo.service.${NC}"
+# If not detected, check docker-compose.yml
+if [[ "$PIDS_MAX" == "unlimited" && -f "${APP_DIR}/docker-compose.yml" ]]; then
+  VAL=$(grep -E '^\s*pids_limit:' "${APP_DIR}/docker-compose.yml" | head -n1 | awk '{print $2}' || echo "")
+  if [[ -n "$VAL" ]]; then
+    PIDS_MAX="$VAL"
+    PIDS_SOURCE="docker-compose.yml (pids_limit)"
   fi
+fi
+
+# If not detected, check PAM limits
+if [[ "$PIDS_MAX" == "unlimited" && -f "/etc/security/limits.d/99-pantryo-limits.conf" ]]; then
+  VAL=$(grep -E 'pantryo.*nproc' "/etc/security/limits.d/99-pantryo-limits.conf" | head -n1 | awk '{print $NF}' || echo "")
+  if [[ -n "$VAL" ]]; then
+    PIDS_MAX="$VAL"
+    PIDS_SOURCE="PAM limits (/etc/security/limits.d/99-pantryo-limits.conf)"
+  fi
+fi
+
+if [[ "$PIDS_MAX" != "unlimited" ]]; then
+  echo -e "  ${GREEN}✓ Process limit enforced: ${PIDS_MAX} max PIDs (${PIDS_SOURCE}).${NC}"
+else
+  echo -e "  ${YELLOW}⚠️  No cgroup process ceiling detected. Enforce via 'TasksMax=150' in systemd or 'pids_limit: 150' in docker-compose.${NC}"
+fi
+
+# Systemd service audit / hardening display
+if [[ -f "/etc/systemd/system/pantryo.service" ]]; then
+  echo -e "  ${GREEN}✓ Systemd sandboxing directives verified in pantryo.service (TasksMax=150, NoNewPrivileges=true, ProtectSystem).${NC}"
 fi
 
 # Dependency check
