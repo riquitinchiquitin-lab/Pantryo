@@ -4250,7 +4250,16 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
 
                     <div className="flex items-center gap-2 flex-wrap">
                       <a
-                        href="/README.md"
+                        href="https://github.com/riquitinchiquitin-lab/Pantryo"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-black text-white text-[11px] font-bold flex items-center gap-1 transition-all"
+                      >
+                        <span>GitHub Repo</span>
+                        <ExternalLink className="w-3 h-3 text-slate-400" />
+                      </a>
+                      <a
+                        href="https://github.com/riquitinchiquitin-lab/Pantryo/blob/main/README.md"
                         target="_blank"
                         rel="noreferrer"
                         className="px-2.5 py-1 rounded-lg bg-[#FAF7EE] hover:bg-teal-50 border border-[#E0D9C8] hover:border-teal-300 text-[11px] font-bold text-[#0D3B37] flex items-center gap-1 transition-all"
@@ -4259,7 +4268,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                         <ExternalLink className="w-3 h-3 text-slate-400" />
                       </a>
                       <a
-                        href="/INSTALLATION.md"
+                        href="https://github.com/riquitinchiquitin-lab/Pantryo/blob/main/INSTALLATION.md"
                         target="_blank"
                         rel="noreferrer"
                         className="px-2.5 py-1 rounded-lg bg-[#FAF7EE] hover:bg-teal-50 border border-[#E0D9C8] hover:border-teal-300 text-[11px] font-bold text-[#0D3B37] flex items-center gap-1 transition-all"
@@ -4268,7 +4277,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                         <ExternalLink className="w-3 h-3 text-slate-400" />
                       </a>
                       <a
-                        href="/FEATURES.md"
+                        href="https://github.com/riquitinchiquitin-lab/Pantryo/blob/main/FEATURES.md"
                         target="_blank"
                         rel="noreferrer"
                         className="px-2.5 py-1 rounded-lg bg-[#FAF7EE] hover:bg-teal-50 border border-[#E0D9C8] hover:border-teal-300 text-[11px] font-bold text-[#0D3B37] flex items-center gap-1 transition-all"

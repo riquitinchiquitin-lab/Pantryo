@@ -234,21 +234,44 @@ Ensure your [Tailscale ACLs](https://login.tailscale.com/admin/acls) include `"n
 
 ---
 
+## 🔄 Updating Pantryo
+
+Pantryo preserves your encrypted database (`/opt/pantryo/server/data/pantryo.sqlite`) and your configuration (`/opt/pantryo/.env`) safely across all updates.
+
+### One-Line Automated Update (Recommended)
+
+Run inside your LXC container or server terminal:
+
+```bash
+cd /opt/pantryo
+git reset --hard HEAD
+git pull
+sudo ./scripts/auto-update-all.sh
+sudo systemctl daemon-reload && sudo systemctl restart pantryo
+```
+
+*This command synchronizes the repository, normalizes `.env`, compiles native SQLite binary bindings (`better-sqlite3-multiple-ciphers`), installs any new packages with `--include=dev`, applies security patches, builds the production bundle, and restarts the background service.*
+
+---
+
 ## 📱 Progressive Web App & Expo Mobile
 
 - **PWA (Progressive Web App)**: Add Pantryo to your iPhone, iPad, or Android home screen with a single tap. Works offline with client-side Service Worker caching for instant pantry lookups inside grocery stores without mobile reception.
 - **Expo Mobile Client**: Point the `EXPO_PUBLIC_API_URL` environment variable to your server's domain to run the native iOS/Android client.
+- **In-App Material 3 Alerts**: Zero native browser popups; all notifications use sleek floating bottom toasts with auto-dismiss and tactile bottom-sheet confirmation cards for destructive actions.
 
 ---
 
 ## 📚 Documentation Index
 
-- 📘 [Comprehensive Installation Runbook (INSTALLATION.md)](INSTALLATION.md) — Detailed steps for Proxmox VE, Debian/Ubuntu, Arch, Fedora, Docker, and Nginx.
-- 📙 [Complete Feature Specification (FEATURES.md)](FEATURES.md) — Exhaustive guide on AI Vision, SQLCipher, Meal Planning, and Household Sync.
-- 📗 [Environment Configuration Guide (.env.example)](.env.example) — Complete reference of server and client environment variables.
+- 🐙 [GitHub Repository](https://github.com/riquitinchiquitin-lab/Pantryo) — Source code, issue tracker, and releases.
+- 📘 [Comprehensive Installation Runbook (INSTALLATION.md)](https://github.com/riquitinchiquitin-lab/Pantryo/blob/main/INSTALLATION.md) — Detailed steps for Proxmox VE, Debian/Ubuntu, Arch, Fedora, Docker, and Nginx.
+- 📙 [Complete Feature Specification (FEATURES.md)](https://github.com/riquitinchiquitin-lab/Pantryo/blob/main/FEATURES.md) — Exhaustive guide on AI Vision, SQLCipher, Meal Planning, and Household Sync.
+- 📗 [Environment Configuration Guide (.env.example)](https://github.com/riquitinchiquitin-lab/Pantryo/blob/main/.env.example) — Complete reference of server and client environment variables.
 
 ---
 
 ## 📄 License
 
 Pantryo is released under the **MIT License**. Free and open-source for personal, homelab, and commercial use.
+Copyright © 2026 Pantryo Project — [https://github.com/riquitinchiquitin-lab/Pantryo](https://github.com/riquitinchiquitin-lab/Pantryo)

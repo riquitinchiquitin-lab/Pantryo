@@ -124,20 +124,50 @@ Every aspect of Pantryo is fully translated and localized:
 
 ---
 
-## 9. Detailed Technical Specifications
+---
+
+## 9. Integrated In-App Notification System & Zero-Popup Architecture
+
+- **No Browser Popups (`window.alert` / `window.confirm`)**: All actions utilize custom in-app components that match the application's Material 3 aesthetic and never freeze iframes or mobile web views.
+- **Bottom Floating Toasts**: Auto-dismissing status notifications with status badges (success, error, warning, info) and optional tactile undo actions, positioned above the mobile navigation bar with safe-area support.
+- **Embedded Bottom Sheet Confirmation Cards**: Destructive actions (deletions, discards, member removals) open an accessible in-app bottom sheet with dimmed backdrop blur, title, detailed description, and tactile Confirm / Cancel buttons.
+
+---
+
+## 10. Container & OS-Level Hardening (CIS / OWASP / NIST)
+
+- **Process Ceiling Enforcement**: Enforces `TasksMax=150` in systemd (`pantryo.service`), `pids_limit: 150` in `docker-compose.yml`, and `lxc.cgroup2.pids.max: 150` in Proxmox VE LXC container configurations to prevent fork-bomb attacks.
+- **Privilege Separation & Sandboxing**: `NoNewPrivileges=true`, `PrivateTmp=true`, `ProtectSystem=full`, `ProtectKernelTunables=true`, and `ProtectControlGroups=true`.
+- **Supply Chain & Precompiled Binary Compatibility**: Automatic detection of C/C++ compilation tools with verified precompiled native binaries for `better-sqlite3-multiple-ciphers`.
+
+---
+
+## 11. Detailed Technical Specifications
 
 | Component | Technology | Version | Purpose |
 | :--- | :--- | :--- | :--- |
 | **Frontend Framework** | React + TypeScript | 19.x | Component-driven reactive user interface |
 | **Styling & Theme** | Tailwind CSS v4 | 4.x | Utilitarian homelab editorial design system |
+| **UI Motion & Transitions** | Motion | 14.x | Smooth, hardware-accelerated fluid UI transitions |
 | **Server Engine** | Node.js + Express | 22.x LTS | REST API, static files, and PWA service worker delivery |
-| **Database** | SQLite + SQLCipher | 3.4x | Local-first, 256-bit AES encrypted at-rest storage |
+| **Database** | SQLite + SQLCipher | `better-sqlite3-multiple-ciphers` 13.x | Local-first, 256-bit AES encrypted at-rest storage |
 | **Vision Classification**| MobileNetV2 | ONNX / TFJS | 399 produce classes client-side neural inference |
 | **Biometric Auth** | FIDO2 / WebAuthn | W3C Standard | Passkeys via Touch ID, Face ID, Windows Hello & YubiKey |
 | **Key Derivation** | Argon2id | RFC 9106 | Password hashing & session token authentication |
+| **Process Hardening** | Systemd / cgroups v2 | TasksMax=150 | Fork-bomb and resource exhaustion prevention |
 | **PWA Engine** | Service Worker + CacheStorage | W3C Standard | Offline pantry lookups & grocery checklist storage |
 | **Packaging & CI** | Docker, Bash, Systemd | Multi-Arch | Proxmox LXC, Raspberry Pi, Ubuntu, Debian, Docker |
 
 ---
 
+## 📚 Repository Links & Documentation
+
+- 🐙 **GitHub Repository**: [https://github.com/riquitinchiquitin-lab/Pantryo](https://github.com/riquitinchiquitin-lab/Pantryo)
+- 📘 **Installation Guide**: [INSTALLATION.md](https://github.com/riquitinchiquitin-lab/Pantryo/blob/main/INSTALLATION.md)
+- 📙 **README Runbook**: [README.md](https://github.com/riquitinchiquitin-lab/Pantryo/blob/main/README.md)
+- 📗 **Environment Config**: [.env.example](https://github.com/riquitinchiquitin-lab/Pantryo/blob/main/.env.example)
+
+---
+
 *Pantryo — Engineered for privacy, sustainability, and delicious meals.*
+Copyright © 2026 Pantryo Project. Free and open-source under the MIT License.

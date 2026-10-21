@@ -25,7 +25,9 @@ import {
   Refrigerator,
   UtensilsCrossed,
   ScanLine,
+  GitBranch,
 } from 'lucide-react';
+import { Github } from './icons/Github';
 import { PantryoLogo } from './PantryoLogo';
 import { useLanguage, LanguageSwitcher } from '../utils/i18n';
 
@@ -72,8 +74,10 @@ export function DocumentationModal({
   };
 
   const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/riquitinchiquitin-lab/Pantryo/main';
+  const GITHUB_REPO_URL = 'https://github.com/riquitinchiquitin-lab/Pantryo';
   const proxmoxCurlCommand = `bash -c "$(curl -fsSL ${GITHUB_RAW_BASE}/install-proxmox.sh)"`;
   const linuxCurlCommand = `curl -fsSL ${GITHUB_RAW_BASE}/install.sh | sudo bash`;
+  const updateCommand = `cd /opt/pantryo && git reset --hard HEAD && git pull && sudo ./scripts/auto-update-all.sh && sudo systemctl daemon-reload && sudo systemctl restart pantryo`;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 md:p-6 animate-fade-in overflow-hidden">
@@ -100,6 +104,16 @@ export function DocumentationModal({
           </div>
 
           <div className="flex items-center gap-2.5">
+            <a
+              href="https://github.com/riquitinchiquitin-lab/Pantryo"
+              target="_blank"
+              rel="noreferrer"
+              className="px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-xs"
+              title="GitHub Repository"
+            >
+              <Github className="w-3.5 h-3.5 text-slate-300" />
+              <span className="hidden sm:inline">GitHub</span>
+            </a>
             <LanguageSwitcher />
             <button
               onClick={onClose}
@@ -432,6 +446,39 @@ export function DocumentationModal({
                       <span className="font-bold text-teal-800 block">Clé SQLCipher 256 bits:</span>
                       <span>64 hex auto-générés (AES-256-GCM)</span>
                     </div>
+                  </div>
+                </div>
+
+                {/* Updating Pantryo on Proxmox Card */}
+                <div className="p-4 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-black uppercase tracking-wider text-[#0D3B37] flex items-center gap-1.5">
+                      <RefreshCw className="w-3.5 h-3.5 text-teal-700" />
+                      <span>{lang === 'FR' ? 'Mise à jour 1-clic (Dans la console LXC ou SSH)' : '1-Click Update (Inside LXC Console or SSH)'}</span>
+                    </label>
+                    <span className="text-[11px] text-[#527470]">{lang === 'FR' ? 'Copier' : 'Copy'}</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-[#0F172A] border border-slate-700 font-mono text-xs text-teal-300 flex items-center justify-between gap-2 shadow-xs">
+                    <div className="overflow-x-auto select-all pr-2 whitespace-nowrap">
+                      {updateCommand}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(updateCommand, 'proxmox-update')}
+                      className="px-3 py-1 rounded-lg bg-teal-700 hover:bg-teal-600 text-white font-bold text-xs shrink-0 flex items-center gap-1 transition-all active:scale-95 cursor-pointer shadow-xs"
+                    >
+                      {copiedId === 'proxmox-update' ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-300 stroke-[3]" />
+                          <span>{lang === 'FR' ? 'Copié !' : 'Copied!'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>{lang === 'FR' ? 'Copier' : 'Copy'}</span>
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -900,55 +947,77 @@ export function DocumentationModal({
               </div>
 
               {/* GitHub Files Direct Access Card */}
-              <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-3">
-                <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0D3B37] flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 text-teal-700" />
-                  <span>{lang === 'FR' ? 'Fichiers de Documentation du Dépôt' : 'Repository Documentation Files'}</span>
-                </h5>
+              <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-3.5">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0D3B37] flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-teal-700" />
+                    <span>{lang === 'FR' ? 'Documentation GitHub & Fichiers du Dépôt' : 'GitHub Documentation & Repository Files'}</span>
+                  </h5>
+                  <a
+                    href="https://github.com/riquitinchiquitin-lab/Pantryo"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-black text-white text-[11px] font-bold transition-all shadow-xs"
+                  >
+                    <Github className="w-3 h-3" />
+                    <span>github.com/riquitinchiquitin-lab/Pantryo</span>
+                    <ExternalLink className="w-3 h-3 text-slate-400" />
+                  </a>
+                </div>
+
                 <p className="text-xs text-[#527470]">
                   {lang === 'FR'
-                    ? 'Ces guides complets sont également inclus à la racine de votre installation pour GitHub et votre wiki :'
-                    : 'These complete runbooks are also included at the root of your installation for GitHub and wikis:'}
+                    ? 'Consultez les guides complets directement sur GitHub ou ouvrez les fichiers locaux inclus avec votre installation :'
+                    : 'Browse the complete runbooks directly on GitHub or view the local copies included with your installation:'}
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   <a
-                    href="/README.md"
+                    href="https://github.com/riquitinchiquitin-lab/Pantryo/blob/main/README.md"
                     target="_blank"
                     rel="noreferrer"
-                    className="p-3 rounded-xl bg-[#FAF7EE] hover:bg-teal-50 border border-[#E5DFD0] hover:border-teal-300 text-xs font-bold text-[#0D3B37] flex items-center justify-between transition-all"
+                    className="p-3 rounded-xl bg-[#FAF7EE] hover:bg-teal-50 border border-[#E5DFD0] hover:border-teal-300 text-xs font-bold text-[#0D3B37] flex items-center justify-between transition-all group"
                   >
                     <div className="flex items-center gap-2">
                       <BookOpen className="w-4 h-4 text-teal-700" />
-                      <span>README.md</span>
+                      <div>
+                        <span>README.md</span>
+                        <span className="block text-[10px] font-normal text-[#527470]">{lang === 'FR' ? 'Sur GitHub' : 'On GitHub'}</span>
+                      </div>
                     </div>
-                    <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-teal-700" />
                   </a>
 
                   <a
-                    href="/INSTALLATION.md"
+                    href="https://github.com/riquitinchiquitin-lab/Pantryo/blob/main/INSTALLATION.md"
                     target="_blank"
                     rel="noreferrer"
-                    className="p-3 rounded-xl bg-[#FAF7EE] hover:bg-teal-50 border border-[#E5DFD0] hover:border-teal-300 text-xs font-bold text-[#0D3B37] flex items-center justify-between transition-all"
+                    className="p-3 rounded-xl bg-[#FAF7EE] hover:bg-teal-50 border border-[#E5DFD0] hover:border-teal-300 text-xs font-bold text-[#0D3B37] flex items-center justify-between transition-all group"
                   >
                     <div className="flex items-center gap-2">
                       <Server className="w-4 h-4 text-orange-600" />
-                      <span>INSTALLATION.md</span>
+                      <div>
+                        <span>INSTALLATION.md</span>
+                        <span className="block text-[10px] font-normal text-[#527470]">{lang === 'FR' ? 'Guide Complet' : 'Complete Runbook'}</span>
+                      </div>
                     </div>
-                    <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-orange-600" />
                   </a>
 
                   <a
-                    href="/FEATURES.md"
+                    href="https://github.com/riquitinchiquitin-lab/Pantryo/blob/main/FEATURES.md"
                     target="_blank"
                     rel="noreferrer"
-                    className="p-3 rounded-xl bg-[#FAF7EE] hover:bg-teal-50 border border-[#E5DFD0] hover:border-teal-300 text-xs font-bold text-[#0D3B37] flex items-center justify-between transition-all"
+                    className="p-3 rounded-xl bg-[#FAF7EE] hover:bg-teal-50 border border-[#E5DFD0] hover:border-teal-300 text-xs font-bold text-[#0D3B37] flex items-center justify-between transition-all group"
                   >
                     <div className="flex items-center gap-2">
                       <Sparkles className="w-4 h-4 text-emerald-600" />
-                      <span>FEATURES.md</span>
+                      <div>
+                        <span>FEATURES.md</span>
+                        <span className="block text-[10px] font-normal text-[#527470]">{lang === 'FR' ? 'Spécifications' : 'Specifications'}</span>
+                      </div>
                     </div>
-                    <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-600" />
                   </a>
                 </div>
               </div>

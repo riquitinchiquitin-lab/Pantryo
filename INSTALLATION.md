@@ -307,13 +307,17 @@ Pantryo preserves your encrypted SQLite database (`/opt/pantryo/server/data/pant
 Log into your LXC container console or SSH and run:
 
 ```bash
-cd /opt/pantryo && sudo ./update.sh
+cd /opt/pantryo
+git reset --hard HEAD
+git pull
+sudo ./scripts/auto-update-all.sh
+sudo systemctl daemon-reload && sudo systemctl restart pantryo
 ```
 
-Or run the update directly from the **Proxmox Node Host Shell** (replace `<CT_ID>` with your container number, e.g. `105`):
+Or run the update directly from the **Proxmox Node Host Shell** (replace `<CT_ID>` with your container number, e.g. `206`):
 
 ```bash
-pct exec <CT_ID> -- bash -c "cd /opt/pantryo && ./update.sh"
+pct exec <CT_ID> -- bash -c "cd /opt/pantryo && git reset --hard HEAD && git pull && ./scripts/auto-update-all.sh && systemctl daemon-reload && systemctl restart pantryo"
 ```
 
 ### Method 2: Manual Step-by-Step Update
@@ -324,24 +328,27 @@ If you prefer to inspect each command manually:
 # 1. Navigate to application folder
 cd /opt/pantryo
 
-# 2. Pull latest code (preserves .env and server/data/)
-git pull --rebase || git pull
+# 2. Reset tracked modifications and pull latest clean updates
+git reset --hard HEAD
+git pull
 
-# 3. Install new dependencies & recompile native SQLite bindings
-npm install --no-audit
+# 3. Strip legacy NODE_ENV from .env (systemd manages NODE_ENV=production)
+sed -i '/^NODE_ENV=/d' .env 2>/dev/null || true
 
-# 4. Build production bundle (Vite frontend + esbuild server)
+# 4. Install dependencies including build tools (never skip devDependencies)
+npm install --include=dev
+
+# 5. Build production bundle (Vite frontend + esbuild server)
 npm run build
 
-# 5. Fix permissions for the unprivileged system user
-sudo chown -R pantryo:pantryo /opt/pantryo
-sudo chmod 700 /opt/pantryo/server/data
-sudo chmod 600 /opt/pantryo/.env
+# 6. Apply system and container security hardening (TasksMax=150, cgroups, permissions)
+sudo ./scripts/security-harden-container.sh
 
-# 6. Restart the systemd service
+# 7. Restart the systemd service
+sudo systemctl daemon-reload
 sudo systemctl restart pantryo
 
-# 7. Verify the service is active and running
+# 8. Verify the service is active and running
 systemctl status pantryo
 ```
 
