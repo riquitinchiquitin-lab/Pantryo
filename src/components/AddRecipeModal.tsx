@@ -501,34 +501,93 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
     setIsLiveCameraActive(false);
   };
 
-  // Start live in-app camera viewfinder
+  // Callback ref to immediately attach stream when video mounts in the DOM
+  const attachLiveVideoRef = (el: HTMLVideoElement | null) => {
+    videoRef.current = el;
+    if (el && streamRef.current) {
+      if (el.srcObject !== streamRef.current) {
+        el.srcObject = streamRef.current;
+      }
+      el.play().catch((err) => console.warn('Live video play error on attach:', err));
+    }
+  };
+
+  // Synchronize camera stream with video element whenever live camera becomes active
+  useEffect(() => {
+    if (isLiveCameraActive && videoRef.current && streamRef.current) {
+      if (videoRef.current.srcObject !== streamRef.current) {
+        videoRef.current.srcObject = streamRef.current;
+      }
+      videoRef.current.play().catch((err) => console.warn('Live video play error in effect:', err));
+    }
+  }, [isLiveCameraActive]);
+
+  // Cleanup stream on component unmount
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+    };
+  }, []);
+
+  // Stop camera when modal is closed
+  useEffect(() => {
+    if (!isOpen) {
+      stopLiveCamera();
+    }
+  }, [isOpen]);
+
+  // Start live in-app camera viewfinder with robust fallback
   const startLiveCamera = async (facing: 'environment' | 'user' = cameraFacingMode) => {
     setCameraError(null);
     stopLiveCamera();
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: facing },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        },
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error(lang === 'FR' ? 'Caméra non supportée par ce navigateur' : 'Camera not supported by browser');
       }
+
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: facing },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
+        });
+      } catch (err) {
+        console.warn('Ideal constraints failed, attempting fallback camera:', err);
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: facing },
+          });
+        } catch {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        }
+      }
+
+      streamRef.current = stream;
       setCameraFacingMode(facing);
       setIsLiveCameraActive(true);
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play().catch((err) => console.warn('Video play error in startLiveCamera:', err));
+      }
     } catch (err: any) {
       console.error('Live camera error:', err);
       setCameraError(
         lang === 'FR'
-          ? "Impossible d'accéder au flux vidéo direct. Utilisez le bouton 'Ouvrir l'application Caméra' natif ci-dessous."
-          : "Could not access live camera stream. Please use the native 'Open Camera App' button below."
+          ? "Impossible d'accéder au flux vidéo direct. Vérifiez les permissions de votre navigateur ou utilisez le bouton 'Ouvrir l'application Caméra' natif ci-dessous."
+          : "Could not access live camera stream. Please check browser permissions or use the native 'Open Camera App' button below."
       );
       setIsLiveCameraActive(false);
     }
@@ -1906,10 +1965,13 @@ Instructions:
 
                     <div className="relative w-full h-64 sm:h-72 rounded-xl overflow-hidden bg-black flex items-center justify-center">
                       <video
-                        ref={videoRef}
+                        ref={attachLiveVideoRef}
                         autoPlay
                         playsInline
                         muted
+                        onLoadedMetadata={(e) => {
+                          e.currentTarget.play().catch((err) => console.warn('Video play on metadata loaded:', err));
+                        }}
                         className="w-full h-full object-cover"
                       />
                       {/* Framing guides overlay */}

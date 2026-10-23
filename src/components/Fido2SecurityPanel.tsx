@@ -304,7 +304,7 @@ export const Fido2SecurityPanel: React.FC<Fido2SecurityPanelProps> = ({
     } catch (err: any) {
       setStatusNotice({
         type: 'error',
-        text: err.message || 'Impossible de démarrer la configuration 2FA 6 chiffres',
+        text: err.message || (lang === 'FR' ? 'Impossible de démarrer la configuration 2FA 6 chiffres' : 'Could not start 6-digit 2FA setup'),
       });
     } finally {
       setActionLoading(false);
@@ -353,7 +353,7 @@ export const Fido2SecurityPanel: React.FC<Fido2SecurityPanelProps> = ({
     } catch (err: any) {
       setStatusNotice({
         type: 'error',
-        text: err.message || 'Code à 6 chiffres incorrect ou expiré',
+        text: err.message || (lang === 'FR' ? 'Code à 6 chiffres incorrect ou expiré' : 'Incorrect or expired 6-digit code'),
       });
     } finally {
       setActionLoading(false);
@@ -1233,7 +1233,11 @@ export const Fido2SecurityPanel: React.FC<Fido2SecurityPanelProps> = ({
                     className="ml-2 px-2.5 py-1 rounded bg-white border border-teal-200 text-teal-800 text-[10px] font-bold shrink-0 cursor-pointer flex items-center gap-1"
                   >
                     {copiedSecret ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-                    <span>{copiedSecret ? 'Copié' : 'Copier'}</span>
+                    <span>
+                      {copiedSecret
+                        ? (lang === 'FR' ? 'Copié' : 'Copied')
+                        : (lang === 'FR' ? 'Copier' : 'Copy')}
+                    </span>
                   </button>
                 </div>
               </div>

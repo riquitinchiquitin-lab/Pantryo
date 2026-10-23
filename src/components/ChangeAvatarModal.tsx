@@ -355,7 +355,38 @@ export const ChangeAvatarModal: React.FC<ChangeAvatarModalProps> = ({
     if (user.avatarUrl) {
       setSelectedAvatar(user.avatarUrl);
     }
+    if (!isOpen) {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+      setIsCapturingCamera(false);
+      setCameraError(null);
+    }
   }, [user.avatarUrl, isOpen]);
+
+  // Synchronize camera stream with video element whenever camera becomes active
+  useEffect(() => {
+    if (isCapturingCamera && videoRef.current && streamRef.current) {
+      if (videoRef.current.srcObject !== streamRef.current) {
+        videoRef.current.srcObject = streamRef.current;
+      }
+      videoRef.current.play().catch((err) => console.warn('Camera video play error in effect:', err));
+    }
+  }, [isCapturingCamera]);
+
+  // Cleanup stream on component unmount
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+    };
+  }, []);
 
   const filteredAvatars = useMemo(() => {
     return CARTOON_AVATARS.filter((avatar) => {
@@ -417,39 +448,76 @@ export const ChangeAvatarModal: React.FC<ChangeAvatarModalProps> = ({
     e.target.value = '';
   };
 
-  // Start live webcam capture
+  // Callback ref to immediately attach stream when video mounts in the DOM
+  const attachVideoRef = (el: HTMLVideoElement | null) => {
+    videoRef.current = el;
+    if (el && streamRef.current) {
+      if (el.srcObject !== streamRef.current) {
+        el.srcObject = streamRef.current;
+      }
+      el.play().catch((err) => console.warn('Video play error on attach:', err));
+    }
+  };
+
+  // Start live webcam capture with fallback and immediate stream attachment
   const startCamera = async () => {
     setCameraError(null);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 400 }, height: { ideal: 400 } },
-      });
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error(lang === 'FR' ? 'Caméra non supportée par ce navigateur' : 'Camera not supported by browser');
+      }
+
+      // Stop any existing stream
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 640 } },
+        });
+      } catch (err) {
+        console.warn('User camera constraints failed, attempting basic video:', err);
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      }
+
       streamRef.current = stream;
+      setIsCapturingCamera(true);
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        videoRef.current.play().catch((err) => console.warn('Video play error in startCamera:', err));
       }
-      setIsCapturingCamera(true);
     } catch (err: any) {
       console.error('Camera access error:', err);
       setCameraError(
         lang === 'FR'
-          ? 'Impossible d\'accéder à la caméra. Vérifiez les permissions de votre navigateur.'
+          ? "Impossible d'accéder à la caméra. Vérifiez les permissions de votre navigateur."
           : 'Unable to access camera. Please check browser permissions.'
       );
+      setIsCapturingCamera(false);
     }
   };
 
-  // Snap photo from webcam
+  // Snap photo from webcam with aspect ratio center crop
   const snapPhoto = () => {
     if (!videoRef.current) return;
+    const video = videoRef.current;
     const canvas = document.createElement('canvas');
-    canvas.width = 300;
-    canvas.height = 300;
+    const size = 300;
+    canvas.width = size;
+    canvas.height = size;
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      ctx.drawImage(videoRef.current, 0, 0, 300, 300);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      const vWidth = video.videoWidth || size;
+      const vHeight = video.videoHeight || size;
+      const minDim = Math.min(vWidth, vHeight);
+      const sx = (vWidth - minDim) / 2;
+      const sy = (vHeight - minDim) / 2;
+      ctx.drawImage(video, sx, sy, minDim, minDim, 0, 0, size, size);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
       setSelectedAvatar(dataUrl);
     }
     stopCamera();
@@ -459,6 +527,9 @@ export const ChangeAvatarModal: React.FC<ChangeAvatarModalProps> = ({
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
     setIsCapturingCamera(false);
   };
@@ -538,11 +609,14 @@ export const ChangeAvatarModal: React.FC<ChangeAvatarModalProps> = ({
           {isCapturingCamera ? (
             <div className="p-3 rounded-2xl bg-black text-white space-y-2.5 flex flex-col items-center">
               <video
-                ref={videoRef}
+                ref={attachVideoRef}
                 autoPlay
                 playsInline
                 muted
-                className="w-48 h-48 rounded-full object-cover border-2 border-emerald-400"
+                onLoadedMetadata={(e) => {
+                  e.currentTarget.play().catch((err) => console.warn('Video play on metadata loaded:', err));
+                }}
+                className="w-48 h-48 rounded-full object-cover border-2 border-emerald-400 bg-black"
               />
               <div className="flex items-center gap-2">
                 <button

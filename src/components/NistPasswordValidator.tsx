@@ -183,7 +183,7 @@ export const NistPasswordValidator: React.FC<NistPasswordValidatorProps> = ({
             id="btn-generate-passphrase"
             onClick={handleGeneratePassphrase}
             className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-medium hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors border border-emerald-200/60 dark:border-emerald-800/40 cursor-pointer"
-            title="Générer une phrase de passe mémorisable multi-mots (NIST SP 800-63B)"
+            title={lang === 'FR' ? 'Générer une phrase de passe mémorisable multi-mots (NIST SP 800-63B)' : 'Generate memorable multi-word passphrase (NIST SP 800-63B)'}
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>{lang === 'FR' ? 'Phrase multi-mots (16+ car)' : 'Passphrase (16+ chars)'}</span>
@@ -194,7 +194,7 @@ export const NistPasswordValidator: React.FC<NistPasswordValidatorProps> = ({
             id="btn-generate-machine-password"
             onClick={handleGenerateRandom}
             className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-medium hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors border border-blue-200/60 dark:border-blue-800/40 cursor-pointer"
-            title="Générer une chaîne aléatoire 24 caractères pour gestionnaire"
+            title={lang === 'FR' ? 'Générer une chaîne aléatoire 24 caractères pour gestionnaire' : 'Generate random 24-character string for password manager'}
           >
             <KeyRound className="w-3.5 h-3.5" />
             <span>{lang === 'FR' ? 'Aléatoire 24 car.' : 'Random 24-char'}</span>
@@ -208,7 +208,7 @@ export const NistPasswordValidator: React.FC<NistPasswordValidatorProps> = ({
               id="btn-copy-password"
               onClick={handleCopy}
               className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-200/70 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300/70 transition-colors cursor-pointer"
-              title="Copier le mot de passe"
+              title={lang === 'FR' ? 'Copier le mot de passe' : 'Copy password'}
             >
               {copied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
               <span>{copied ? (lang === 'FR' ? 'Copié !' : 'Copied!') : (lang === 'FR' ? 'Copier' : 'Copy')}</span>
@@ -220,7 +220,7 @@ export const NistPasswordValidator: React.FC<NistPasswordValidatorProps> = ({
             id="btn-paste-password"
             onClick={handlePaste}
             className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-200/70 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300/70 transition-colors cursor-pointer"
-            title="Coller depuis le gestionnaire de mots de passe (autorisé par NIST)"
+            title={lang === 'FR' ? 'Coller depuis le gestionnaire de mots de passe (autorisé par NIST)' : 'Paste from password manager (allowed by NIST)'}
           >
             <ClipboardPaste className="w-3 h-3" />
             <span>{lang === 'FR' ? 'Coller' : 'Paste'}</span>
@@ -382,7 +382,7 @@ export const NistPasswordValidator: React.FC<NistPasswordValidatorProps> = ({
                       Tier 2 : {lang === 'FR' ? 'Phrase de passe (16+ car) + 2FA' : 'Passphrase (16+ chars) + MFA'}
                     </span>
                     <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-200 text-emerald-900 dark:bg-emerald-800 dark:text-emerald-100">
-                      ÉLEVÉ
+                      {lang === 'FR' ? 'ÉLEVÉ' : 'HIGH'}
                     </span>
                   </div>
                   <p className="text-emerald-800/80 dark:text-emerald-300 text-[10px] mt-0.5">
@@ -422,7 +422,7 @@ export const NistPasswordValidator: React.FC<NistPasswordValidatorProps> = ({
                       {lang === 'FR' ? 'Pratiques obsolètes proscrites par le NIST' : 'Banned Obsolete Practices (NIST)'}
                     </span>
                     <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-200 text-rose-900 dark:bg-rose-800 dark:text-rose-100">
-                      PROSCRIT
+                      {lang === 'FR' ? 'PROSCRIT' : 'BANNED'}
                     </span>
                   </div>
                   <p className="text-rose-800/80 dark:text-rose-300 text-[10px] mt-0.5">

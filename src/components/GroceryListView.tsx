@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   ShoppingCart,
   Plus,
@@ -10,6 +10,16 @@ import {
   Sparkles,
   ArrowRight,
   RotateCcw,
+  Apple,
+  Milk,
+  Beef,
+  Wheat,
+  Package,
+  Snowflake,
+  Flame,
+  Coffee,
+  Cookie,
+  ShoppingBag,
 } from 'lucide-react';
 import { InventoryItem, SavedGroceryListItem, StorageType } from '../types';
 import { FoodVisualBadge } from './FoodVisualBadge';
@@ -117,6 +127,248 @@ function inferLocation(name: string, category?: string): StorageType {
     return 'PANTRY';
   }
   return 'FRIDGE';
+}
+
+export interface AisleCategory {
+  id: string;
+  nameEn: string;
+  nameFr: string;
+  icon: React.ComponentType<{ className?: string }>;
+  iconBg: string;
+  iconColor: string;
+  order: number;
+}
+
+export const AISLE_CATEGORIES: Record<string, AisleCategory> = {
+  produce: {
+    id: 'produce',
+    nameEn: 'Produce',
+    nameFr: 'Fruits & Légumes',
+    icon: Apple,
+    iconBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    iconColor: 'text-emerald-700',
+    order: 1,
+  },
+  dairy: {
+    id: 'dairy',
+    nameEn: 'Dairy & Eggs',
+    nameFr: 'Produits Laitiers & Œufs',
+    icon: Milk,
+    iconBg: 'bg-sky-50 text-sky-700 border-sky-200',
+    iconColor: 'text-sky-700',
+    order: 2,
+  },
+  meat: {
+    id: 'meat',
+    nameEn: 'Meat & Seafood',
+    nameFr: 'Viandes & Poissons',
+    icon: Beef,
+    iconBg: 'bg-rose-50 text-rose-700 border-rose-200',
+    iconColor: 'text-rose-700',
+    order: 3,
+  },
+  bakery: {
+    id: 'bakery',
+    nameEn: 'Bakery',
+    nameFr: 'Boulangerie',
+    icon: Wheat,
+    iconBg: 'bg-amber-50 text-amber-700 border-amber-200',
+    iconColor: 'text-amber-700',
+    order: 4,
+  },
+  pantry: {
+    id: 'pantry',
+    nameEn: 'Pantry & Dry Goods',
+    nameFr: 'Garde-Manger & Épicerie',
+    icon: Package,
+    iconBg: 'bg-purple-50 text-purple-700 border-purple-200',
+    iconColor: 'text-purple-700',
+    order: 5,
+  },
+  frozen: {
+    id: 'frozen',
+    nameEn: 'Frozen',
+    nameFr: 'Surgelés',
+    icon: Snowflake,
+    iconBg: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    iconColor: 'text-indigo-700',
+    order: 6,
+  },
+  spices: {
+    id: 'spices',
+    nameEn: 'Spices & Condiments',
+    nameFr: 'Épices & Condiments',
+    icon: Flame,
+    iconBg: 'bg-orange-50 text-orange-700 border-orange-200',
+    iconColor: 'text-orange-700',
+    order: 7,
+  },
+  beverages: {
+    id: 'beverages',
+    nameEn: 'Beverages',
+    nameFr: 'Boissons',
+    icon: Coffee,
+    iconBg: 'bg-teal-50 text-teal-700 border-teal-200',
+    iconColor: 'text-teal-700',
+    order: 8,
+  },
+  snacks: {
+    id: 'snacks',
+    nameEn: 'Snacks & Sweets',
+    nameFr: 'Collations & Douceurs',
+    icon: Cookie,
+    iconBg: 'bg-amber-50 text-amber-700 border-amber-200',
+    iconColor: 'text-amber-700',
+    order: 9,
+  },
+  other: {
+    id: 'other',
+    nameEn: 'Household & Other',
+    nameFr: 'Maison & Divers',
+    icon: ShoppingBag,
+    iconBg: 'bg-slate-50 text-slate-700 border-slate-200',
+    iconColor: 'text-slate-700',
+    order: 10,
+  },
+};
+
+export function getGroceryAisleId(item: GroceryCartItem): string {
+  const cat = (item.category || '').toLowerCase();
+  const name = (item.name || '').toLowerCase();
+  const text = `${cat} ${name}`;
+
+  // 1. Spices & Seasonings
+  if (
+    item.locationType === 'SPICE_RACK' ||
+    text.includes('spice') || text.includes('épice') || text.includes('epice') ||
+    text.includes('poivre') || text.includes('pepper') || text.includes('sel') ||
+    text.includes('salt') || text.includes('cinnamon') || text.includes('cannelle') ||
+    text.includes('paprika') || text.includes('curry') || text.includes('oregano') ||
+    text.includes('origan') || text.includes('thyme') || text.includes('thym') ||
+    text.includes('cumin') || text.includes('herbes') || text.includes('seasoning') ||
+    text.includes('assaisonnement') || text.includes('vanille') || text.includes('vanilla')
+  ) {
+    return 'spices';
+  }
+
+  // 2. Frozen
+  if (
+    item.locationType === 'FREEZER' ||
+    text.includes('frozen') || text.includes('surgel') || text.includes('glace') ||
+    text.includes('ice cream') || text.includes('congel')
+  ) {
+    return 'frozen';
+  }
+
+  // 3. Produce (Fruits, Vegetables, Fresh Herbs)
+  if (
+    cat.includes('produce') || cat.includes('legume') || cat.includes('légume') ||
+    cat.includes('fruit') || cat.includes('vegetable') || cat.includes('salad') ||
+    cat.includes('greens') || cat.includes('citrus') || cat.includes('root') ||
+    text.includes('pomme') || text.includes('apple') || text.includes('banana') ||
+    text.includes('banane') || text.includes('potato') || text.includes('pomme de terre') ||
+    text.includes('patate') || text.includes('carrot') || text.includes('carotte') ||
+    text.includes('onion') || text.includes('oignon') || text.includes('garlic') ||
+    text.includes('ail') || text.includes('tomato') || text.includes('tomate') ||
+    text.includes('avocat') || text.includes('avocado') || text.includes('lettuce') ||
+    text.includes('laitue') || text.includes('spinach') || text.includes('épinard') ||
+    text.includes('epinard') || text.includes('cucumber') || text.includes('concombre') ||
+    (text.includes('pepper') && (text.includes('bell') || text.includes('poivron'))) ||
+    text.includes('poivron') || text.includes('citron') || text.includes('lemon') ||
+    text.includes('lime') || text.includes('berry') || text.includes('baie') ||
+    text.includes('orange') || text.includes('fraise') || text.includes('strawberry') ||
+    text.includes('champignon') || text.includes('mushroom') || text.includes('zucchini') ||
+    text.includes('courgette') || text.includes('brocoli') || text.includes('broccoli')
+  ) {
+    return 'produce';
+  }
+
+  // 4. Dairy & Eggs
+  if (
+    cat.includes('dairy') || cat.includes('lait') || cat.includes('egg') ||
+    cat.includes('oeuf') || cat.includes('œuf') || cat.includes('cheese') ||
+    cat.includes('fromage') || text.includes('milk') || text.includes('lait') ||
+    text.includes('butter') || text.includes('beurre') || text.includes('yogurt') ||
+    text.includes('yaourt') || text.includes('cream') || text.includes('crème') ||
+    text.includes('creme') || text.includes('mozzarella') || text.includes('cheddar') ||
+    text.includes('parmesan') || text.includes('feta') || text.includes('brie') ||
+    text.includes('egg') || text.includes('oeuf') || text.includes('œuf')
+  ) {
+    return 'dairy';
+  }
+
+  // 5. Meat & Seafood
+  if (
+    cat.includes('meat') || cat.includes('viande') || cat.includes('seafood') ||
+    cat.includes('poisson') || cat.includes('fish') || cat.includes('poulet') ||
+    cat.includes('chicken') || cat.includes('beef') || cat.includes('boeuf') ||
+    cat.includes('bœuf') || cat.includes('pork') || cat.includes('porc') ||
+    cat.includes('salmon') || cat.includes('saumon') || cat.includes('turkey') ||
+    cat.includes('dinde') || cat.includes('tuna') || cat.includes('thon') ||
+    cat.includes('shrimp') || cat.includes('crevette') || text.includes('steak') ||
+    text.includes('bacon') || text.includes('sausage') || text.includes('saucisse') ||
+    text.includes('jambon') || text.includes('ham') || text.includes('veal') ||
+    text.includes('veau') || text.includes('lamb') || text.includes('agneau')
+  ) {
+    return 'meat';
+  }
+
+  // 6. Bakery
+  if (
+    cat.includes('bakery') || cat.includes('boulangerie') || cat.includes('pain') ||
+    cat.includes('bread') || text.includes('pain') || text.includes('bread') ||
+    text.includes('baguette') || text.includes('croissant') || text.includes('brioche') ||
+    text.includes('tortilla') || text.includes('pita') || text.includes('bagel') ||
+    text.includes('muffin') || text.includes('buns') || text.includes('toast')
+  ) {
+    return 'bakery';
+  }
+
+  // 7. Beverages
+  if (
+    cat.includes('beverage') || cat.includes('boisson') || cat.includes('drink') ||
+    text.includes('coffee') || text.includes('café') || text.includes('cafe') ||
+    text.includes('tea') || text.includes('thé') || text.includes('the') ||
+    text.includes('juice') || text.includes('jus') || text.includes('water') ||
+    text.includes('eau') || text.includes('soda') || text.includes('coke') ||
+    text.includes('beer') || text.includes('bière') || text.includes('wine') ||
+    text.includes('vin') || text.includes('sparkling') || text.includes('kombucha')
+  ) {
+    return 'beverages';
+  }
+
+  // 8. Snacks & Sweets
+  if (
+    cat.includes('snack') || cat.includes('sweet') || cat.includes('dessert') ||
+    cat.includes('collation') || text.includes('chocolate') || text.includes('chocolat') ||
+    text.includes('chips') || text.includes('cookie') || text.includes('biscuit') ||
+    text.includes('candy') || text.includes('bonbon') || text.includes('nuts') ||
+    text.includes('noix') || text.includes('popcorn') || text.includes('cracker')
+  ) {
+    return 'snacks';
+  }
+
+  // 9. Pantry & Dry Goods
+  if (
+    cat.includes('pantry') || cat.includes('garde-manger') || cat.includes('staple') ||
+    cat.includes('grocery') || cat.includes('épicerie') || item.locationType === 'PANTRY' ||
+    text.includes('pasta') || text.includes('pâte') || text.includes('pate') ||
+    text.includes('spaghetti') || text.includes('macaroni') || text.includes('rice') ||
+    text.includes('riz') || text.includes('flour') || text.includes('farine') ||
+    text.includes('sugar') || text.includes('sucre') || text.includes('oil') ||
+    text.includes('huile') || text.includes('vinegar') || text.includes('vinaigre') ||
+    text.includes('sauce') || text.includes('canned') || text.includes('conserve') ||
+    text.includes('bean') || text.includes('haricot') || text.includes('chickpea') ||
+    text.includes('pois') || text.includes('lentil') || text.includes('lentille') ||
+    text.includes('cereal') || text.includes('céréale') || text.includes('oats') ||
+    text.includes('avoine') || text.includes('syrup') || text.includes('sirop') ||
+    text.includes('honey') || text.includes('miel') || text.includes('bouillon') ||
+    text.includes('broth') || text.includes('stock')
+  ) {
+    return 'pantry';
+  }
+
+  return 'other';
 }
 
 export const GroceryListView: React.FC<GroceryListViewProps> = ({
@@ -299,6 +551,38 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
       ? Math.round((inCartItems.length / groceryItems.length) * 100)
       : 0;
 
+  // Group and sort items by supermarket aisle category, and alphabetically within each category
+  const categorizedGroceryList = useMemo(() => {
+    const groups: Record<string, { aisle: AisleCategory; items: GroceryCartItem[] }> = {};
+
+    groceryItems.forEach((item) => {
+      const aisleId = getGroceryAisleId(item);
+      if (!groups[aisleId]) {
+        groups[aisleId] = {
+          aisle: AISLE_CATEGORIES[aisleId] || AISLE_CATEGORIES.other,
+          items: [],
+        };
+      }
+      groups[aisleId].items.push(item);
+    });
+
+    // Sort items within each category alphabetically A-Z (active unchecked first, then checked)
+    Object.values(groups).forEach((group) => {
+      group.items.sort((a, b) => {
+        // Active unchecked items first
+        if (a.inCart !== b.inCart) {
+          return a.inCart ? 1 : -1;
+        }
+        const aName = getItemDisplayName(a, lang);
+        const bName = getItemDisplayName(b, lang);
+        return aName.localeCompare(bName, lang === 'FR' ? 'fr' : 'en', { sensitivity: 'base' });
+      });
+    });
+
+    // Return categories in supermarket aisle order
+    return Object.values(groups).sort((a, b) => a.aisle.order - b.aisle.order);
+  }, [groceryItems, lang]);
+
   return (
     <div className="space-y-3.5 pb-32 animate-fade-in">
       {/* Top Banner / Success Notice */}
@@ -443,10 +727,10 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
         </div>
       )}
 
-      {/* M3 Quick Add Form */}
+      {/* Quick Add Form - Perfectly aligned and responsive */}
       <form
         onSubmit={addItem}
-        className="p-2.5 sm:p-3 rounded-[20px] bg-[var(--md-sys-color-surface-container-low)] border border-[var(--md-sys-color-outline-variant)] shadow-none flex items-center gap-2"
+        className="p-2 sm:p-2.5 rounded-2xl bg-white border border-[#E5DFD0] shadow-2xs flex items-center gap-2"
       >
         <input
           type="text"
@@ -454,10 +738,10 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
           onChange={(e) => setInputName(e.target.value)}
           placeholder={
             lang === 'FR'
-              ? 'Ajouter un article à la liste (ex. Pain, Pommes, Lait)...'
-              : 'Add item to list (e.g. Sourdough, Apples, Milk)...'
+              ? 'Ajouter un article (ex. Pain, Pommes, Lait)...'
+              : 'Add item (e.g. Sourdough, Apples, Milk)...'
           }
-          className="flex-1 px-3.5 py-2 text-xs bg-[var(--md-sys-color-surface-container-lowest)] border border-[var(--md-sys-color-outline-variant)] rounded-full focus:outline-none focus:ring-2 focus:ring-[var(--md-sys-color-primary-container)] focus:border-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-surface)]"
+          className="flex-1 min-w-0 px-3 py-2 text-xs bg-[#FAF7EE]/60 border border-[#E5DFD0] rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-600/30 focus:border-teal-600 text-[#0D3B37]"
         />
         <div className="flex items-center gap-1.5 shrink-0">
           <input
@@ -474,7 +758,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                 setInputQty(Number(num.toFixed(3)));
               }
             }}
-            className="w-14 px-1 py-2 text-xs text-center font-bold bg-[var(--md-sys-color-surface-container-lowest)] border border-[var(--md-sys-color-outline-variant)] rounded-full focus:outline-none focus:ring-2 focus:ring-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-surface)]"
+            className="w-11 sm:w-13 px-1 py-2 text-xs text-center font-bold bg-[#FAF7EE]/60 border border-[#E5DFD0] rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-600/30 text-[#0D3B37]"
             title={lang === 'FR' ? 'Quantité' : 'Quantity'}
           />
           <input
@@ -482,28 +766,28 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
             value={inputUnit}
             onChange={(e) => setInputUnit(e.target.value)}
             placeholder={lang === 'FR' ? 'unités' : 'unit'}
-            className="w-16 px-1.5 py-2 text-xs bg-[var(--md-sys-color-surface-container-lowest)] border border-[var(--md-sys-color-outline-variant)] rounded-full focus:outline-none focus:ring-2 focus:ring-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-surface)] text-center"
+            className="w-12 sm:w-14 px-1 py-2 text-xs text-center bg-[#FAF7EE]/60 border border-[#E5DFD0] rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-600/30 text-[#0D3B37]"
             title={lang === 'FR' ? 'Unité (ex. pack, kg, oz)' : 'Unit (e.g. pack, lbs, oz)'}
           />
           <button
             type="submit"
-            className="m3-btn-filled px-3.5 py-2 rounded-full font-medium text-xs flex items-center gap-1 cursor-pointer"
+            className="h-8.5 px-3 sm:px-3.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs flex items-center justify-center gap-1 shrink-0 transition-all active:scale-95 cursor-pointer shadow-2xs"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-4 h-4 stroke-[2.5]" />
             <span className="hidden sm:inline">{lang === 'FR' ? 'Ajouter' : 'Add'}</span>
           </button>
         </div>
       </form>
 
-      {/* Checklist of Items - M3 Surface Containers */}
-      <div className="space-y-2">
+      {/* Categorized Grocery List */}
+      <div className="space-y-4">
         {groceryItems.length === 0 ? (
-          <div className="p-8 rounded-[20px] bg-[var(--md-sys-color-surface-container-low)] border border-[var(--md-sys-color-outline-variant)] text-center text-[var(--md-sys-color-on-surface-variant)] space-y-1.5 shadow-none">
-            <ShoppingCart className="w-8 h-8 mx-auto text-[var(--md-sys-color-outline)] opacity-60 mb-1" />
-            <p className="text-xs font-bold text-[var(--md-sys-color-on-surface)]">
+          <div className="p-8 rounded-2xl bg-white border border-[#E5DFD0] text-center text-[#527470] space-y-2 shadow-2xs">
+            <ShoppingCart className="w-8 h-8 mx-auto text-slate-300 mb-1" />
+            <p className="text-xs font-bold text-[#0D3B37]">
               {lang === 'FR' ? 'Votre liste de courses est vide' : 'Your shopping list is empty'}
             </p>
-            <p className="text-[11px]">
+            <p className="text-[11px] text-[#527470]">
               {lang === 'FR'
                 ? 'Ajoutez des articles ci-dessus ou chargez une de vos listes sauvegardées.'
                 : 'Add groceries above or pick one of your saved shopping lists.'}
@@ -514,96 +798,132 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                 setSavedListsInitialTab('saved');
                 setIsSavedListsOpen(true);
               }}
-              className="mt-2 m3-btn-filled text-xs py-2 px-4 rounded-full font-medium inline-flex items-center gap-1.5 cursor-pointer"
+              className="mt-2 text-xs py-2 px-4 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold inline-flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all active:scale-95"
             >
               <BookmarkCheck className="w-3.5 h-3.5" />
               <span>{lang === 'FR' ? 'Charger une Liste de Courses' : 'Load a Shopping List'}</span>
             </button>
           </div>
         ) : (
-          groceryItems.map((item) => {
-            const visual = getFoodVisual(item.name);
+          categorizedGroceryList.map(({ aisle, items }) => {
+            const AisleIcon = aisle.icon;
+            const aisleName = lang === 'FR' ? aisle.nameFr : aisle.nameEn;
+            const aisleCheckedCount = items.filter((i) => i.inCart).length;
+            const isAisleComplete = items.length > 0 && aisleCheckedCount === items.length;
 
             return (
-              <div
-                key={item.id}
-                onClick={() => toggleCart(item.id)}
-                className={`p-3 rounded-[16px] border transition-all flex items-center justify-between gap-2.5 cursor-pointer select-none group ${
-                  item.inCart
-                    ? 'bg-[var(--md-sys-color-surface-container)] border-[var(--md-sys-color-outline-variant)] opacity-75'
-                    : 'bg-[var(--md-sys-color-surface-container-low)] border-[var(--md-sys-color-outline-variant)] hover:bg-[var(--md-sys-color-surface-container)] hover:border-[var(--md-sys-color-outline)]'
-                }`}
-              >
-                {/* Left: Tactile M3 Checkbox & Info */}
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  {/* M3 Checkbox */}
-                  <div
-                    title={
-                      item.inCart
-                        ? (lang === 'FR' ? 'Décocher' : 'Uncheck')
-                        : (lang === 'FR' ? 'Cocher (barrer)' : 'Check off (cross out)')
-                    }
-                    className={`w-6 h-6 rounded-[4px] flex items-center justify-center transition-all shrink-0 active:scale-90 ${
-                      item.inCart
-                        ? 'bg-[var(--md-sys-color-primary)] text-white shadow-xs'
-                        : 'border-2 border-[var(--md-sys-color-outline)] group-hover:border-[var(--md-sys-color-primary)] bg-[var(--md-sys-color-surface-container-lowest)]'
-                    }`}
-                  >
-                    {item.inCart && <Check className="w-4 h-4 stroke-[3]" />}
-                  </div>
-
-                  <div className={item.inCart ? 'opacity-60 grayscale-[30%]' : ''}>
-                    <FoodVisualBadge
-                      itemName={getItemDisplayName(item, lang)}
-                      categoryName={item.category || visual.badgeLabel}
-                      size="sm"
-                    />
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span
-                        className={`text-xs font-bold truncate transition-all ${
-                          item.inCart
-                            ? 'line-through text-slate-400 decoration-slate-400 decoration-2'
-                            : 'text-[#233527]'
-                        }`}
-                      >
-                        {getItemDisplayName(item, lang)}
-                      </span>
+              <div key={aisle.id} className="space-y-1.5">
+                {/* Category Aisle Header */}
+                <div className="flex items-center justify-between px-1 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-5 h-5 rounded-md flex items-center justify-center border text-xs shrink-0 ${aisle.iconBg}`}>
+                      <AisleIcon className="w-3 h-3" />
                     </div>
-
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span
-                        className={`text-[10px] font-bold px-1.5 py-0.2 rounded transition-all ${
-                          item.inCart
-                            ? 'bg-[#E3EDE1] text-slate-400 line-through'
-                            : 'bg-[#EDF3EC] text-[#39503D]'
-                        }`}
-                      >
-                        {formatLocalizedQuantityUnit(item.quantity, item.unit, lang)}
-                      </span>
-                      {item.autoSuggested && (
-                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 font-semibold">
-                          {lang === 'FR' ? 'Réassort' : 'Restock'}
-                        </span>
-                      )}
-                    </div>
+                    <span className="font-extrabold text-[#0D3B37] text-xs">
+                      {aisleName}
+                    </span>
+                    <span className="text-[11px] font-semibold text-[#527470]">
+                      ({items.length})
+                    </span>
                   </div>
+
+                  {isAisleComplete && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      <Check className="w-2.5 h-2.5 stroke-[3]" />
+                      <span>{lang === 'FR' ? 'Rayon terminé' : 'Aisle complete'}</span>
+                    </span>
+                  )}
                 </div>
 
-                {/* Right: Remove Button */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeItem(item.id);
-                  }}
-                  className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors shrink-0 cursor-pointer"
-                  title={lang === 'FR' ? 'Supprimer de la liste' : 'Remove from list'}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                {/* Items in Category (Alphabetical, Checked crossed out) */}
+                <div className="rounded-2xl bg-white border border-[#E5DFD0] overflow-hidden divide-y divide-[#E5DFD0]/60 shadow-2xs">
+                  {items.map((item) => {
+                    const visual = getFoodVisual(item.name);
+
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => toggleCart(item.id)}
+                        className={`p-3 transition-colors flex items-center justify-between gap-2.5 cursor-pointer select-none group ${
+                          item.inCart
+                            ? 'bg-slate-50/70 hover:bg-slate-100/70 opacity-70'
+                            : 'bg-white hover:bg-[#F9FAF8]'
+                        }`}
+                      >
+                        {/* Left: Tactile Checkbox & Visual & Name */}
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          {/* Checkbox */}
+                          <div
+                            title={
+                              item.inCart
+                                ? (lang === 'FR' ? 'Décocher' : 'Uncheck')
+                                : (lang === 'FR' ? 'Cocher (barrer)' : 'Check off (cross out)')
+                            }
+                            className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all shrink-0 active:scale-90 ${
+                              item.inCart
+                                ? 'bg-teal-700 text-white shadow-2xs'
+                                : 'border-2 border-slate-300 group-hover:border-teal-600 bg-white'
+                            }`}
+                          >
+                            {item.inCart && <Check className="w-4 h-4 stroke-[3]" />}
+                          </div>
+
+                          <div className={item.inCart ? 'opacity-50 grayscale-[40%]' : ''}>
+                            <FoodVisualBadge
+                              itemName={getItemDisplayName(item, lang)}
+                              categoryName={item.category || visual.badgeLabel}
+                              size="sm"
+                            />
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span
+                                className={`text-xs font-bold truncate transition-all ${
+                                  item.inCart
+                                    ? 'line-through text-slate-400 decoration-slate-400 decoration-2'
+                                    : 'text-[#0D3B37]'
+                                }`}
+                              >
+                                {getItemDisplayName(item, lang)}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span
+                                className={`text-[10px] font-bold px-1.5 py-0.2 rounded transition-all ${
+                                  item.inCart
+                                    ? 'bg-slate-100 text-slate-400 line-through'
+                                    : 'bg-[#EDF3EC] text-[#2C4A33]'
+                                }`}
+                              >
+                                {formatLocalizedQuantityUnit(item.quantity, item.unit, lang)}
+                              </span>
+                              {item.autoSuggested && (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 font-semibold">
+                                  {lang === 'FR' ? 'Réassort' : 'Restock'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Right: Remove Button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeItem(item.id);
+                          }}
+                          className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors shrink-0 cursor-pointer"
+                          title={lang === 'FR' ? 'Supprimer de la liste' : 'Remove from list'}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             );
           })
@@ -611,18 +931,23 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
 
         {groceryItems.length > 0 && (
           <div className="pt-2 px-1 flex items-center justify-between text-[11px] text-[#556D58]">
-            <span>
+            <span className="font-semibold">
               {groceryItems.length}{' '}
               {lang === 'FR'
                 ? (groceryItems.length === 1 ? 'article au total' : 'articles au total')
                 : (groceryItems.length === 1 ? 'total item' : 'total items')}
+              {' · '}
+              {categorizedGroceryList.length}{' '}
+              {lang === 'FR'
+                ? (categorizedGroceryList.length === 1 ? 'rayon' : 'rayons')
+                : (categorizedGroceryList.length === 1 ? 'category' : 'categories')}
             </span>
 
             {inCartItems.length > 0 && (
               <button
                 type="button"
                 onClick={handleUncheckAll}
-                className="text-[#69826D] hover:text-[#233527] font-semibold flex items-center gap-1 hover:underline cursor-pointer"
+                className="text-[#527470] hover:text-[#0D3B37] font-bold flex items-center gap-1 hover:underline cursor-pointer"
               >
                 <RotateCcw className="w-3 h-3" />
                 <span>{lang === 'FR' ? 'Tout décocher' : 'Uncheck all'}</span>

@@ -53,7 +53,7 @@ import {
   BookOpen,
 } from 'lucide-react';
 import { User, DatabaseStats, DatabaseBackupPackage } from '../types';
-import { useLanguage } from '../utils/i18n';
+import { useLanguage, LanguageSwitcher } from '../utils/i18n';
 import { Fido2SecurityPanel } from './Fido2SecurityPanel';
 import { NistPasswordValidator } from './NistPasswordValidator';
 import { generatePassphrase } from '../utils/nistPassword';
@@ -514,7 +514,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
         } catch (err: any) {
           setModelUploadMessage({
             type: 'error',
-            message: err.message || 'Erreur réseau',
+            message: err.message || (lang === 'FR' ? 'Erreur réseau' : 'Network error'),
           });
         } finally {
           setIsUploadingModel(false);
@@ -531,7 +531,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     } catch (err: any) {
       setModelUploadMessage({
         type: 'error',
-        message: err.message || 'Erreur',
+        message: err.message || (lang === 'FR' ? 'Erreur' : 'Error'),
       });
       setIsUploadingModel(false);
     }
@@ -1167,14 +1167,17 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
             </h2>
           </div>
 
-          <button
-            onClick={onClose}
-            className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 border border-slate-200 cursor-pointer"
-            title={lang === 'FR' ? 'Fermer' : 'Close'}
-          >
-            <X className="w-4 h-4" />
-            <span>{lang === 'FR' ? 'Fermer' : 'Close'}</span>
-          </button>
+          <div className="flex items-center gap-2.5">
+            <LanguageSwitcher />
+            <button
+              onClick={onClose}
+              className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 border border-slate-200 cursor-pointer"
+              title={lang === 'FR' ? 'Fermer' : 'Close'}
+            >
+              <X className="w-4 h-4" />
+              <span>{lang === 'FR' ? 'Fermer' : 'Close'}</span>
+            </button>
+          </div>
         </div>
 
         {/* Global Toast / Feedback */}
@@ -1548,7 +1551,9 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                           <div className="flex items-center justify-between font-bold text-[#0D3B37]">
                             <span>{lang === 'FR' ? 'Fichier analysé :' : 'Analyzed package:'}</span>
                             <span className="text-teal-700">
-                              {restorePackage.metadata?.isEncrypted ? 'Chiffré AES-256-GCM' : 'Archive Détectée'}
+                              {restorePackage.metadata?.isEncrypted
+                                ? (lang === 'FR' ? 'Chiffré AES-256-GCM' : 'AES-256-GCM Encrypted')
+                                : (lang === 'FR' ? 'Archive Détectée' : 'Archive Detected')}
                             </span>
                           </div>
                           <p className="text-[11px] text-[#527470]">
@@ -1842,7 +1847,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                               {u.fido2Enabled ? (
                                 <span
                                   className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300"
-                                  title="Protégé par clé FIDO2"
+                                  title={lang === 'FR' ? 'Protégé par clé FIDO2' : 'Protected by FIDO2 key'}
                                 >
                                   <ShieldCheck className="w-2.5 h-2.5 text-emerald-700" />
                                   <span>{lang === 'FR' ? 'FIDO2 Conforme' : 'FIDO2 Compliant'}</span>
@@ -1850,7 +1855,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                               ) : (
                                 <span
                                   className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300"
-                                  title="Enrôlement FIDO2 requis"
+                                  title={lang === 'FR' ? 'Enrôlement FIDO2 requis' : 'FIDO2 enrollment required'}
                                 >
                                   <AlertTriangle className="w-2.5 h-2.5 text-amber-700" />
                                   <span>{lang === 'FR' ? 'Clé Requise' : 'Key Required'}</span>
@@ -2488,20 +2493,44 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-[10px]">
                     <div className="p-2 rounded-lg bg-purple-900/60 border border-purple-500/40">
-                      <span className="font-bold text-purple-300 block mb-0.5">Tier 1 : Passkeys / FIDO2</span>
-                      <p className="text-purple-200/80">Inviolable au phishing, biométrie & matériel sécurisé.</p>
+                      <span className="font-bold text-purple-300 block mb-0.5">
+                        {lang === 'FR' ? 'Tier 1 : Passkeys / FIDO2' : 'Tier 1: Passkeys / FIDO2'}
+                      </span>
+                      <p className="text-purple-200/80">
+                        {lang === 'FR'
+                          ? 'Inviolable au phishing, biométrie & matériel sécurisé.'
+                          : 'Phishing-resistant, hardware & biometric security.'}
+                      </p>
                     </div>
                     <div className="p-2 rounded-lg bg-emerald-900/60 border border-emerald-500/40">
-                      <span className="font-bold text-emerald-300 block mb-0.5">Tier 2 : Phrase 16+ car + 2FA</span>
-                      <p className="text-emerald-200/80">Haute entropie de dictionnaire (Diceware) mémorisable.</p>
+                      <span className="font-bold text-emerald-300 block mb-0.5">
+                        {lang === 'FR' ? 'Tier 2 : Phrase 16+ car + 2FA' : 'Tier 2: 16+ Char Passphrase + 2FA'}
+                      </span>
+                      <p className="text-emerald-200/80">
+                        {lang === 'FR'
+                          ? 'Haute entropie de dictionnaire (Diceware) mémorisable.'
+                          : 'High dictionary entropy (Diceware) memorizable passphrase.'}
+                      </p>
                     </div>
                     <div className="p-2 rounded-lg bg-blue-900/60 border border-blue-500/40">
-                      <span className="font-bold text-blue-300 block mb-0.5">Tier 3 : Gestionnaire 24 car.</span>
-                      <p className="text-blue-200/80">Chaînes aléatoires générées par Bitwarden / 1Password.</p>
+                      <span className="font-bold text-blue-300 block mb-0.5">
+                        {lang === 'FR' ? 'Tier 3 : Gestionnaire 24 car.' : 'Tier 3: 24+ Char Password Manager'}
+                      </span>
+                      <p className="text-blue-200/80">
+                        {lang === 'FR'
+                          ? 'Chaînes aléatoires générées par Bitwarden / 1Password.'
+                          : 'Random strings generated by Bitwarden / 1Password.'}
+                      </p>
                     </div>
                     <div className="p-2 rounded-lg bg-rose-900/60 border border-rose-500/40">
-                      <span className="font-bold text-rose-300 block mb-0.5">Banni : Mots de passe courts</span>
-                      <p className="text-rose-200/80">Règles symboles (P@ssword1!) et resets 90 jours proscrits.</p>
+                      <span className="font-bold text-rose-300 block mb-0.5">
+                        {lang === 'FR' ? 'Banni : Mots de passe courts' : 'Banned: Short Passwords'}
+                      </span>
+                      <p className="text-rose-200/80">
+                        {lang === 'FR'
+                          ? 'Règles symboles (P@ssword1!) et resets 90 jours proscrits.'
+                          : 'Forced symbol rules (P@ssword1!) & 90-day resets proscribed.'}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -2937,7 +2966,11 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                       }`}
                     >
                       <Sparkles className="w-3.5 h-3.5" />
-                      <span>{settings.hasGeminiKey ? 'Gemini IA OK' : 'Gemini Non Défini'}</span>
+                      <span>
+                        {settings.hasGeminiKey
+                          ? (lang === 'FR' ? 'Gemini IA OK' : 'Gemini AI Ready')
+                          : (lang === 'FR' ? 'Gemini Non Défini' : 'Gemini Not Configured')}
+                      </span>
                     </div>
                     <div
                       className={`px-2.5 py-1 rounded-lg border flex items-center gap-1.5 font-medium ${
@@ -3315,13 +3348,13 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                               )}
                               {domainTestResult.isCloudflare && (
                                 <span className="px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-800 text-[10px] font-bold">
-                                  Cloudflare Ray Validé
+                                  {lang === 'FR' ? 'Cloudflare Ray Validé' : 'Cloudflare Ray Verified'}
                                 </span>
                               )}
                             </div>
                             {domainTestResult.resolvedIp && (
                               <div className="text-[10px] text-[#527470] font-mono">
-                                IP Résolue : {domainTestResult.resolvedIp}
+                                {lang === 'FR' ? 'IP Résolue :' : 'Resolved IP:'} {domainTestResult.resolvedIp}
                               </div>
                             )}
                           </div>
@@ -3489,7 +3522,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                             </div>
                             {domainTestResult.resolvedIp && (
                               <div className="text-[10px] text-emerald-800 font-mono">
-                                IP Résolue : {domainTestResult.resolvedIp}
+                                {lang === 'FR' ? 'IP Résolue :' : 'Resolved IP:'} {domainTestResult.resolvedIp}
                               </div>
                             )}
                           </div>
@@ -3712,7 +3745,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                           type={showGeminiKey ? 'text' : 'password'}
                           value={settings.geminiApiKey}
                           onChange={(e) => setSettings({ ...settings, geminiApiKey: e.target.value })}
-                          placeholder={settings.isGoogleManagedKey ? 'Gérée par l’environnement Google (vide = auto)' : 'AIzaSy...'}
+                          placeholder={settings.isGoogleManagedKey ? (lang === 'FR' ? 'Gérée par l’environnement Google (vide = auto)' : 'Managed by Google environment (blank = auto)') : 'AIzaSy...'}
                           className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-[#D5CEBD] bg-[#FAF7EE] focus:bg-white focus:outline-teal-800 text-xs font-mono text-[#0D3B37]"
                         />
                         <button
@@ -3847,7 +3880,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                             type={showDbSettingsKey ? 'text' : 'password'}
                             value={settings.dbEncryptionKey}
                             onChange={(e) => setSettings({ ...settings, dbEncryptionKey: e.target.value })}
-                            placeholder="Clé hexadécimale de 64 caractères..."
+                            placeholder={lang === 'FR' ? 'Clé hexadécimale de 64 caractères...' : '64-character hexadecimal key...'}
                             className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-[#D5CEBD] bg-[#FAF7EE] focus:bg-white focus:outline-teal-800 text-xs font-mono text-[#0D3B37]"
                           />
                           <button
@@ -3916,7 +3949,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                         {lang === 'FR' ? 'Fichiers Associés :' : 'Associated Artifacts:'}
                       </span>
                       <span className="font-mono text-[10px] text-slate-600">
-                        classes_399.txt • classes_metadata.json (399 entrées bilingues)
+                        classes_399.txt • classes_metadata.json ({lang === 'FR' ? '399 entrées bilingues' : '399 bilingual entries'})
                       </span>
                     </div>
                   </div>
