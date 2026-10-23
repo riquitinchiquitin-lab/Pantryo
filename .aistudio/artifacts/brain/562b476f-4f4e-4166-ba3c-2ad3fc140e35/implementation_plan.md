@@ -1,87 +1,49 @@
-# Categorized & Alphabetical Grocery List with Responsive Add Bar
+# Debian 12 Deployment & Security Strategy for Pantryo
 
-Organize the grocery shopping list into supermarket aisle categories with items sorted alphabetically, and fix the layout and alignment of the Quick Add form so the Add button and quantity inputs fit within mobile card boundaries.
+Confirming Debian 12 (Bookworm) as the recommended host distribution for Pantryo, maintaining current production systemd and Proxmox LXC scripts, and integrating an OS Architecture & Security Comparison into the Admin Center.
 
 ## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> The following user preferences were confirmed during clarification:
-> - **Category Ordering**: Supermarket aisle progression (Produce, Dairy & Eggs, Meat & Seafood, Bakery, Pantry & Dry Goods, Frozen, Spices & Seasonings, Beverages, Snacks & Sweets, Household & Other).
-> - **Checked Items Display**: Kept within their respective category section with strikethrough styling.
+> The following user preference was confirmed during clarification:
+> - **Deployment Path**: **Stay on Debian 12 and keep current systemd scripts**.
 
-- **Confirmed Decision 1**: Group grocery items under clean category section headers (featuring domain icons and item count badges) rather than a flat unstructured list.
-- **Confirmed Decision 2**: Sort items alphabetically ($A \to Z$) within each category using case-insensitive locale comparison (`localeCompare`), prioritizing active unchecked items first followed by completed items.
-- **Confirmed Decision 3**: Fix the Add form row clipping by applying `min-w-0` to the item name input, optimizing quantity/unit widths, and ensuring the `+` button aligns with container padding.
-
----
-
-## 1. Overview & Core Concept
-
-- **What It Does**: Transforms the grocery shopping list into an aisle-organized shopping companion. Items automatically group into recognizable grocery store aisles (such as Produce, Dairy, Meat, Bakery, and Pantry) and sort alphabetically.
-- **Target Audience / Persona**: Household shoppers using mobile devices in physical grocery stores who need to navigate aisles efficiently without backtracking or searching through a mixed list.
-- **Key Value**: Streamlines physical shopping trips by mirroring store aisle flow, ensures easy item scanning via alphabetical order, and fixes mobile input overflow.
+- **Technical Verdict 1: Can Pantryo run on Arch Linux?**
+  Yes. Pantryo is a standard Node.js (v20/v22 LTS) + SQLite/SQLCipher + systemd application. It runs smoothly on Arch Linux with `pacman -S nodejs npm sqlcipher`.
+- **Technical Verdict 2: Debian 12 vs. Arch Linux vs. Debian 13 (Trixie)**
+  - **Debian 12 Bookworm (Recommended)**: Rock-solid stability, 5-year LTS cycle, AppArmor enabled by default, automated security patches via `unattended-upgrades`, and zero breaking system updates for a 24/7 home server.
+  - **Arch Linux**: Bleeding-edge rolling release (`pacman -Syu`). Excellent for desktop enthusiasts, but introduces unexpected kernel, glibc, and Node native module (better-sqlite3) rebuild breakages on headless servers. Mandatory manual hardening (no default MAC/AppArmor enforcement).
+  - **Debian 13 "Trixie"**: Currently the *testing* release. Debian's security team does not provide immediate security updates or guaranteed security SLAs for the testing suite until it is frozen and formally released as stable (expected mid-2025). Do not use Debian 13 for production data yet.
+- **Technical Verdict 3: Is Arch Linux secure enough?**
+  Arch Linux is inherently as secure as the administrator configures it, but out-of-the-box it does not enforce Mandatory Access Control (AppArmor/SELinux), lacks automated security backports, and exposes bleeding-edge upstream software before community vetting. Debian 12 provides a hardened, battle-tested baseline with CIS benchmark compliance built into Pantryo's audit suite.
 
 ---
 
-## 2. User Experience & Visual Design
+## 1. Plan Overview
 
-### Categorized Section Layout
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  [ Add item to list...     ] [ 1 ] [ pcs ] [ + ]            │  <-- Perfectly aligned within card
-└─────────────────────────────────────────────────────────────┘
-
-  🥕 PRODUCE (2)
-┌─────────────────────────────────────────────────────────────┐
-│  [ ]  🍎  Apples                  3 pcs                [🗑️] │
-│  [ ]  🥔  Potatoes                1 unit               [🗑️] │
-└─────────────────────────────────────────────────────────────┘
-
-  🥛 DAIRY & EGGS (1)
-┌─────────────────────────────────────────────────────────────┐
-│  [✓]  🧀  Cheddar Cheese          200 g                [🗑️] │
-└─────────────────────────────────────────────────────────────┘
-```
-
-- **Category Header**:
-  - Clean unboxed header with category icon, title in localized language (EN / FR), and count badge (e.g. `Produce · 2 items`).
-  - Progress indicator per category if all items in that aisle are checked.
-- **Item Ordering**:
-  - Sorted alphabetically ($A \to Z$) by displayed name in current active language.
-  - Active items appear first, followed by checked items with muted strikethrough styling.
-- **Quick Add Bar Fix**:
-  - Enclosed in `rounded-2xl bg-white border border-[#E5DFD0] p-2 sm:p-2.5 shadow-2xs`.
-  - Item name input: `flex-1 min-w-0` with `text-xs rounded-xl`.
-  - Quantity input: `w-12 text-center text-xs font-bold`.
-  - Unit input: `w-13 text-center text-xs`.
-  - Add button: `h-9 w-9 sm:w-auto sm:px-3.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white flex items-center justify-center shrink-0 shadow-2xs`.
-  - All elements remain within container boundaries on screens from 340px to 1440px.
+1. **Retain & Consolidate Debian 12 Systemd Scripts**:
+   - Keep the hardened Debian 12 / Ubuntu systemd unit, automatic startup, sandboxing (`ProtectSystem=strict`, `PrivateTmp=true`, `ProtectHome=true`), and `unattended-upgrades` cron.
+2. **Add In-App OS Guidance & Rationale**:
+   - Enhance the **Host & Server Deployment** section in `AdminManagementModal.tsx` and `DocumentationModal.tsx` with a dedicated **"Debian 12 vs Arch Linux vs Debian 13"** advisory card in both English and French.
+   - Clearly explain why Debian 12 Bookworm is the gold standard for Pantryo (AppArmor, 5-year LTS, unattended CVE patches, zero rolling downtime), while clarifying how Arch Linux or Docker can be used if ever desired.
+3. **CIS Debian 12 Security Audit Compliance**:
+   - Verify that all CIS Debian 12 benchmarks (`SEC-01` to `SEC-07`) in the Admin Center correctly validate file permissions (600 for `.env`, 700 for data directories) and systemd sandboxing.
 
 ---
 
-## 3. Key Product Decisions & Trade-Offs
+## 2. Proposed UI Enhancements
 
-- **Decision 1: Category Aisle Progression vs. Flat Alphabetical**
-  - *Chosen Approach*: Supermarket aisle order (Produce $\to$ Dairy $\to$ Meat $\to$ Bakery $\to$ Pantry $\to$ Frozen $\to$ Spices $\to$ Beverages $\to$ Snacks $\to$ Other), with alphabetical sorting inside each aisle.
-  - *Why*: Directly aligns with user choice and mirrors real-world shopping psychology so users don't jump back and forth across physical store aisles.
-- **Decision 2: Checked Items Placement**
-  - *Chosen Approach*: Kept within category group with subtle opacity and line-through.
-  - *Why*: Allows the shopper to see at a glance what they have completed in that specific aisle before walking to the next.
+In `src/components/AdminManagementModal.tsx` (Deployment / Host tab) and `src/components/DocumentationModal.tsx`:
+- Add a visual distro badge component:
+  - 🟢 **Debian 12 (Bookworm LTS)**: *Recommended Production Standard* (AppArmor, LTS stability, automatic security patches).
+  - 🟡 **Arch Linux**: *Compatible but Not Recommended for 24/7 Headless* (Rolling updates risk native module breakages, manual security required).
+  - 🔴 **Debian 13 (Trixie Testing)**: *Not Recommended for Production* (Testing branch lacks formal Debian Security Team SLAs until release).
+- Provide a quick toggle/view for the user to see the exact security comparison table directly in the Admin Center.
 
 ---
 
-## 4. Technical Implementation & Verification Plan
+## 3. Verification Plan
 
-### Technical Strategy
-- In `src/components/GroceryListView.tsx`:
-  - Build helper `categorizeGroceryItem(item: GroceryCartItem): CategoryId` using `item.category`, `item.name`, and `ALL_FOOD_CATEGORIES`.
-  - Group and sort items using `useMemo` for 60fps responsiveness.
-  - Render categorized accordion/sections with smooth item transitions.
-  - Refactor the Add Form JSX so `flex-1 min-w-0` and proportional widths prevent horizontal overflow.
-- Internationalization: Support English (`EN`) and French (`FR`) category names and item counts.
-
-### Verification Steps
-1. Run `compile_applet` to verify Vite bundle builds cleanly.
-2. Run `lint_applet` (`tsc --noEmit`) to verify strict type correctness.
-3. Test with single items, multiple categorized items, and narrow 360px viewport to confirm alignment.
+1. Verify that `AdminManagementModal.tsx` and `DocumentationModal.tsx` compile cleanly without TypeScript or React errors.
+2. Confirm the language toggle (`FR` / `EN`) seamlessly renders the new OS comparison text.
+3. Run `lint_applet` and `compile_applet` to ensure pristine production build.
