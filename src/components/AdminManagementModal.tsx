@@ -156,6 +156,9 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     port: number;
     dbEncryptionKey: string;
     nodeEnv: string;
+    aiVisionProvider?: 'gemini' | 'local_gemma';
+    localVisionUrl?: string;
+    localVisionModel?: string;
     updatedAt?: string | null;
   }>({
     kitchenName: 'Your Kitchen',
@@ -172,6 +175,9 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     port: 3000,
     dbEncryptionKey: '',
     nodeEnv: 'production',
+    aiVisionProvider: 'gemini',
+    localVisionUrl: '',
+    localVisionModel: 'paligemma',
   });
   const [selectedHostingMode, setSelectedHostingMode] = useState<'cloudflare' | 'tailscale' | 'custom_domain' | 'local_lan'>('cloudflare');
   const [selectedReverseProxy, setSelectedReverseProxy] = useState<'tailscale' | 'caddy' | 'nginx' | 'npm' | 'traefik' | 'dns'>('tailscale');
@@ -193,6 +199,8 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
   const [showDbSettingsKey, setShowDbSettingsKey] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [isTestingGemini, setIsTestingGemini] = useState(false);
+  const [isTestingGemma, setIsTestingGemma] = useState(false);
+  const [gemmaTestResult, setGemmaTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [geminiTestResult, setGeminiTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [settingsStatus, setSettingsStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -731,6 +739,42 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
       });
     } finally {
       setIsTestingGemini(false);
+    }
+  };
+
+  const handleTestLocalGemma = async () => {
+    setIsTestingGemma(true);
+    setGemmaTestResult(null);
+    try {
+      const res = await fetch('/api/v1/admin/test-gemma', {
+        method: 'POST',
+        headers: await getAdminHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          localVisionUrl: settings.localVisionUrl || 'http://localhost:11434',
+          localVisionModel: settings.localVisionModel || 'paligemma',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Connection failed');
+      }
+      setGemmaTestResult({
+        success: true,
+        message:
+          data.message ||
+          (lang === 'FR'
+            ? 'Connexion au serveur Open-Source Gemma réussie !'
+            : 'Successfully connected to Local Open-Source Gemma server!'),
+      });
+    } catch (err: any) {
+      setGemmaTestResult({
+        success: false,
+        message:
+          err.message ||
+          (lang === 'FR' ? 'Impossible de joindre le serveur local Gemma.' : 'Could not reach local Gemma server.'),
+      });
+    } finally {
+      setIsTestingGemma(false);
     }
   };
 
@@ -3794,6 +3838,133 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                         ? 'Alimente la reconnaissance de reçus (OCR), le scan photo du garde-manger et les suggestions culinaires intelligentes.'
                         : 'Powers grocery receipt OCR, camera pantry scanning, and smart chef meal suggestions.'}
                     </p>
+
+                    {/* Token Economics & Scanning Quota Transparency Card */}
+                    <div className="p-3.5 rounded-xl bg-[#FAF7EE] border border-[#E0D9C8] space-y-2 mt-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs text-[#0D3B37] flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                          <span>
+                            {lang === 'FR' ? 'Consommation de Tokens & Quotas de Scan' : 'Token Economics & Scanning Quotas'}
+                          </span>
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-wider">
+                          {lang === 'FR' ? '1 500 Scans / Jour Gratuits' : '1,500 Free Scans / Day'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
+                        <div className="p-2 rounded-lg bg-white border border-[#E0D9C8]">
+                          <span className="text-[#527470] block text-[9px] uppercase font-bold tracking-wider">
+                            {lang === 'FR' ? 'Tokens par photo' : 'Tokens per photo'}
+                          </span>
+                          <span className="font-extrabold text-[#0D3B37] text-xs">~1 500 tokens</span>
+                          <span className="text-[9px] text-[#527470] block">
+                            {lang === 'FR' ? '~258 img + ~600 sortie JSON' : '~258 img + ~600 output'}
+                          </span>
+                        </div>
+                        <div className="p-2 rounded-lg bg-white border border-[#E0D9C8]">
+                          <span className="text-[#527470] block text-[9px] uppercase font-bold tracking-wider">
+                            {lang === 'FR' ? 'Quota gratuit' : 'Free tier quota'}
+                          </span>
+                          <span className="font-extrabold text-emerald-700 text-xs">1 500 / jour</span>
+                          <span className="text-[9px] text-[#527470] block">
+                            {lang === 'FR' ? '~45 000 recettes / mois' : '~45,000 recipes / month'}
+                          </span>
+                        </div>
+                        <div className="p-2 rounded-lg bg-white border border-[#E0D9C8]">
+                          <span className="text-[#527470] block text-[9px] uppercase font-bold tracking-wider">
+                            {lang === 'FR' ? 'Coût en mode payant' : 'Cost if paid tier'}
+                          </span>
+                          <span className="font-extrabold text-[#0D3B37] text-xs">~0,0003 $ / scan</span>
+                          <span className="text-[9px] text-[#527470] block">
+                            {lang === 'FR' ? '$1.00 = ~3 000 recettes' : '$1.00 = ~3,000 recipes'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Open-Source Local Gemma / PaliGemma Configuration */}
+                    <div className="p-3.5 rounded-xl bg-white border border-[#D5E1D2] space-y-3 mt-3 shadow-2xs">
+                      <div className="flex items-center justify-between">
+                        <label className="font-bold text-[#0D3B37] text-xs flex items-center gap-1.5">
+                          <span className="text-sm">🛡️</span>
+                          <span>
+                            {lang === 'FR' ? 'Moteur Open-Source Local (Gemma / PaliGemma)' : 'Local Open-Source Engine (Gemma / PaliGemma)'}
+                          </span>
+                        </label>
+                        <span className="text-[10px] text-teal-800 bg-teal-50 px-2 py-0.5 rounded-full font-bold border border-teal-200">
+                          {lang === 'FR' ? 'Option 100% Hors-Ligne' : '100% Local / Self-Hosted'}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-[#527470] leading-relaxed">
+                        {lang === 'FR'
+                          ? 'Idéal pour votre serveur Debian 12 ou Proxmox si vous préférez qu’aucune photo ne quitte votre réseau local. Connectez une instance locale Ollama ou vLLM faisant tourner PaliGemma.'
+                          : 'Ideal for Debian 12 or Proxmox home servers when you want 100% private OCR with zero internet traffic. Connects to any local Ollama or vLLM instance running PaliGemma.'}
+                      </p>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10px] font-bold text-[#527470] block mb-1">
+                            {lang === 'FR' ? 'URL du serveur local (Ollama / vLLM)' : 'Local Server URL (Ollama / vLLM)'}
+                          </label>
+                          <input
+                            type="text"
+                            value={settings.localVisionUrl || ''}
+                            onChange={(e) => setSettings({ ...settings, localVisionUrl: e.target.value })}
+                            placeholder="http://localhost:11434"
+                            className="w-full px-3 py-2 rounded-xl border border-[#D5CEBD] bg-[#FAF7EE] focus:bg-white text-xs font-mono text-[#0D3B37]"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-[#527470] block mb-1">
+                            {lang === 'FR' ? 'Nom du modèle VLM' : 'Vision Model Name'}
+                          </label>
+                          <input
+                            type="text"
+                            value={settings.localVisionModel || 'paligemma'}
+                            onChange={(e) => setSettings({ ...settings, localVisionModel: e.target.value })}
+                            placeholder="paligemma"
+                            className="w-full px-3 py-2 rounded-xl border border-[#D5CEBD] bg-[#FAF7EE] focus:bg-white text-xs font-mono text-[#0D3B37]"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={handleTestLocalGemma}
+                          disabled={isTestingGemma}
+                          className="px-3 py-1.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
+                        >
+                          {isTestingGemma ? (
+                            <RefreshCw className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Check className="w-3 h-3" />
+                          )}
+                          <span>{lang === 'FR' ? 'Tester Connexion Gemma Locale' : 'Test Local Gemma'}</span>
+                        </button>
+                        <span className="text-[10px] text-slate-500 font-mono">
+                          curl -fsSL https://ollama.com/install.sh | sh && ollama run paligemma
+                        </span>
+                      </div>
+
+                      {gemmaTestResult && (
+                        <div
+                          className={`p-2.5 rounded-xl text-xs flex items-center gap-2 ${
+                            gemmaTestResult.success
+                              ? 'bg-emerald-50 border border-emerald-200 text-emerald-900'
+                              : 'bg-rose-50 border border-rose-200 text-rose-900'
+                          }`}
+                        >
+                          {gemmaTestResult.success ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          ) : (
+                            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                          )}
+                          <span className="font-medium text-[11px]">{gemmaTestResult.message}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -4189,6 +4360,65 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                             <div>
                               <div className="font-bold text-[#0D3B37]">Docker Engine</div>
                               <div className="text-[9px] text-[#527470]">Compose multi-arch</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* OS Architecture & Security Advisory (Debian 12 vs Arch vs Debian 13) */}
+                        <div className="pt-2 border-t border-[#E0D9C8] space-y-2">
+                          <span className="font-bold text-xs text-[#0D3B37] flex items-center gap-1.5">
+                            <Shield className="w-3.5 h-3.5 text-teal-800" />
+                            <span>
+                              {lang === 'FR'
+                                ? 'Recommandation Système d’Exploitation & Sécurité :'
+                                : 'OS Architecture & Production Security Advisory:'}
+                            </span>
+                          </span>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                            <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-300 text-[11px] space-y-1">
+                              <div className="flex items-center gap-1.5 font-bold text-emerald-900">
+                                <span>🟢</span>
+                                <span>Debian 12 (Bookworm LTS)</span>
+                              </div>
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-emerald-200 text-emerald-900 inline-block">
+                                {lang === 'FR' ? 'Standard Recommandé' : 'Recommended Standard'}
+                              </span>
+                              <p className="text-[#3A5C58] text-[10px] leading-tight">
+                                {lang === 'FR'
+                                  ? 'Cycle LTS 5 ans, AppArmor actif par défaut, paquets de sécurité automatisés. Zéro rupture pour un serveur 24/7.'
+                                  : '5-year LTS cycle, AppArmor enabled by default, automated security patches. Rock-solid for 24/7 home servers.'}
+                              </p>
+                            </div>
+
+                            <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-300 text-[11px] space-y-1">
+                              <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                                <span>🟡</span>
+                                <span>Arch Linux</span>
+                              </div>
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-200 text-amber-900 inline-block">
+                                {lang === 'FR' ? 'Compatible • Rolling' : 'Compatible • Rolling'}
+                              </span>
+                              <p className="text-[#6B5526] text-[10px] leading-tight">
+                                {lang === 'FR'
+                                  ? 'Fonctionne avec pacman, mais les mises à jour rolling (pacman -Syu) risquent de casser les modules Node natifs (better-sqlite3). Durcissement manuel requis.'
+                                  : 'Runs via pacman, but rolling updates (pacman -Syu) risk breaking native Node modules (better-sqlite3). Requires manual AppArmor hardening.'}
+                              </p>
+                            </div>
+
+                            <div className="p-2.5 rounded-xl bg-rose-50/70 border border-rose-300 text-[11px] space-y-1">
+                              <div className="flex items-center gap-1.5 font-bold text-rose-900">
+                                <span>🔴</span>
+                                <span>Debian 13 (Trixie)</span>
+                              </div>
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-rose-200 text-rose-900 inline-block">
+                                {lang === 'FR' ? 'Non Recommandé (Testing)' : 'Not Recommended (Testing)'}
+                              </span>
+                              <p className="text-[#7A2E2E] text-[10px] leading-tight">
+                                {lang === 'FR'
+                                  ? 'Actuellement en phase de test. L’équipe sécurité Debian ne garantit pas de correctifs de sécurité immédiats avant la sortie officielle.'
+                                  : 'Currently Debian testing branch. The Debian Security Team does not provide dedicated security patch SLAs before official release.'}
+                              </p>
                             </div>
                           </div>
                         </div>

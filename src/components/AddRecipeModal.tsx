@@ -606,8 +606,8 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
     setParsedRecipe(null);
     setParsingStep(
       lang === 'FR'
-        ? 'Numérisation OCR & extraction IA de votre fiche recette...'
-        : 'Running OCR & AI extraction on your recipe card...'
+        ? 'Numérisation haute précision de la recette & détection des notes...'
+        : 'High-precision recipe scanning & handwritten note detection...'
     );
     setErrorMsg(null);
     try {
@@ -628,7 +628,17 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
         throw new Error(data.error || 'Failed to parse recipe photo');
       }
 
-      setParsedRecipe(normalizeRecipe(data.recipe));
+      const normalized = normalizeRecipe(data.recipe, lang);
+      setParsedRecipe(normalized);
+
+      if (normalized?.hasHandwrittenNotes) {
+        showToast(
+          lang === 'FR'
+            ? '✍️ Annotations manuscrites détectées et intégrées aux ingrédients !'
+            : '✍️ Handwritten notes detected & merged into ingredients!',
+          'success'
+        );
+      }
     } catch (err: any) {
       console.error('AI Parse/Import failed:', err);
       setErrorMsg(err.message || 'Error communicating with AI service');
@@ -2177,6 +2187,32 @@ Instructions:
                   <RotateCcw className="w-3 h-3" />
                   <span>{lang === 'FR' ? 'Changer de source' : 'Change Source'}</span>
                 </button>
+              </div>
+            )}
+
+            {/* Handwritten Notes Detected & Merged Indicator */}
+            {parsedRecipe.hasHandwrittenNotes && (
+              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 text-xs flex items-start gap-2.5 shadow-2xs animate-fade-in">
+                <span className="text-base leading-none">✍️</span>
+                <div className="flex-1">
+                  <div className="font-bold flex items-center gap-1.5 text-amber-900">
+                    <span>
+                      {lang === 'FR'
+                        ? 'Annotations manuscrites détectées et intégrées'
+                        : 'Handwritten pen notes detected & incorporated'}
+                    </span>
+                  </div>
+                  {parsedRecipe.handwrittenNotesSummary && (
+                    <p className="text-[11px] text-amber-800 mt-0.5 font-mono bg-white/60 p-1.5 rounded-lg border border-amber-200/50">
+                      {parsedRecipe.handwrittenNotesSummary}
+                    </p>
+                  )}
+                  <p className="text-[10px] text-amber-700/90 mt-1">
+                    {lang === 'FR'
+                      ? 'Vos annotations et quantités modifiées au stylo ont été fusionnées directement avec les ingrédients correspondants.'
+                      : 'Your pen annotations, adjustments, and quantity tweaks were merged directly into the corresponding recipe ingredients.'}
+                  </p>
+                </div>
               </div>
             )}
 

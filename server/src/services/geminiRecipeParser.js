@@ -238,35 +238,65 @@ export async function parseRecipeFromPhoto({
 }) {
   const cleanBase64 = imageBase64.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, "").trim();
   const imageUrl = imageBase64.startsWith("data:") ? imageBase64 : `data:${mimeType};base64,${imageBase64}`;
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = (process.env.GEMINI_API_KEY || dbStore?.systemSettings?.geminiApiKey || "").trim();
+  const localVisionUrl = (process.env.LOCAL_GEMMA_URL || dbStore?.systemSettings?.localVisionUrl || "").trim();
+  const visionProvider = dbStore?.systemSettings?.aiVisionProvider || (localVisionUrl ? "local_gemma" : "gemini");
 
-  // 1. If Gemini API key is configured and appears valid, try Gemini Vision first
-  if (apiKey && apiKey.trim().length > 15 && !apiKey.startsWith("your_")) {
+  // 1. If Local Open-Source Gemma / PaliGemma endpoint is configured and active, try it first
+  if (visionProvider === "local_gemma" && localVisionUrl) {
+    try {
+      console.info(`[Gemma Vision] Attempting local open-source vision scan via ${localVisionUrl}...`);
+      const gemmaResult = await parseWithLocalGemma({
+        imageBase64: cleanBase64,
+        endpoint: localVisionUrl,
+        model: dbStore?.systemSettings?.localVisionModel || "paligemma",
+        notes,
+        language,
+      });
+      if (gemmaResult && gemmaResult.recipe) {
+        return {
+          success: true,
+          provider: "local_gemma",
+          recipe: normalizeRecipeOutput(gemmaResult.recipe, {
+            source: "Local Gemma Vision",
+            imageUrl,
+            language,
+          }),
+        };
+      }
+    } catch (gemmaErr) {
+      console.warn("[Gemma Vision] Local open-source Gemma scan failed, falling back to Gemini/Tesseract:", gemmaErr.message);
+    }
+  }
+
+  // 2. If Gemini API key is configured and appears valid, run high-accuracy Gemini 3.8 Flash Vision
+  if (apiKey && apiKey.length > 10 && !apiKey.startsWith("your_") && apiKey !== "MY_GEMINI_API_KEY") {
     try {
       const ai = getGeminiClient();
 
-      const systemInstruction = `You are Pantryo's OCR and AI vision culinary expert.
-Your task is to inspect photos of handwritten family recipe cards, printed cookbook pages, magazine clippings, or food packaging.
+      const systemInstruction = `You are Pantryo's master culinary archivist, high-precision OCR specialist, and bilingual chef.
+Your mission is to inspect photos of printed cookbook pages, magazine clippings, recipe printouts, and handwritten family cards, and convert them into a complete structured recipe JSON.
 
-1. Transcribe the text from the photo with extreme precision.
-2. Structure the data into a clean, complete recipe JSON:
-   - title: Descriptive title in English.
-   - titleFr: French title.
-   - descriptionEn: Brief summary of dish.
-   - descriptionFr: French summary.
-   - prepTime: Estimated prep time.
-   - cookTime: Estimated cooking time.
-   - totalTime: Total time.
-   - servings: Number of servings.
-   - difficulty: "Easy", "Medium", or "Advanced".
-   - difficultyFr: "Facile", "Moyen", or "Avancé".
-   - calories: Estimated calories per serving.
-   - tags: Array of descriptive tags.
-   - ingredients: Array with { name, nameFr, amount, category, locationType ("FRIDGE", "FREEZER", "PANTRY") }.
-   - instructionsEn: Array of step-by-step instructions.
-   - instructionsFr: French instructions.
+CRITICAL INSTRUCTIONS FOR REAL-WORLD RECIPE PHOTOS:
+1. PLASTIC SLEEVES & SPECULAR GLARE:
+   The recipe may be inside a transparent plastic sheet protector, binder sleeve, or laminated film with harsh overhead light reflections, glares, or hot spots.
+   Use the surrounding culinary context, sentence flow, ingredient patterns, and cooking techniques to deduce and extrapolate any partially obscured words or letters (e.g. "fineCooking", "Chinese Restaurant-Style", "all-purpose flour", "melt butter").
 
-Respond strictly in JSON following the schema.`;
+2. COLORED COOKBOOK PAPER & CURVED GUTTER SHADOWS:
+   Pages may be printed on colored backgrounds (e.g., pale blue, deep amber, warm orange, yellow, or beige) with shadows along the book spine/gutter.
+   Disregard page numbers (e.g., '220', '221', 'Page 1 of 1'), website URLs, print timestamps, and decorative book running headers. Focus strictly on the culinary recipe title, times, servings, ingredients, and instructions.
+
+3. HANDWRITTEN PEN ANNOTATIONS & SUBSTITUTIONS:
+   The recipe may have handwritten pen or pencil notes, additions, substitutions, or quantity corrections written in margins, next to ingredients, or between lines (for example: blue or purple ink notes like "- 3 slices", "- 3 cups", "1 or just either one 3/8 (6 tbsp)", "2 pcs").
+   YOU MUST PRESERVE AND MERGE THESE HANDWRITTEN NOTES!
+   - Merge the handwritten quantity or modification directly into the ingredient amount or name (e.g., "3/4 cup (3oz) shredded Cheddar cheese (note: 3 slices)", "6 to 8 cups beef broth (note: reduced to 3 cups)").
+   - Set "hasHandwrittenNotes": true and summarize all detected pen/pencil additions in "handwrittenNotesSummary".
+
+4. BILINGUAL EXCELLENCE (EN & FR):
+   Provide titles, descriptions, ingredient names, and instructions in both English and French (title/titleFr, descriptionEn/descriptionFr, instructionsEn/instructionsFr).
+
+5. INGREDIENT LOCATION & CATEGORIES:
+   Assign each ingredient an optimal storage location ("FRIDGE", "FREEZER", "PANTRY") and category ("Produce", "Dairy & Eggs", "Meat & Seafood", "Bakery", "Pantry", "Frozen Foods", "Condiments", "Beverages").`;
 
       const response = await ai.models.generateContent({
         model: "gemini-3.8-flash",
@@ -279,13 +309,13 @@ Respond strictly in JSON following the schema.`;
               },
             },
             {
-              text: `Carefully read this recipe photo and convert it into a structured recipe JSON. Additional user context/notes: ${notes || "None"}.`,
+              text: `Transcribe and digitize this recipe photo. Look carefully for any handwritten pen notes, plastic sleeve glare, or cookbook times/servings. User notes: ${notes || "None"}.`,
             },
           ],
         },
         config: {
           systemInstruction,
-          temperature: 0.2,
+          temperature: 0.1,
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
@@ -301,6 +331,12 @@ Respond strictly in JSON following the schema.`;
               difficulty: { type: Type.STRING },
               difficultyFr: { type: Type.STRING },
               calories: { type: Type.STRING },
+              hasHandwrittenNotes: { type: Type.BOOLEAN },
+              handwrittenNotesSummary: { type: Type.STRING },
+              recipeNotes: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+              },
               tags: {
                 type: Type.ARRAY,
                 items: { type: Type.STRING },
@@ -345,9 +381,11 @@ Respond strictly in JSON following the schema.`;
         const parsed = JSON.parse(cleanJson);
         return {
           success: true,
+          provider: "gemini_flash",
           recipe: normalizeRecipeOutput(parsed, {
             source: "Photo Import",
             imageUrl,
+            language,
           }),
         };
       }
@@ -356,11 +394,12 @@ Respond strictly in JSON following the schema.`;
     }
   }
 
-  // 2. High-precision Tesseract OCR fallback: reads actual handwritten cards & cookbook pages
-  console.info("[Gemini Recipe Parser] Running Tesseract OCR on recipe image...");
+  // 3. Embedded Local Tesseract OCR fallback: reads actual handwritten cards & cookbook pages
+  console.info("[Gemini Recipe Parser] Running Tesseract OCR on recipe image (eng+fra+spa)...");
   try {
     const imageBuffer = Buffer.from(cleanBase64, "base64");
-    const ocrResult = await Tesseract.recognize(imageBuffer, "eng+fra+spa+tgl");
+    // Use stable languages: english, french, spanish (tagalog is not hosted on cdn and causes 404)
+    const ocrResult = await Tesseract.recognize(imageBuffer, "eng+fra+spa");
     const ocrText = ocrResult?.data?.text?.trim() || "";
     console.info(`[Gemini Recipe Parser] Tesseract extracted ${ocrText.length} characters.`);
 
@@ -375,12 +414,13 @@ Respond strictly in JSON following the schema.`;
 
     const structuredRecipe = parseRecipeTextDirectly(combinedText, {
       language,
-      source: "Photo Import",
+      source: "Photo Import (OCR)",
       imageUrl,
     });
 
     return {
       success: true,
+      provider: "tesseract_ocr",
       recipe: structuredRecipe,
       ocrText,
     };
@@ -393,6 +433,76 @@ Respond strictly in JSON following the schema.`;
           : "Unable to extract recipe from this photo. Please check image clarity.")
     );
   }
+}
+
+/**
+ * Open-source Gemma / PaliGemma local vision parser (supports Ollama and OpenAI-compatible vision servers)
+ */
+async function parseWithLocalGemma({ imageBase64, endpoint, model = "paligemma", notes = "", language = "EN" }) {
+  const url = endpoint.replace(/\/+$/, "");
+  const isOllamaNative = !url.endsWith("/v1");
+
+  const prompt = `Transcribe this recipe photo into structured text including Title, Prep Time, Cook Time, Servings, Ingredients list with measurements and any handwritten pen notes, and step-by-step numbered Instructions. Notes: ${notes || "None"}.`;
+
+  let extractedText = "";
+
+  if (isOllamaNative) {
+    // Ollama /api/generate endpoint
+    const ollamaUrl = `${url}/api/generate`;
+    const res = await safeFetch(ollamaUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: model || "paligemma",
+        prompt,
+        images: [imageBase64],
+        stream: false,
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(`Ollama HTTP error ${res.status}: ${res.statusText}`);
+    }
+    const data = await res.json();
+    extractedText = data.response || "";
+  } else {
+    // OpenAI-compatible /v1/chat/completions endpoint
+    const chatUrl = `${url}/chat/completions`;
+    const res = await safeFetch(chatUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: model || "paligemma",
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              {
+                type: "image_url",
+                image_url: { url: `data:image/jpeg;base64,${imageBase64}` },
+              },
+            ],
+          },
+        ],
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(`OpenAI-compatible HTTP error ${res.status}: ${res.statusText}`);
+    }
+    const data = await res.json();
+    extractedText = data.choices?.[0]?.message?.content || "";
+  }
+
+  if (!extractedText || extractedText.trim().length < 10) {
+    throw new Error("Local Gemma returned empty OCR text");
+  }
+
+  const recipe = parseRecipeTextDirectly(extractedText, {
+    language,
+    source: "Local Gemma Vision",
+  });
+
+  return { recipe, rawText: extractedText };
 }
 
 /**
@@ -595,14 +705,33 @@ export function parseRecipeTextDirectly(text, { language = "EN", source = "Perso
     );
   }
 
-  const lines = clean
+  const rawLines = clean
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
 
+  // Filter out OCR border/binder-ring noise, print timestamps, and URLs
+  const lines = rawLines.filter((l) => {
+    // Drop URLs or page numbers
+    if (/^https?:\/\/|www\./i.test(l)) return false;
+    if (/^page\s+\d+\s+of\s+\d+/i.test(l) || /^\d{4}-\d{2}-\d{2}.*\d{1,2}:\d{2}/i.test(l)) return false;
+    // Drop binder edge artifacts with high symbol count
+    const symbolMatches = l.match(/[|!\\\/\[\]{}~*_=+^#<>;]/g);
+    if (symbolMatches && symbolMatches.length > l.length * 0.2) return false;
+    // Drop lines with high concentration of short 1-2 character words (typical of binder rings / margin OCR artifacts)
+    const words = l.split(/\s+/).filter(Boolean);
+    if (words.length >= 3) {
+      const shortWords = words.filter((w) => w.length <= 2);
+      if (shortWords.length / words.length >= 0.45) return false;
+    }
+    // Drop lines that are pure uppercase non-title noise
+    if (words.length >= 4 && words.every((w) => w === w.toUpperCase() && w.length <= 4)) return false;
+    return true;
+  });
+
   // Extract Title candidate
   let titleCandidate = "";
-  for (let i = 0; i < Math.min(lines.length, 5); i++) {
+  for (let i = 0; i < Math.min(lines.length, 6); i++) {
     const l = lines[i];
     const prefixMatch = l.match(/^(?:recette|recipe|titre|title)\s*[:\-]\s*(.+)$/i);
     if (prefixMatch) {
@@ -611,23 +740,32 @@ export function parseRecipeTextDirectly(text, { language = "EN", source = "Perso
     }
   }
 
-  // If no prefix, pick the first line that is not a generic header
+  // If no prefix, pick the first line that is a recognizable dish name
   if (!titleCandidate) {
-    for (let i = 0; i < Math.min(lines.length, 4); i++) {
+    for (let i = 0; i < Math.min(lines.length, 6); i++) {
       const l = lines[i];
-      if (!/^(?:ingr|direct|instruct|step|étap|temps|time|serv|port|prep|cuiss)/i.test(l) && l.length > 2 && l.length < 70) {
+      // Skip meta indicators like Course, Cuisine, Author, Rating
+      if (/^(?:ingr|direct|instruct|step|étap|temps|time|serv|port|prep|cuiss|course|cuisine|author|calories|star|rating)/i.test(l)) {
+        continue;
+      }
+      const words = l.split(/\s+/).filter(Boolean);
+      // Skip if line looks like header noise
+      if (words.length >= 2 && words.filter((w) => w.length <= 2).length / words.length > 0.4) {
+        continue;
+      }
+      if (l.length >= 4 && l.length <= 80 && /[aeiouy]/i.test(l)) {
         titleCandidate = l.replace(/^[-*•#\d.]+\s*/, "").trim();
         break;
       }
     }
   }
   if (!titleCandidate || titleCandidate.length < 3) {
-    titleCandidate = language === "FR" ? "Recette maison scannée" : "Scanned Homemade Recipe";
+    titleCandidate = language === "FR" ? "Recette maison numérisée" : "Scanned Homemade Recipe";
   }
 
-  // Extract prep/cook time and servings
-  let prepTime = "15 mins";
-  let cookTime = "25 mins";
+  // Extract prep/cook time, servings, and calories
+  let prepTime = "10 mins";
+  let cookTime = "20 mins";
   let servings = "4";
 
   for (const line of lines) {
@@ -637,6 +775,9 @@ export function parseRecipeTextDirectly(text, { language = "EN", source = "Perso
     const cookMatch = line.match(/(?:cook(?:ing)?|cuisson)\s*[:\-]?\s*(\d+\s*(?:min|m|h|hr|minutes?|heures?))/i);
     if (cookMatch) cookTime = cookMatch[1].trim();
 
+    const totalMatch = line.match(/(?:total(?:\s*time)?|durée\s*totale)\s*[:\-]?\s*(\d+\s*(?:min|m|h|hr|minutes?|heures?))/i);
+    if (totalMatch && !cookMatch) cookTime = totalMatch[1].trim();
+
     const servMatch = line.match(/(?:servings?|portions?|pour)\s*[:\-]?\s*(\d+(?:\s*[-àa]\s*\d+)?\s*(?:personnes?|portions?|servings?)?)/i);
     if (servMatch) servings = servMatch[1].trim();
   }
@@ -644,10 +785,15 @@ export function parseRecipeTextDirectly(text, { language = "EN", source = "Perso
   // Section splitting
   const ingredients = [];
   const instructions = [];
-  let currentSection = "ingredients";
+  let descriptionLines = [];
+  let tags = [source, "Custom Recipe"];
+  let hasHandwrittenNotes = false;
+  let handwrittenNotesList = [];
+  let currentSection = "header";
 
-  const ingredientKeywords = /^(?:ingr[ée]dients?|composants?|what you need|items?|ingredients list)/i;
-  const instructionKeywords = /^(?:instructions?|[ée]tapes?|directions?|pr[ée]paration|m[ée]thode|steps?|procedure|cooking steps|r[ée]alisation)/i;
+  const ingredientKeywords = /^(?:ingr[ée]dients?|composants?|what you need|items?|ingredients list)\b/i;
+  const instructionKeywords = /^(?:instructions?|[ée]tapes?|directions?|pr[ée]paration|m[ée]thode|steps?|procedure|cooking steps|r[ée]alisation)\b/i;
+  const notesOrNutritionKeywords = /^(?:notes?|remarques?|nutrition|calories?)\b/i;
 
   for (const line of lines) {
     if (line === titleCandidate || line.toLowerCase().startsWith("title:") || line.toLowerCase().startsWith("titre:")) {
@@ -662,17 +808,53 @@ export function parseRecipeTextDirectly(text, { language = "EN", source = "Perso
       currentSection = "instructions";
       continue;
     }
+    if (notesOrNutritionKeywords.test(line)) {
+      currentSection = "notes";
+      continue;
+    }
+
+    // In header/intro area before Ingredients
+    if (currentSection === "header") {
+      const courseMatch = line.match(/(?:course|service|type)\s*[:\-]\s*(.+)$/i);
+      if (courseMatch) {
+        tags.push(...courseMatch[1].split(/[,/]/).map((t) => t.trim()).filter(Boolean));
+        continue;
+      }
+      const cuisineMatch = line.match(/(?:cuisine|pays)\s*[:\-]\s*(.+)$/i);
+      if (cuisineMatch) {
+        tags.push(cuisineMatch[1].trim());
+        continue;
+      }
+      // If line is descriptive text (e.g. "This fabulous creamy homemade cheese sauce...")
+      if (!/^(?:author|prep|cook|serv|total|calor)/i.test(line) && line.length > 20) {
+        descriptionLines.push(line);
+        continue;
+      }
+      // Check if line looks like an ingredient bullet even if header was missed
+      if (/^[-*•]\s*\d+/.test(line)) {
+        currentSection = "ingredients";
+      } else {
+        continue;
+      }
+    }
 
     const isStepNumber = /^(\d+[\.\)]|step\s*\d+|étape\s*\d+)/i.test(line);
     const hasCookingAction = /\b(mélanger|cuire|faire chauffer|préchauffer|enfourner|verser|ajouter|assaisonner|battre|sauter|rôtir|mijoter|mix|cook|bake|heat|preheat|stir|pour|add|season|whisk|sauté|simmer|roast|fry)\b/i.test(line);
 
-    if (isStepNumber || (hasCookingAction && line.length > 25)) {
+    if (currentSection !== "instructions" && (isStepNumber || (hasCookingAction && line.length > 30))) {
       currentSection = "instructions";
     }
 
     if (currentSection === "ingredients") {
       const cleanLine = line.replace(/^[-*•+–—\s]+/, "").trim();
       if (cleanLine.length < 2) continue;
+
+      // Detect handwritten additions / annotations (e.g. "- 3 slices", "1 or just either one", "- 3 cups", "2 pcs")
+      const noteMatch = cleanLine.match(/[-–—]\s*(\d+\s*(?:slices?|cups?|tasses?|tranches?|pcs?|morceaux?|tbsp|c\.\s*à\s*s\.|g|oz)|(?:or\s+just\s+either\s+one|ou\s+l'un\s+des\s+deux))/i);
+      if (noteMatch) {
+        hasHandwrittenNotes = true;
+        handwrittenNotesList.push(cleanLine);
+      }
 
       const amountRegex = /^((?:\d+(?:[.,/]\d+)?(?:\s*-\s*\d+)?|\d+\/\d+|\d+\s+\d+\/\d+|un|une|one|a|half|demi)\s*(?:c\.\s*à\s*(?:soupe|café|thé)|cuill[eè]res?\s*à\s*(?:soupe|café|thé)|tbsp|tsp|tbs|t|c\.|cups?|tasses?|ml|cl|dl|l|litres?|liters?|g|gr|kg|kilos?|oz|ounces?|lbs?|livres?|pinc[ée]es?|pinch|gousses?|cloves?|tranches?|slices?|bo[iî]tes?|cans?|paquets?|packets?|sachets?|morceaux?|pieces?)?)\s*(?:de\s+|d'|of\s+)?(.*)$/i;
       const match = cleanLine.match(amountRegex);
@@ -692,10 +874,10 @@ export function parseRecipeTextDirectly(text, { language = "EN", source = "Perso
       if (/(beurre|butter|lait|milk|cream|crème|cheese|fromage|egg|oeuf|œuf|yogourt|yogurt)/.test(lowerName)) {
         category = "Dairy & Eggs";
         locationType = "FRIDGE";
-      } else if (/(chicken|poulet|beef|boeuf|bœuf|pork|porc|fish|poisson|shrimp|crevette|salmon|saumon|steak|meat|viande|bacon|dinde|turkey)/.test(lowerName)) {
+      } else if (/(chicken|poulet|beef|boeuf|bœuf|pork|porc|fish|poisson|shrimp|crevette|salmon|saumon|steak|meat|viande|bacon|dinde|turkey|veal|veau)/.test(lowerName)) {
         category = "Meat & Seafood";
         locationType = "FRIDGE";
-      } else if (/(pomme|apple|onion|oignon|garlic|ail|tomate|tomato|spinach|épinard|carrot|carotte|potato|pomme de terre|citron|lemon|lime|herbe|herb|basil|parsley|persil|rosemary|romarin|salade|lettuce|poivron|pepper|champignon|mushroom)/.test(lowerName)) {
+      } else if (/(pomme|apple|onion|oignon|garlic|ail|tomate|tomato|spinach|épinard|carrot|carotte|potato|pomme de terre|citron|lemon|lime|herbe|herb|basil|parsley|persil|rosemary|romarin|salade|lettuce|poivron|pepper|champignon|mushroom|beans|haricots?|bok choy|scallion|thyme|thym)/.test(lowerName)) {
         category = "Produce";
         locationType = /(potato|pomme de terre|onion|oignon|garlic|ail)/.test(lowerName) ? "PANTRY" : "FRIDGE";
       } else if (/(ice cream|glace|congel|frozen|petits pois surgel)/.test(lowerName)) {
@@ -704,7 +886,7 @@ export function parseRecipeTextDirectly(text, { language = "EN", source = "Perso
       } else if (/(pain|bread|baguette|croissant|tortilla|brioche|croûte|crust|pâte)/.test(lowerName)) {
         category = "Bakery";
         locationType = "PANTRY";
-      } else if (/(flour|farine|sugar|sucre|oil|huile|vinegar|vinaigre|pasta|pâtes|rice|riz|salt|sel|poivre|pepper|bouillon|broth|sauce|spices|épices|vanilla|vanille|levure|yeast)/.test(lowerName)) {
+      } else if (/(flour|farine|sugar|sucre|oil|huile|vinegar|vinaigre|pasta|pâtes|rice|riz|salt|sel|poivre|pepper|bouillon|broth|sauce|spices|épices|vanilla|vanille|levure|yeast|wine|vin|honey|miel|cayenne)/.test(lowerName)) {
         category = "Pantry";
         locationType = "PANTRY";
       }
@@ -719,7 +901,7 @@ export function parseRecipeTextDirectly(text, { language = "EN", source = "Perso
         category,
         locationType,
       });
-    } else {
+    } else if (currentSection === "instructions") {
       const cleanStep = line.replace(/^[-*•\d.)\s]+/, "").trim();
       if (cleanStep.length > 5) {
         instructions.push(cleanStep);
@@ -748,6 +930,7 @@ export function parseRecipeTextDirectly(text, { language = "EN", source = "Perso
     );
   }
 
+  const isFrench = language === "FR" || isTextFrench(titleCandidate) || isTextFrench(clean);
   const recipeId = `rec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const directActiveTitle = language === "FR" && resolvedTitleFr ? resolvedTitleFr : (resolvedTitleEn || resolvedTitleFr);
   return {
@@ -770,9 +953,11 @@ export function parseRecipeTextDirectly(text, { language = "EN", source = "Perso
     source,
     isRicardoOfficial: false,
     isCustom: true,
-    descriptionEn: `Homemade ${titleCandidate} digitized from your personal recipe.`,
-    descriptionFr: `${titleCandidate} maison numérisée à partir de votre fiche de recette.`,
-    tags: [source, "Custom Recipe", "Home Cooking"],
+    descriptionEn: descriptionLines.length > 0 ? descriptionLines.join(" ") : `Homemade ${titleCandidate} digitized from your personal recipe.`,
+    descriptionFr: descriptionLines.length > 0 ? descriptionLines.join(" ") : `${titleCandidate} maison numérisée à partir de votre fiche de recette.`,
+    tags: Array.from(new Set(tags)),
+    hasHandwrittenNotes,
+    handwrittenNotesSummary: hasHandwrittenNotes ? handwrittenNotesList.join("; ") : undefined,
     ingredients,
     instructionsEn: isFrench ? instructions.map(s => translateCookingStepToEnglish(s) || s) : instructions,
     instructionsFr: isFrench ? instructions : instructions.map(s => translateCookingStepToFrench(s) || s),

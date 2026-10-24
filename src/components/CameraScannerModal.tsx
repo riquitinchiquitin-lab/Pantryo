@@ -22,6 +22,7 @@ import {
   Tag,
   ExternalLink,
   SlidersHorizontal,
+  Clipboard,
 } from 'lucide-react';
 import { ScannedItemCandidate, InventoryItem } from '../types';
 import { FoodVisualBadge } from './FoodVisualBadge';
@@ -81,7 +82,7 @@ interface CameraScannerModalProps {
   onItemAdded: (item: InventoryItem) => void;
   currentUser: { id: string; name: string };
   onOpenManualAdd?: () => void;
-  initialMode?: 'snap' | 'flyer' | 'receipt' | 'barcode' | 'upload' | 'presets' | 'recipe' | 'produce';
+  initialMode?: 'snap' | 'flyer' | 'receipt' | 'barcode' | 'upload' | 'presets' | 'recipe' | 'produce' | 'paste';
 }
 
 interface SessionItem {
@@ -223,8 +224,8 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
 }) => {
   const { lang } = useLanguage();
 
-  // Mode: 'photo' | 'produce' | 'flyer' | 'receipt' | 'barcode' | 'recipe'
-  const [activeMode, setActiveMode] = useState<'photo' | 'produce' | 'flyer' | 'receipt' | 'barcode' | 'recipe'>('photo');
+  // Mode: 'photo' | 'produce' | 'flyer' | 'receipt' | 'barcode' | 'recipe' | 'paste'
+  const [activeMode, setActiveMode] = useState<'photo' | 'produce' | 'flyer' | 'receipt' | 'barcode' | 'recipe' | 'paste'>('photo');
 
   // Background processing states
   const [activeJobsCount, setActiveJobsCount] = useState(0);
@@ -253,7 +254,9 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
   // Sync mode when opened
   useEffect(() => {
     if (isOpen) {
-      if (initialMode === 'produce') {
+      if (initialMode === 'paste') {
+        setActiveMode('paste');
+      } else if (initialMode === 'produce') {
         setActiveMode('produce');
       } else if (initialMode === 'flyer') {
         setActiveMode('flyer');
@@ -1439,8 +1442,204 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
           )}
         </div>
 
+        {/* Navigation Mode Segmented Tabs */}
+        <div className="px-5 py-1.5 shrink-0 overflow-x-auto">
+          <div className="flex items-center gap-1.5 p-1 bg-[#F0EBE0] rounded-2xl w-max min-w-full">
+            <button
+              type="button"
+              onClick={() => setActiveMode('photo')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
+                activeMode === 'photo'
+                  ? 'bg-teal-800 text-white shadow-2xs'
+                  : 'text-[#0D3B37] hover:bg-white/60'
+              }`}
+            >
+              <Camera className="w-3.5 h-3.5" />
+              <span>{lang === 'FR' ? 'Photo Auto' : 'Smart Photo'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveMode('paste')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
+                activeMode === 'paste'
+                  ? 'bg-amber-700 text-white shadow-2xs'
+                  : 'text-[#0D3B37] hover:bg-white/60'
+              }`}
+            >
+              <Clipboard className="w-3.5 h-3.5" />
+              <span>{lang === 'FR' ? 'Coller reçu e-mail' : 'Paste E-Receipt'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveMode('produce')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
+                activeMode === 'produce'
+                  ? 'bg-emerald-700 text-white shadow-2xs'
+                  : 'text-[#0D3B37] hover:bg-white/60'
+              }`}
+            >
+              <span>🍎</span>
+              <span>{lang === 'FR' ? 'Fruits & Légumes' : 'Produce Lens'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveMode('receipt')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
+                activeMode === 'receipt'
+                  ? 'bg-amber-600 text-white shadow-2xs'
+                  : 'text-[#0D3B37] hover:bg-white/60'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>{lang === 'FR' ? 'Photo reçu papier' : 'Receipt OCR'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveMode('flyer')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
+                activeMode === 'flyer'
+                  ? 'bg-rose-700 text-white shadow-2xs'
+                  : 'text-[#0D3B37] hover:bg-white/60'
+              }`}
+            >
+              <span>🛒</span>
+              <span>{lang === 'FR' ? 'Circulaires rabais' : 'Flyer Deals'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveMode('barcode')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
+                activeMode === 'barcode'
+                  ? 'bg-blue-700 text-white shadow-2xs'
+                  : 'text-[#0D3B37] hover:bg-white/60'
+              }`}
+            >
+              <Barcode className="w-3.5 h-3.5" />
+              <span>{lang === 'FR' ? 'Codes & Base CNF' : 'Barcodes & DB'}</span>
+            </button>
+          </div>
+        </div>
+
         {/* Main Content Area */}
         <div className="flex-1 overflow-y-auto px-5 py-2 space-y-4">
+          {/* DEDICATED EMAIL & STORE RECEIPT PASTE VIEW */}
+          {activeMode === 'paste' && (
+            <div className="space-y-4">
+              <div className="w-full rounded-3xl bg-white border-2 border-amber-600/30 p-5 space-y-4 shadow-xs">
+                <div className="flex items-center justify-between border-b border-[#F0EBE0] pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+                      <Clipboard className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-sm text-[#0D3B37]">
+                        {lang === 'FR' ? 'Coller le texte d’un reçu ou courriel' : 'Paste Store / Email Receipt Text'}
+                      </h3>
+                      <p className="text-[11px] text-[#527470]">
+                        {lang === 'FR'
+                          ? 'Idéal pour reçus Maxi, Costco, Super C, Walmart, Metro reçus par courriel'
+                          : 'Ideal for Maxi, Costco, Super C, Walmart, Metro e-receipts and delivery emails'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        if (typeof navigator !== 'undefined' && navigator.clipboard?.readText) {
+                          const text = await navigator.clipboard.readText();
+                          if (text) setReceiptText(text);
+                        }
+                      } catch (e) {
+                        console.warn(e);
+                      }
+                    }}
+                    className="py-1 px-2.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <Clipboard className="w-3 h-3" />
+                    <span>{lang === 'FR' ? 'Presse-papier' : 'Clipboard'}</span>
+                  </button>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-[#0D3B37]">
+                    {lang === 'FR' ? 'Texte brut de la facture ou confirmation :' : 'Raw receipt or order text:'}
+                  </label>
+                  <textarea
+                    rows={6}
+                    value={receiptText}
+                    onChange={(e) => setReceiptText(e.target.value)}
+                    placeholder={
+                      lang === 'FR'
+                        ? 'Collez votre reçu ici...\nEx: 1 OIKOS YOGOURT 750G 4.97\n2 BROCOLIS 3.98\n1 BEURRE SANS NOM 4.88'
+                        : 'Paste your receipt here...\ne.g. 114890 ORG MILK 2% 9.89\n542019 KS CHICKEN BREAST 28.50'
+                    }
+                    className="w-full p-3 font-mono text-xs rounded-2xl bg-[#FAF7EE] border border-[#D5E1D2] text-[#0D3B37] placeholder:text-slate-400 focus:outline-none focus:border-amber-600 transition-all"
+                  />
+                </div>
+
+                {/* Sample Presets */}
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-extrabold uppercase text-[#527470]">
+                    {lang === 'FR' ? 'Exemples de reçus courriel :' : 'Sample E-Receipts:'}
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                    {[
+                      { store: 'Maxi (Courriel)', text: `MAXI & CIE #0881\n1 OIKOS YOGOURT GREC 750G $4.97\n1 POULET ENTIER FRAIS $8.45\n2 BROCOLI DU QUEBEC $3.98\n1 POMMES MCINTOSH SAC 3LB $2.99\n1 SANS NOM BEURRE SALE 454G $4.88` },
+                      { store: 'Costco (E-Receipt)', text: `COSTCO WHOLESALE #541\n114890 ORG MILK 2% 3X1L $9.89\n542019 KS CHICKEN BREAST 2KG $28.50\n882910 KIRKLAND MAPLE SYRUP 1L $14.99\n332014 RASPBERRIES FRESH 340G $5.99` },
+                      { store: 'Super C (Facture)', text: `SUPER C (METRO INC.)\nFILET DE PORC FRAIS DU QUEBEC $7.76\nYOGOURT ASTRO ORIGINAL 750G $3.99\nRAISINS ROUGES SANS PEPINS 1LB $1.48\nFROMAGE CHEDDAR BLACK DIAMOND $4.44` },
+                      { store: 'Walmart (Email)', text: `WALMART CANADA #3019\nGREAT VALUE 100% CANADIAN MILK 4L $5.48\nGREAT VALUE LARGE EGGS 18PK $4.98\nBONELESS SKINLESS CHICKEN BREAST $12.00\nFRESH HASS AVOCADOS 5PK $2.97` },
+                    ].map((s, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setReceiptText(s.text)}
+                        className="p-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-amber-50 hover:border-amber-300 text-left text-[11px] font-semibold text-slate-800 transition-colors cursor-pointer truncate"
+                      >
+                        🧾 {s.store}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-[#F0EBE0]">
+                  <button
+                    type="button"
+                    onClick={() => setReceiptText('')}
+                    className="text-xs text-slate-500 hover:text-slate-700 underline cursor-pointer"
+                  >
+                    {lang === 'FR' ? 'Effacer le texte' : 'Clear text'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleParseReceiptText}
+                    disabled={isParsingReceipt || !receiptText.trim()}
+                    className="py-2.5 px-5 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-2 shadow-xs transition-transform active:scale-95 cursor-pointer"
+                  >
+                    {isParsingReceipt ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>{lang === 'FR' ? 'Analyse...' : 'Parsing...'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        <span>{lang === 'FR' ? 'Analyser et ajouter à la cuisine' : 'Parse & Add to Kitchen'}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* PHOTO OR RECIPE MODE (Simplified & Continuous) */}
           {(activeMode === 'photo' || activeMode === 'recipe') && (
             <div className="flex flex-col items-center space-y-4">

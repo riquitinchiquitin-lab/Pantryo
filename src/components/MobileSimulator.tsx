@@ -48,6 +48,7 @@ import {
   LogOut,
   Info,
   SlidersHorizontal,
+  Clipboard,
 } from 'lucide-react';
 import { InventoryItem, User, PlannedMeal, StorageType } from '../types';
 import { FoodVisualBadge } from './FoodVisualBadge';
@@ -57,6 +58,8 @@ import { deductRecipeFromInventory } from '../utils/recipeCooker';
 import { CameraScannerModal } from './CameraScannerModal';
 import { AddEditItemModal } from './AddEditItemModal';
 import { ImportLeftoverModal } from './ImportLeftoverModal';
+import { PasteReceiptModal } from './PasteReceiptModal';
+import { FoodItemImage } from '../utils/foodIllustrations';
 import { GroceryListView, GroceryCartItem } from './GroceryListView';
 import { CookingIdeasView } from './CookingIdeasView';
 import { FamilySyncView } from './FamilySyncView';
@@ -332,7 +335,8 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   const [plannedMeals, setPlannedMeals] = useState<PlannedMeal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const [scannerInitialMode, setScannerInitialMode] = useState<'snap' | 'receipt' | 'barcode' | 'upload' | 'presets' | 'produce' | 'flyer'>('snap');
+  const [isPasteReceiptOpen, setIsPasteReceiptOpen] = useState(false);
+  const [scannerInitialMode, setScannerInitialMode] = useState<'snap' | 'receipt' | 'barcode' | 'upload' | 'presets' | 'produce' | 'flyer' | 'paste'>('snap');
   const [isAddEditModalOpen, setIsAddEditModalOpen] = useState(false);
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
@@ -1263,6 +1267,19 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               <span className="hidden sm:inline">{lang === 'FR' ? 'Scanner' : 'Scan'}</span>
             </button>
 
+            {/* Paste Store / Email Receipt Button */}
+            <button
+              type="button"
+              id="header-paste-receipt-btn"
+              onClick={() => setIsPasteReceiptOpen(true)}
+              className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-full bg-amber-700 hover:bg-amber-800 text-white text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 shrink-0 cursor-pointer shadow-2xs"
+              title={lang === 'FR' ? 'Coller un reçu (courriel / magasin)' : 'Paste receipt (email / store)'}
+              aria-label={lang === 'FR' ? 'Coller reçu' : 'Paste receipt'}
+            >
+              <Clipboard className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-100" />
+              <span className="hidden sm:inline">{lang === 'FR' ? 'Coller reçu' : 'Paste Receipt'}</span>
+            </button>
+
             {/* Quick Add Item Button */}
             <button
               type="button"
@@ -1420,6 +1437,17 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                   {(filterLocation !== 'ALL' || selectedFoodType !== 'ALL' || filterLeftoversOnly) && (
                     <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
                   )}
+                </button>
+
+                {/* Paste Receipt Quick Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsPasteReceiptOpen(true)}
+                  className="px-2.5 py-2.5 rounded-full border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shrink-0 shadow-2xs"
+                  title={lang === 'FR' ? 'Coller un reçu de courriel ou magasin' : 'Paste email or store receipt'}
+                >
+                  <Clipboard className="w-4 h-4 text-amber-700" />
+                  <span className="hidden xs:inline">{lang === 'FR' ? 'Reçu' : 'Receipt'}</span>
                 </button>
 
                 {/* Multi-selection toggle */}
@@ -1767,12 +1795,12 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           />
                         ) : (
-                          <div className={`w-full h-full flex flex-col items-center justify-center ${visual.bgColor} ${visual.textColor} transition-colors select-none`}>
-                            <CategoryIcon className="w-10 h-10 stroke-[1.6]" />
-                            <span className="text-[10px] font-bold mt-1.5 opacity-80 max-w-[90%] truncate text-center">
-                              {getCategoryLocalizedName(item.categoryName, lang)}
-                            </span>
-                          </div>
+                          <FoodItemImage
+                            name={getItemDisplayName(item, lang)}
+                            category={item.categoryName}
+                            size="xl"
+                            className="w-full h-full rounded-none"
+                          />
                         )}
                         {/* Top-left Category Icon Pill (offset right from checkbox) */}
                         <div
@@ -2546,6 +2574,26 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         currentUser={currentUser}
         onOpenManualAdd={handleOpenAddModal}
         initialMode={scannerInitialMode}
+      />
+
+      {/* Paste Store / Email Receipt Modal */}
+      <PasteReceiptModal
+        isOpen={isPasteReceiptOpen}
+        onClose={() => setIsPasteReceiptOpen(false)}
+        currentUser={currentUser}
+        onItemsAdded={(newItems) => {
+          setItems((prev) => {
+            const newIds = new Set(newItems.map((i) => i.id));
+            return [...newItems, ...prev.filter((i) => !newIds.has(i.id))];
+          });
+          const count = newItems.length;
+          setBannerNotice(
+            lang === 'FR'
+              ? `✓ ${count} article(s) du reçu importé(s) dans la cuisine !`
+              : `✓ ${count} receipt item(s) imported into kitchen!`
+          );
+          setTimeout(() => setBannerNotice(null), 4500);
+        }}
       />
 
       {/* Manual Add & Edit Item Modal */}

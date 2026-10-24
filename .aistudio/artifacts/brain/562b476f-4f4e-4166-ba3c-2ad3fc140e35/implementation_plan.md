@@ -1,49 +1,135 @@
-# Debian 12 Deployment & Security Strategy for Pantryo
+# Email Receipt Pasting, Food Category Illustrations, Recipe Portion Scaler & Batch Cooking
 
-Confirming Debian 12 (Bookworm) as the recommended host distribution for Pantryo, maintaining current production systemd and Proxmox LXC scripts, and integrating an OS Architecture & Security Comparison into the Admin Center.
+Implement email/store receipt text pasting, curated generic category illustrations for photo-less food items, real-time recipe portion scaling by number of people eating, and a Batch Cooking mode that auto-generates freezer meal-prep containers.
 
 ## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> The following user preference was confirmed during clarification:
-> - **Deployment Path**: **Stay on Debian 12 and keep current systemd scripts**.
-
-- **Technical Verdict 1: Can Pantryo run on Arch Linux?**
-  Yes. Pantryo is a standard Node.js (v20/v22 LTS) + SQLite/SQLCipher + systemd application. It runs smoothly on Arch Linux with `pacman -S nodejs npm sqlcipher`.
-- **Technical Verdict 2: Debian 12 vs. Arch Linux vs. Debian 13 (Trixie)**
-  - **Debian 12 Bookworm (Recommended)**: Rock-solid stability, 5-year LTS cycle, AppArmor enabled by default, automated security patches via `unattended-upgrades`, and zero breaking system updates for a 24/7 home server.
-  - **Arch Linux**: Bleeding-edge rolling release (`pacman -Syu`). Excellent for desktop enthusiasts, but introduces unexpected kernel, glibc, and Node native module (better-sqlite3) rebuild breakages on headless servers. Mandatory manual hardening (no default MAC/AppArmor enforcement).
-  - **Debian 13 "Trixie"**: Currently the *testing* release. Debian's security team does not provide immediate security updates or guaranteed security SLAs for the testing suite until it is frozen and formally released as stable (expected mid-2025). Do not use Debian 13 for production data yet.
-- **Technical Verdict 3: Is Arch Linux secure enough?**
-  Arch Linux is inherently as secure as the administrator configures it, but out-of-the-box it does not enforce Mandatory Access Control (AppArmor/SELinux), lacks automated security backports, and exposes bleeding-edge upstream software before community vetting. Debian 12 provides a hardened, battle-tested baseline with CIS benchmark compliance built into Pantryo's audit suite.
+> The following user preferences were confirmed during clarification:
+> - **Receipt Paste Tool**: Available **both** inside the Smart Scanner modal and directly on the main Inventory screen.
+> - **Batch Cooking Organization**: Scaled batch cooking with **auto-generated freezer meal prep containers** saved directly into inventory with reheat instructions and expiration dates.
+> - **Generic Food Images**: Curated food category illustrations and cut icons for any food item without a user-uploaded photo.
+> - **Recipe Portion Adjustment**: Real-time ingredient and nutrition scaling based on number of people eating / portions.
 
 ---
 
-## 1. Plan Overview
+## 1. Overview of Features
 
-1. **Retain & Consolidate Debian 12 Systemd Scripts**:
-   - Keep the hardened Debian 12 / Ubuntu systemd unit, automatic startup, sandboxing (`ProtectSystem=strict`, `PrivateTmp=true`, `ProtectHome=true`), and `unattended-upgrades` cron.
-2. **Add In-App OS Guidance & Rationale**:
-   - Enhance the **Host & Server Deployment** section in `AdminManagementModal.tsx` and `DocumentationModal.tsx` with a dedicated **"Debian 12 vs Arch Linux vs Debian 13"** advisory card in both English and French.
-   - Clearly explain why Debian 12 Bookworm is the gold standard for Pantryo (AppArmor, 5-year LTS, unattended CVE patches, zero rolling downtime), while clarifying how Arch Linux or Docker can be used if ever desired.
-3. **CIS Debian 12 Security Audit Compliance**:
-   - Verify that all CIS Debian 12 benchmarks (`SEC-01` to `SEC-07`) in the Admin Center correctly validate file permissions (600 for `.env`, 700 for data directories) and systemd sandboxing.
+### Feature 1: Email & Store Receipt Text Pasting
+- **Access Points**:
+  1. Main Inventory screen header: `[📋 Paste Email Receipt]` quick-action button.
+  2. Smart Scanner modal: Dedicated `[📋 Paste Text]` tab alongside Camera, Flyer, and Barcode.
+- **Functionality**:
+  - Accepts raw text copied from store emails (Costco, Walmart, Super C, Maxi, Metro, IGA, Amazon, etc.).
+  - Backend `/api/v1/inventory/scan-receipt-text` extracts store name, purchase date, item names, quantities, unit prices, and storage zones (FRIDGE, FREEZER, PANTRY).
+  - Shows preview modal with checkable items before 1-click adding to kitchen inventory.
+
+### Feature 2: Curated Generic Food Category Illustrations & Visual Cut Icons
+- **Asset Dictionary (`src/utils/foodIllustrations.ts`)**:
+  - Provides curated SVG illustrations and high-fidelity food icons for all food categories:
+    - 🥦 Produce & Vegetables
+    - 🍎 Fruits & Berries
+    - 🥛 Dairy & Eggs
+    - 🥩 Fresh Meat & Poultry
+    - 🐟 Seafood & Fish
+    - 🥖 Bakery & Breads
+    - 🍝 Pantry, Grains & Canned Goods
+    - 🧊 Frozen Foods & Ice Cream
+    - 🧂 Spices, Seasonings & Condiments
+    - ☕ Beverages & Drinks
+    - 🍲 Prepared Meals & Meal Prep Containers
+- **Universal Fallback**:
+  - Applied across Inventory cards, Grocery Shopping list, Recipe ingredients, and Meal Planner. When `!item.imageUrl`, renders the curated category illustration with vibrant accents.
+
+### Feature 3: Real-Time Recipe Portion Scaler (Number of People Eating)
+- **Interactive Portion Controller**:
+  - In `CookingIdeasView.tsx`, recipe preview modals, and `AddRecipeModal.tsx`:
+  - Quick buttons: `[-]` and `[+]` plus direct number input (1 to 24 people).
+  - Fraction & metric scaling helper (`scaleIngredientQuantity(amount, baseServings, targetServings)`):
+    - Example: `1/2 cup` for 4 people $\to$ `3/4 cup` for 6 people, `1 cup` for 8 people.
+    - Example: `200g` for 2 people $\to$ `600g` for 6 people.
+  - Dynamically updates recipe calories, macros, and displays a *"Scaled for X people (Original: Y)"* badge.
+
+### Feature 4: Batch Cooking Mode with Auto-Generated Freezer Containers
+- **Batch Cook Toolbar**:
+  - Quick multipliers: `2x Batch`, `3x Batch`, `4x Batch` or custom container count (e.g. `8 containers`).
+  - Cooking pot capacity advice (e.g., "Requires 6L+ Dutch Oven or Stockpot").
+- **1-Click Save to Freezer**:
+  - Button: `[❄️ Save X Meal Prep Containers to Freezer]`.
+  - Automatically provisions items in inventory:
+    - Name: `🍲 [Recipe Name] (Meal Prep Container)`
+    - Quantity: e.g. `8 units`
+    - Location: `FREEZER`
+    - Expiry Date: +90 days (freezer safe)
+    - Notes: Reheat directions (e.g. "Reheat in microwave 3-4 mins or thaw overnight in fridge").
 
 ---
 
-## 2. Proposed UI Enhancements
+## 2. Technical Implementation Architecture
 
-In `src/components/AdminManagementModal.tsx` (Deployment / Host tab) and `src/components/DocumentationModal.tsx`:
-- Add a visual distro badge component:
-  - 🟢 **Debian 12 (Bookworm LTS)**: *Recommended Production Standard* (AppArmor, LTS stability, automatic security patches).
-  - 🟡 **Arch Linux**: *Compatible but Not Recommended for 24/7 Headless* (Rolling updates risk native module breakages, manual security required).
-  - 🔴 **Debian 13 (Trixie Testing)**: *Not Recommended for Production* (Testing branch lacks formal Debian Security Team SLAs until release).
-- Provide a quick toggle/view for the user to see the exact security comparison table directly in the Admin Center.
+```
+┌─────────────────────────────────────────────────────────────┐
+│                       Inventory View                        │
+│   [📷 Camera Scan]  [📋 Paste Email Receipt]  [+ Manual]     │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                ┌──────────────▼─────────────┐
+                │ PasteReceiptModal / Tab   │
+                │ Parses email store receipt │
+                │ Bulk review & save to stock│
+                └──────────────┬─────────────┘
+                               │
+        ┌──────────────────────┴──────────────────────┐
+        ▼                                             ▼
+┌──────────────────────────────┐      ┌──────────────────────────────┐
+│  src/utils/foodIllustrations │      │ Recipe Portion & Batch Cook  │
+│  Curated SVGs/icons for:     │      │ - Portion Scaler (2-24 ppl)  │
+│  Produce, Dairy, Meat, etc.  │      │ - Batch Multipliers (2x-4x)  │
+│  Used when imageUrl is null  │      │ - ❄️ Auto-generate Freezer   │
+│                              │      │   Meal Prep Containers       │
+└──────────────────────────────┘      └──────────────────────────────┘
+```
 
 ---
 
-## 3. Verification Plan
+## 3. Step-by-Step Implementation Plan
 
-1. Verify that `AdminManagementModal.tsx` and `DocumentationModal.tsx` compile cleanly without TypeScript or React errors.
-2. Confirm the language toggle (`FR` / `EN`) seamlessly renders the new OS comparison text.
-3. Run `lint_applet` and `compile_applet` to ensure pristine production build.
+### Step 1: Curated Generic Food Category Illustrations (`src/utils/foodIllustrations.ts`)
+- Create `getFoodCategoryIllustration(categoryOrName, location)`:
+  - Returns curated SVG food cuts and category graphics with optimized background colors.
+  - Add fallback component `<FoodItemImage src={item.imageUrl} category={item.category} name={item.name} />`.
+  - Integrate into `InventoryView.tsx`, `GroceryListView.tsx`, and `CookingIdeasView.tsx`.
+
+### Step 2: Email Receipt Pasting Modal & Integration (`src/components/PasteReceiptModal.tsx`)
+- Build a dedicated, user-friendly `PasteReceiptModal`:
+  - Large text area with placeholder examples of Canadian/US grocery receipts.
+  - Quick parse with `/api/v1/inventory/scan-receipt-text` (already supported in backend with Quebec/Canadian store recognition).
+  - Interactive table allowing user to verify detected items, quantities, and storage zones before saving.
+- Add trigger button to:
+  - Main Inventory view toolbar (`[📋 Coller un reçu / Paste Receipt]`).
+  - `CameraScannerModal.tsx` as a dedicated tab.
+
+### Step 3: Recipe Portion Scaler (`src/utils/portionScaler.ts`)
+- Create portion scaling utility with robust fraction handling (`1/4`, `1/3`, `1/2`, `3/4`, `1 1/2`, grams, ounces, tablespoons, teaspoons, cans).
+- Embed portion scaler controls into `CookingIdeasView.tsx` recipe modal and active cooking step view.
+
+### Step 4: Batch Cooking Mode & Auto-Generated Freezer Containers
+- Add Batch Cooking drawer/panel in recipe view with container calculation (`Yield: X individual meal prep containers`).
+- Implement `handleSaveBatchToFreezer(recipe, containerCount, targetLocation)`:
+  - Adds items to inventory with category `"Prepared Meals"`, storage zone `"FREEZER"`, and 3-month shelf life.
+  - Emits success toast: `[✓ X containers saved to Freezer!]`.
+
+---
+
+## 4. Verification & Testing Plan
+
+1. **Email Receipt Pasting**:
+   - Paste a sample store email receipt (Super C / Walmart / Costco format with items and prices) and verify that items parse cleanly and add to inventory.
+2. **Generic Food Illustrations**:
+   - Create a photo-less food item in inventory, recipe, and grocery list, verifying that the curated category illustration renders with crisp styling.
+3. **Portion Scaling**:
+   - Change a 4-serving recipe to 2 servings and 8 servings; verify all ingredient quantities scale proportionally and fractions remain clean.
+4. **Batch Cooking**:
+   - Click "Batch Cook 4x", verify meal-prep yield calculates to 8 or 16 containers, click "Save to Freezer", and verify container entries appear in the Freezer inventory tab.
+5. **Build & Lint**:
+   - Run `compile_applet` and `lint_applet` to ensure 0 errors.

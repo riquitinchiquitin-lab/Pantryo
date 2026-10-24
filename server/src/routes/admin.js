@@ -309,6 +309,36 @@ router.post("/test-gemini", requireAdmin, async (req, res) => {
 });
 
 /**
+ * POST /api/v1/admin/test-gemma
+ * Verifies connectivity of a local open-source Gemma / Ollama vision endpoint
+ */
+router.post("/test-gemma", requireAdmin, async (req, res) => {
+  try {
+    const { localVisionUrl, localVisionModel = "paligemma" } = req.body;
+    const url = (localVisionUrl || dbStore?.systemSettings?.localVisionUrl || "http://localhost:11434").trim().replace(/\/+$/, "");
+
+    const testUrl = url.endsWith("/v1") ? `${url}/models` : `${url}/api/tags`;
+    const response = await fetch(testUrl, { method: "GET", signal: AbortSignal.timeout(5000) });
+    if (!response.ok) {
+      throw new Error(`Serveur local a répondu avec le statut HTTP ${response.status}`);
+    }
+    const data = await response.json();
+    res.json({
+      success: true,
+      message: `Connexion au serveur Open-Source Gemma (${url}) validée avec succès !`,
+      endpoint: url,
+      model: localVisionModel,
+      availableModels: data.models ? data.models.map((m) => m.name) : undefined,
+    });
+  } catch (err) {
+    res.status(400).json({
+      success: false,
+      error: `Impossible de contacter le serveur local Gemma (${err.message}). Vérifiez qu'Ollama est démarré (ex: ollama serve).`,
+    });
+  }
+});
+
+/**
  * POST /api/v1/admin/test-domain
  * Verifies connectivity of a custom domain or Cloudflare endpoint
  */

@@ -37,9 +37,11 @@ import {
   Thermometer,
   ShieldCheck,
   Pencil,
+  Users,
 } from 'lucide-react';
 import { InventoryItem, PlannedMeal, MealType } from '../types';
 import { RICARDO_RECIPES, RicardoRecipe, formatRecipeIngredientAmount } from '../data/ricardoRecipes';
+import { parseServingsCount, scaleIngredientAmount } from '../utils/portionScaler';
 import { AddRecipeModal } from './AddRecipeModal';
 import { GuidedCookingModal } from './GuidedCookingModal';
 import { SmartMealSuggestionsModal } from './SmartMealSuggestionsModal';
@@ -99,6 +101,62 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
   // Guided Cooking Modal state
   const [cookedRecipeIds, setCookedRecipeIds] = useState<Set<string>>(new Set());
   const [cookingToast, setCookingToast] = useState<string | null>(null);
+
+  // Portion Scaling & Batch Cooking State
+  const [portionsByRecipe, setPortionsByRecipe] = useState<Record<string, number>>({});
+  const [batchModeByRecipe, setBatchModeByRecipe] = useState<Record<string, boolean>>({});
+  const [isSavingBatchMeal, setIsSavingBatchMeal] = useState(false);
+
+  const handleSaveBatchContainersToFreezer = async (recipe: RicardoRecipe, portions: number) => {
+    setIsSavingBatchMeal(true);
+    try {
+      const title = getRecipeDisplayTitle(recipe, lang);
+      const containerCount = Math.max(2, Math.round(portions / 2));
+      const payload = {
+        name: lang === 'FR' ? `${title} (Plat cuisiné maison)` : `${title} (Homemade Meal Prep)`,
+        nameFr: `${recipe.titleFr || recipe.title} (Plat cuisiné maison)`,
+        nameEn: `${recipe.title} (Homemade Meal Prep)`,
+        categoryName: 'Meal Prep',
+        quantity: containerCount,
+        unit: lang === 'FR' ? 'plats' : 'containers',
+        locationType: 'FREEZER',
+        locationName: 'Freezer',
+        daysUntilExpiration: 90,
+        expirationDate: new Date(Date.now() + 90 * 86400000).toISOString().split('T')[0],
+        notes: lang === 'FR'
+          ? `Batch préparé le ${new Date().toLocaleDateString('fr-CA')}. ${portions} portions totales (${containerCount} contenants de 2). Réchauffer au micro-ondes 3-4 min ou au four à 180°C.`
+          : `Batch prepared on ${new Date().toLocaleDateString('en-CA')}. ${portions} total portions (${containerCount} containers of 2). Microwave 3-4 min or reheat at 350°F.`,
+        addedBy: 'Chef',
+        addedById: 'chef',
+        isLeftover: true,
+        leftoverRecipeTitle: recipe.title,
+      };
+
+      const res = await fetch('/api/v1/inventory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        showToast(
+          lang === 'FR'
+            ? `🍱 ${containerCount} plats de "${title}" ajoutés au congélateur (conservation 90 jours) !`
+            : `🍱 ${containerCount} containers of "${title}" added to Freezer (90-day shelf life)!`,
+          'success'
+        );
+      } else {
+        throw new Error('Failed to save to inventory');
+      }
+    } catch (err: any) {
+      showToast(
+        lang === 'FR' ? 'Erreur lors de l’enregistrement au congélateur.' : 'Error saving containers to freezer.',
+        'error'
+      );
+    } finally {
+      setIsSavingBatchMeal(false);
+    }
+  };
 
   const handleLaunchCooking = (recipe: RicardoRecipe) => {
     startCooking(recipe, {
@@ -1666,91 +1724,253 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                 <div className="p-4 space-y-3">
                   <p className="text-xs text-[#5D7060] leading-relaxed">{desc}</p>
 
-                  {/* Ingredients Checklist with In-Kitchen indicators */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-[11px] font-bold text-[#556D58]">
-                      <span className="uppercase tracking-wider">
-                        {lang === 'FR' ? 'INGRÉDIENTS REQUIS :' : 'INGREDIENTS NEEDED:'}
-                      </span>
-                      <span className="text-[10px] text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60 font-black">
-                        {matchedIngredientsCount}/{totalIngredientsCount}{' '}
-                        {lang === 'FR' ? 'dans votre cuisine' : 'in kitchen'}
-                      </span>
-                    </div>
+                  {/* Portion & Convives Scaler + Batch Cooking Mode */}
+                  {(() => {
+                    const baseServings = parseServingsCount(recipe.servings);
+                    const currentPortions = portionsByRecipe[recipe.id] || baseServings;
+                    const scaleRatio = currentPortions / baseServings;
+                    const isBatchMode = Boolean(batchModeByRecipe[recipe.id]);
 
-                    <div className="space-y-1.5">
-                      {recipe.ingredients.map((ing, i) => {
-                        const inStock = isIngredientInKitchen(ing.name, ing.inKitchenItemName);
-                        const ingDisplayName = getItemDisplayName(ing, lang);
-
-                        return (
-                          <div
-                            key={i}
-                            className={`p-2 rounded-xl border text-xs flex items-center justify-between transition-all ${
-                              inStock
-                                ? 'bg-[#F4F9F3] border-[#CDE1CB] text-[#1E3022]'
-                                : 'bg-white border-slate-200 text-slate-700'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <div
-                                className={`w-4 h-4 rounded-md flex items-center justify-center shrink-0 ${
-                                  inStock
-                                    ? 'bg-emerald-600 text-white'
-                                    : 'border border-slate-300 bg-slate-50'
-                                }`}
-                              >
-                                {inStock ? (
-                                  <Check className="w-2.5 h-2.5 stroke-[3]" />
-                                ) : (
-                                  <div className="w-1.5 h-1.5 rounded-full bg-slate-300" />
-                                )}
+                    return (
+                      <div className="space-y-3">
+                        <div className="p-3.5 rounded-2xl bg-gradient-to-r from-teal-900/5 via-emerald-900/5 to-teal-900/5 border border-emerald-200/80 space-y-2.5">
+                          <div className="flex items-center justify-between flex-wrap gap-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-xl bg-teal-800 text-white flex items-center justify-center shrink-0">
+                                <Users className="w-4 h-4" />
                               </div>
-                              <span className="font-bold truncate">{ingDisplayName}</span>
-                              <span className="text-[10px] text-slate-400 font-normal shrink-0">
-                                ({formatRecipeIngredientAmount(ing, lang)})
-                              </span>
+                              <div>
+                                <p className="text-xs font-black text-[#0D3B37]">
+                                  {lang === 'FR' ? 'Ajuster les portions & convives' : 'Adjust Portions & People Eating'}
+                                </p>
+                                <p className="text-[10px] text-[#527470]">
+                                  {lang === 'FR'
+                                    ? `Recette originale : ${baseServings} portions (calcul auto des fractions)`
+                                    : `Original recipe: ${baseServings} servings (auto fraction calculation)`}
+                                </p>
+                              </div>
                             </div>
 
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              {ing.estimatedKcal ? (
-                                <span className="text-[10px] font-mono font-bold text-amber-800 bg-amber-50/80 px-1.5 py-0.5 rounded border border-amber-200/80">
-                                  {ing.estimatedKcal} kcal
-                                </span>
-                              ) : null}
-
-                              {inStock ? (
-                                <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 flex items-center gap-0.5">
-                                  {ing.locationType === 'FRIDGE' && <Refrigerator className="w-2.5 h-2.5" />}
-                                  {ing.locationType === 'FREEZER' && <Snowflake className="w-2.5 h-2.5" />}
-                                  {ing.locationType === 'PANTRY' && <Boxes className="w-2.5 h-2.5" />}
-                                  {lang === 'FR' ? 'En stock' : 'Have it'}
-                                </span>
-                              ) : (
-                                onAddMissingToGrocery && (
-                                  <button
-                                    onClick={() =>
-                                      handleAddMissing(
-                                        ing.name,
-                                        ing.category,
-                                        ing.locationType,
-                                        title
-                                      )
-                                    }
-                                    className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/70 flex items-center gap-1 active:scale-95 transition-all cursor-pointer"
-                                    title="Add missing ingredient to grocery shopping list"
-                                  >
-                                    <Plus className="w-3 h-3" />
-                                    <span>{lang === 'FR' ? '+ Épicerie' : '+ Grocery'}</span>
-                                  </button>
-                                )
-                              )}
+                            {/* Stepper */}
+                            <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-slate-200 shadow-2xs">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPortionsByRecipe((prev) => ({
+                                    ...prev,
+                                    [recipe.id]: Math.max(1, (prev[recipe.id] || baseServings) - 1),
+                                  }));
+                                }}
+                                className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-sm flex items-center justify-center cursor-pointer transition-colors"
+                                title={lang === 'FR' ? 'Moins de portions' : 'Fewer portions'}
+                              >
+                                -
+                              </button>
+                              <div className="px-2 font-black text-xs text-[#0D3B37] min-w-16 text-center">
+                                {currentPortions} {lang === 'FR' ? 'pers.' : 'ppl'}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPortionsByRecipe((prev) => ({
+                                    ...prev,
+                                    [recipe.id]: (prev[recipe.id] || baseServings) + 1,
+                                  }));
+                                }}
+                                className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-sm flex items-center justify-center cursor-pointer transition-colors"
+                                title={lang === 'FR' ? 'Plus de portions' : 'More portions'}
+                              >
+                                +
+                              </button>
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+
+                          {/* Quick Portion Presets & Batch Cooking Toggle */}
+                          <div className="flex items-center justify-between gap-1.5 flex-wrap pt-1 border-t border-emerald-950/10 text-[11px]">
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <span className="text-[10px] text-slate-500 font-bold mr-1">
+                                {lang === 'FR' ? 'Rapide :' : 'Quick:'}
+                              </span>
+                              {[1, 2, 4, 6, 8].map((num) => (
+                                <button
+                                  key={num}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPortionsByRecipe((prev) => ({ ...prev, [recipe.id]: num }));
+                                  }}
+                                  className={`px-2 py-0.5 rounded-lg font-bold text-[10px] transition-all cursor-pointer ${
+                                    currentPortions === num
+                                      ? 'bg-teal-700 text-white shadow-2xs'
+                                      : 'bg-white border border-slate-200 text-slate-700 hover:bg-teal-50'
+                                  }`}
+                                >
+                                  {num} {lang === 'FR' ? 'pers.' : 'p.'}
+                                </button>
+                              ))}
+                            </div>
+
+                            {/* Batch Cook Toggle */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const nextState = !isBatchMode;
+                                setBatchModeByRecipe((prev) => ({ ...prev, [recipe.id]: nextState }));
+                                if (nextState && currentPortions < baseServings * 2) {
+                                  setPortionsByRecipe((prev) => ({ ...prev, [recipe.id]: baseServings * 2 }));
+                                }
+                              }}
+                              className={`px-2.5 py-1 rounded-xl font-bold text-[10px] flex items-center gap-1 transition-all cursor-pointer ${
+                                isBatchMode
+                                  ? 'bg-indigo-600 text-white shadow-xs'
+                                  : 'bg-indigo-50 border border-indigo-200 text-indigo-900 hover:bg-indigo-100'
+                              }`}
+                            >
+                              <span>🍱</span>
+                              <span>{lang === 'FR' ? 'Mode Batch Cooking' : 'Batch Cooking Mode'}</span>
+                            </button>
+                          </div>
+
+                          {/* Batch Cooking Meal Prep Card (when active) */}
+                          {isBatchMode && (
+                            <div className="p-3 rounded-xl bg-indigo-50/80 border border-indigo-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 animate-fade-in">
+                              <div className="space-y-0.5">
+                                <p className="font-extrabold text-xs text-indigo-950 flex items-center gap-1.5">
+                                  <span>❄️</span>
+                                  <span>
+                                    {lang === 'FR'
+                                      ? `Batch Cooking : ${currentPortions} portions (${Math.max(2, Math.round(currentPortions / 2))} barquettes repas)`
+                                      : `Batch Cooking: ${currentPortions} portions (${Math.max(2, Math.round(currentPortions / 2))} meal prep containers)`}
+                                  </span>
+                                </p>
+                                <p className="text-[10px] text-indigo-800">
+                                  {lang === 'FR'
+                                    ? 'Conservation 90 jours au congélateur • Réchauffage micro-ondes 3-4 min • Préparation en lot'
+                                    : '90-day freezer shelf life • 3-4 min microwave reheat • Scaled batch meal prep'}
+                                </p>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSaveBatchContainersToFreezer(recipe, currentPortions);
+                                }}
+                                disabled={isSavingBatchMeal}
+                                className="py-1.5 px-3 rounded-xl bg-indigo-700 hover:bg-indigo-800 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs transition-transform active:scale-95 cursor-pointer shrink-0"
+                              >
+                                <Snowflake className="w-3.5 h-3.5" />
+                                <span>
+                                  {isSavingBatchMeal
+                                    ? (lang === 'FR' ? 'Enregistrement...' : 'Saving...')
+                                    : (lang === 'FR' ? 'Enregistrer au congélateur' : 'Save to Freezer')}
+                                </span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Ingredients Checklist with In-Kitchen indicators */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-[11px] font-bold text-[#556D58]">
+                            <div className="flex items-center gap-2">
+                              <span className="uppercase tracking-wider">
+                                {lang === 'FR' ? 'INGRÉDIENTS REQUIS :' : 'INGREDIENTS NEEDED:'}
+                              </span>
+                              {scaleRatio !== 1 && (
+                                <span className="text-[10px] font-black text-amber-900 bg-amber-100 px-2 py-0.2 rounded-md">
+                                  ⚡ {lang === 'FR' ? `Ajusté pour ${currentPortions} pers. (${scaleRatio.toFixed(1)}x)` : `Scaled for ${currentPortions} (${scaleRatio.toFixed(1)}x)`}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60 font-black">
+                              {matchedIngredientsCount}/{totalIngredientsCount}{' '}
+                              {lang === 'FR' ? 'dans votre cuisine' : 'in kitchen'}
+                            </span>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            {recipe.ingredients.map((ing, i) => {
+                              const inStock = isIngredientInKitchen(ing.name, ing.inKitchenItemName);
+                              const ingDisplayName = getItemDisplayName(ing, lang);
+                              const baseAmount = formatRecipeIngredientAmount(ing, lang);
+                              const scaledAmount = scaleRatio !== 1 ? scaleIngredientAmount(baseAmount, scaleRatio) : baseAmount;
+                              const scaledKcal = ing.estimatedKcal ? Math.round(ing.estimatedKcal * scaleRatio) : null;
+
+                              return (
+                                <div
+                                  key={i}
+                                  className={`p-2 rounded-xl border text-xs flex items-center justify-between transition-all ${
+                                    inStock
+                                      ? 'bg-[#F4F9F3] border-[#CDE1CB] text-[#1E3022]'
+                                      : 'bg-white border-slate-200 text-slate-700'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div
+                                      className={`w-4 h-4 rounded-md flex items-center justify-center shrink-0 ${
+                                        inStock
+                                          ? 'bg-emerald-600 text-white'
+                                          : 'border border-slate-300 bg-slate-50'
+                                      }`}
+                                    >
+                                      {inStock ? (
+                                        <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                      ) : (
+                                        <div className="w-1.5 h-1.5 rounded-full bg-slate-300" />
+                                      )}
+                                    </div>
+                                    <span className="font-bold truncate">{ingDisplayName}</span>
+                                    <span className={`text-[10px] font-normal shrink-0 ${scaleRatio !== 1 ? 'text-amber-800 font-bold' : 'text-slate-500'}`}>
+                                      ({scaledAmount})
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    {scaledKcal ? (
+                                      <span className="text-[10px] font-mono font-bold text-amber-800 bg-amber-50/80 px-1.5 py-0.5 rounded border border-amber-200/80">
+                                        {scaledKcal} kcal
+                                      </span>
+                                    ) : null}
+
+                                    {inStock ? (
+                                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 flex items-center gap-0.5">
+                                        {ing.locationType === 'FRIDGE' && <Refrigerator className="w-2.5 h-2.5" />}
+                                        {ing.locationType === 'FREEZER' && <Snowflake className="w-2.5 h-2.5" />}
+                                        {ing.locationType === 'PANTRY' && <Boxes className="w-2.5 h-2.5" />}
+                                        {lang === 'FR' ? 'En stock' : 'Have it'}
+                                      </span>
+                                    ) : (
+                                      onAddMissingToGrocery && (
+                                        <button
+                                          onClick={() =>
+                                            handleAddMissing(
+                                              ing.name,
+                                              ing.category,
+                                              ing.locationType,
+                                              title
+                                            )
+                                          }
+                                          className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/70 flex items-center gap-1 active:scale-95 transition-all cursor-pointer"
+                                          title="Add missing ingredient to grocery shopping list"
+                                        >
+                                          <Plus className="w-3 h-3" />
+                                          <span>{lang === 'FR' ? '+ Épicerie' : '+ Grocery'}</span>
+                                        </button>
+                                      )
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Recipe Telemetry (Prep time, Cook time, Calories, Difficulty, Macros) */}
                   <div className="pt-2 border-t border-[#EDF3EC] flex items-center justify-between text-xs text-[#6C826E] flex-wrap gap-2">

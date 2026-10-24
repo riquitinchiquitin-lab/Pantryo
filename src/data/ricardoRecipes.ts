@@ -100,6 +100,8 @@ export interface RicardoRecipe {
   tags: string[];
   suggestedPantryNeeds: string[];
   rawOcrText?: string;
+  hasHandwrittenNotes?: boolean;
+  handwrittenNotesSummary?: string;
   mealTypes?: MealType[];
   safeCooking?: {
     internalTempC: number;
