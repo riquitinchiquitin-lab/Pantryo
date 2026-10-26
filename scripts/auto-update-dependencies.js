@@ -110,11 +110,14 @@ export async function runAutoUpdate(options = {}) {
       process.argv.includes("--all")
   );
 
+  const isDirectRun = Boolean(process.argv[1] && process.argv[1].endsWith("auto-update-dependencies.js"));
   const targetedPackages = Array.isArray(options.packages)
     ? options.packages
-    : process.argv
-        .slice(2)
-        .filter((arg) => !arg.startsWith("-") && arg.trim().length > 0);
+    : isDirectRun
+        ? process.argv
+            .slice(2)
+            .filter((arg) => !arg.startsWith("-") && !/^\d+$/.test(arg) && !/^\d+\.\d+\.\d+\.\d+$/.test(arg) && arg.trim().length > 0)
+        : [];
 
   const result = {
     timestamp: new Date().toISOString(),

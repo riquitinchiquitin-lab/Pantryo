@@ -20,6 +20,7 @@ import {
   Coffee,
   Cookie,
   ShoppingBag,
+  AlertTriangle,
 } from 'lucide-react';
 import { InventoryItem, SavedGroceryListItem, StorageType } from '../types';
 import { FoodVisualBadge } from './FoodVisualBadge';
@@ -37,6 +38,7 @@ export interface GroceryCartItem {
   locationType: StorageType;
   inCart: boolean;
   autoSuggested?: boolean;
+  outOfStock?: boolean;
   notes?: string;
   imageUrl?: string;
 }
@@ -405,6 +407,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
           unit: item.unit,
           locationType: item.locationType || inferLocation(item.name, item.category),
           inCart: false,
+          outOfStock: item.outOfStock,
         };
       });
       onUpdateGroceryItems(newItems);
@@ -419,6 +422,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
             result[existingIdx] = {
               ...result[existingIdx],
               quantity: result[existingIdx].quantity + item.quantity,
+              outOfStock: item.outOfStock || result[existingIdx].outOfStock,
             };
           } else {
             const visual = getFoodVisual(item.name);
@@ -430,6 +434,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
               unit: item.unit,
               locationType: item.locationType || inferLocation(item.name, item.category),
               inCart: false,
+              outOfStock: item.outOfStock,
             });
           }
         });
@@ -887,6 +892,23 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                               >
                                 {getItemDisplayName(item, lang)}
                               </span>
+                              {item.outOfStock && (
+                                <span
+                                  className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md border flex items-center gap-1 transition-all ${
+                                    item.inCart
+                                      ? 'bg-amber-50/70 border-amber-200/60 text-amber-700/60 line-through'
+                                      : 'bg-amber-100 border-amber-300 text-amber-900 shadow-2xs'
+                                  }`}
+                                  title={
+                                    lang === 'FR'
+                                      ? 'Article épuisé dans la cuisine (Rupture de stock)'
+                                      : 'Item used up in kitchen (Out of stock)'
+                                  }
+                                >
+                                  <AlertTriangle className="w-2.5 h-2.5 stroke-[2.5]" />
+                                  <span>{lang === 'FR' ? '(Rupture de stock)' : '(Out of stock)'}</span>
+                                </span>
+                              )}
                             </div>
 
                             <div className="flex items-center gap-1.5 mt-0.5">

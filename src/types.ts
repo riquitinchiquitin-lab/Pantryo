@@ -164,6 +164,7 @@ export interface SavedGroceryListItem {
   unit: string;
   locationType: StorageType;
   category?: string;
+  outOfStock?: boolean;
 }
 
 export interface SavedGroceryList {

@@ -48,6 +48,19 @@ import {
   getLocalizedOrigin,
   isTextFrench,
 } from '../utils/foodTranslator';
+import { TeachPackageModal } from './TeachPackageModal';
+import { PackageTrainingManagerModal } from './PackageTrainingManagerModal';
+import {
+  matchPackage,
+  getTrainedPackages,
+  PackageMatchResult,
+} from '../services/packageTrainingService';
+import {
+  ContainerType,
+  PackageRegion,
+  getContainerTypeInfo,
+  getRegionBadge,
+} from '../services/globalPackageCatalog';
 
 /**
  * Optical Barcode Detector helper
@@ -245,6 +258,11 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
   const [isParsingReceipt, setIsParsingReceipt] = useState(false);
   const [showPresets, setShowPresets] = useState(false);
   const [selectedFlyerBannerId, setSelectedFlyerBannerId] = useState<'maxi' | 'super-c' | 'no-frills' | 'metro' | 'iga' | 'walmart'>('maxi');
+
+  // Package Training & 5-Region Global DB State
+  const [isTeachModalOpen, setIsTeachModalOpen] = useState(false);
+  const [teachModalInitialData, setTeachModalInitialData] = useState<any>(undefined);
+  const [isPackageManagerOpen, setIsPackageManagerOpen] = useState(false);
 
   // Native hidden file inputs
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
@@ -521,9 +539,50 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
       let winningMethod: 'barcode' | 'produce' | 'receipt' | 'packaging' | 'flyer' = 'packaging';
       let winningMethodLabel = lang === 'FR' ? 'Aliment emballé canadien' : 'Canadian packaged grocery';
 
+      // Global Package Training & 5-Region Recognition Engine
+      const candidateTokens = `${serverData?.detectedText || ''} ${serverData?.items?.[0]?.name || ''} ${serverData?.items?.[0]?.brand || ''} ${serverData?.summary || ''}`;
+      const packageMatch = matchPackage({
+        rawText: candidateTokens,
+        barcode: detectedBarcode || undefined,
+        lang: lang === 'FR' ? 'FR' : 'EN',
+      });
+
       // Arbitration Decision Matrix:
+      // Priority 0: Custom Trained Package Memory (Top User Authority)
+      if (packageMatch && packageMatch.sourceMethod === 'custom_trained') {
+        const isFr = lang === 'FR';
+        items = [
+          {
+            name: isFr ? packageMatch.nameFr : packageMatch.nameEn,
+            nameFr: packageMatch.nameFr,
+            nameEn: packageMatch.nameEn,
+            brand: packageMatch.brand,
+            category: packageMatch.category,
+            quantity: 1,
+            unit: packageMatch.containerBadge.short,
+            netContent: packageMatch.standardNetQuantity,
+            packagingFormat: `${packageMatch.containerBadge.icon} ${packageMatch.containerBadge.label} • ${packageMatch.standardNetQuantity}`,
+            recommendedLocation: packageMatch.defaultLocation,
+            estimatedShelfLifeDays: packageMatch.shelfLifeDays,
+            unopenedShelfLifeDays: packageMatch.shelfLifeDays,
+            openedShelfLifeDays: Math.round(packageMatch.shelfLifeDays / 10) || 7,
+            monthsFrozenShelfLife: packageMatch.monthsFrozenShelfLife,
+            dietaryBadges: [
+              `${packageMatch.regionBadge.flag} ${packageMatch.regionBadge.label}`,
+              packageMatch.containerBadge.label,
+            ],
+            storageTip: packageMatch.storageTip,
+            confidence: packageMatch.confidence,
+            detectedText: packageMatch.displaySubtitle,
+            barcode: packageMatch.barcode,
+          },
+        ];
+        winningMethod = 'packaging';
+        winningMethodLabel = packageMatch.sourceLabel;
+      }
+
       // Priority 1: Optical Barcode detected and resolved via Canadian/Open DB
-      if (detectedBarcode && detectedBarcode.length >= 8) {
+      if (items.length === 0 && detectedBarcode && detectedBarcode.length >= 8) {
         try {
           const barcodeRes = await fetch(`/api/v1/inventory/barcode/${detectedBarcode}?language=${lang}`);
           const barcodeData = await barcodeRes.json();
@@ -683,6 +742,52 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
           winningMethod = 'packaging';
           winningMethodLabel = lang === 'FR' ? '✨ Yogourt & Produits laitiers' : '✨ Yogurt & Dairy';
         }
+      }
+
+      // Priority 6: Global 5-Region Package Catalog Fallback (North America, South America, China, Japan, Philippines)
+      if (items.length === 0 && packageMatch) {
+        const isFr = lang === 'FR';
+        items = [
+          {
+            name: isFr ? packageMatch.nameFr : packageMatch.nameEn,
+            nameFr: packageMatch.nameFr,
+            nameEn: packageMatch.nameEn,
+            brand: packageMatch.brand,
+            category: packageMatch.category,
+            quantity: 1,
+            unit: packageMatch.containerBadge.short,
+            netContent: packageMatch.standardNetQuantity,
+            packagingFormat: `${packageMatch.containerBadge.icon} ${packageMatch.containerBadge.label} • ${packageMatch.standardNetQuantity}`,
+            recommendedLocation: packageMatch.defaultLocation,
+            estimatedShelfLifeDays: packageMatch.shelfLifeDays,
+            unopenedShelfLifeDays: packageMatch.shelfLifeDays,
+            openedShelfLifeDays: Math.round(packageMatch.shelfLifeDays / 10) || 7,
+            monthsFrozenShelfLife: packageMatch.monthsFrozenShelfLife,
+            dietaryBadges: [
+              `${packageMatch.regionBadge.flag} ${packageMatch.regionBadge.label}`,
+              packageMatch.containerBadge.label,
+            ],
+            storageTip: packageMatch.storageTip,
+            confidence: packageMatch.confidence,
+            detectedText: packageMatch.displaySubtitle,
+            barcode: packageMatch.barcode,
+          },
+        ];
+        winningMethod = 'packaging';
+        winningMethodLabel = packageMatch.sourceLabel;
+      } else if (packageMatch && items.length > 0) {
+        // Enrich detected item with container format and region
+        if (!items[0].packagingFormat) {
+          items[0].packagingFormat = `${packageMatch.containerBadge.icon} ${packageMatch.containerBadge.label} • ${packageMatch.standardNetQuantity}`;
+        }
+        if (packageMatch.displaySubtitle && !items[0].detectedText) {
+          items[0].detectedText = packageMatch.displaySubtitle;
+        }
+        items[0].dietaryBadges = Array.from(new Set([
+          ...(items[0].dietaryBadges || []),
+          `${packageMatch.regionBadge.flag} ${packageMatch.regionBadge.label}`,
+          packageMatch.containerBadge.label,
+        ]));
       }
 
       // Intelligent Quality Filter (filter out OCR noise)
@@ -1364,6 +1469,27 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsPackageManagerOpen(true)}
+              className="px-2.5 py-1.5 rounded-full bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
+              title={lang === 'FR' ? 'Consulter la base mondiale des emballages (5 régions)' : 'Browse global packages database (5 regions)'}
+            >
+              <span>🥫</span>
+              <span className="hidden sm:inline">{lang === 'FR' ? 'Paquets (5 régions)' : 'Packages (5 Regions)'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTeachModalInitialData(undefined);
+                setIsTeachModalOpen(true);
+              }}
+              className="px-2.5 py-1.5 rounded-full bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
+              title={lang === 'FR' ? 'Enseigner un nouveau paquet ou format' : 'Teach a new package or container'}
+            >
+              <span>🎓</span>
+              <span className="hidden sm:inline">{lang === 'FR' ? 'Enseigner' : 'Teach'}</span>
+            </button>
             {sessionItems.length > 0 && (
               <span className="text-[11px] font-black px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300">
                 {lang === 'FR' ? `✓ ${sessionItems.length} ajoutés` : `✓ ${sessionItems.length} added`}
@@ -1939,14 +2065,50 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                       <span>{lang === 'FR' ? 'Enregistré dans le stock' : 'Saved to kitchen inventory'}</span>
                     </span>
 
-                    <button
-                      type="button"
-                      onClick={() => cameraInputRef.current?.click()}
-                      className="px-3.5 py-1.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
-                    >
-                      <Camera className="w-3.5 h-3.5" />
-                      <span>{lang === 'FR' ? 'Photo suivante' : 'Snap Next'}</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const packStr = (inspectingItem.packagingFormat || '').toLowerCase();
+                          let inferredContainer: ContainerType = 'CAN';
+                          if (packStr.includes('bocal') || packStr.includes('jar') || packStr.includes('verre')) inferredContainer = 'JAR';
+                          else if (packStr.includes('boîte de carton') || packStr.includes('box') || packStr.includes('carton') || packStr.includes('pâtes')) inferredContainer = 'BOX';
+                          else if (packStr.includes('sac') || packStr.includes('bag') || packStr.includes('sachet') || packStr.includes('pouch')) inferredContainer = 'BAG';
+                          else if (packStr.includes('brique') || packStr.includes('tetra') || packStr.includes('bouillon')) inferredContainer = 'CARTON';
+                          else if (packStr.includes('bouteille') || packStr.includes('bottle')) inferredContainer = 'BOTTLE';
+                          else if (packStr.includes('pot') || packStr.includes('tub') || packStr.includes('yogourt')) inferredContainer = 'TUB';
+
+                          setTeachModalInitialData({
+                            brand: inspectingItem.brand || '',
+                            name: inspectingItem.name || '',
+                            nameFr: inspectingItem.name || '',
+                            nameEn: inspectingItem.name || '',
+                            containerType: inferredContainer,
+                            netQuantity: inspectingItem.netContent || `${inspectingItem.quantity} ${inspectingItem.unit}`,
+                            category: inspectingItem.categoryName || 'Pantry Staples',
+                            location: (inspectingItem.locationName as any) || 'Pantry',
+                            shelfLifeDays: inspectingItem.estimatedShelfLifeDays || 180,
+                            samplePhoto: inspectingItem.imageUrl,
+                            keywords: inspectingItem.name.split(' ').concat(inspectingItem.brand ? [inspectingItem.brand] : []),
+                          });
+                          setIsTeachModalOpen(true);
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer"
+                        title={lang === 'FR' ? 'Enseigner ou corriger la marque et le contenant pour le futur' : 'Teach or adjust brand and container format for future scans'}
+                      >
+                        <span>🎓</span>
+                        <span>{lang === 'FR' ? 'Enseigner / Corriger' : 'Teach / Adjust'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => cameraInputRef.current?.click()}
+                        className="px-3.5 py-1.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
+                      >
+                        <Camera className="w-3.5 h-3.5" />
+                        <span>{lang === 'FR' ? 'Photo suivante' : 'Snap Next'}</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -2807,6 +2969,34 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Teach Package Modal */}
+      {isTeachModalOpen && (
+        <TeachPackageModal
+          isOpen={isTeachModalOpen}
+          onClose={() => {
+            setIsTeachModalOpen(false);
+            setTeachModalInitialData(undefined);
+          }}
+          initialData={teachModalInitialData}
+          onSaved={(pkg) => {
+            showToast(
+              lang === 'FR'
+                ? `🎓 Paquet "${pkg.nameFr}" mémorisé dans votre IA locale !`
+                : `🎓 Package "${pkg.nameEn}" learned into your local AI!`,
+              'success'
+            );
+          }}
+        />
+      )}
+
+      {/* 5-Region Global Package Explorer & Training Manager Modal */}
+      {isPackageManagerOpen && (
+        <PackageTrainingManagerModal
+          isOpen={isPackageManagerOpen}
+          onClose={() => setIsPackageManagerOpen(false)}
+        />
+      )}
     </div>
   );
 };

@@ -539,6 +539,19 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
 
       setItems(outcome.updatedInventory);
 
+      // Prompt user to add any depleted ingredients to grocery list with (Out of stock) label
+      const depletedDeductions = outcome.deductions.filter((d) => d.wasFullyDepleted);
+      depletedDeductions.forEach((d) => {
+        const original = items.find((i) => i.id === d.inventoryItemId);
+        promptDepletedItem(
+          original || {
+            name: d.inventoryItemName,
+            unit: d.remainingUnit,
+            locationType: 'PANTRY',
+          }
+        );
+      });
+
       if (outcome.deductions.length > 0) {
         const deductionSummary = outcome.deductions
           .map((d) =>
@@ -601,6 +614,19 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
     }
 
     setItems(outcome.updatedInventory);
+
+    // Prompt user to add any depleted ingredients to grocery list with (Out of stock) label
+    const depletedDeductions = outcome.deductions.filter((d) => d.wasFullyDepleted);
+    depletedDeductions.forEach((d) => {
+      const original = items.find((i) => i.id === d.inventoryItemId);
+      promptDepletedItem(
+        original || {
+          name: d.inventoryItemName,
+          unit: d.remainingUnit,
+          locationType: 'PANTRY',
+        }
+      );
+    });
 
     if (outcome.deductions.length > 0) {
       const deductionSummary = outcome.deductions
@@ -680,36 +706,100 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   };
 
   // Add an item from inventory to grocery shopping list / cart
-  const handleAddItemToGroceryCart = (item: InventoryItem) => {
+  const handleAddItemToGroceryCart = (
+    item: InventoryItem | { name: string; nameFr?: string; nameEn?: string; categoryName?: string; unit?: string; locationType?: StorageType; id?: string },
+    isOutOfStock = false
+  ) => {
     const targetLoc =
       item.locationType === 'FREEZER'
         ? 'FREEZER'
         : item.locationType === 'PANTRY'
         ? 'PANTRY'
+        : item.locationType === 'SPICE_RACK'
+        ? 'SPICE_RACK'
         : 'FRIDGE';
 
-    setGroceryItems((prev) => [
-      {
-        id: `g_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        name: item.name,
-        category: item.categoryName,
-        quantity: 1,
-        unit: item.unit,
-        locationType: targetLoc,
-        inCart: true,
-        notes:
+    const displayName = getItemDisplayName(item as any, lang);
+
+    setGroceryItems((prev) => {
+      const existingIdx = prev.findIndex(
+        (g) => g.name.trim().toLowerCase() === item.name.trim().toLowerCase()
+      );
+      if (existingIdx >= 0) {
+        const copy = [...prev];
+        copy[existingIdx] = {
+          ...copy[existingIdx],
+          outOfStock: isOutOfStock ? true : copy[existingIdx].outOfStock,
+          inCart: false, // Needs to be bought
+          notes: isOutOfStock
+            ? (lang === 'FR' ? 'Rupture de stock signalée en cuisine' : 'Out of stock reported from kitchen')
+            : copy[existingIdx].notes,
+        };
+        return copy;
+      }
+
+      return [
+        {
+          id: `g_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          name: item.name,
+          category: item.categoryName || 'Produce',
+          quantity: 1,
+          unit: item.unit || (lang === 'FR' ? 'unités' : 'pcs'),
+          locationType: targetLoc,
+          inCart: false,
+          outOfStock: isOutOfStock,
+          notes: isOutOfStock
+            ? (lang === 'FR' ? 'Rupture de stock signalée en cuisine' : 'Out of stock reported from kitchen')
+            : (lang === 'FR'
+                ? `Réapprovisionnement demandé par ${currentUser?.name || 'Admin'}`
+                : `Restock requested by ${currentUser?.name || 'Admin'}`),
+        },
+        ...prev,
+      ];
+    });
+
+    if (isOutOfStock) {
+      showToast({
+        message:
           lang === 'FR'
-            ? `Réapprovisionnement demandé par ${currentUser?.name || 'Admin'}`
-            : `Restock requested by ${currentUser?.name || 'Admin'}`,
+            ? `🛒 « ${displayName} » a été ajouté à votre liste d'épicerie avec l'étiquette (Rupture de stock) !`
+            : `🛒 Added "${displayName}" to your grocery list with (Out of stock) label!`,
+        type: 'success',
+        duration: 4000,
+      });
+    } else {
+      setBannerNotice(
+        lang === 'FR'
+          ? `🛒 "${displayName}" ajouté à votre panier de courses !`
+          : `🛒 Added "${displayName}" to your grocery cart!`
+      );
+      setTimeout(() => setBannerNotice(null), 3000);
+    }
+  };
+
+  // Centralized prompt asking user if depleted item should be placed in grocery list with (Out of stock) label
+  const promptDepletedItem = (item: {
+    id?: string;
+    name: string;
+    nameFr?: string;
+    nameEn?: string;
+    categoryName?: string;
+    unit?: string;
+    locationType?: StorageType;
+  }) => {
+    const displayName = getItemDisplayName(item as any, lang);
+    showToast({
+      message:
+        lang === 'FR'
+          ? `« ${displayName} » est épuisé ! Voulez-vous l'ajouter à votre liste d'épicerie ?`
+          : `"${displayName}" is used up! Add it to your grocery list?`,
+      type: 'warning',
+      duration: 7500,
+      actionLabel: lang === 'FR' ? '+ Épicerie (Rupture)' : '+ Add (Out of stock)',
+      onAction: () => {
+        handleAddItemToGroceryCart(item as InventoryItem, true);
       },
-      ...prev,
-    ]);
-    setBannerNotice(
-      lang === 'FR'
-        ? `🛒 "${item.name}" ajouté à votre panier de courses !`
-        : `🛒 Added "${item.name}" to your grocery cart!`
-    );
-    setTimeout(() => setBannerNotice(null), 3000);
+    });
   };
 
   // Fetch initial household inventory from backend API
@@ -947,6 +1037,9 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
       );
     }
     setTimeout(() => setBannerNotice(null), 3000);
+    if (!isNew && (savedItem.quantity <= 0 || savedItem.status === 'CONSUMED')) {
+      promptDepletedItem(savedItem);
+    }
     fetchInventory();
   };
 
@@ -1004,6 +1097,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             : `Marked "${item.name}" as consumed!`
         );
         setTimeout(() => setBannerNotice(null), 3000);
+        promptDepletedItem(item);
       }
     } catch (err) {
       console.error('Consume item failed:', err);
@@ -1260,24 +1354,11 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 setIsScannerOpen(true);
               }}
               className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-full bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 shrink-0 cursor-pointer shadow-2xs"
-              title={lang === 'FR' ? 'Scanner (Code-barres / Photo / Reçu)' : 'Scan (Barcode / Photo / Receipt)'}
+              title={lang === 'FR' ? 'Scanner (Code-barres / Photo)' : 'Scan (Barcode / Photo)'}
               aria-label={lang === 'FR' ? 'Scanner' : 'Scan'}
             >
               <Camera className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-teal-100" />
               <span className="hidden sm:inline">{lang === 'FR' ? 'Scanner' : 'Scan'}</span>
-            </button>
-
-            {/* Paste Store / Email Receipt Button */}
-            <button
-              type="button"
-              id="header-paste-receipt-btn"
-              onClick={() => setIsPasteReceiptOpen(true)}
-              className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-full bg-amber-700 hover:bg-amber-800 text-white text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 shrink-0 cursor-pointer shadow-2xs"
-              title={lang === 'FR' ? 'Coller un reçu (courriel / magasin)' : 'Paste receipt (email / store)'}
-              aria-label={lang === 'FR' ? 'Coller reçu' : 'Paste receipt'}
-            >
-              <Clipboard className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-100" />
-              <span className="hidden sm:inline">{lang === 'FR' ? 'Coller reçu' : 'Paste Receipt'}</span>
             </button>
 
             {/* Quick Add Item Button */}
@@ -1437,17 +1518,6 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                   {(filterLocation !== 'ALL' || selectedFoodType !== 'ALL' || filterLeftoversOnly) && (
                     <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
                   )}
-                </button>
-
-                {/* Paste Receipt Quick Button */}
-                <button
-                  type="button"
-                  onClick={() => setIsPasteReceiptOpen(true)}
-                  className="px-2.5 py-2.5 rounded-full border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shrink-0 shadow-2xs"
-                  title={lang === 'FR' ? 'Coller un reçu de courriel ou magasin' : 'Paste email or store receipt'}
-                >
-                  <Clipboard className="w-4 h-4 text-amber-700" />
-                  <span className="hidden xs:inline">{lang === 'FR' ? 'Reçu' : 'Receipt'}</span>
                 </button>
 
                 {/* Multi-selection toggle */}
@@ -2258,7 +2328,37 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 </div>
               </button>
 
-              {/* Option 3: Plan a Meal in Calendar (Planifier un repas) */}
+              {/* Option 3: Paste Store / Email Receipt (Coller un reçu) */}
+              <button
+                type="button"
+                id="add-paste-receipt-menu-btn"
+                onClick={() => {
+                  setIsAddMenuOpen(false);
+                  setIsPasteReceiptOpen(true);
+                }}
+                className="w-full p-3.5 sm:p-4 rounded-3xl bg-white hover:bg-amber-50/70 border-2 border-amber-600/30 hover:border-amber-500 flex items-center gap-3.5 sm:gap-4 text-left transition-all active:scale-[0.98] shadow-xs group cursor-pointer"
+              >
+                <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-tr from-amber-700 via-amber-600 to-yellow-500 text-white flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition-transform">
+                  <Clipboard className="w-6 h-6 text-amber-100" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-extrabold text-[#0D3B37]">
+                      {lang === 'FR' ? 'Coller un reçu (magasin ou courriel)' : 'Paste Receipt (Store or Email)'}
+                    </p>
+                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300">
+                      ⚡ {lang === 'FR' ? 'Multi-articles' : 'Bulk'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#527470]">
+                    {lang === 'FR'
+                      ? 'Collez le texte d’un reçu Maxi, Super C, Costco, IGA ou facture courriel'
+                      : 'Paste raw text from Maxi, Super C, Costco, IGA or email order confirmation'}
+                  </p>
+                </div>
+              </button>
+
+              {/* Option 4: Plan a Meal in Calendar (Planifier un repas) */}
               <button
                 type="button"
                 id="add-plan-meal-calendar-option"
@@ -2608,6 +2708,10 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         currentUser={currentUser}
         defaultLocationType={modalDefaultLocation}
         onSaved={handleItemSaved}
+        onOpenPasteReceipt={() => {
+          setIsAddEditModalOpen(false);
+          setIsPasteReceiptOpen(true);
+        }}
         onDeleted={(itemId) => {
           setItems((prev) => prev.filter((i) => i.id !== itemId));
           setBannerNotice(lang === 'FR' ? "Article supprimé de l'inventaire." : 'Item deleted from inventory.');

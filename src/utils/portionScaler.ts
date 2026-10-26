@@ -56,10 +56,29 @@ export function formatCulinaryFraction(val: number): string {
 }
 
 /**
- * Parses a fractional or decimal number from a string (e.g. "1 1/2" -> 1.5, "3/4" -> 0.75, "2.5" -> 2.5)
+ * Normalizes unicode fraction glyphs (½, ¼, ¾, etc.) to standard ASCII fractions
  */
-function parseFractionOrNumber(str: string): number | null {
-  const clean = str.trim();
+export function normalizeUnicodeFractions(str: string): string {
+  if (!str) return '';
+  return str
+    .replace(/(\d+)\s*([½¼¾⅓⅔⅛⅜⅝⅞])/g, '$1 $2')
+    .replace(/½/g, '1/2')
+    .replace(/¼/g, '1/4')
+    .replace(/¾/g, '3/4')
+    .replace(/⅓/g, '1/3')
+    .replace(/⅔/g, '2/3')
+    .replace(/⅛/g, '1/8')
+    .replace(/⅜/g, '3/8')
+    .replace(/⅝/g, '5/8')
+    .replace(/⅞/g, '7/8')
+    .trim();
+}
+
+/**
+ * Parses a fractional or decimal number from a string (e.g. "1 1/2" -> 1.5, "3/4" -> 0.75, "2.5" -> 2.5, "½" -> 0.5)
+ */
+export function parseFractionOrNumber(str: string): number | null {
+  const clean = normalizeUnicodeFractions(str);
   if (/^\d+\s+\d+\/\d+$/.test(clean)) {
     const parts = clean.split(/\s+/);
     const whole = parseInt(parts[0], 10);
@@ -89,9 +108,11 @@ export function scaleIngredientAmount(amountStr: string, factor: number): string
     return amountStr;
   }
 
+  const normalizedStr = normalizeUnicodeFractions(amountStr);
+
   // Replace numbers, fractions, and parenthesis-enclosed quantities
   // e.g., "1 1/2 cups", "3/4 cup (3oz)", "200 g"
-  const scaled = amountStr.replace(/(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)/g, (match) => {
+  const scaled = normalizedStr.replace(/(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)/g, (match) => {
     const num = parseFractionOrNumber(match);
     if (num === null) return match;
     const scaledNum = num * factor;

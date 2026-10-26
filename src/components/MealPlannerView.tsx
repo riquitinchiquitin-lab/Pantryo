@@ -45,7 +45,7 @@ import {
   recalculateDynamicNutrition,
   estimateIngredientNutrition,
 } from '../services/nutritionEngine';
-import { getCuratedMealPhoto, getFoodSvgFallback, CURATED_FOOD_PHOTOS } from '../utils/curatedFoodImages';
+import { getCuratedMealPhoto, getFoodSvgFallback, CURATED_FOOD_PHOTOS, isDocumentScan } from '../utils/curatedFoodImages';
 import { GuidedCookingModal } from './GuidedCookingModal';
 import { AddRecipeModal } from './AddRecipeModal';
 import { RicardoRecipe } from '../data/ricardoRecipes';
@@ -1347,8 +1347,9 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                           {/* Meal Photo Thumbnail */}
                           <div className="relative w-14 h-14 rounded-2xl overflow-hidden shrink-0 border border-[#E5DFD0] bg-[#FAF8F5] shadow-2xs">
                             {(() => {
-                              const photoSrc = meal.imageUrl?.trim()
-                                ? meal.imageUrl
+                              const hasRealFoodPhoto = meal.imageUrl?.trim() && !isDocumentScan(meal.imageUrl);
+                              const photoSrc = hasRealFoodPhoto
+                                ? meal.imageUrl!
                                 : getCuratedMealPhoto(meal.title, meal.mealType);
                               return (
                                 <img
@@ -1986,7 +1987,7 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                   {/* Live Photo Preview */}
                   <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-[#E0D9C8] bg-white shadow-2xs relative">
                     <img
-                      src={imageUrl.trim() || getCuratedMealPhoto(mealTitle || 'Repas', mealType)}
+                      src={(imageUrl.trim() && !isDocumentScan(imageUrl)) ? imageUrl.trim() : getCuratedMealPhoto(mealTitle || 'Repas', mealType)}
                       alt="Aperçu repas"
                       className="w-full h-full object-cover"
                       referrerPolicy="no-referrer"

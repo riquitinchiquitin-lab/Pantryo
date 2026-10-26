@@ -21,6 +21,7 @@ import {
   Camera,
   Upload,
   Image as ImageIcon,
+  Clipboard,
 } from 'lucide-react';
 import { InventoryItem, User, StorageType } from '../types';
 import { ALL_FOOD_CATEGORIES, ALL_SUB_CATEGORIES, ALL_MEAT_SEAFOOD_SUBCATEGORIES } from '../utils/foodVisuals';
@@ -38,6 +39,7 @@ interface AddEditItemModalProps {
   onSaved: (item: InventoryItem, isNew: boolean) => void;
   onDeleted?: (itemId: string) => void;
   defaultLocationType?: 'FRIDGE' | 'FREEZER' | 'PANTRY' | 'SPICE_RACK';
+  onOpenPasteReceipt?: () => void;
 }
 
 export type UnitCategory = 'metric' | 'imperial' | 'container' | 'composite';
@@ -140,6 +142,7 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
   onSaved,
   onDeleted,
   defaultLocationType,
+  onOpenPasteReceipt,
 }) => {
   const { t, lang } = useLanguage();
   const { confirmAction, showToast } = useAlertToast();
@@ -531,6 +534,40 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Quick Paste Receipt Shortcut Banner */}
+          {!isEditing && onOpenPasteReceipt && (
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-50 via-amber-100/50 to-orange-50/60 border-2 border-amber-300/80 flex items-center justify-between gap-3 shadow-2xs">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-700 to-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Clipboard className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="text-xs sm:text-sm font-extrabold text-amber-950">
+                      {lang === 'FR' ? 'Vous avez un reçu de caisse ou courriel ?' : 'Have a store receipt or email?'}
+                    </p>
+                    <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-amber-200/80 text-amber-900 border border-amber-300">
+                      ⚡ {lang === 'FR' ? 'Rapide' : 'Quick'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-amber-900/80 line-clamp-1 mt-0.5">
+                    {lang === 'FR'
+                      ? 'Collez le texte pour ajouter tous vos articles d’un coup (Maxi, Super C, Costco, IGA...)'
+                      : 'Paste receipt text to add multiple groceries at once with smart categorization'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onOpenPasteReceipt}
+                className="px-3 py-2 sm:px-4 sm:py-2 rounded-xl bg-amber-700 hover:bg-amber-800 text-white text-xs font-black shrink-0 transition-all active:scale-95 shadow-xs cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <Clipboard className="w-3.5 h-3.5" />
+                <span>{lang === 'FR' ? 'Coller reçu' : 'Paste Receipt'}</span>
+              </button>
+            </div>
+          )}
+
           {/* Item Name */}
           <div>
             <label className="block text-xs font-bold text-[#0D3B37] mb-1">

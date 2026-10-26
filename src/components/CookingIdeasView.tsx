@@ -57,7 +57,7 @@ import {
 } from '../utils/foodTranslator';
 import { ScrollableRow } from './ScrollableRow';
 import { detectSafeCookingRule, SAFE_COOKING_GUIDELINES, SafeCookingRule } from '../utils/safeCookingInstructions';
-import { getCuratedMealPhoto, getFoodSvgFallback } from '../utils/curatedFoodImages';
+import { getCuratedMealPhoto, getFoodSvgFallback, isDocumentScan } from '../utils/curatedFoodImages';
 
 const LOCAL_STORAGE_CUSTOM_RECIPES = 'kitchen_komrade_custom_recipes';
 
@@ -97,6 +97,8 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
   const [expandedStepsRecipeId, setExpandedStepsRecipeId] = useState<string | null>(null);
   const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
   const [addedItemsNotice, setAddedItemsNotice] = useState<string | null>(null);
+  const [viewingScanUrl, setViewingScanUrl] = useState<string | null>(null);
+  const [viewingScanTitle, setViewingScanTitle] = useState<string | null>(null);
 
   // Guided Cooking Modal state
   const [cookedRecipeIds, setCookedRecipeIds] = useState<Set<string>>(new Set());
@@ -419,9 +421,24 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
     }
   };
 
-  // Combine static Ricardo recipes + custom user-added recipes
+  // Combine static Ricardo recipes + custom user-added recipes with strict ID deduplication
   const allRecipes = useMemo(() => {
-    return [...customRecipes, ...RICARDO_RECIPES];
+    const seenIds = new Set<string>();
+    const combined: RicardoRecipe[] = [];
+    // Custom user recipes take precedence
+    for (const r of customRecipes) {
+      if (r && r.id && !seenIds.has(r.id)) {
+        seenIds.add(r.id);
+        combined.push(r);
+      }
+    }
+    for (const r of RICARDO_RECIPES) {
+      if (r && r.id && !seenIds.has(r.id)) {
+        seenIds.add(r.id);
+        combined.push(r);
+      }
+    }
+    return combined;
   }, [customRecipes]);
 
   // Items expiring in 3 days or less
@@ -1249,9 +1266,11 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                     {/* Recipe Thumbnail */}
                     <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden bg-[#FAF7EE] shrink-0 relative border border-[#E5DFD0] flex items-center justify-center shadow-2xs group-hover:scale-[1.02] transition-transform">
                       {(() => {
-                        const photo = recipe.imageUrl?.trim()
-                          ? recipe.imageUrl
-                          : getCuratedMealPhoto(recipe.title);
+                        const hasRealFoodPhoto = recipe.imageUrl?.trim() && !isDocumentScan(recipe.imageUrl);
+                        const primaryMealType = (recipe as any).mealType || recipe.mealTypes?.[0];
+                        const photo = hasRealFoodPhoto
+                          ? recipe.imageUrl!
+                          : getCuratedMealPhoto(recipe.title, primaryMealType, recipe.tags);
                         return (
                           <img
                             src={photo}
@@ -1260,7 +1279,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                             className="w-full h-full object-cover"
                             onError={(e) => {
                               const target = e.currentTarget as HTMLImageElement;
-                              const curated = getCuratedMealPhoto(recipe.title);
+                              const curated = getCuratedMealPhoto(recipe.title, primaryMealType, recipe.tags);
                               if (target.src !== curated) {
                                 target.src = curated;
                               } else {
@@ -1483,9 +1502,11 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                   /* Recipe Image Banner (Hero) */
                   <div className="h-40 w-full relative overflow-hidden bg-slate-900 border-b border-[#E5DFD0]">
                     {(() => {
-                      const heroPhoto = recipe.imageUrl?.trim()
-                        ? recipe.imageUrl
-                        : getCuratedMealPhoto(recipe.title);
+                      const hasRealFoodPhoto = recipe.imageUrl?.trim() && !isDocumentScan(recipe.imageUrl);
+                      const primaryMealType = (recipe as any).mealType || recipe.mealTypes?.[0];
+                      const heroPhoto = hasRealFoodPhoto
+                        ? recipe.imageUrl!
+                        : getCuratedMealPhoto(recipe.title, primaryMealType, recipe.tags);
                       return (
                         <img
                           src={heroPhoto}
@@ -1494,7 +1515,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                           className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
                           onError={(e) => {
                             const target = e.currentTarget as HTMLImageElement;
-                            const curated = getCuratedMealPhoto(recipe.title);
+                            const curated = getCuratedMealPhoto(recipe.title, primaryMealType, recipe.tags);
                             if (target.src !== curated) {
                               target.src = curated;
                             } else {
@@ -1536,6 +1557,23 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                             <FileText className="w-2.5 h-2.5" />
                             <span>{lang === 'FR' ? 'Ma Recette' : 'My Recipe'}</span>
                           </span>
+                        )}
+
+                        {/* View Original Scanned Document if available */}
+                        {(recipe.documentScanUrl || (recipe.imageUrl && isDocumentScan(recipe.imageUrl))) && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setViewingScanUrl(recipe.documentScanUrl || recipe.imageUrl || null);
+                              setViewingScanTitle(title);
+                            }}
+                            className="px-2.5 py-0.5 rounded-full bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-black flex items-center gap-1 shadow-2xs border border-amber-300/40 cursor-pointer active:scale-95 transition-all"
+                            title={lang === 'FR' ? 'Consulter le document numérisé original' : 'View original scanned document'}
+                          >
+                            <FileText className="w-2.5 h-2.5" />
+                            <span>{lang === 'FR' ? '📜 Page originale' : '📜 Original Scan'}</span>
+                          </button>
                         )}
 
                         {/* Edit Recipe Button */}
@@ -2234,9 +2272,11 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
               {/* Recipe Summary Card */}
               <div className="p-2.5 rounded-2xl bg-[#F6F9F5] border border-[#D5E1D2] flex items-center gap-3">
                 {(() => {
-                  const modalPhoto = planningRecipe.imageUrl?.trim()
-                    ? planningRecipe.imageUrl
-                    : getCuratedMealPhoto(planningRecipe.title);
+                  const hasRealFoodPhoto = planningRecipe.imageUrl?.trim() && !isDocumentScan(planningRecipe.imageUrl);
+                  const primaryMealType = (planningRecipe as any).mealType || planningRecipe.mealTypes?.[0];
+                  const modalPhoto = hasRealFoodPhoto
+                    ? planningRecipe.imageUrl!
+                    : getCuratedMealPhoto(planningRecipe.title, primaryMealType, planningRecipe.tags);
                   return (
                     <img
                       src={modalPhoto}
@@ -2245,7 +2285,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                       className="w-14 h-14 rounded-xl object-cover shrink-0 shadow-2xs"
                       onError={(e) => {
                         const target = e.currentTarget as HTMLImageElement;
-                        const curated = getCuratedMealPhoto(planningRecipe.title);
+                        const curated = getCuratedMealPhoto(planningRecipe.title, primaryMealType, planningRecipe.tags);
                         if (target.src !== curated) {
                           target.src = curated;
                         } else {
@@ -2461,6 +2501,58 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
         initialPhotoBase64={capturedRecipePhoto}
         recipeToEdit={recipeToEdit}
       />
+
+      {/* Original Scanned Recipe Document Lightbox */}
+      {viewingScanUrl && (
+        <div
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-fade-in"
+          onClick={() => setViewingScanUrl(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] overflow-hidden flex flex-col shadow-2xl border border-white/20 animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                <FileText className="w-5 h-5 text-amber-400 shrink-0" />
+                <div className="min-w-0">
+                  <h3 className="font-extrabold text-sm truncate">
+                    {viewingScanTitle || (lang === 'FR' ? 'Document original numérisé' : 'Original Scanned Document')}
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    {lang === 'FR' ? 'Fiche de recette vintage authentique' : 'Authentic vintage cookbook / card sheet'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingScanUrl(null)}
+                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                aria-label={lang === 'FR' ? 'Fermer' : 'Close'}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-4 sm:p-6 bg-slate-950/90 flex items-center justify-center min-h-[300px]">
+              <img
+                src={viewingScanUrl}
+                alt={viewingScanTitle || 'Scanned Document'}
+                className="max-w-full max-h-[75vh] object-contain rounded-xl shadow-2xl border border-slate-700 bg-white"
+              />
+            </div>
+            <div className="p-3 bg-slate-900 border-t border-slate-800 flex items-center justify-between text-xs text-slate-300">
+              <span>{lang === 'FR' ? 'Document d’archive conservé intact' : 'Archive document preserved intact'}</span>
+              <button
+                type="button"
+                onClick={() => setViewingScanUrl(null)}
+                className="px-4 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold transition-all cursor-pointer"
+              >
+                {lang === 'FR' ? 'Fermer' : 'Close'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

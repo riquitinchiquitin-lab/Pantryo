@@ -281,6 +281,7 @@ export const SavedListsModal: React.FC<SavedListsModalProps> = ({
       unit: item.unit,
       locationType: item.locationType || inferLocation(item.name, item.category),
       category: item.category,
+      outOfStock: item.outOfStock,
     }));
 
     const newList: SavedGroceryList = {

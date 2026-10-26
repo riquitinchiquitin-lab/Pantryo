@@ -271,6 +271,22 @@ Translate item names and categories to ${language === "FR" ? "French" : "English
                 type: Type.STRING,
                 description: "Printed net weight, volume, or count (e.g. '1.36 kg / 3 lb', '680 mL', '900 mL')",
               },
+              containerType: {
+                type: Type.STRING,
+                description: "Container silhouette: 'CAN', 'BOX', 'BAG', 'JAR', 'CARTON', 'BOTTLE', or 'TUB'",
+              },
+              region: {
+                type: Type.STRING,
+                description: "Culinary origin region: 'NORTH_AMERICA', 'SOUTH_AMERICA', 'CHINA', 'JAPAN', 'PHILIPPINES', or 'GLOBAL'",
+              },
+              originalScript: {
+                type: Type.STRING,
+                description: "Native foreign script if from China, Japan, Philippines, South America (e.g. '老干妈 香辣脆油辣椒', 'キユーピー マヨネーズ', 'Harina P.A.N.')",
+              },
+              romanization: {
+                type: Type.STRING,
+                description: "Romanized transliteration (Pinyin, Romaji)",
+              },
               unopenedLocation: {
                 type: Type.STRING,
                 description: "Recommended compartment before opening (e.g. 'Pantry' or 'Fridge')",

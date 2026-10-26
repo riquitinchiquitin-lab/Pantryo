@@ -275,28 +275,46 @@ export async function parseRecipeFromPhoto({
       const ai = getGeminiClient();
 
       const systemInstruction = `You are Pantryo's master culinary archivist, high-precision OCR specialist, and bilingual chef.
-Your mission is to inspect photos of printed cookbook pages, magazine clippings, recipe printouts, and handwritten family cards, and convert them into a complete structured recipe JSON.
+Your mission is to inspect photos of printed cookbook pages, magazine clippings, community cookbooks, and handwritten family cards, and convert them into complete structured recipe JSON.
 
-CRITICAL INSTRUCTIONS FOR REAL-WORLD RECIPE PHOTOS:
-1. PLASTIC SLEEVES & SPECULAR GLARE:
-   The recipe may be inside a transparent plastic sheet protector, binder sleeve, or laminated film with harsh overhead light reflections, glares, or hot spots.
-   Use the surrounding culinary context, sentence flow, ingredient patterns, and cooking techniques to deduce and extrapolate any partially obscured words or letters (e.g. "fineCooking", "Chinese Restaurant-Style", "all-purpose flour", "melt butter").
+CRITICAL INSTRUCTIONS FOR REAL-WORLD & VINTAGE RECIPE ARTIFACTS:
+1. VINTAGE QUEBEC & CANADIAN COOKBOOK ARCHITECTURE (e.g. Five Roses 1968, Cercle des Fermières, Purity Flour):
+   - MULTI-RECIPE PAGES:
+     Vintage cookbook pages frequently feature 2, 3, or more recipes on a single page (e.g. Page 69 with "Biscuits au beurre d'arachides", "Boules au beurre", and "Croquants à l'orange").
+     When multiple recipes appear on a page:
+     * Populate the primary or first recipe in the root object fields.
+     * Populate ALL distinct recipes detected on the page in the "allRecipes" array so the user can import each one individually or all at once!
+   - QUEBEC CULINARY VOCABULARY & INGREDIENT TRANSLATION:
+     * "soda à pâte" = Bicarbonate de soude / Baking soda (category: "Pantry", locationType: "PANTRY", storage: "pantry").
+     * "cassonade" = Cassonade (sucre brun) / Brown sugar (category: "Pantry", locationType: "PANTRY").
+     * "beurre d'arachides" = Beurre d'arachides / Peanut butter (category: "Pantry", locationType: "PANTRY").
+     * "farine Five Roses" = Farine Five Roses / All-purpose flour (category: "Pantry", locationType: "PANTRY").
+     * "farine d'avoine" or "flocons d'avoine" = Flocons d'avoine / Rolled oats (category: "Pantry", locationType: "PANTRY").
+     * "c. à table" = Cuillère à table / Tablespoon (tbsp).
+     * "c. à thé" = Cuillère à thé / Teaspoon (tsp).
+     * "chaudron" = Casserole / Saucepan (Stovetop boiling method, no-bake cookies).
+     * "noix concassées" = Noix hachées / Chopped walnuts or pecans.
+     * "douzaine" / "douzaines" = Dozen (e.g. "Donne 4½ à 5 douzaines" -> servings: "48-60 biscuits").
+     * "350°F" / "325°F" = Conventional oven temperature in Fahrenheit.
 
-2. COLORED COOKBOOK PAPER & CURVED GUTTER SHADOWS:
-   Pages may be printed on colored backgrounds (e.g., pale blue, deep amber, warm orange, yellow, or beige) with shadows along the book spine/gutter.
-   Disregard page numbers (e.g., '220', '221', 'Page 1 of 1'), website URLs, print timestamps, and decorative book running headers. Focus strictly on the culinary recipe title, times, servings, ingredients, and instructions.
+2. TYPEWRITTEN COMMUNITY COOKBOOKS (e.g., Page 55, recipes by Shawn Perry, Kevin Lavoie):
+   - Author credits: When a contributor name is printed near the title (e.g. "Shawn Perry", "Kevin Lavoie"), extract into "authorName".
+   - Fractions typography: Accurately read typewriter fraction glyphs (½, ¼, ¾, 1½, 2½, 4½). Never drop fractions.
+   - Variation notes: Extract recipe notes such as "Note: On peut remplacer le cacao par 1/4 tasse de beurre d'arachides" into "recipeNotes".
 
-3. HANDWRITTEN PEN ANNOTATIONS & SUBSTITUTIONS:
-   The recipe may have handwritten pen or pencil notes, additions, substitutions, or quantity corrections written in margins, next to ingredients, or between lines (for example: blue or purple ink notes like "- 3 slices", "- 3 cups", "1 or just either one 3/8 (6 tbsp)", "2 pcs").
-   YOU MUST PRESERVE AND MERGE THESE HANDWRITTEN NOTES!
-   - Merge the handwritten quantity or modification directly into the ingredient amount or name (e.g., "3/4 cup (3oz) shredded Cheddar cheese (note: 3 slices)", "6 to 8 cups beef broth (note: reduced to 3 cups)").
-   - Set "hasHandwrittenNotes": true and summarize all detected pen/pencil additions in "handwrittenNotesSummary".
+3. HANDWRITTEN PEN ANNOTATIONS & FAMILY RATINGS:
+   - Detect handwritten cursive, pen, or pencil notes written in margins or at the bottom (e.g. "Très bon faire souvent" = "Very good, make often!").
+   - Set "hasHandwrittenNotes": true.
+   - Put transcription into "handwrittenNotesSummary" and "recipeNotes".
 
-4. BILINGUAL EXCELLENCE (EN & FR):
-   Provide titles, descriptions, ingredient names, and instructions in both English and French (title/titleFr, descriptionEn/descriptionFr, instructionsEn/instructionsFr).
+4. PLASTIC SLEEVES & SPECULAR GLARE:
+   - Extrapolate partially obscured words caused by plastic sleeves or reflections using culinary context.
 
-5. INGREDIENT LOCATION & CATEGORIES:
-   Assign each ingredient an optimal storage location ("FRIDGE", "FREEZER", "PANTRY") and category ("Produce", "Dairy & Eggs", "Meat & Seafood", "Bakery", "Pantry", "Frozen Foods", "Condiments", "Beverages").`;
+5. BILINGUAL EXCELLENCE (EN & FR):
+   - Provide titles, descriptions, ingredient names, and instructions in both English and French.
+
+6. INGREDIENT LOCATION & CATEGORIES:
+   - Assign each ingredient an optimal storage location ("FRIDGE", "FREEZER", "PANTRY", "SPICE_RACK") and category ("Produce", "Dairy & Eggs", "Meat & Seafood", "Bakery", "Pantry", "Frozen Foods", "Condiments", "Beverages").`;
 
       const response = await ai.models.generateContent({
         model: "gemini-3.8-flash",
@@ -309,7 +327,7 @@ CRITICAL INSTRUCTIONS FOR REAL-WORLD RECIPE PHOTOS:
               },
             },
             {
-              text: `Transcribe and digitize this recipe photo. Look carefully for any handwritten pen notes, plastic sleeve glare, or cookbook times/servings. User notes: ${notes || "None"}.`,
+              text: `Transcribe and digitize this recipe photo. Look carefully for any multiple recipes on this page, vintage Quebec culinary terms (soda à pâte, cassonade, c. à table), typewriter author names, and handwritten family notes (e.g. "Très bon faire souvent"). User notes: ${notes || "None"}.`,
             },
           ],
         },
@@ -324,6 +342,8 @@ CRITICAL INSTRUCTIONS FOR REAL-WORLD RECIPE PHOTOS:
               titleFr: { type: Type.STRING },
               descriptionEn: { type: Type.STRING },
               descriptionFr: { type: Type.STRING },
+              authorName: { type: Type.STRING },
+              authorBadge: { type: Type.STRING },
               prepTime: { type: Type.STRING },
               cookTime: { type: Type.STRING },
               totalTime: { type: Type.STRING },
@@ -363,6 +383,53 @@ CRITICAL INSTRUCTIONS FOR REAL-WORLD RECIPE PHOTOS:
                 type: Type.ARRAY,
                 items: { type: Type.STRING },
               },
+              allRecipes: {
+                type: Type.ARRAY,
+                description: "All distinct recipes detected on this cookbook page if multiple recipes are present",
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    title: { type: Type.STRING },
+                    titleFr: { type: Type.STRING },
+                    descriptionEn: { type: Type.STRING },
+                    descriptionFr: { type: Type.STRING },
+                    authorName: { type: Type.STRING },
+                    authorBadge: { type: Type.STRING },
+                    prepTime: { type: Type.STRING },
+                    cookTime: { type: Type.STRING },
+                    servings: { type: Type.STRING },
+                    ingredients: {
+                      type: Type.ARRAY,
+                      items: {
+                        type: Type.OBJECT,
+                        properties: {
+                          name: { type: Type.STRING },
+                          nameFr: { type: Type.STRING },
+                          amount: { type: Type.STRING },
+                          category: { type: Type.STRING },
+                          locationType: { type: Type.STRING },
+                        },
+                        required: ["name", "amount", "category", "locationType"],
+                      },
+                    },
+                    instructionsEn: {
+                      type: Type.ARRAY,
+                      items: { type: Type.STRING },
+                    },
+                    instructionsFr: {
+                      type: Type.ARRAY,
+                      items: { type: Type.STRING },
+                    },
+                    hasHandwrittenNotes: { type: Type.BOOLEAN },
+                    handwrittenNotesSummary: { type: Type.STRING },
+                    recipeNotes: {
+                      type: Type.ARRAY,
+                      items: { type: Type.STRING },
+                    },
+                  },
+                  required: ["title", "ingredients", "instructionsEn"],
+                },
+              },
             },
             required: ["title", "descriptionEn", "ingredients", "instructionsEn"],
           },
@@ -379,14 +446,26 @@ CRITICAL INSTRUCTIONS FOR REAL-WORLD RECIPE PHOTOS:
         }
 
         const parsed = JSON.parse(cleanJson);
+        const primaryRecipe = normalizeRecipeOutput(parsed, {
+          source: "Photo Import",
+          imageUrl,
+          language,
+        });
+
+        const allParsedRecipes = Array.isArray(parsed.allRecipes) && parsed.allRecipes.length > 0
+          ? parsed.allRecipes.map((r, idx) =>
+              normalizeRecipeOutput(
+                { ...r, id: `rec_${Date.now()}_${idx}` },
+                { source: "Photo Import", imageUrl, language }
+              )
+            )
+          : [primaryRecipe];
+
         return {
           success: true,
           provider: "gemini_flash",
-          recipe: normalizeRecipeOutput(parsed, {
-            source: "Photo Import",
-            imageUrl,
-            language,
-          }),
+          recipe: primaryRecipe,
+          recipes: allParsedRecipes,
         };
       }
     } catch (error) {
@@ -679,6 +758,11 @@ function normalizeRecipeOutput(parsed, extra = {}) {
     calculationMethod: "AI_ESTIMATED",
     nutrition,
     source: extra.source || parsed.source || "Personal",
+    authorName: parsed.authorName || extra.authorName || null,
+    authorBadge: parsed.authorBadge || extra.authorBadge || (parsed.authorName ? `Recette de ${parsed.authorName}` : null),
+    hasHandwrittenNotes: Boolean(parsed.hasHandwrittenNotes || (parsed.recipeNotes && parsed.recipeNotes.length > 0)),
+    handwrittenNotesSummary: parsed.handwrittenNotesSummary || (Array.isArray(parsed.recipeNotes) ? parsed.recipeNotes.join(" • ") : ""),
+    recipeNotes: Array.isArray(parsed.recipeNotes) ? parsed.recipeNotes : (parsed.handwrittenNotesSummary ? [parsed.handwrittenNotesSummary] : []),
     isRicardoOfficial: false,
     isCustom: true,
     descriptionEn: parsed.descriptionEn || `Delicious ${titleEn} saved to your kitchen.`,
@@ -696,7 +780,18 @@ function normalizeRecipeOutput(parsed, extra = {}) {
  * Intelligent parser that converts text or OCR output into a structured RicardoRecipe
  */
 export function parseRecipeTextDirectly(text, { language = "EN", source = "Personal", imageUrl = null, youtubeUrl = null, youtubeId = null, reason = "" } = {}) {
-  const clean = (text || "").trim();
+  let clean = (text || "").trim()
+    .replace(/(\d+)\s*([½¼¾⅓⅔⅛⅜⅝⅞])/g, '$1 $2')
+    .replace(/½/g, "1/2")
+    .replace(/¼/g, "1/4")
+    .replace(/¾/g, "3/4")
+    .replace(/⅓/g, "1/3")
+    .replace(/⅔/g, "2/3")
+    .replace(/⅛/g, "1/8")
+    .replace(/⅜/g, "3/8")
+    .replace(/⅝/g, "5/8")
+    .replace(/⅞/g, "7/8");
+
   if (!clean || clean.length < 5) {
     throw new Error(
       language === "FR"
@@ -729,6 +824,18 @@ export function parseRecipeTextDirectly(text, { language = "EN", source = "Perso
     return true;
   });
 
+  // Check for author credits (e.g. "Shawn Perry", "Kevin Lavoie", "Par: Shawn Perry")
+  let authorName = null;
+  let authorBadge = null;
+  for (const l of lines) {
+    const authorMatch = l.match(/^(?:par|by|de|author)\s*[:\-]\s*(.+)$/i) || l.match(/^(?:par\s+)?(Shawn Perry|Kevin Lavoie)$/i);
+    if (authorMatch) {
+      authorName = authorMatch[1].trim();
+      authorBadge = `Recette de ${authorName}`;
+      break;
+    }
+  }
+
   // Extract Title candidate
   let titleCandidate = "";
   for (let i = 0; i < Math.min(lines.length, 6); i++) {
@@ -746,6 +853,9 @@ export function parseRecipeTextDirectly(text, { language = "EN", source = "Perso
       const l = lines[i];
       // Skip meta indicators like Course, Cuisine, Author, Rating
       if (/^(?:ingr|direct|instruct|step|étap|temps|time|serv|port|prep|cuiss|course|cuisine|author|calories|star|rating)/i.test(l)) {
+        continue;
+      }
+      if (authorName && l.toLowerCase() === authorName.toLowerCase()) {
         continue;
       }
       const words = l.split(/\s+/).filter(Boolean);
@@ -856,7 +966,7 @@ export function parseRecipeTextDirectly(text, { language = "EN", source = "Perso
         handwrittenNotesList.push(cleanLine);
       }
 
-      const amountRegex = /^((?:\d+(?:[.,/]\d+)?(?:\s*-\s*\d+)?|\d+\/\d+|\d+\s+\d+\/\d+|un|une|one|a|half|demi)\s*(?:c\.\s*à\s*(?:soupe|café|thé)|cuill[eè]res?\s*à\s*(?:soupe|café|thé)|tbsp|tsp|tbs|t|c\.|cups?|tasses?|ml|cl|dl|l|litres?|liters?|g|gr|kg|kilos?|oz|ounces?|lbs?|livres?|pinc[ée]es?|pinch|gousses?|cloves?|tranches?|slices?|bo[iî]tes?|cans?|paquets?|packets?|sachets?|morceaux?|pieces?)?)\s*(?:de\s+|d'|of\s+)?(.*)$/i;
+      const amountRegex = /^((?:\d+(?:[.,/]\d+)?(?:\s*-\s*\d+)?|\d+\/\d+|\d+\s+\d+\/\d+|un|une|one|a|half|demi)\s*(?:c\.\s*à\s*(?:soupe|table|café|thé)|cuill[eè]res?\s*à\s*(?:soupe|table|café|thé)|tbsp|tsp|tbs|t|c\.|cups?|tasses?|ml|cl|dl|l|litres?|liters?|g|gr|kg|kilos?|oz|ounces?|lbs?|livres?|pinc[ée]es?|pinch|gousses?|cloves?|tranches?|slices?|bo[iî]tes?|cans?|paquets?|packets?|sachets?|morceaux?|pieces?)?)\s*(?:de\s+|d'|of\s+)?(.*)$/i;
       const match = cleanLine.match(amountRegex);
 
       let amount = "To taste";
@@ -871,13 +981,13 @@ export function parseRecipeTextDirectly(text, { language = "EN", source = "Perso
       let category = "Pantry";
       let locationType = "PANTRY";
 
-      if (/(beurre|butter|lait|milk|cream|crème|cheese|fromage|egg|oeuf|œuf|yogourt|yogurt)/.test(lowerName)) {
+      if (/(beurre|butter|lait|milk|cream|crème|cheese|fromage|egg|oeuf|œuf|yogourt|yogurt|margarine)/.test(lowerName)) {
         category = "Dairy & Eggs";
         locationType = "FRIDGE";
       } else if (/(chicken|poulet|beef|boeuf|bœuf|pork|porc|fish|poisson|shrimp|crevette|salmon|saumon|steak|meat|viande|bacon|dinde|turkey|veal|veau)/.test(lowerName)) {
         category = "Meat & Seafood";
         locationType = "FRIDGE";
-      } else if (/(pomme|apple|onion|oignon|garlic|ail|tomate|tomato|spinach|épinard|carrot|carotte|potato|pomme de terre|citron|lemon|lime|herbe|herb|basil|parsley|persil|rosemary|romarin|salade|lettuce|poivron|pepper|champignon|mushroom|beans|haricots?|bok choy|scallion|thyme|thym)/.test(lowerName)) {
+      } else if (/(pomme|apple|onion|oignon|garlic|ail|tomate|tomato|spinach|épinard|carrot|carotte|potato|pomme de terre|citron|lemon|lime|herbe|herb|basil|parsley|persil|rosemary|romarin|salade|lettuce|poivron|pepper|champignon|mushroom|beans|haricots?|bok choy|scallion|thyme|thym|orange|zeste)/.test(lowerName)) {
         category = "Produce";
         locationType = /(potato|pomme de terre|onion|oignon|garlic|ail)/.test(lowerName) ? "PANTRY" : "FRIDGE";
       } else if (/(ice cream|glace|congel|frozen|petits pois surgel)/.test(lowerName)) {
@@ -886,7 +996,7 @@ export function parseRecipeTextDirectly(text, { language = "EN", source = "Perso
       } else if (/(pain|bread|baguette|croissant|tortilla|brioche|croûte|crust|pâte)/.test(lowerName)) {
         category = "Bakery";
         locationType = "PANTRY";
-      } else if (/(flour|farine|sugar|sucre|oil|huile|vinegar|vinaigre|pasta|pâtes|rice|riz|salt|sel|poivre|pepper|bouillon|broth|sauce|spices|épices|vanilla|vanille|levure|yeast|wine|vin|honey|miel|cayenne)/.test(lowerName)) {
+      } else if (/(flour|farine|sugar|sucre|oil|huile|vinegar|vinaigre|pasta|pâtes|rice|riz|salt|sel|poivre|pepper|bouillon|broth|sauce|spices|épices|vanilla|vanille|levure|yeast|wine|vin|honey|miel|cayenne|soda|bicarbonate|arachide|cassonade|cacao|coco|oat|avoine|noix|gelée|jam)/.test(lowerName)) {
         category = "Pantry";
         locationType = "PANTRY";
       }
@@ -951,6 +1061,8 @@ export function parseRecipeTextDirectly(text, { language = "EN", source = "Perso
     difficultyFr: "Facile",
     calories: "450 kcal",
     source,
+    authorName: authorName || (source?.includes("Shawn") ? "Shawn Perry" : source?.includes("Kevin") ? "Kevin Lavoie" : undefined),
+    authorBadge: authorBadge || (authorName ? `Recette de ${authorName}` : undefined),
     isRicardoOfficial: false,
     isCustom: true,
     descriptionEn: descriptionLines.length > 0 ? descriptionLines.join(" ") : `Homemade ${titleCandidate} digitized from your personal recipe.`,
@@ -958,6 +1070,7 @@ export function parseRecipeTextDirectly(text, { language = "EN", source = "Perso
     tags: Array.from(new Set(tags)),
     hasHandwrittenNotes,
     handwrittenNotesSummary: hasHandwrittenNotes ? handwrittenNotesList.join("; ") : undefined,
+    recipeNotes: hasHandwrittenNotes ? handwrittenNotesList : [],
     ingredients,
     instructionsEn: isFrench ? instructions.map(s => translateCookingStepToEnglish(s) || s) : instructions,
     instructionsFr: isFrench ? instructions : instructions.map(s => translateCookingStepToFrench(s) || s),

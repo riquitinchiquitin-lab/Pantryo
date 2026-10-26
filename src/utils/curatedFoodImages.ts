@@ -10,6 +10,135 @@ export interface FoodPhotoPreset {
 }
 
 export const CURATED_FOOD_PHOTOS: FoodPhotoPreset[] = [
+  // --- Cookies & Baked Treats (Biscuits & Pâtisseries) ---
+  {
+    id: 'peanut_butter_cookies',
+    labelFr: 'Biscuits dorés au beurre d\'arachides',
+    labelEn: 'Classic Peanut Butter Cookies',
+    url: 'https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?auto=format&fit=crop&w=800&q=80',
+    keywords: ['peanut butter', 'beurre d\'arachide', 'beurre d\'arachides', 'arachides', 'peanuts', 'five roses', 'quadrillage', 'fourchette'],
+  },
+  {
+    id: 'butter_balls_jam',
+    labelFr: 'Boules au beurre avec confiture',
+    labelEn: 'Butter Balls with Jam',
+    url: 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?auto=format&fit=crop&w=800&q=80',
+    keywords: ['boules au beurre', 'butter balls', 'thumbprint', 'confiture', 'sablés', 'shortbread', 'sablé', 'boule'],
+  },
+  {
+    id: 'orange_crisps',
+    labelFr: 'Croquants à l\'orange',
+    labelEn: 'Orange Crisp Cookies',
+    url: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=800&q=80',
+    keywords: ['croquants', 'orange', 'crisps', 'biscotti', 'citron', 'agrumes', 'croquant', 'biscuit croquant'],
+  },
+  {
+    id: 'chaudron_cookies',
+    labelFr: 'Biscuits préparés au chaudron (sans cuisson)',
+    labelEn: 'Stovetop Chocolate Oatmeal Cookies',
+    url: 'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?auto=format&fit=crop&w=800&q=80',
+    keywords: ['chaudron', 'shawn perry', 'sans cuisson', 'no bake', 'no-bake', 'cacao', 'fudge', 'casserole', 'drop cookies'],
+  },
+  {
+    id: 'oatmeal_cookies',
+    labelFr: 'Biscuits moelleux à l\'avoine',
+    labelEn: 'Chewy Oatmeal Cookies',
+    url: 'https://images.unsplash.com/photo-1597528662465-55ece5734101?auto=format&fit=crop&w=800&q=80',
+    keywords: ['avoine', 'oatmeal', 'oat', 'kevin lavoie', 'flocons d\'avoine', 'raisins', 'biscuit à l\'avoine', 'galettes à l\'avoine'],
+  },
+  {
+    id: 'classic_cookies',
+    labelFr: 'Biscuits aux pépites de chocolat',
+    labelEn: 'Chocolate Chip Cookies',
+    url: 'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?auto=format&fit=crop&w=800&q=80',
+    keywords: ['biscuit', 'biscuits', 'cookie', 'cookies', 'galette', 'galettes', 'pépites', 'chocolate chip'],
+  },
+  {
+    id: 'blueberry_muffins',
+    labelFr: 'Muffins moelleux aux bleuets',
+    labelEn: 'Blueberry Muffins',
+    url: 'https://images.unsplash.com/photo-1586985289688-ca3cf47d3e6e?auto=format&fit=crop&w=800&q=80',
+    keywords: ['muffin', 'muffins', 'bleuets', 'blueberries', 'cupcake', 'cupcakes', 'gâteau', 'cake', 'brownie', 'dessert'],
+  },
+  {
+    id: 'apple_pie',
+    labelFr: 'Tarte dorée aux pommes & cannelle',
+    labelEn: 'Cinnamon Apple Pie',
+    url: 'https://images.unsplash.com/photo-1568571780765-9276ac8b75a2?auto=format&fit=crop&w=800&q=80',
+    keywords: ['tarte', 'pie', 'tourtière', 'apple pie', 'tarte aux pommes', 'crumble', 'croustade'],
+  },
+
+  // --- Savory Meals & Meats ---
+  {
+    id: 'maple_pork_roast',
+    labelFr: 'Rôti de porc aux pommes & érable',
+    labelEn: 'Apple & Maple Syrup Pork Roast',
+    url: 'https://images.unsplash.com/photo-1432139555190-58524dae6a55?auto=format&fit=crop&w=800&q=80',
+    keywords: ['rôti de porc', 'pork roast', 'porc', 'pork', 'érable', 'maple', 'pommes', 'longe', 'porc aux pommes'],
+  },
+  {
+    id: 'tuscan_chicken',
+    labelFr: 'Poulet crémeux toscan',
+    labelEn: 'Creamy Tuscan Chicken',
+    url: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?auto=format&fit=crop&w=800&q=80',
+    keywords: ['tuscan', 'toscane', 'crémeux', 'cream', 'épinards', 'spinach', 'parmesan chicken', 'poulet', 'chicken', 'volaille'],
+  },
+  {
+    id: 'meatballs_marinara',
+    labelFr: 'Boulettes de viande à la sauce marinara',
+    labelEn: 'Italian Meatballs Marinara',
+    url: 'https://images.unsplash.com/photo-1529042410759-befb1204b468?auto=format&fit=crop&w=800&q=80',
+    keywords: ['meatball', 'meatballs', 'boulette', 'boulettes', 'polpette', 'polpettes', 'meatball nirvana'],
+  },
+  {
+    id: 'beef_stew',
+    labelFr: 'Poêlée campagnarde de bœuf',
+    labelEn: 'French Beef & Veggie Skillet',
+    url: 'https://images.unsplash.com/photo-1534939561126-855b8675edd7?auto=format&fit=crop&w=800&q=80',
+    keywords: ['stew', 'boeuf', 'bœuf', 'beef', 'bourguignon', 'poêlée', 'viande', 'meat', 'steak', 'bavette', 'filet mignon'],
+  },
+  {
+    id: 'filipino_stew',
+    labelFr: 'Mijoté savoureux & riz',
+    labelEn: 'Savory Pork Belly Stew & Rice',
+    url: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80',
+    keywords: ['sinigang', 'adobo', 'pork belly', 'liempo', 'filipino', 'panlasang', 'tinola', 'caldereta', 'menudo', 'sisig'],
+  },
+  {
+    id: 'french_onion_soup',
+    labelFr: 'Soupe à l\'oignon gratinée',
+    labelEn: 'Classic French Onion Soup',
+    url: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=800&q=80',
+    keywords: ['oignon', 'onion soup', 'soupe à l\'oignon', 'gratinée', 'gruyère', 'broth', 'soup', 'soupe', 'potage', 'minestrone', 'velouté'],
+  },
+  {
+    id: 'coconut_curry',
+    labelFr: 'Curry de poulet au lait de coco',
+    labelEn: 'Coconut Chicken Curry',
+    url: 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?auto=format&fit=crop&w=800&q=80',
+    keywords: ['curry', 'cari', 'coco', 'coconut', 'curry de poulet', 'tikka'],
+  },
+  {
+    id: 'pasta_bolognese',
+    labelFr: 'Pâtes bolognaise au ragù',
+    labelEn: 'Tagliatelle Bolognese',
+    url: 'https://images.unsplash.com/photo-1555949258-eb67b1ef0ceb?auto=format&fit=crop&w=800&q=80',
+    keywords: ['pasta', 'pâtes', 'tagliatelle', 'spaghetti', 'bolognese', 'ragù', 'lasagne', 'penne', 'spaghetti sauce', 'pomodoro', 'tomate', 'tomato', 'marinara'],
+  },
+  {
+    id: 'margherita_pizza',
+    labelFr: 'Pizza margherita au feu de bois',
+    labelEn: 'Wood-Fired Margherita Pizza',
+    url: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80',
+    keywords: ['pizza', 'calzone', 'focaccia', 'croûte'],
+  },
+  {
+    id: 'gourmet_burger',
+    labelFr: 'Burger gourmet & frites',
+    labelEn: 'Gourmet Burger & Fries',
+    url: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=800&q=80',
+    keywords: ['burger', 'hambourgeois', 'sandwich', 'panini', 'club sandwich'],
+  },
   {
     id: 'salmon_asparagus',
     labelFr: 'Saumon grillé & asperges',
@@ -18,25 +147,20 @@ export const CURATED_FOOD_PHOTOS: FoodPhotoPreset[] = [
     keywords: ['salmon', 'saumon', 'fish', 'poisson', 'asparagus', 'asperges', 'truite'],
   },
   {
-    id: 'pasta_bolognese',
-    labelFr: 'Pâtes bolognaise au ragù',
-    labelEn: 'Tagliatelle Bolognese',
-    url: 'https://images.unsplash.com/photo-1555949258-eb67b1ef0ceb?auto=format&fit=crop&w=800&q=80',
-    keywords: ['pasta', 'pâtes', 'tagliatelle', 'spaghetti', 'bolognese', 'ragù', 'lasagne', 'penne', 'spaghetti sauce'],
+    id: 'garden_salad',
+    labelFr: 'Salade maraîchère fraîche',
+    labelEn: 'Fresh Garden Salad',
+    url: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=800&q=80',
+    keywords: ['salad', 'salade', 'greens', 'laitue', 'crudités', 'vinaigrette', 'caesar'],
   },
+
+  // --- Breakfast & Brunch ---
   {
-    id: 'pasta_pomodoro',
-    labelFr: 'Pâtes tomate & basilic',
-    labelEn: 'Tomato & Basil Pasta',
-    url: 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=800&q=80',
-    keywords: ['pomodoro', 'tomate', 'tomato', 'ail', 'garlic', 'marinara', 'italian'],
-  },
-  {
-    id: 'french_toast',
-    labelFr: 'Pain doré aux petits fruits',
-    labelEn: 'Berry French Toast',
-    url: 'https://images.unsplash.com/photo-1484723091739-30a097e8f929?auto=format&fit=crop&w=800&q=80',
-    keywords: ['french toast', 'pain doré', 'pain', 'toast', 'compote', 'berries', 'érable', 'maple', 'pancake', 'crepe', 'crêpe'],
+    id: 'fluffy_pancakes',
+    labelFr: 'Crêpes & pancakes au sirop d\'érable',
+    labelEn: 'Fluffy Buttermilk Pancakes',
+    url: 'https://images.unsplash.com/photo-1528207776546-365bb710ee93?auto=format&fit=crop&w=800&q=80',
+    keywords: ['pancake', 'pancakes', 'crêpe', 'crêpes', 'gaufre', 'gaufres', 'waffle', 'french toast', 'pain doré'],
   },
   {
     id: 'avocado_toast',
@@ -50,119 +174,91 @@ export const CURATED_FOOD_PHOTOS: FoodPhotoPreset[] = [
     labelFr: 'Œufs brouillés crémeux',
     labelEn: 'Creamy Scrambled Eggs',
     url: 'https://images.unsplash.com/photo-1582169505937-b9992bd01ed9?auto=format&fit=crop&w=800&q=80',
-    keywords: ['scramble', 'brouillade', 'œufs', 'oeufs', 'eggs', 'omelette', 'omelet', 'ramsay'],
-  },
-  {
-    id: 'beef_tacos',
-    labelFr: 'Tacos au bœuf & légumes',
-    labelEn: 'Beef Tacos Skillet',
-    url: 'https://images.unsplash.com/photo-1551504734-5ee1c4a1479b?auto=format&fit=crop&w=800&q=80',
-    keywords: ['taco', 'tacos', 'mexican', 'mexicaine', 'fajita', 'burrito', 'quesadilla', 'skillet'],
-  },
-  {
-    id: 'salmon_poke_bowl',
-    labelFr: 'Bol zen saumon & avocat',
-    labelEn: 'Salmon Avocado Poke Bowl',
-    url: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80',
-    keywords: ['bowl', 'poke', 'zen', 'sésame', 'riz', 'rice bowl', 'salade de saumon'],
-  },
-  {
-    id: 'beef_stew',
-    labelFr: 'Poêlée campagnarde de bœuf',
-    labelEn: 'French Beef & Veggie Skillet',
-    url: 'https://images.unsplash.com/photo-1534939561126-855b8675edd7?auto=format&fit=crop&w=800&q=80',
-    keywords: ['stew', 'boeuf', 'bœuf', 'beef', 'bourguignon', 'poêlée', 'viande', 'meat', 'steak', 'marmiton'],
-  },
-  {
-    id: 'filipino_stew',
-    labelFr: 'Mijoté savoureux & riz',
-    labelEn: 'Savory Pork Belly Stew & Rice',
-    url: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80',
-    keywords: ['sinigang', 'adobo', 'pork belly', 'liempo', 'filipino', 'panlasang', 'tinola', 'caldereta', 'menudo', 'sisig'],
-  },
-  {
-    id: 'hummus_pita',
-    labelFr: 'Trempette houmous & pain pita',
-    labelEn: 'Herbed Pita & Chickpea Dip',
-    url: 'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?auto=format&fit=crop&w=800&q=80',
-    keywords: ['hummus', 'houmous', 'dip', 'trempette', 'pita', 'chickpea', 'pois chiches'],
+    keywords: ['scramble', 'brouillade', 'œufs', 'oeufs', 'eggs', 'omelette', 'omelet'],
   },
   {
     id: 'strawberry_parfait',
     labelFr: 'Parfait yogourt & fraises',
     labelEn: 'Strawberry Yogurt Parfait',
     url: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=800&q=80',
-    keywords: ['parfait', 'yogurt', 'yogourt', 'fraises', 'strawberries', 'granola', 'dessert'],
-  },
-  {
-    id: 'salmon_veggies',
-    labelFr: 'Pavé de saumon aux légumes',
-    labelEn: 'Salmon & Steamed Veggies',
-    url: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=800&q=80',
-    keywords: ['legumes', 'légumes', 'steamed', 'healthy', 'filet de saumon'],
-  },
-  {
-    id: 'garden_salad',
-    labelFr: 'Salade maraîchère fraîche',
-    labelEn: 'Fresh Garden Salad',
-    url: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=800&q=80',
-    keywords: ['salad', 'salade', 'greens', 'laitue', 'crudités', 'vinaigrette', 'caesar'],
-  },
-  {
-    id: 'veggie_soup',
-    labelFr: 'Soupe rustique aux légumes',
-    labelEn: 'Rustic Minestrone Soup',
-    url: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=800&q=80',
-    keywords: ['soup', 'soupe', 'minestrone', 'potage', 'bouillon', 'velouté'],
-  },
-  {
-    id: 'smoothie_bowl',
-    labelFr: 'Bol de smoothie aux baies',
-    labelEn: 'Antioxidant Berry Smoothie',
-    url: 'https://images.unsplash.com/photo-1590301157890-4810ed352733?auto=format&fit=crop&w=800&q=80',
-    keywords: ['smoothie', 'shake', 'baies', 'fruits', 'açaí', 'acai', 'breakfast bowl'],
-  },
-  {
-    id: 'chicken_fajitas',
-    labelFr: 'Poulet rôti ou fajitas',
-    labelEn: 'Roasted Chicken Skillet',
-    url: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?auto=format&fit=crop&w=800&q=80',
-    keywords: ['chicken', 'poulet', 'volaille', 'fajitas', 'curry de poulet', 'afritada'],
+    keywords: ['parfait', 'yogurt', 'yogourt', 'fraises', 'strawberries', 'granola', 'smoothie', 'shake', 'baies'],
   },
 ];
 
 /**
- * Returns a high-definition food photograph matching title, keywords, or meal slot type.
+ * Returns true if a given URL is a raw scanned document (cookbook page, typewriter page, receipt).
  */
-export function getCuratedMealPhoto(title?: string, mealType?: string): string {
-  if (!title) {
-    if (mealType === 'BREAKFAST') return CURATED_FOOD_PHOTOS[4].url; // Avocado toast
-    if (mealType === 'LUNCH') return CURATED_FOOD_PHOTOS[1].url; // Pasta bolognese
-    if (mealType === 'SNACK') return CURATED_FOOD_PHOTOS[11].url; // Strawberry parfait
-    return CURATED_FOOD_PHOTOS[0].url; // Salmon & asparagus
-  }
+export function isDocumentScan(url?: string): boolean {
+  if (!url) return false;
+  return /Image_October|PXL_|Screenshot_|camera_snap|raw_scan|data:image/i.test(url);
+}
 
-  const lower = title.toLowerCase();
+/**
+ * Returns a high-definition food photograph accurately matching title, keywords, or meal slot type.
+ * Never misclassifies baked goods or cookies as fish/dinner stews.
+ */
+export function getCuratedMealPhoto(title?: string, mealType?: string, tags: string[] = []): string {
+  const combinedText = [
+    title || '',
+    ...(Array.isArray(tags) ? tags : []),
+  ].join(' ').toLowerCase();
 
-  for (const preset of CURATED_FOOD_PHOTOS) {
-    if (preset.keywords.some((k) => lower.includes(k))) {
-      return preset.url;
+  if (combinedText.trim()) {
+    // 1. Direct Keyword Match against curated library
+    for (const preset of CURATED_FOOD_PHOTOS) {
+      if (preset.keywords.some((k) => combinedText.includes(k.toLowerCase()))) {
+        return preset.url;
+      }
+    }
+
+    // 2. High-level category fallbacks based on food words
+    // Baked goods & Cookies
+    if (/biscuit|cookie|galette|croquant|sablé|shortbread|pâtisserie|baking|arachide|fudge|cacao/i.test(combinedText)) {
+      return CURATED_FOOD_PHOTOS[5].url; // Classic cookies
+    }
+    // Cakes, muffins & desserts
+    if (/gâteau|cake|muffin|tarte|pie|brownie|dessert|sucre/i.test(combinedText)) {
+      return CURATED_FOOD_PHOTOS[6].url; // Blueberry muffins
+    }
+    // Pork & Roasts
+    if (/porc|pork|longe|jambon|ham|bacon/i.test(combinedText)) {
+      return CURATED_FOOD_PHOTOS[8].url; // Maple pork roast
+    }
+    // Chicken & Poultry
+    if (/poulet|chicken|dindon|turkey|volaille|fajita/i.test(combinedText)) {
+      return CURATED_FOOD_PHOTOS[9].url; // Tuscan chicken
+    }
+    // Beef & Red Meat
+    if (/bœuf|boeuf|beef|steak|veau|veal/i.test(combinedText)) {
+      return CURATED_FOOD_PHOTOS[11].url; // Beef stew / steak
+    }
+    // Pasta & Italian
+    if (/pâte|pasta|spaghetti|macaroni|lasagne|penne/i.test(combinedText)) {
+      return CURATED_FOOD_PHOTOS[15].url; // Pasta bolognese
+    }
+    // Soups
+    if (/soupe|soup|potage|bouillon|chowder|crème/i.test(combinedText)) {
+      return CURATED_FOOD_PHOTOS[13].url; // French onion soup
+    }
+    // Fish & Seafood
+    if (/saumon|salmon|poisson|fish|crevette|shrimp|morue|truite/i.test(combinedText)) {
+      return CURATED_FOOD_PHOTOS[18].url; // Grilled salmon
     }
   }
 
-  // Fallback by meal slot type
-  if (mealType === 'BREAKFAST' || lower.includes('déjeuner') || lower.includes('breakfast')) {
-    return CURATED_FOOD_PHOTOS[5].url; // Scrambled eggs
+  // 3. Fallback by meal slot type
+  if (mealType === 'BREAKFAST' || /déjeuner|breakfast|brunch/i.test(combinedText)) {
+    return CURATED_FOOD_PHOTOS[20].url; // Fluffy pancakes
   }
-  if (mealType === 'SNACK' || lower.includes('collation') || lower.includes('snack')) {
-    return CURATED_FOOD_PHOTOS[11].url; // Strawberry parfait
+  if (mealType === 'SNACK' || /collation|snack|goûter|biscuit/i.test(combinedText)) {
+    return CURATED_FOOD_PHOTOS[5].url; // Classic cookies
   }
-  if (mealType === 'LUNCH' || lower.includes('midi') || lower.includes('lunch')) {
-    return CURATED_FOOD_PHOTOS[7].url; // Poke bowl
+  if (mealType === 'LUNCH' || /midi|lunch|dîner/i.test(combinedText)) {
+    return CURATED_FOOD_PHOTOS[17].url; // Gourmet burger or sandwich
   }
 
-  // General dinner fallback: pasta or salmon
-  return CURATED_FOOD_PHOTOS[1].url; // Tagliatelle bolognese
+  // General dinner fallback: comforting pasta
+  return CURATED_FOOD_PHOTOS[15].url; // Tagliatelle bolognese
 }
 
 /**

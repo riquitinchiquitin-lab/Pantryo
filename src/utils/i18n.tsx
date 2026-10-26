@@ -173,6 +173,10 @@ export const translations = {
     empty_grocery: 'Your grocery cart is empty!',
     empty_grocery_hint: 'Add ingredients from your recipe ideas, meal plans, or routine grocery templates.',
     clear_in_cart_btn: 'Clear Checked Items',
+    out_of_stock_badge: 'Out of stock',
+    out_of_stock_toast_title: '"{name}" is used up! Add to grocery list?',
+    out_of_stock_toast_action: '+ Add to List',
+    out_of_stock_added_toast: '🛒 Added "{name}" to grocery list with (Out of stock) label!',
 
     // Stock Kitchen Modal
     stock_modal_title: 'Stock Cart Items into Kitchen',
@@ -429,6 +433,10 @@ export const translations = {
     empty_grocery: "Votre panier d'épicerie est vide !",
     empty_grocery_hint: 'Ajoutez des ingrédients depuis vos recettes, vos repas planifiés ou vos listes types.',
     clear_in_cart_btn: 'Vider les articles pris',
+    out_of_stock_badge: 'Rupture de stock',
+    out_of_stock_toast_title: '« {name} » est épuisé ! L\'ajouter à la liste d\'épicerie ?',
+    out_of_stock_toast_action: '+ Ajouter à l\'épicerie',
+    out_of_stock_added_toast: '🛒 « {name} » ajouté à votre liste de courses (Rupture de stock) !',
 
     // Stock Kitchen Modal
     stock_modal_title: 'Ranger les courses en cuisine',

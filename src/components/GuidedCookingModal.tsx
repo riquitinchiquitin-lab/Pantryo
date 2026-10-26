@@ -30,7 +30,7 @@ import { InventoryItem } from '../types';
 import { useLanguage, LanguageSwitcher } from '../utils/i18n';
 import { deductRecipeFromInventory, CookRecipeOutcome, DeductionResult } from '../utils/recipeCooker';
 import { detectSafeCookingRule, SafeCookingRule } from '../utils/safeCookingInstructions';
-import { getCuratedMealPhoto, getFoodSvgFallback } from '../utils/curatedFoodImages';
+import { getCuratedMealPhoto, getFoodSvgFallback, isDocumentScan } from '../utils/curatedFoodImages';
 import {
   getRecipeDisplayTitle,
   getRecipeDisplayDescription,
@@ -411,7 +411,10 @@ export const GuidedCookingModal: React.FC<GuidedCookingModalProps> = ({
   const isLastStep = currentStepIndex === steps.length - 1;
 
   // Curated hero image
-  const heroPhoto = recipe.imageUrl?.trim() ? recipe.imageUrl : getCuratedMealPhoto(recipe.title);
+  const hasRealFoodPhoto = recipe.imageUrl?.trim() && !isDocumentScan(recipe.imageUrl);
+  const heroPhoto = hasRealFoodPhoto
+    ? recipe.imageUrl!
+    : getCuratedMealPhoto(recipe.title, (recipe as any).mealType, (recipe as any).tags);
 
   return (
     <div className="fixed inset-0 z-50 w-full h-full flex flex-col bg-[var(--md-sys-color-surface)] text-[var(--md-sys-color-on-surface)] overflow-hidden animate-fade-in">

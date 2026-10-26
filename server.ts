@@ -55,6 +55,30 @@ app.use((req, res, next) => {
   next();
 });
 
+// High-priority static asset handler for AI Studio uploaded files (including extensionless JPEG/PNG assets)
+app.use(["/assets/aistudio", "/public/assets/aistudio"], (req, res, next) => {
+  const safeFilename = path.basename(req.path);
+  const filePath = path.join(process.cwd(), "public", "assets", "aistudio", safeFilename);
+  if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+    try {
+      const buffer = Buffer.alloc(8);
+      const fd = fs.openSync(filePath, "r");
+      fs.readSync(fd, buffer, 0, 8, 0);
+      fs.closeSync(fd);
+      if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) {
+        res.setHeader("Content-Type", "image/png");
+      } else {
+        res.setHeader("Content-Type", "image/jpeg");
+      }
+    } catch (_) {
+      res.setHeader("Content-Type", "image/jpeg");
+    }
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    return res.sendFile(filePath);
+  }
+  next();
+});
+
 // Standard API parser (2MB max) to protect from memory-exhaustion Denial of Service (SEC-04)
 const standardJsonParser = express.json({ limit: "2mb" });
 const standardUrlParser = express.urlencoded({ extended: true, limit: "2mb" });
@@ -212,6 +236,14 @@ app.use(express.static(path.join(process.cwd(), "public"), {
       res.setHeader("Content-Type", "image/png");
     } else if (filePath.endsWith(".svg")) {
       res.setHeader("Content-Type", "image/svg+xml");
+    } else if (
+      filePath.includes("assets/aistudio") ||
+      filePath.includes("Image_October") ||
+      filePath.includes("PXL_") ||
+      filePath.endsWith(".jpg") ||
+      filePath.endsWith(".jpeg")
+    ) {
+      res.setHeader("Content-Type", "image/jpeg");
     }
   }
 }));
