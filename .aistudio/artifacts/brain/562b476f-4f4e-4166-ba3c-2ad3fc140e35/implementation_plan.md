@@ -1,135 +1,129 @@
-# Auto-Prompt Depleted Items to Grocery List with "(Out of Stock)" Label
+# Production Grocery & Produce Vision Training Pipeline
 
-Prompt users whenever a food or pantry item is depleted (consumed, cooked, or reduced to 0 quantity) with an instant interactive toast allowing one-tap addition to the Grocery List with a dedicated **(Out of stock) / (Rupture de stock)** badge.
+A self-contained, enterprise-grade PyTorch training and fine-tuning pipeline designed to classify grocery products, fresh produce, packages, and cans from multi-source datasets (GroceryStoreDataset, Open Food Facts, FooDI-ML/RPC), exporting to optimized FP32 and INT8 ONNX models with zero-dependency runtime inference.
 
 ---
 
 ### User Review & Critical Decisions
 
 > [!IMPORTANT]
-> The clarifying questions were answered in Phase 1:
-> - **Trigger Scope**: Trigger on all item depletion events: quick-consume checkmark, recipe cooking depletion, and setting quantity to 0.
-> - **Prompt Style**: An instant interactive toast banner with a direct one-tap **"Add to List" / "Ajouter à l'épicerie"** action button (7-second comfortable touch window).
-> - **Label Styling**: A dedicated high-visibility amber badge **`(Out of stock)` / `(Rupture de stock)`** positioned right beside the product title in the grocery list.
+> The architectural decisions confirmed in Phase 1:
+> - **Vision Backbone**: `mobilenetv3_large_100` (pre-trained via `timm` / ImageNet-1k) for ultra-low latency (<15 ms) and edge/browser compatibility.
+> - **Dataset Ingestion**: Flexible, multi-format PyTorch `Dataset` supporting both CSV/JSON metadata mappings and nested class-folder layouts with automatic class index harmonization.
+> - **Export Format**: Full FP32 ONNX model with dynamic batching `[batch_size, 3, 224, 224]`, accompanied by an optimized **INT8 dynamic quantized model** (`model_int8.onnx`) and `labels.json`.
 
 ---
 
 ## 1. Overview & Core Concept
 
-When busy home cooks finish the last egg, can of crushed tomatoes, or bag of potatoes, they need a frictionless way to prevent forgetting to restock. Instead of forcing manual navigation to the Shopping tab, Pantryo automatically detects when any item reaches zero quantity and surfaces an actionable prompt:
+Home inventory and grocery checkouts face severe computer vision challenges: long-tail class distributions (hundreds of fresh fruits vs. thousands of packaged brand goods), variable supermarket and kitchen lighting, reflective packaging glare, and deformed plastic bags.
 
-1. **Detection**: Whenever an item is consumed via the quick-check circle, depleted through cooking a planned recipe, or saved with 0 quantity.
-2. **Instant Prompt**: An alert toast with an actionable button:
-   - *FR*: `« Lait » est épuisé ! Voulez-vous l'ajouter à votre liste ?` ➔ `[+ Ajouter (Rupture)]`
-   - *EN*: `"${item.name}" is used up! Add to your grocery list?` ➔ `[+ Add (Out of stock)]`
-3. **Dedicated Grocery Tagging**: Adding from this prompt attaches the `outOfStock: true` metadata flag. The grocery list displays a dedicated, warm amber badge:
-   - ⚠️ **Rupture de stock** (FR) / **Out of stock** (EN)
-   - Preserves original unit, category, and storage aisle.
-
----
-
-## 2. User Experience & Visual Design
-
-### Depletion Flow & Tactile Feedback
-
-```
-  [ Inventory View ] 
-          │
-    User clicks ○ Check / Cooks Recipe / Sets Qty = 0
-          │
-          ▼
-   Item status -> CONSUMED (removed from active shelf)
-          │
-          ▼
-  ┌─────────────────────────────────────────────────────────────┐
-  │ 🔔 « Pommes de terre grelots » est épuisé !                 │
-  │    Voulez-vous l'ajouter à votre liste de courses ?         │
-  │                                                             │
-  │               [+ Ajouter (Rupture)]   [✕]                   │
-  └─────────────────────────────────────────────────────────────┘
-          │ User taps "+ Ajouter (Rupture)"
-          ▼
-  ┌─────────────────────────────────────────────────────────────┐
-  │ 🛒 Ajouté à la liste avec l'étiquette (Rupture de stock)    │
-  └─────────────────────────────────────────────────────────────┘
-          │
-          ▼
-  [ Grocery List Tab ]
-  ┌─────────────────────────────────────────────────────────────┐
-  │ [ ] 🥔 Pommes de terre grelots  [ ⚠️ Rupture de stock ]     │
-  │     1 sac · Maraîchers                                      │
-  └─────────────────────────────────────────────────────────────┘
-```
-
-### Visual Specifications
-- **Badge Styling**: Soft amber background (`bg-amber-100 text-amber-900 border border-amber-300 dark:bg-amber-950/60 dark:text-amber-200 dark:border-amber-700/60`), rounded-md, with a subtle alert icon.
-- **Touch-Friendly Action Target**: Toast button meets the $\ge 44\text{px}$ touch target guideline with bold, clear micro-copy.
-- **Zero Pill AI-Slop Violation**: The badge is placed cleanly beside the food title, complementing rather than overwhelming the aisle layout.
+This script implements an end-to-end, reproducible training script (`train_grocery_vision.py`) providing:
+1. **Multi-Dataset Ingestion**: Unifies GroceryStoreDataset (fine-grained produce), Open Food Facts (packaging/labels), and RPC/FooDI-ML into a unified class taxonomy.
+2. **Transfer Learning Head**: Modular classification head with LayerNorm, Dropout, and balanced cross-entropy with label smoothing ($\epsilon = 0.1$) to prevent overconfidence on sparse categories.
+3. **Domain-Specific Augmentations**: Perspective warps, color temperature shifts, and coarse dropouts simulating handheld camera photography.
+4. **Resilient Training**: Mixed precision (`torch.amp.autocast`), AdamW with decoupled weight decay, Cosine Annealing with linear warmup, and Top-1/Top-5/Macro-F1 evaluation.
+5. **Edge Deployment**: Automated ONNX export with dynamic batch sizes, dynamic INT8 quantization via `onnxruntime.quantization`, and a standalone Python verification runner.
 
 ---
 
-## 3. Key Product Decisions & Trade-Offs
+## 2. Pipeline Architecture & Data Flow
 
-| Decision | Chosen Approach | Rationale |
-| :--- | :--- | :--- |
-| **Prompt Delivery** | Non-modal Interactive Toast (`AlertToastContext`) with explicit Action button | Does not block the screen like a modal dialog, allowing fast uninterrupted cooking, while remaining immediately accessible for 7 seconds. |
-| **Data Representation** | `outOfStock: boolean` on `GroceryCartItem` & localized notes | Allows filtering, sorting, visual badging, and seamless persistence across local storage and cloud sync. |
-| **Depletion Triggers** | Centralized `promptDepletedItem(item)` handler | Reusable across `handleConsumeItem`, recipe deduction outcomes (`wasFullyDepleted`), and `AddEditItemModal` zero-quantity saves. |
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                   Data Sources & Ingestion                             │
+│                                                                        │
+│  GroceryStoreDataset ──┐                                               │
+│  Open Food Facts ──────┼──> UnifiedGroceryDataset                      │
+│  FooDI-ML / RPC ───────┘      ├── Class balancing & Label Smoothing    │
+│                               └── Albumentations Lighting/Perspective  │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                   Transfer Learning & Training                         │
+│                                                                        │
+│  Pretrained Backbone (MobileNetV3-Large / timm)                        │
+│    ├── Phase 1: Frozen backbone (warmup head)                          │
+│    └── Phase 2: Full fine-tuning with Cosine Annealing                 │
+│                                                                        │
+│  Loss: LabelSmoothingCrossEntropy (with optional class weights)        │
+│  Optimization: Mixed Precision AMP + AdamW (weight_decay=1e-2)         │
+│  Metrics: Top-1 Accuracy, Top-5 Accuracy, Macro F1-Score               │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                   Artifact Export & Validation                         │
+│                                                                        │
+│  ├── best_model.pt               (PyTorch Checkpoint)                  │
+│  ├── model.onnx                  (FP32 Dynamic Batching)               │
+│  ├── model_int8.onnx             (Quantized Edge Model)                │
+│  ├── labels.json                 (Class ID <-> Name Dictionary)        │
+│  └── run_inference()             (Zero-dependency ONNX Runtime Tester) │
+└────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## 4. Technical Architecture & Data Strategy
+## 3. Key Technical Decisions & Strategy
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           MobileSimulator.tsx                           │
-│                                                                         │
-│  handleConsumeItem() ──────┐                                            │
-│  handleCookMealAndDeduct()─┼──> promptDepletedItem(item)                │
-│  handleItemSaved(qty <= 0) ┘         │                                  │
-│                                      ▼                                  │
-│                             showToast({                                 │
-│                               message: "...",                           │
-│                               actionLabel: "+ Ajouter (Rupture)",       │
-│                               onAction: () => handleAddOutOfStock(...)  │
-│                             })                                          │
-└──────────────────────────────────────┬──────────────────────────────────┘
-                                       │
-                                       ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           GroceryListView.tsx                           │
-│                                                                         │
-│  GroceryCartItem {                                                      │
-│    ...                                                                  │
-│    outOfStock: true,                                                    │
-│    notes: "Rupture de stock / Out of stock"                             │
-│  }                                                                      │
-│                                                                         │
-│  Renders:                                                               │
-│  <span className="bg-amber-100 text-amber-900 border-amber-300...">     │
-│    ⚠️ Rupture de stock                                                  │
-│  </span>                                                                │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+### 1. Data Ingestion & Imbalance Handling
+- **Unified Schema**: Samples mapped to `(image_path, label_id, label_name, dataset_source)`.
+- **Handling Long Tails**: Calculate class frequencies and apply effective-number-of-samples weighting or label smoothing ($\alpha = 0.1$). Label smoothing softens one-hot vectors to handle noisy crowd-sourced annotations from Open Food Facts.
 
-### Files to Modify
-1. `src/components/GroceryListView.tsx`:
-   - Add `outOfStock?: boolean` to `GroceryCartItem` interface.
-   - Render the dedicated `(Rupture de stock)` / `(Out of stock)` badge next to `getItemDisplayName`.
-2. `src/components/MobileSimulator.tsx`:
-   - Implement `promptDepletedItem(item: InventoryItem)` helper function.
-   - Hook into:
-     - `handleConsumeItem`: when item is consumed.
-     - `handleCookMealAndDeduct` & `handleCookRecipeDirectly`: when ingredients have `d.wasFullyDepleted === true`.
-     - `handleItemSaved`: when an item is saved with `quantity <= 0`.
-   - Implement `handleAddOutOfStockItem(item: InventoryItem)` which creates a `GroceryCartItem` with `outOfStock: true` and defaults quantity to 1.
-3. `src/utils/i18n.tsx`:
-   - Add translation keys for French and English prompts, button labels, and badging.
+### 2. Augmentations (Albumentations)
+- **Geometry**: `RandomResizedCrop(224, 224, scale=(0.7, 1.0))`, `HorizontalFlip(p=0.5)`, `ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=15, p=0.5)`.
+- **Photometry**: `ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05, p=0.7)` and `RandomToneCurve(p=0.3)` to emulate fluorescent store lighting vs. warm kitchen lamps.
+- **Occlusion**: `CoarseDropout(max_holes=4, max_height=24, max_width=24, p=0.3)` to force the model to look beyond brand logos.
+
+### 3. Model Architecture & Fine-Tuning Schedule
+- **Backbone**: `timm.create_model('mobilenetv3_large_100', pretrained=True, num_classes=0)` yielding 960-dim feature embeddings.
+- **Head**:
+  ```python
+  nn.Sequential(
+      nn.BatchNorm1d(960),
+      nn.Dropout(p=0.3),
+      nn.Linear(960, 512),
+      nn.SiLU(),
+      nn.BatchNorm1d(512),
+      nn.Dropout(p=0.2),
+      nn.Linear(512, num_classes)
+  )
+  ```
+- **Two-Stage Fine-Tuning**:
+  - *Warmup (Epochs 1–3)*: Train head only ($lr = 10^{-3}$, backbone frozen).
+  - *Main Fine-Tuning (Epochs 4–30)*: Unfreeze all layers with discriminative learning rates ($lr_{backbone} = 10^{-4}, lr_{head} = 5 \times 10^{-4}$) using Cosine Annealing with minimum $lr = 10^{-6}$.
+
+### 4. ONNX & INT8 Dynamic Quantization
+- Dynamic batch axis: `dynamic_axes={'input': {0: 'batch_size'}, 'output': {0: 'batch_size'}}`.
+- Uses `onnxruntime.quantization.quantize_dynamic` targeting `Linear` and `Conv` weights to reduce model footprint by ~4x (from ~22 MB down to ~6 MB) with negligible top-1 accuracy loss.
+
+---
+
+## 4. Deliverable File Structure
+
+The script will be written as a comprehensive, production-grade script:
+- `train_grocery_vision.py`: Complete, standalone script containing:
+  1. Dependencies specification and command-line argument parser (`argparse`).
+  2. Dataset classes: `UnifiedGroceryDataset` supporting CSV/JSON and class folders.
+  3. Albumentations transform pipelines.
+  4. PyTorch model definition with custom classification head.
+  5. Training & validation engine with AMP, early stopping, Top-1/Top-5/F1 metrics.
+  6. ONNX export and INT8 dynamic quantization pipeline.
+  7. Standalone inference function `predict_image(image_path, model_path, labels_path)` using `onnxruntime`.
+  8. Synthetic mock dataset generator for out-of-the-box pipeline validation without external downloads.
 
 ---
 
 ## 5. Verification Plan
-- **Quick Consume**: Click circle check on an inventory item ➔ verify toast prompt appears with action button.
-- **One-Tap Addition**: Click the button in the toast ➔ switch to Grocery tab and verify the item appears with the `(Out of stock)` badge.
-- **Recipe Cooking**: Cook a recipe that exhausts an inventory item ➔ verify prompt triggers for depleted ingredient.
-- **Full Build Test**: Run `lint_applet` and `compile_applet` to confirm 0 compilation errors.
+
+1. **Syntax & Type Checking**: Validate types and syntax using Python AST and standard compilation tools.
+2. **End-to-End Dry Run**:
+   - Run the script in synthetic benchmark mode to verify:
+     - DataLoader batching and augmentations.
+     - Mixed precision forward and backward passes.
+     - Metric computations (Top-1, Top-5, F1).
+     - Model checkpoint generation (`best_model.pt`).
+     - ONNX FP32 export and ONNX INT8 quantization.
+     - Inference verification with ONNX Runtime.
