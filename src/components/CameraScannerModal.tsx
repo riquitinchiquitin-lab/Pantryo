@@ -125,6 +125,13 @@ interface SessionItem {
   confidence?: number;
   identifiedMethod?: string;
   identifiedMethodLabel?: string;
+  alternatives?: Array<{
+    label_fr: string;
+    label_en: string;
+    confidence: number;
+    class_key?: string;
+    slug?: string;
+  }>;
 }
 
 interface SamplePresetItem {
@@ -144,6 +151,17 @@ interface SamplePreset {
   label: string;
   items: SamplePresetItem[];
 }
+
+export const AISLE_OPTIONS = [
+  { value: 'Produce', slug: 'fruits-legumes', labelFr: 'Fruits & Légumes (fruits-legumes)', labelEn: 'Produce (fruits-legumes)', icon: '🍎' },
+  { value: 'Dairy & Eggs', slug: 'produits-laitiers-oeufs', labelFr: 'Produits Laitiers & Œufs (produits-laitiers-oeufs)', labelEn: 'Dairy & Eggs (produits-laitiers-oeufs)', icon: '🥛' },
+  { value: 'Meat & Seafood', slug: 'viandes-volailles', labelFr: 'Viandes & Volailles (viandes-volailles)', labelEn: 'Meat & Poultry (viandes-volailles)', icon: '🥩' },
+  { value: 'Bakery', slug: 'boulangerie-patisserie', labelFr: 'Boulangerie & Pâtisserie (boulangerie-patisserie)', labelEn: 'Bakery (boulangerie-patisserie)', icon: '🥖' },
+  { value: 'Pantry Staples', slug: 'garde-manger', labelFr: 'Garde-Manger (garde-manger)', labelEn: 'Pantry Staples (garde-manger)', icon: '🥫' },
+  { value: 'Frozen Meals', slug: 'surgeles', labelFr: 'Surgelés (surgeles)', labelEn: 'Frozen Foods (surgeles)', icon: '❄️' },
+  { value: 'Beverages', slug: 'boissons', labelFr: 'Boissons (boissons)', labelEn: 'Beverages (boissons)', icon: '☕' },
+  { value: 'Snacks', slug: 'collations-bonbons', labelFr: 'Collations & Bonbons (collations-bonbons)', labelEn: 'Snacks & Sweets (collations-bonbons)', icon: '🍪' },
+];
 
 const SAMPLE_PRESETS: SamplePreset[] = [
   {
@@ -347,6 +365,36 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
   const [inspectingItem, setInspectingItem] = useState<SessionItem | null>(null);
   const [isEditingName, setIsEditingName] = useState(false);
   const [customNameInput, setCustomNameInput] = useState('');
+  const [editItemName, setEditItemName] = useState('');
+  const [editItemCategory, setEditItemCategory] = useState('Produce');
+
+  // Sync inputs whenever inspectingItem changes
+  useEffect(() => {
+    if (inspectingItem) {
+      setEditItemName(inspectingItem.name || '');
+      setEditItemCategory(inspectingItem.categoryName || 'Produce');
+    }
+  }, [inspectingItem?.id, inspectingItem?.name, inspectingItem?.categoryName]);
+
+  // Apply suggestion chip directly
+  const handleApplySuggestion = (
+    targetItem: SessionItem,
+    alt: { label_fr: string; label_en: string; confidence: number; class_key?: string; slug?: string }
+  ) => {
+    const chosenName = lang === 'FR' ? alt.label_fr : alt.label_en;
+    setEditItemName(chosenName);
+    handleCorrectItem(
+      targetItem,
+      chosenName,
+      targetItem.categoryName,
+      targetItem.locationName,
+      targetItem.estimatedShelfLifeDays
+    );
+    showToast(
+      lang === 'FR' ? `✓ Suggestion appliquée : ${chosenName}` : `✓ Applied suggestion: ${chosenName}`,
+      'success'
+    );
+  };
 
   // Canadian Food & PLU Database live search state
   const [dbSearchQuery, setDbSearchQuery] = useState('');
@@ -506,6 +554,20 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
         }
       })();
 
+      const visionClassifyPromise = fetch('/api/v1/inventory/vision-classify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64: compressedDataUrl,
+          language: lang,
+        }),
+      })
+        .then((r) => r.json())
+        .catch((err) => {
+          console.warn('[VisionClassify] Microservice call error:', err);
+          return null;
+        });
+
       const endpoint = isFlyer
         ? '/api/v1/inventory/scan-flyer'
         : isReceipt
@@ -529,10 +591,11 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
           return { success: false, items: [] };
         });
 
-      const [detectedBarcode, onDeviceVisionResult, serverData] = await Promise.all([
+      const [detectedBarcode, onDeviceVisionResult, serverData, visionData] = await Promise.all([
         barcodePromise,
         onDevicePromise,
         serverPromise,
+        visionClassifyPromise,
       ]);
 
       let items: ScannedItemCandidate[] = [];
@@ -661,6 +724,53 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
             ? (lang === 'FR' ? 'Rabais circulaire Super C' : 'Super C Flyer promo')
             : (lang === 'FR' ? 'Épicerie québécoise & canadienne' : 'Canadian grocery database');
         }
+      }
+
+      // Priority 3.5: Two-Tier ONNX Edge Vision Microservice (Super C Department & 399 Produce)
+      if (
+        (items.length === 0 || isProduce) &&
+        visionData &&
+        visionData.success &&
+        (visionData.produce?.detected || isProduce || (visionData.department && visionData.department.confidence >= 0.35))
+      ) {
+        const prod = visionData.produce;
+        const dept = visionData.department;
+        const isFr = lang === 'FR';
+
+        const labelFr = prod?.label_fr || dept?.name_fr || 'Produit d’épicerie';
+        const labelEn = prod?.label_en || dept?.name_en || 'Grocery item';
+        const chosenName = isFr ? labelFr : labelEn;
+        const chosenCategory = dept?.pantryo_category || (prod ? 'Produce' : 'Pantry Staples');
+        const defaultLoc = (dept?.default_location as any) || (chosenCategory === 'Produce' ? 'Fridge' : 'Pantry');
+
+        items = [
+          {
+            name: chosenName,
+            nameFr: labelFr,
+            nameEn: labelEn,
+            category: chosenCategory,
+            quantity: 1,
+            unit: 'pcs',
+            recommendedLocation: defaultLoc,
+            estimatedShelfLifeDays: chosenCategory === 'Produce' ? 7 : 30,
+            monthsFrozenShelfLife: 6,
+            brand: dept?.name_fr || 'Super C',
+            packagingFormat: isFr ? 'Produit d’épicerie frais' : 'Fresh grocery product',
+            dietaryBadges: [dept?.name_fr || 'Super C', isFr ? 'Vision ONNX' : 'ONNX Vision'],
+            storageTip: isFr
+              ? 'Conserver dans l’espace approprié (réfrigérateur ou garde-manger).'
+              : 'Store in appropriate area (refrigerator or pantry).',
+            storageReason: isFr
+              ? `Reconnu par IA ONNX à 2 niveaux (${dept?.name_fr || 'Rayon'})`
+              : `Identified by two-tier ONNX edge vision (${dept?.name_en || 'Aisle'})`,
+            confidence: prod?.confidence || dept?.confidence || 0.75,
+            alternatives: prod?.alternatives || dept?.alternatives || [],
+          },
+        ];
+        winningMethod = 'produce';
+        winningMethodLabel = isFr
+          ? `Vision ONNX : ${dept?.name_fr || 'Fruits & Légumes'}`
+          : `ONNX Vision: ${dept?.name_en || 'Produce'}`;
       }
 
       // Priority 4: Verified Optical PLU Sticker or High-Confidence Fresh Produce Vision
@@ -851,6 +961,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
             confidence: itemCandidate.confidence,
             identifiedMethod: winningMethod,
             identifiedMethodLabel: winningMethodLabel,
+            alternatives: itemCandidate.alternatives,
           };
 
           addedThisBatch.push(sessionEntry);
@@ -1903,9 +2014,24 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                             {lang === 'FR' ? 'Nom du produit' : 'Product Name'}
                           </td>
                           <td className="py-2 px-3">
-                            <span className="font-extrabold text-sm text-[#0D3B37]">
-                              {getItemDisplayName(inspectingItem, lang)}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={editItemName}
+                                onChange={(e) => setEditItemName(e.target.value)}
+                                className="flex-1 px-3 py-1.5 text-xs font-black text-[#0D3B37] bg-[#FAF7EE] border border-[#D5E1D2] rounded-xl focus:outline-none focus:border-teal-700"
+                                placeholder={lang === 'FR' ? 'Nom de l’aliment...' : 'Food name...'}
+                              />
+                              {editItemName !== inspectingItem.name && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCorrectItem(inspectingItem, editItemName, editItemCategory, inspectingItem.locationName, inspectingItem.estimatedShelfLifeDays)}
+                                  className="px-3 py-1.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-[11px] font-black cursor-pointer shadow-2xs transition-all active:scale-95 shrink-0"
+                                >
+                                  {lang === 'FR' ? 'Appliquer' : 'Apply'}
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
 
@@ -1986,10 +2112,24 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
 
                         <tr>
                           <td className="py-2 px-3 font-bold text-[#527470]">
-                            {lang === 'FR' ? 'Catégorie' : 'Category'}
+                            {lang === 'FR' ? 'Rayon / Catégorie' : 'Aisle / Category'}
                           </td>
-                          <td className="py-2 px-3 font-semibold text-[#1F3323]">
-                            {getCategoryLocalizedName(inspectingItem.categoryName, lang)}
+                          <td className="py-2 px-3">
+                            <select
+                              value={editItemCategory}
+                              onChange={(e) => {
+                                const newCat = e.target.value;
+                                setEditItemCategory(newCat);
+                                handleCorrectItem(inspectingItem, editItemName || inspectingItem.name, newCat, inspectingItem.locationName, inspectingItem.estimatedShelfLifeDays);
+                              }}
+                              className="w-full px-3 py-1.5 text-xs font-bold text-[#0D3B37] bg-[#FAF7EE] border border-[#D5E1D2] rounded-xl focus:outline-none focus:border-teal-700 cursor-pointer"
+                            >
+                              {AISLE_OPTIONS.map((opt) => (
+                                <option key={opt.value} value={opt.value}>
+                                  {opt.icon} {lang === 'FR' ? opt.labelFr : opt.labelEn}
+                                </option>
+                              ))}
+                            </select>
                           </td>
                         </tr>
 
@@ -2057,6 +2197,46 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                       </tbody>
                     </table>
                   </div>
+
+                  {/* Under-70% Confidence Suggestion Chips for Ranks 2 & 3 */}
+                  {inspectingItem.confidence !== undefined && inspectingItem.confidence < 0.70 && inspectingItem.alternatives && inspectingItem.alternatives.length > 0 && (
+                    <div className="p-3.5 rounded-2xl bg-amber-50/90 border border-amber-300 space-y-2 animate-fade-in shadow-2xs">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <Sparkles className="w-4 h-4 text-amber-700 animate-pulse" />
+                          <span className="text-xs font-black text-amber-950">
+                            {lang === 'FR'
+                              ? `Confiance < 70% (${Math.round(inspectingItem.confidence * 100)}%) — Suggestions alternatives :`
+                              : `Confidence < 70% (${Math.round(inspectingItem.confidence * 100)}%) — Alternative suggestions:`}
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-bold text-amber-900 bg-amber-200/80 px-2 py-0.5 rounded-full border border-amber-300">
+                          {lang === 'FR' ? '1 clic pour corriger' : '1-click to select'}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {inspectingItem.alternatives.slice(0, 2).map((alt, aIdx) => {
+                          const altLabel = lang === 'FR' ? alt.label_fr : alt.label_en;
+                          const rankLabel = aIdx === 0 ? '🥈 Rang 2' : '🥉 Rang 3';
+                          return (
+                            <button
+                              key={aIdx}
+                              type="button"
+                              onClick={() => handleApplySuggestion(inspectingItem, alt)}
+                              className="px-3 py-1.5 rounded-xl text-xs font-black bg-white hover:bg-amber-100 text-amber-950 border border-amber-400 shadow-2xs transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+                              title={lang === 'FR' ? `Remplacer par ${altLabel}` : `Select ${altLabel}`}
+                            >
+                              <span className="text-[10px] font-extrabold text-amber-800">{rankLabel} :</span>
+                              <span className="underline decoration-amber-400 font-bold">{altLabel}</span>
+                              <span className="text-[10px] font-mono text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded-md">
+                                {Math.round(alt.confidence * 100)}%
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Actions footer */}
                   <div className="flex items-center justify-between gap-2 pt-1">

@@ -30,13 +30,43 @@ services:
       - KITCHEN_NAME=${KITCHEN_NAME:-Your Kitchen}
       - DB_ENCRYPTION_KEY=${DB_ENCRYPTION_KEY:-}
       - SESSION_SECRET=${SESSION_SECRET:-}
+      - VISION_SERVICE_URL=http://vision_service:8000
     depends_on:
       db:
         condition: service_healthy
+      vision_service:
+        condition: service_started
     volumes:
       - pantryo_data:/app/server/data
     networks:
       - pantryo_net
+
+  vision_service:
+    build:
+      context: ./vision_service
+      dockerfile: Dockerfile
+    container_name: pantryo_vision
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 80
+    environment:
+      - MODELS_DIR=/app/models
+      - ONNX_NUM_THREADS=2
+    volumes:
+      - ./public/models/grocery_model:/app/models:ro
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - pantryo_net
+
 
   tunnel:
     image: cloudflare/cloudflared:latest

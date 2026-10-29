@@ -128,6 +128,13 @@ export interface ScannedItemCandidate {
   unopenedShelfLifeDays?: number;
   openedShelfLifeDays?: number;
   imageUrl?: string;
+  alternatives?: Array<{
+    label_fr: string;
+    label_en: string;
+    confidence: number;
+    class_key?: string;
+    slug?: string;
+  }>;
 }
 
 export interface ScanResponse {
