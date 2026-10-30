@@ -45,6 +45,7 @@ const PUBLIC_AUTH_PATHS = [
   '/auth/status',
   '/auth/public-members',
   '/auth/setup-admin',
+  '/auth/fido2',
 ];
 
 // Reference the native fetch before overriding

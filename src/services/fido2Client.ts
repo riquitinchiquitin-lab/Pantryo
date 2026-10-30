@@ -105,13 +105,37 @@ export const fido2Client = {
    * Get enrolled FIDO2 credentials and 2FA status for a user
    */
   async getStatus(userId: string): Promise<Fido2Status> {
-    const res = await fetch(`/api/v1/auth/fido2/status/${encodeURIComponent(userId)}`, {
-      headers: getAuthHeaders(),
-    });
-    if (!res.ok) {
-      throw new Error(`Failed to fetch FIDO2 status: ${res.statusText}`);
+    try {
+      const res = await fetch(`/api/v1/auth/fido2/status/${encodeURIComponent(userId)}`, {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) {
+        return {
+          fido2Enabled: false,
+          fido2Enforced: true,
+          allUsersRequired: true,
+          isCompliant: false,
+          requiresEnrollment: true,
+          totpEnabled: false,
+          credentialsCount: 0,
+          credentials: [],
+          recoveryCodesRemaining: 5,
+        };
+      }
+      return await res.json();
+    } catch {
+      return {
+        fido2Enabled: false,
+        fido2Enforced: true,
+        allUsersRequired: true,
+        isCompliant: false,
+        requiresEnrollment: true,
+        totpEnabled: false,
+        credentialsCount: 0,
+        credentials: [],
+        recoveryCodesRemaining: 5,
+      };
     }
-    return res.json();
   },
 
   /**
