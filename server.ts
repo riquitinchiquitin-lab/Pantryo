@@ -47,11 +47,56 @@ app.use((req, res, next) => {
   res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
   res.setHeader(
     "Content-Security-Policy",
-    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https: ws: wss:; object-src 'none'; base-uri 'self'; form-action 'self';"
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https: ws: wss: data: blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self';"
   );
   if (req.secure || req.headers["x-forwarded-proto"] === "https") {
     res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
   }
+  next();
+});
+
+// Dedicated WebAssembly (.wasm) and ES Module (.mjs) Asset Handler
+// Prevents SPA fallback from serving index.html as a response to WASM requests (which causes WebAssembly magic word errors)
+app.use((req, res, next) => {
+  const cleanPath = req.path.split("?")[0];
+  if (cleanPath.endsWith(".wasm")) {
+    res.setHeader("Content-Type", "application/wasm");
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    const filename = path.basename(cleanPath);
+    const candidateDirs = [
+      path.join(process.cwd(), "public", "wasm"),
+      path.join(process.cwd(), "public"),
+      path.join(process.cwd(), "node_modules", "onnxruntime-web", "dist"),
+    ];
+    for (const dir of candidateDirs) {
+      const fullPath = path.join(dir, filename);
+      if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+        res.setHeader("Cache-Control", "public, max-age=604800, immutable");
+        return res.sendFile(fullPath);
+      }
+    }
+    // Return 404 rather than falling through to HTML index
+    return res.status(404).type("text/plain").send("WASM binary not found");
+  }
+
+  if (cleanPath.endsWith(".mjs")) {
+    res.setHeader("Content-Type", "application/javascript");
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    const filename = path.basename(cleanPath);
+    const candidateDirs = [
+      path.join(process.cwd(), "public", "wasm"),
+      path.join(process.cwd(), "public"),
+      path.join(process.cwd(), "node_modules", "onnxruntime-web", "dist"),
+    ];
+    for (const dir of candidateDirs) {
+      const fullPath = path.join(dir, filename);
+      if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+        res.setHeader("Cache-Control", "public, max-age=604800, immutable");
+        return res.sendFile(fullPath);
+      }
+    }
+  }
+
   next();
 });
 
@@ -111,6 +156,8 @@ const HIGH_CAPACITY_PREFIXES = [
   "/api/inventory/scan-produce",
   "/api/v1/inventory/classify-produce-model",
   "/api/inventory/classify-produce-model",
+  "/api/v1/inventory/gemini-validate",
+  "/api/inventory/gemini-validate",
 ];
 
 app.use((req, res, next) => {

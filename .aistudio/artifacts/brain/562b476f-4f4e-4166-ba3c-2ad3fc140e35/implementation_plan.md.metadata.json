@@ -1,6 +1,0 @@
-{
-  "summary":  "Production-ready Python machine learning pipeline for fine-tuning a MobileNetV3-Large vision model on grocery and produce datasets, with mixed-precision training, Albumentations transforms, metric tracking, and dual FP32/INT8 ONNX export.",
-  "updatedAt":  "2026-10-27T14:43:11.080949105Z",
-  "requestFeedback":  true,
-  "userFacing":  true
-}

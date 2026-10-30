@@ -1484,6 +1484,32 @@ export const IFPS_PLU_CODES = {
     storageTipEn: "Store in crisper drawer in loose plastic wrap.",
     calories: 17, protein: "1.2g", carbs: "3.1g", fat: "0.3g", fiber: "1g",
   },
+  "4593": {
+    nameFr: "Concombre anglais sans pépins (Notaro / Serres du Québec)",
+    nameEn: "English Seedless Cucumber",
+    variety: "English Seedless / Concombre anglais",
+    category: "Produce",
+    categoryFr: "Produits frais",
+    location: "Fridge",
+    shelfLifeDays: 8,
+    origin: "Notaro • 307 Rang St-François, Sherrington, Québec • PLU #4593",
+    storageTipFr: "Conserver dans sa pellicule plastique d'origine au réfrigérateur.",
+    storageTipEn: "Keep in original plastic shrink wrap in refrigerator crisper.",
+    calories: 15, protein: "0.7g", carbs: "3.6g", fat: "0.1g", fiber: "0.5g",
+  },
+  "4062": {
+    nameFr: "Concombre régulier de plein champ",
+    nameEn: "Standard Field Cucumber",
+    variety: "Field Cucumber",
+    category: "Produce",
+    categoryFr: "Produits frais",
+    location: "Fridge",
+    shelfLifeDays: 7,
+    origin: "Canada / Québec • PLU #4062",
+    storageTipFr: "Conserver au bac à légumes du réfrigérateur.",
+    storageTipEn: "Keep cold in refrigerator crisper.",
+    calories: 15, protein: "0.7g", carbs: "3.6g", fat: "0.1g", fiber: "0.5g",
+  },
 };
 
 // ============================================================================

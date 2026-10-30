@@ -13,8 +13,6 @@ const PRECACHE_ASSETS = [
   '/pwa-512x512.png',
   '/pwa-maskable-192x192.png',
   '/pwa-maskable-512x512.png',
-  '/screenshot-desktop.png',
-  '/screenshot-mobile.png',
   '/favicon.ico'
 ];
 

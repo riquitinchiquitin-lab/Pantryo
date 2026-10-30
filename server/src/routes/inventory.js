@@ -2,7 +2,7 @@ import express from "express";
 import fs from "fs";
 import path from "path";
 import Tesseract from "tesseract.js";
-import { analyzeFoodImage, analyzeReceiptText, analyzeReceiptImage, analyzeFlyerImage } from "../services/geminiVision.js";
+import { analyzeFoodImage, analyzeReceiptText, analyzeReceiptImage, analyzeFlyerImage, validateFoodItemWithGemini } from "../services/geminiVision.js";
 import { dbStore } from "../services/dbStore.js";
 import { analyzePackagingText, analyzeMultiItemPackagingText } from "../services/packagingAnalyzer.js";
 import { resolveBarcodeUnified, searchCanadianAndPluDatabase, IFPS_PLU_CODES, CANADIAN_NUTRIENT_FILE_CATALOG } from "../services/groceryDbService.js";
@@ -325,25 +325,25 @@ router.post("/scan", async (req, res) => {
             nameEn: insight.nameEn,
             brand: insight.brand || (isFlyerLike ? detectedBanner : undefined),
             gradeOrigin: insight.gradeOrigin || undefined,
-            packagingFormat: isFr ? insight.packagingFormat : insight.packagingFormatEn,
+            packagingFormat: isFr ? (insight.packagingFormatFr || insight.packagingFormat) : (insight.packagingFormatEn || insight.packagingFormat),
             dietaryBadges: insight.dietaryBadges || (isFlyerLike ? [`Circulaire ${detectedBanner}`] : undefined),
             netContent: insight.netContent || undefined,
             price: insight.price || undefined,
-            category: isFr ? insight.category : insight.categoryEn,
-            quantity: insight.quantity,
-            unit: insight.unit,
-            recommendedLocation: insight.recommendedLocation,
-            unopenedLocation: insight.unopenedLocation,
-            openedLocation: insight.openedLocation,
-            unopenedShelfLifeDays: insight.unopenedShelfLifeDays,
-            openedShelfLifeDays: insight.openedShelfLifeDays,
-            estimatedShelfLifeDays: insight.estimatedShelfLifeDays,
-            monthsFrozenShelfLife: insight.monthsFrozenShelfLife,
-            storageReason: insight.storageReason,
-            storageTip: insight.storageTip,
-            freezerTip: insight.freezerTip,
+            category: isFr ? (insight.categoryFr || insight.category) : (insight.categoryEn || insight.category),
+            quantity: insight.quantity || 1,
+            unit: insight.unit || "pcs",
+            recommendedLocation: insight.recommendedLocation || "Pantry",
+            unopenedLocation: isFr ? (insight.unopenedLocationFr || insight.unopenedLocation) : (insight.unopenedLocationEn || insight.unopenedLocation),
+            openedLocation: isFr ? (insight.openedLocationFr || insight.openedLocation) : (insight.openedLocationEn || insight.openedLocation),
+            unopenedShelfLifeDays: insight.unopenedShelfLifeDays || 7,
+            openedShelfLifeDays: insight.openedShelfLifeDays || 5,
+            estimatedShelfLifeDays: insight.estimatedShelfLifeDays || 7,
+            monthsFrozenShelfLife: insight.monthsFrozenShelfLife ?? 6,
+            storageReason: isFr ? (insight.storageReasonFr || insight.storageReason) : (insight.storageReasonEn || insight.storageReason),
+            storageTip: isFr ? (insight.storageTipFr || insight.storageTip) : (insight.storageTipEn || insight.storageTip),
+            freezerTip: isFr ? (insight.freezerTipFr || insight.freezerTip) : (insight.freezerTipEn || insight.freezerTip),
             confidence: insight.confidence || 0.95,
-            suggestedExpirationDate: getRelativeDate(insight.estimatedShelfLifeDays).split("T")[0],
+            suggestedExpirationDate: getRelativeDate(insight.estimatedShelfLifeDays || 7).split("T")[0],
             detectedText: ocrText.slice(0, 150),
           }));
 
@@ -719,6 +719,41 @@ router.post("/classify-produce-model", async (req, res) => {
     });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/v1/inventory/gemini-validate
+ * Validates or corrects an on-device scanned item using multimodal Gemini 3.8 Flash.
+ * Returns verified item details and exact token counts.
+ */
+router.post("/gemini-validate", async (req, res) => {
+  try {
+    const { imageBase64, currentCandidate, language = "FR", mimeType = "image/jpeg" } = req.body;
+    if (!imageBase64) {
+      return res.status(400).json({ success: false, error: "Missing imageBase64 in request body." });
+    }
+
+    const apiKey = (process.env.GEMINI_API_KEY || dbStore?.systemSettings?.geminiApiKey || "").trim();
+    const isApiKeyConfigured = Boolean(
+      apiKey &&
+      apiKey !== "MY_GEMINI_API_KEY" &&
+      apiKey.length > 15 &&
+      !apiKey.startsWith("your_")
+    );
+
+    if (!isApiKeyConfigured) {
+      return res.status(503).json({
+        success: false,
+        error: "GEMINI_API_KEY is not configured. Configure your key in environment or Admin Settings to use live AI validation.",
+      });
+    }
+
+    const validation = await validateFoodItemWithGemini(imageBase64, currentCandidate, mimeType, language);
+    return res.json(validation);
+  } catch (err) {
+    console.error("[Inventory Route] /gemini-validate error:", err.message || err);
+    return res.status(500).json({ success: false, error: err.message || "Gemini validation failed." });
   }
 });
 

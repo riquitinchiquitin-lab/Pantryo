@@ -389,11 +389,11 @@ export const PRODUCE_MAPPING: Record<string, ProduceDetails> = {
   cucumber: {
     nameFr: 'Concombre anglais sans pépins',
     nameEn: 'English Seedless Cucumber',
-    pluCode: '4062',
+    pluCode: '4593',
     location: 'Fridge',
     shelfLife: 8,
-    originFr: 'Serres du Québec / Ontario • Pastille PLU #4062',
-    originEn: 'Canadian Greenhouse • PLU #4062',
+    originFr: 'Notaro / Serres du Québec • Pastille PLU #4593',
+    originEn: 'Quebec Greenhouse (Notaro) • PLU #4593',
     storageTipFr: 'Garder dans sa pellicule d’origine dans la partie médiane du réfrigérateur.',
     storageTipEn: 'Keep in original plastic wrap in the middle fridge shelf.',
     freezerTipFr: 'Ne se congèle pas entier en raison de sa haute teneur en eau.',
@@ -401,7 +401,7 @@ export const PRODUCE_MAPPING: Record<string, ProduceDetails> = {
     calories: 15,
     category: 'Produce',
     targetHueRange: [90, 140],
-    keywords: ['cucumber', 'concombre', '4062'],
+    keywords: ['cucumber', 'concombre', '4593', '4062', 'notaro', 'sherrington'],
   },
   'bell pepper': {
     nameFr: 'Poivrons doux rouges / variés',
@@ -1148,8 +1148,8 @@ export const PRODUCE_MAPPING: Record<string, ProduceDetails> = {
     keywords: ['green onion', 'scallion', 'scallions', 'echalote', 'échalote', 'oignon vert', '4068'],
   },
   garlic: {
-    nameFr: 'Bulbe d’ail frais',
-    nameEn: 'Fresh Garlic Bulb',
+    nameFr: 'Bulbe d’ail frais (Filet)',
+    nameEn: 'Fresh Garlic Bulb (Mesh Sleeve)',
     pluCode: '4608',
     location: 'Pantry',
     shelfLife: 60,
@@ -1161,7 +1161,23 @@ export const PRODUCE_MAPPING: Record<string, ProduceDetails> = {
     freezerTipEn: 'Peel cloves and freeze whole or minced.',
     calories: 149,
     category: 'Produce',
-    keywords: ['garlic', 'ail', '4608'],
+    keywords: ['garlic', 'ail', '4608', 'garlic ail', 'filet d ail'],
+  },
+  shallot: {
+    nameFr: 'Échalotes françaises sèches (Attitude Fraîche)',
+    nameEn: 'Fresh French Shallots (Dry)',
+    pluCode: '4662',
+    location: 'Pantry',
+    shelfLife: 45,
+    originFr: 'Aliments du Québec • Produit du Canada • PLU #4662',
+    originEn: 'Canada Product • PLU #4662',
+    storageTipFr: 'Garder dans un panier ou filet aéré au garde-manger. Éloigner des pommes de terre.',
+    storageTipEn: 'Store in breathable basket in cool dry pantry. Keep away from potatoes.',
+    freezerTipFr: 'Hacher et congeler en sac hermétique à plat pour sautés et sauces.',
+    freezerTipEn: 'Mince finely and freeze in airtight flat bag for sauces and stir-fries.',
+    calories: 72,
+    category: 'Produce',
+    keywords: ['shallot', 'shallots', 'echalote', 'échalote', 'echalotes', 'échalotes', 'french shallot', 'attitude fraiche', 'fresh attitude', '4662'],
   },
   ginger: {
     nameFr: 'Racine de gingembre frais',
@@ -2101,30 +2117,41 @@ export async function checkAndLoadCustomOfflineModel(): Promise<boolean> {
   // 1. Try native ONNX (direct from PyTorch)
   try {
     const onnxRes = await fetch('/models/grocery_model/grocery_model.onnx');
-    if (onnxRes.ok) {
+    const contentType = onnxRes.headers.get('content-type') || '';
+    if (onnxRes.ok && !contentType.includes('text/html')) {
       const ort = await import('onnxruntime-web');
-      const modelBuffer = await onnxRes.arrayBuffer();
-      customOnnxSession = await ort.InferenceSession.create(new Uint8Array(modelBuffer), {
-        executionProviders: ['wasm'],
-      });
-      const classRes = await fetch('/models/grocery_model/classes.txt');
-      if (classRes.ok) {
-        const text = await classRes.text();
-        customClasses = text.split('\n').map((c) => c.trim()).filter(Boolean);
+      // Configure onnxruntime-web WASM environment safely
+      if (ort?.env?.wasm) {
+        ort.env.wasm.numThreads = 1;
+        ort.env.wasm.wasmPaths = '/wasm/';
       }
-      try {
-        const metaRes = await fetch('/models/grocery_model/classes_metadata.json');
-        if (metaRes.ok) {
-          customMetadata = await metaRes.json();
-          console.info('[ProduceVision] Loaded classes metadata with', Object.keys(customMetadata).length, 'entries');
+      const modelBuffer = await onnxRes.arrayBuffer();
+      // Ensure model buffer starts with valid binary header, not HTML
+      const headerBytes = new Uint8Array(modelBuffer.slice(0, 4));
+      const isHtmlHeader = headerBytes[0] === 0x3c && headerBytes[1] === 0x21; // '<!'
+      if (!isHtmlHeader) {
+        customOnnxSession = await ort.InferenceSession.create(new Uint8Array(modelBuffer), {
+          executionProviders: ['wasm'],
+        });
+        const classRes = await fetch('/models/grocery_model/classes.txt');
+        if (classRes.ok) {
+          const text = await classRes.text();
+          customClasses = text.split('\n').map((c) => c.trim()).filter(Boolean);
         }
-      } catch (_) {}
-      console.info('[ProduceVision] Native ONNX model loaded directly with', customClasses.length, 'classes!');
-      return true;
+        try {
+          const metaRes = await fetch('/models/grocery_model/classes_metadata.json');
+          if (metaRes.ok) {
+            customMetadata = await metaRes.json();
+            console.info('[ProduceVision] Loaded classes metadata with', Object.keys(customMetadata).length, 'entries');
+          }
+        } catch (_) {}
+        console.info('[ProduceVision] Native ONNX model loaded directly with', customClasses.length, 'classes!');
+        return true;
+      }
     }
   } catch (err) {
-    console.warn('[ProduceVision] ONNX load notice:', err);
-    // ONNX model not present or failed, fallback to checking for TF.js
+    console.warn('[ProduceVision] ONNX load notice (falling back gracefully):', err);
+    // ONNX model not present or failed, fallback to checking for TF.js or heuristic vision
   }
 
   // 2. Try TensorFlow.js model
@@ -2297,6 +2324,10 @@ export async function classifyProduceOnDevice(
     const hasCustom = await checkAndLoadCustomOfflineModel();
     if (hasCustom && customOnnxSession) {
       const ort = await import('onnxruntime-web');
+      if (ort?.env?.wasm) {
+        ort.env.wasm.numThreads = 1;
+        ort.env.wasm.wasmPaths = '/wasm/';
+      }
       const canvas = document.createElement('canvas');
       canvas.width = 224;
       canvas.height = 224;
