@@ -140,24 +140,31 @@ Start the container:
 docker compose up -d
 ```
 
-### Option D: Local Development
+### Option D: Local Development / Manual Host
 
 ```bash
 # 1. Clone repository
 git clone https://github.com/riquitinchiquitin-lab/Pantryo.git
 cd pantryo
 
-# 2. Install dependencies
+# 2. Configure environment & Admin password
+cp .env.example .env
+# Edit .env to set PANTRYO_ADMIN_PASSWORD="YourSecurePassword"
+
+# 3. Install dependencies
 npm install
 
-# 3. Copy environment configuration
-cp .env.example .env
-
-# 4. Start full-stack development server (Hot Module Replacement enabled)
+# 4. Start full-stack development server
 npm run dev
 ```
 
 Open your browser at `http://localhost:3000`.
+
+#### 🔑 Initial Login & Default Credentials
+On a fresh installation without custom environment variables:
+* **Initial Admin Email / Username:** `admin@example.com` (or `admin`)
+* **Initial Password:** `YourSecurePassword2026!` (set in `.env` via `PANTRYO_ADMIN_PASSWORD`)
+* **Security Recommendation:** Sign in and navigate to **Famille / Household** to change your password or enroll a **Biometric Passkey (Touch ID, Face ID, Windows Hello, YubiKey)**.
 
 ---
 
@@ -178,16 +185,20 @@ Open your browser at `http://localhost:3000`.
 
 Pantryo was engineered from day one around **Zero Trust** and **Privacy-by-Design**:
 
-1. **At-Rest Database Encryption (SQLCipher)**:
+1. **Enforced API Session Security & Token Verification**:
+   - All backend API endpoints (`/api/v1/items`, `/api/v1/recipes`, `/api/v1/admin`) strictly reject unauthenticated requests (HTTP 401).
+   - Global client request interceptor attaches verified `Authorization: Bearer <token>` and `x-auth-token` headers.
+   - Dedicated top-bar **Log Out** button calls `POST /api/v1/auth/logout` to immediately invalidate sessions, wipe cookies, and return to the secure sign-in splash.
+2. **At-Rest Database Encryption (SQLCipher)**:
    - All pantry items, receipt images, custom recipes, household member records, and audit logs are encrypted using **256-bit AES in GCM mode**.
    - Database key is derived using memory-hard **Argon2id**.
-2. **FIDO2 WebAuthn Passwordless Authentication**:
+3. **FIDO2 WebAuthn Passwordless Authentication**:
    - Zero credentials stored in cleartext.
    - Support for platform authenticators (Apple Touch ID, Face ID, Windows Hello, Android Biometrics) and roaming hardware tokens (YubiKey 5 Series).
-3. **Zero External Tracking**:
+4. **Zero External Tracking**:
    - No Google Analytics, no telemetry beacons, no external third-party CDN scripts.
    - AI vision processing and produce classification run 100% locally on the device or inside your private LAN.
-4. **Encrypted Backups**:
+5. **Encrypted Backups**:
    - Download or restore encrypted JSON snapshot backups with custom decryption passphrases right from the Admin Console.
 
 ---
@@ -238,7 +249,7 @@ Ensure your [Tailscale ACLs](https://login.tailscale.com/admin/acls) include `"n
 
 Pantryo preserves your encrypted database (`/opt/pantryo/server/data/pantryo.sqlite`) and your configuration (`/opt/pantryo/.env`) safely across all updates.
 
-### One-Line Automated Update (Recommended)
+### Method 1: Standard One-Line Update (Fast)
 
 Run inside your LXC container or server terminal:
 
@@ -250,7 +261,19 @@ sudo ./scripts/auto-update-all.sh
 sudo systemctl daemon-reload && sudo systemctl restart pantryo
 ```
 
-*This command synchronizes the repository, normalizes `.env`, compiles native SQLite binary bindings (`better-sqlite3-multiple-ciphers`), installs any new packages with `--include=dev`, applies security patches, builds the production bundle, and restarts the background service.*
+### Method 2: Automated Clean Reinstall, Backup & Data Restore (Recommended)
+
+If you encounter dependency conflicts or want a fresh rebuild that backs up your data, purges stale files, and reinstalls everything cleanly:
+
+```bash
+# Automated clean update, data backup & restore
+sudo /opt/pantryo/scripts/clean-update-restore.sh
+
+# Or via the update script flag
+sudo /opt/pantryo/update.sh --clean
+```
+
+*This script automatically halts the service, creates an atomic backup of `.env`, the encrypted SQLite database (`server/data/*`), and uploads to `/var/backups/pantryo/`, wipes old build artifacts, pulls the latest release, builds cleanly with safe memory allocation, restores your data, enforces strict permissions, and restarts `pantryo.service` with automatic rollback protection.*
 
 ---
 

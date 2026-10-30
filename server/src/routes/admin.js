@@ -1590,4 +1590,20 @@ router.get("/me", (req, res) => {
   });
 });
 
+/**
+ * POST /api/v1/auth/logout
+ * Acknowledges session termination and clears session cookie
+ */
+router.post("/logout", (req, res) => {
+  try {
+    if (res.clearCookie) {
+      res.clearCookie("pantryo_session", { path: "/" });
+    }
+  } catch (_) {}
+  res.json({
+    success: true,
+    message: "Logged out successfully",
+  });
+});
+
 export default router;

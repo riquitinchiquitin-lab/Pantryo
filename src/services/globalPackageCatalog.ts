@@ -24,7 +24,8 @@ export type ContainerType =
   | 'JAR'       // Bocal en verre / Pot
   | 'CARTON'    // Brique aseptique / Carton (Tetra Pak)
   | 'BOTTLE'    // Bouteille
-  | 'TUB';      // Bac / Pot plastique
+  | 'TUB'       // Bac / Pot plastique
+  | 'TRAY';     // Barquette / Panier
 
 export interface GlobalPackageItem {
   id: string;

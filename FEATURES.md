@@ -84,13 +84,20 @@ Empower all members of the household without compromising individual preferences
 
 Your kitchen habits, dietary choices, and shopping receipts belong to you alone:
 
+- **Strict API Endpoint Protection & Session Interceptor**:
+  - Every API endpoint (`/api/v1/items`, `/api/v1/recipes`, `/api/v1/admin`) strictly rejects unauthenticated requests with HTTP 401.
+  - Global client fetch interceptor attaches verified `Authorization: Bearer <token>` and `x-auth-token` headers to every backend interaction.
+  - Client-side cryptographic session verification gatekeeper validates user identity against `/api/v1/auth/me` on every reload before unlocking the app.
+- **Top-Bar Instant Session Invalidation**:
+  - Prominent **Déconnexion / Log Out** button in the header triggers `POST /api/v1/auth/logout`.
+  - Clears stored session tokens, invalidates cookies, and instantly redirects to the secure authentication gate.
 - **256-Bit AES SQLCipher Encryption**:
   - The SQLite database file (`pantryo.sqlite`) is encrypted at rest using industry-standard **AES-256-GCM**.
   - Without the server secret or passphrase, data dumps are unreadable pseudorandom bytes.
 - **FIDO2 WebAuthn Passkeys**:
   - Eliminates vulnerable shared passwords.
   - Authenticate instantly using Apple Touch ID / Face ID, Windows Hello, Android Biometrics, or hardware YubiKeys.
-- **Argon2id Key Derivation**: High-memory, time-tested key hashing protects all user authentication tokens against offline GPU brute-force attacks.
+- **Argon2id Key Derivation & NIST SP 800-63B Compliance**: High-memory, time-tested key hashing protects all user authentication tokens against offline GPU brute-force attacks.
 - **Zero Telemetry**: No third-party tracking scripts, analytics cookies, or phone-home beacons.
 
 ---

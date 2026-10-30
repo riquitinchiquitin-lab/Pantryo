@@ -6,6 +6,14 @@ set -euo pipefail
 
 INSTALL_DIR="${PANTRYO_DIR:-/opt/pantryo}"
 
+# Delegate to clean backup & restore script if requested
+if [[ "${1:-}" =~ ^(--clean|--fresh|-c|-f|--backup-restore)$ ]]; then
+  SCRIPT_PATH="$(dirname "$0")/scripts/clean-update-restore.sh"
+  if [ -f "$SCRIPT_PATH" ]; then
+    exec bash "$SCRIPT_PATH" "${@:2}"
+  fi
+fi
+
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
 YELLOW='\033[1;33m'

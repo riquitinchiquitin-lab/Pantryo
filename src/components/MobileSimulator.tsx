@@ -126,17 +126,8 @@ function getStoredMembers(): User[] {
   return DEFAULT_MEMBERS;
 }
 
-function getInitialActiveUser(members: User[]): User | null {
-  try {
-    const savedId = localStorage.getItem(LOCAL_STORAGE_ACTIVE_USER_ID);
-    const token = localStorage.getItem('pantryo_auth_token');
-    if (savedId && token) {
-      const found = members.find((m) => m.id === savedId);
-      if (found) return found;
-    }
-  } catch (e) {
-    console.error('Failed reading active user from localStorage:', e);
-  }
+// Strict zero-trust authentication: currentUser is null until cryptographically validated by /api/v1/auth/me
+function getInitialActiveUser(): User | null {
   return null;
 }
 
@@ -227,9 +218,11 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   const [selectedSubCategory, setSelectedSubCategory] = useState<string | 'ALL'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [householdMembers, setHouseholdMembers] = useState<User[]>(getStoredMembers);
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const list = getStoredMembers();
-    return getInitialActiveUser(list);
+  // Strict zero-trust auth: currentUser is strictly null until authenticated
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isSessionValidating, setIsSessionValidating] = useState<boolean>(() => {
+    if (typeof localStorage === 'undefined') return false;
+    return Boolean(localStorage.getItem('pantryo_auth_token'));
   });
 
   // When installed, preserve household session only if user is actively authenticated
@@ -244,38 +237,73 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
     }
   }, [isInstalledEffective, currentUser]);
 
-  // Validate active session token against server on initial mount
+  // Strict session token cryptographic verification against server on boot
   useEffect(() => {
     const token = typeof localStorage !== 'undefined' ? localStorage.getItem('pantryo_auth_token') : null;
-    const savedId = typeof localStorage !== 'undefined' ? localStorage.getItem(LOCAL_STORAGE_ACTIVE_USER_ID) : null;
 
-    if (token && savedId) {
-      fetch('/api/v1/auth/me', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'x-auth-token': token,
-        },
-      })
-        .then((res) => {
-          if (!res.ok) {
-            console.warn('[Pantryo Auth] Saved session token invalid or expired. Prompting sign in.');
-            localStorage.removeItem(LOCAL_STORAGE_ACTIVE_USER_ID);
-            localStorage.removeItem('pantryo_auth_token');
-            setCurrentUser(null);
-          } else {
-            res.json().then((data) => {
-              if (data?.user) {
-                setCurrentUser((prev) => (prev ? { ...prev, ...data.user } : data.user));
-              }
-            });
-          }
-        })
-        .catch((err) => {
-          console.warn('[Pantryo Auth] Offline session check note:', err);
-        });
-    } else if (!token && currentUser) {
+    if (!token) {
       setCurrentUser(null);
+      setIsSessionValidating(false);
+      return;
     }
+
+    let isMounted = true;
+    fetch('/api/v1/auth/me', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'x-auth-token': token,
+      },
+    })
+      .then(async (res) => {
+        if (!isMounted) return;
+        if (!res.ok) {
+          console.warn('[Pantryo Auth] Saved session token invalid or rejected by server.');
+          localStorage.removeItem(LOCAL_STORAGE_ACTIVE_USER_ID);
+          localStorage.removeItem('pantryo_auth_token');
+          setCurrentUser(null);
+          setIsSessionValidating(false);
+          return;
+        }
+
+        const data = await res.json();
+        if (!isMounted) return;
+        if (data?.user) {
+          setCurrentUser(data.user);
+          try {
+            localStorage.setItem(LOCAL_STORAGE_ACTIVE_USER_ID, data.user.id);
+          } catch (_) {}
+        } else {
+          setCurrentUser(null);
+        }
+        setIsSessionValidating(false);
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        console.warn('[Pantryo Auth] Session verification network failure:', err);
+        // Do not render authenticated UI on unverified connection
+        localStorage.removeItem(LOCAL_STORAGE_ACTIVE_USER_ID);
+        localStorage.removeItem('pantryo_auth_token');
+        setCurrentUser(null);
+        setIsSessionValidating(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Global listener for 401 unauthorized rejections
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      console.warn('[Pantryo Auth] Unauthorized API rejection caught. Redirecting to login splash.');
+      setCurrentUser(null);
+      setIsSessionValidating(false);
+    };
+
+    window.addEventListener('pantryo:unauthorized', handleUnauthorized);
+    return () => {
+      window.removeEventListener('pantryo:unauthorized', handleUnauthorized);
+    };
   }, []);
 
   const handleLogin = (user: User) => {
@@ -293,7 +321,10 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
     setTimeout(() => setBannerNotice(null), 3000);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/v1/auth/logout', { method: 'POST' });
+    } catch (_) {}
     setCurrentUser(null);
     try {
       localStorage.removeItem(LOCAL_STORAGE_ACTIVE_USER_ID);
@@ -874,10 +905,12 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   };
 
   useEffect(() => {
-    fetchHouseholdMembers();
-    fetchInventory();
-    fetchPlannedMeals();
-  }, []);
+    if (currentUser) {
+      fetchHouseholdMembers();
+      fetchInventory();
+      fetchPlannedMeals();
+    }
+  }, [currentUser?.id]);
 
   const handleAddMeal = async (mealData: Omit<PlannedMeal, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
@@ -1186,6 +1219,23 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
     (i) => i.locationType === 'SPICE_RACK' || (i.categoryName || '').toLowerCase().includes('spice') || (i.categoryName || '').toLowerCase().includes('épice')
   ).length;
   const leftoversCount = items.filter((i) => i.isLeftover).length;
+
+  if (isSessionValidating) {
+    return (
+      <div className="min-h-screen bg-[#FAF7EE] flex flex-col items-center justify-center p-6 text-center select-none">
+        <div className="w-16 h-16 rounded-3xl bg-teal-800 text-white flex items-center justify-center shadow-lg shadow-teal-900/15 mb-4 animate-pulse">
+          <PantryoLogo size={36} />
+        </div>
+        <div className="w-6 h-6 rounded-full border-2 border-teal-700 border-t-transparent animate-spin mb-3" />
+        <h2 className="text-base font-bold text-[#0D3B37]">
+          {lang === 'FR' ? 'Vérification de la session...' : 'Verifying session...'}
+        </h2>
+        <p className="text-xs text-[#527470] mt-1 max-w-xs">
+          {lang === 'FR' ? 'Validation cryptographique de votre accès' : 'Cryptographic verification of your household access'}
+        </p>
+      </div>
+    );
+  }
 
   if (!currentUser) {
     return (
@@ -2227,7 +2277,12 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         {activeNav === 'sync' && (
           <FamilySyncView
             currentUser={currentUser}
-            onSwitchUser={setCurrentUser}
+            onSwitchUser={(switchedUser) => {
+              setCurrentUser(switchedUser);
+              try {
+                localStorage.setItem(LOCAL_STORAGE_ACTIVE_USER_ID, switchedUser.id);
+              } catch (_) {}
+            }}
             members={householdMembers}
             onUpdateMember={handleUpdateMember}
             onLogout={handleLogout}

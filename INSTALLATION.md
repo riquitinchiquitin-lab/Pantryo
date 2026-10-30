@@ -36,37 +36,31 @@
 ### Where are the default passwords?
 
 > [!IMPORTANT]
-> **Pantryo has NO static default passwords by design.**
-> In strict compliance with **NIST SP 800-63B** digital identity standards and modern zero-trust homelab security, hardcoded credentials (such as `admin` / `admin` or `root` / `root`) are never included. Hardcoded default passwords are the #1 attack vector in self-hosted environments.
+> **Pantryo prioritizes NIST SP 800-63B digital identity standards.**
+> All passwords and cryptographic encryption keys are either **interactively created by you during install** or loaded securely from your environment file (`/opt/pantryo/.env`).
 
-All passwords and encryption keys are either **interactively created by you** or **cryptographically generated on the fly** with a copy-paste summary formatted for your password manager:
-
-| Credential Type | Default Value | Provisioning Flow | Where It Is Stored |
+| Credential Type | Default (if unconfigured) | Provisioning Flow | Where It Is Stored |
 | :--- | :--- | :--- | :--- |
-| **Proxmox Container Root Password** | *None* | Interactive prompt during container creation. Press **Enter** to auto-generate a secure 20-character password, or enter your own. | Set via `pct create --password` / `/etc/shadow`. Save to Bitwarden/1Password. |
-| **SQLCipher Database Encryption Key** | *None* | Auto-generated 64-hex key (256-bit AES-GCM) with copy box for password managers. | `/opt/pantryo/.env` (`DB_ENCRYPTION_KEY`, permissions `chmod 600`). |
-| **Pantryo Web Administrator** | *None* | Interactively prompted during setup (Display Name, Username/Email, min 8-character password). | Stored with Argon2id memory-hard hashing inside encrypted SQLite database. |
+| **Pantryo Web Administrator** | `admin@example.com` / `YourSecurePassword2026!` | Prompted interactively during `install.sh`, or specified via `PANTRYO_ADMIN_PASSWORD` in `.env`. | Stored with Argon2id memory-hard hashing inside encrypted SQLite database. |
+| **SQLCipher Database Encryption Key** | *Auto-generated* | Auto-generated 64-hex key (256-bit AES-GCM) with copy box for password managers. | `/opt/pantryo/.env` (`DB_ENCRYPTION_KEY`, permissions `chmod 600`). |
+| **Proxmox Container Root Password** | *None / Custom* | Interactive prompt during container creation. Press **Enter** to auto-generate a secure 20-character password. | Set via `pct create --password` / `/etc/shadow`. Save to Bitwarden/1Password. |
 | **Session Secret Key** | *Auto-generated* | Generated via `openssl rand -hex 32`. | `/opt/pantryo/.env` (`SESSION_SECRET`). |
 
-#### 🔑 Saving Credentials to Password Managers (Bitwarden, 1Password, KeePass)
-During both `install-proxmox.sh` and `install.sh`, the terminal displays formatted credential cards:
-```text
-========================================================================
-        🔐 Container Root Credentials for Password Manager             
-========================================================================
-Container ID:            206
-Container Hostname:      pantryo
-Container Root Username: root
-Container Root Password: X9$mK#2pL8vN!4qR7wY0
-► [Auto-generated 20-char password - save in Bitwarden / 1Password / KeePass]
-Container IP Address:    192.168.1.145
-========================================================================
-```
+#### 🔑 How Do You Know the Admin Password on First Boot?
+1. **If you installed via `install.sh`:** You entered your password during the interactive installation prompt (`Secure Password: ...`), and the script saved it to `/opt/pantryo/.env`.
+2. **If you installed via Docker, Git, or copied `.env.example`:** The default bootstrap credentials are:
+   - **Username / Email:** `admin@example.com` (or username `admin`)
+   - **Initial Password:** `YourSecurePassword2026!`
+   - *Check or edit anytime in `/opt/pantryo/.env` (`PANTRYO_ADMIN_PASSWORD`).*
+3. **First-Time Security Recommendation:**
+   - Log in using your admin credentials.
+   - Click the **Déconnexion / Log Out** button on the top bar anytime to safely invalidate your session.
+   - Navigate to **Famille / Household**, select your Admin profile, and click **Modifier le mot de passe** or enroll a **Biometric Passkey (Touch ID, Face ID, Windows Hello, YubiKey)**.
 
 #### 🔄 How to Reset or Audit Passwords
+- **Web Administrator Password**: Check or update `PANTRYO_ADMIN_PASSWORD` in `/opt/pantryo/.env` and restart Pantryo (`sudo systemctl restart pantryo`).
 - **Container Root Password**: On the Proxmox host shell, run `pct enter <CTID>` and then `passwd root`.
 - **Database Encryption Key**: Inspect `/opt/pantryo/.env` (requires root: `sudo cat /opt/pantryo/.env | grep DB_ENCRYPTION_KEY`).
-- **Web Administrator & Settings**: Open the web application, log in, and click the **Admin Pane** (shield icon in the navbar) to audit and update App URLs, Reverse Proxy settings, Gemini AI API keys, or user roles.
 
 ---
 
@@ -352,6 +346,32 @@ sudo systemctl restart pantryo
 systemctl status pantryo
 ```
 
+### Method 3: Automated Clean Reinstall, Backup & Data Restore (Recommended)
+
+When upgrading across major releases, resolving dependency locks, or repairing corrupted caches without losing any data:
+
+#### 🚀 1-Line Automated Clean Reinstall & Restore
+Run inside your LXC container:
+```bash
+sudo /opt/pantryo/scripts/clean-update-restore.sh
+```
+*(Or via `sudo /opt/pantryo/update.sh --clean`)*
+
+Or run directly from your Proxmox VE Node Shell (replace `<CT_ID>` with your container ID):
+```bash
+pct exec <CT_ID> -- bash -c "curl -fsSL https://raw.githubusercontent.com/riquitinchiquitin-lab/Pantryo/main/scripts/clean-update-restore.sh | sudo bash"
+```
+
+#### What This Automated Script Does:
+1. **Halts the Service:** Gracefully stops `pantryo.service`.
+2. **Atomic Backup:** Creates a timestamped archive at `/var/backups/pantryo/backup_<TIMESTAMP>/` containing your `.env`, SQLCipher encrypted SQLite database (`server/data/*`), master encryption keys, custom uploads, and SHA-256 integrity checksums.
+3. **Purges Old Files:** Wipes `node_modules`, `package-lock.json`, `dist`, `.vite`, and build caches.
+4. **Pulls Latest Release:** Resets repository to the latest official `origin/main` release.
+5. **Fresh Install & Safe Build:** Runs `npm install` and `NODE_OPTIONS="--max-old-space-size=2048" npm run build`.
+6. **Restores User Data:** Automatically copies your `.env`, database, and uploads back into place, and verifies cryptographic integrity.
+7. **Hardens Permissions:** Enforces `pantryo:pantryo` ownership, `chmod 600` on `.env`, and `chmod 700` on `server/data`.
+8. **Restarts & Health Checks:** Reloads systemd, starts `pantryo.service`, and performs a health-check probe with automatic rollback protection if anything fails.
+
 ---
 
 ## 6. Access & Networking Architecture
@@ -514,34 +534,45 @@ Copy `.env.example` to `.env` and configure according to your infrastructure:
 
 ```bash
 # -------------------------------------------------------------
-# PANTRYO SERVER CONFIGURATION
+# AI & INTEGRATIONS
 # -------------------------------------------------------------
-
-# Environment mode: 'production' or 'development'
-NODE_ENV=production
-
-# HTTP Port the server listens on
-PORT=3000
-
-# Path to the encrypted SQLite database file
-DATABASE_PATH=./data/pantryo.sqlite
-
-# Secret key used for cryptographic session signature and token verification (minimum 64 hex characters)
-# Generate via: openssl rand -hex 32
-SESSION_SECRET=e798f98a287b469c8a41147076a54d682496d07e66df423ad43209849201a0bc
-
-# Default password for the initial administrator user on first boot
-ADMIN_DEFAULT_PASSWORD=YourSecurePassword2026!
-
-# Public URL used for OAuth/FIDO2 WebAuthn Origin validation and Expo Mobile sync
-# Example: https://pantry.yourdomain.com or http://192.168.1.100:3000
-PUBLIC_APP_URL=https://pantry.yourdomain.com
+# Optional Google Gemini API key for smart meal planning & receipt categorization
+GEMINI_API_KEY=""
 
 # -------------------------------------------------------------
-# EXPO MOBILE & PWA CLIENT VARIABLES (Client-side exposed)
+# KITCHEN & HOUSEHOLD SETTINGS
 # -------------------------------------------------------------
-# Base backend endpoint for the native iOS/Android Expo application
-EXPO_PUBLIC_API_URL=https://pantry.yourdomain.com
+KITCHEN_NAME="Your Kitchen"
+VITE_KITCHEN_NAME="Your Kitchen"
+
+# -------------------------------------------------------------
+# PRIMARY ADMINISTRATOR CREDENTIALS
+# -------------------------------------------------------------
+PANTRYO_ADMIN_NAME="admin"
+PANTRYO_ADMIN_USERNAME="admin"
+PANTRYO_ADMIN_PASSWORD="YourSecurePassword2026!"
+PANTRYO_ADMIN_AVATAR="/avatars/chef-cat.svg"
+
+# -------------------------------------------------------------
+# DATABASE ENCRYPTION (256-bit AES-GCM / SQLCipher)
+# -------------------------------------------------------------
+# Auto-generated 64 hex characters on install (or generate with openssl rand -hex 32)
+DB_ENCRYPTION_KEY="27f76ac5ffba8d8497dec5374687f317132443edc16e8c624c175e25edf48ea1"
+
+# -------------------------------------------------------------
+# HOSTING & REMOTE INGRESS
+# -------------------------------------------------------------
+# Options: 'cloudflare' (Zero Trust), 'custom_domain' (Nginx/Caddy), or 'local_lan'
+PANTRYO_HOSTING_MODE="cloudflare"
+
+# Application public URL (used for FIDO2 WebAuthn RP verification and PWA origin)
+APP_URL="https://pantryo.local"
+
+# Mobile Client target API URL
+EXPO_PUBLIC_API_URL="http://localhost:3000/api/v1/inventory"
+
+# Cloudflare Zero Trust Tunnel Token (if using Cloudflare tunnel)
+CLOUDFLARE_TUNNEL_TOKEN="your_cloudflare_tunnel_token_here"
 ```
 
 ---

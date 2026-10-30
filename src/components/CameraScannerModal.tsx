@@ -352,7 +352,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
         setActiveMode('receipt');
       } else if (initialMode === 'barcode') {
         setActiveMode('barcode');
-      } else if (initialMode === 'practice' || (initialMode as string) === 'presets') {
+      } else if ((initialMode as string) === 'practice' || (initialMode as string) === 'presets') {
         setActiveMode('practice');
       } else if (initialMode === 'recipe') {
         setActiveMode('recipe');

@@ -11,8 +11,12 @@ import {
 } from "../services/geminiRecipeParser.js";
 import { dbStore } from "../services/dbStore.js";
 import { estimateRecipeNutrition } from "../services/nutritionEngine.js";
+import { requireAuth } from "../services/sessionTokenService.js";
 
 const router = express.Router();
+
+// Strict Session Authentication Guard: All recipe and meal planning routes require a valid session token
+router.use(requireAuth);
 
 /**
  * POST /api/v1/recipes/estimate-nutrition

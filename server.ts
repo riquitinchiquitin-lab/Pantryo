@@ -318,8 +318,10 @@ async function startServer() {
   }
 
   server.listen(PORT, "0.0.0.0", () => {
-    console.log(`[Kitchen Komrade] Server running on http://0.0.0.0:${PORT}`);
-    initAutomatedUpdateScheduler();
+    console.log(`[Pantryo] Server running on http://0.0.0.0:${PORT}`);
+    if (process.env.NODE_ENV === "production") {
+      initAutomatedUpdateScheduler();
+    }
   });
 }
 

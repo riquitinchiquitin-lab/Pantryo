@@ -112,7 +112,7 @@ export interface ScannedItemCandidate {
   recommendedLocation: 'Fridge' | 'Pantry' | 'Freezer';
   storageReason?: string;
   estimatedShelfLifeDays: number;
-  monthsFrozenShelfLife: number;
+  monthsFrozenShelfLife?: number;
   confidence?: number;
   storageTip?: string;
   freezerTip?: string;

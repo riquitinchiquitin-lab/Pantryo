@@ -1,0 +1,6 @@
+{
+  "summary":  "Implementation plan for building a robust, automated clean update, backup, and restore script tailored for Proxmox VE LXC containers and Linux hosts. Preserves encrypted SQLCipher databases, .env configuration, and custom uploads with health checks and rollback support.",
+  "updatedAt":  "2026-10-30T16:11:06.919785193Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

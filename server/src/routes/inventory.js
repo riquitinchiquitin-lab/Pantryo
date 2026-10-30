@@ -167,6 +167,9 @@ let itemsStore = [];
 
 let activityLogs = [];
 
+// Strict Session Authentication Guard: All inventory endpoints require a valid authenticated session token
+router.use(requireAuth);
+
 /**
  * POST /api/v1/inventory/scan
  * Handles photo upload (base64 string or multipart), calls Gemini Vision service,

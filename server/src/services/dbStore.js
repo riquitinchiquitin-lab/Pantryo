@@ -1684,15 +1684,11 @@ class EncryptedDatabaseStore {
       isValid = verifyPassword(cleanPassword, user.passwordHash);
     }
 
-    // Check environment password or default password for ADMIN role
+    // Check environment password for ADMIN role if configured
     const envAdminPass = (process.env.PANTRYO_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD || "").trim();
-    if (!isValid && user.role === "ADMIN") {
-      if (envAdminPass && cleanPassword === envAdminPass) {
+    if (!isValid && user.role === "ADMIN" && envAdminPass) {
+      if (cleanPassword === envAdminPass) {
         isValid = true;
-      } else if (cleanPassword === "YourSecurePassword2026!") {
-        isValid = true;
-      }
-      if (isValid) {
         user.passwordHash = hashPassword(cleanPassword);
         this.persistToEncryptedDisk();
       }
