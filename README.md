@@ -267,10 +267,10 @@ If you encounter dependency conflicts or want a fresh rebuild that backs up your
 
 ```bash
 # Automated clean update, data backup & restore
-sudo /opt/pantryo/scripts/clean-update-restore.sh
+sudo bash /opt/pantryo/scripts/clean-update-restore.sh
 
 # Or via the update script flag
-sudo /opt/pantryo/update.sh --clean
+sudo bash /opt/pantryo/update.sh --clean
 ```
 
 *This script automatically halts the service, creates an atomic backup of `.env`, the encrypted SQLite database (`server/data/*`), and uploads to `/var/backups/pantryo/`, wipes old build artifacts, pulls the latest release, builds cleanly with safe memory allocation, restores your data, enforces strict permissions, and restarts `pantryo.service` with automatic rollback protection.*

@@ -353,9 +353,9 @@ When upgrading across major releases, resolving dependency locks, or repairing c
 #### 🚀 1-Line Automated Clean Reinstall & Restore
 Run inside your LXC container:
 ```bash
-sudo /opt/pantryo/scripts/clean-update-restore.sh
+sudo bash /opt/pantryo/scripts/clean-update-restore.sh
 ```
-*(Or via `sudo /opt/pantryo/update.sh --clean`)*
+*(Or via `sudo bash /opt/pantryo/update.sh --clean`)*
 
 Or run directly from your Proxmox VE Node Shell (replace `<CT_ID>` with your container ID):
 ```bash
