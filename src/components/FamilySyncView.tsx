@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Users, Shield, Clock, Plus, UserCheck, ArrowRightLeft, Key, ShieldAlert, ShieldCheck, Camera, LogOut, Download, Smartphone, CheckCircle2, Edit3, Trash2, X, AlertTriangle, ChefHat, Globe, Cloud, Sparkles, Server, BookOpen } from 'lucide-react';
 import { User, ActivityLogItem } from '../types';
-import { useLanguage, getLocationLocalizedName, LanguageSwitcher } from '../utils/i18n';
+import { useLanguage, getLocationLocalizedName } from '../utils/i18n';
 import { useAlertToast } from '../contexts/AlertToastContext';
 import { Fido2AuthModal } from './Fido2AuthModal';
 import { ChangeAvatarModal } from './ChangeAvatarModal';
@@ -91,9 +91,8 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <LanguageSwitcher />
-          {onLogout && (
+        {onLogout && (
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onLogout}
@@ -103,8 +102,8 @@ export const FamilySyncView: React.FC<FamilySyncViewProps> = ({
               <LogOut className="w-3.5 h-3.5" />
               <span>{lang === 'FR' ? 'Déconnexion' : 'Log Out'}</span>
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Household & Access Admin Quick Card */}

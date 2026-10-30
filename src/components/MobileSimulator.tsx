@@ -10,7 +10,6 @@ import {
   Refrigerator,
   Box,
   Boxes,
-  ShoppingBag,
   Flame,
   Plus,
   RefreshCw,
@@ -1374,6 +1373,18 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               <span className="hidden sm:inline">{lang === 'FR' ? 'Ajouter' : 'Add'}</span>
             </button>
 
+            {/* Log Off Button */}
+            <button
+              type="button"
+              id="header-logout-btn"
+              onClick={handleLogout}
+              className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-full border border-red-200/90 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 shrink-0 cursor-pointer shadow-2xs"
+              title={lang === 'FR' ? 'Déconnexion du compte' : 'Log out of account'}
+              aria-label={lang === 'FR' ? 'Déconnexion' : 'Log out'}
+            >
+              <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-600" />
+              <span className="hidden sm:inline">{lang === 'FR' ? 'Déconnexion' : 'Log out'}</span>
+            </button>
           </div>
         </div>
       </header>
@@ -2435,38 +2446,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 </div>
               </button>
 
-              {/* Option 6: Canadian Grocery Flyers (Maxi, Super C, No Frills, Metro, IGA, Walmart) */}
-              <button
-                type="button"
-                id="add-canadian-flyers-option"
-                onClick={() => {
-                  setIsAddMenuOpen(false);
-                  setScannerInitialMode('flyer');
-                  setIsScannerOpen(true);
-                }}
-                className="w-full p-3.5 sm:p-4 rounded-3xl bg-white hover:bg-rose-50/70 border-2 border-rose-600/30 hover:border-rose-500 flex items-center gap-3.5 sm:gap-4 text-left transition-all active:scale-[0.98] shadow-xs group cursor-pointer"
-              >
-                <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-tr from-rose-700 via-rose-600 to-amber-500 text-white flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition-transform">
-                  <ShoppingBag className="w-6 h-6 text-rose-100" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-extrabold text-[#0D3B37]">
-                      {lang === 'FR' ? 'Circulaires d’épicerie canadiennes' : 'Canadian Grocery Flyers'}
-                    </p>
-                    <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-rose-100 text-rose-900 border border-rose-300">
-                      🇨🇦 Photos & IA
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#527470]">
-                    {lang === 'FR'
-                      ? 'Maxi, Super C, No Frills, Metro, IGA, Walmart : photos de circulaires, yogourts et rabais $/lb'
-                      : 'Maxi, Super C, No Frills, Metro, IGA, Walmart: flyer pictures, yogurts & $/lb deals'}
-                  </p>
-                </div>
-              </button>
-
-              {/* Option 7: Family & Profile Settings */}
+              {/* Option 6: Family & Profile Settings */}
               <button
                 type="button"
                 onClick={() => {
@@ -2649,20 +2629,15 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
           type="button"
           id="desktop-center-bottom-round-add-btn"
           onClick={() => setIsAddMenuOpen((prev) => !prev)}
-          className={`h-14 px-6 rounded-full flex items-center gap-2.5 transition-all cursor-pointer shadow-[var(--md-sys-elevation-3)] hover:shadow-[var(--md-sys-elevation-4)] active:scale-95 border-2 border-white/80 ring-2 ring-emerald-950/20 ${
+          className={`w-14 h-14 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-[var(--md-sys-elevation-3)] hover:shadow-[var(--md-sys-elevation-4)] active:scale-95 border-2 border-white/80 ring-2 ring-emerald-950/20 ${
             isAddMenuOpen
-              ? 'bg-[var(--md-sys-color-error)] text-white'
+              ? 'bg-[var(--md-sys-color-error)] text-white rotate-45'
               : 'bg-[var(--md-sys-color-primary)] text-white hover:brightness-110'
           }`}
           aria-label={lang === 'FR' ? 'Ajouter un aliment' : 'Add Item'}
           title={lang === 'FR' ? 'Ajouter un aliment' : 'Add Item'}
         >
-          <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-            <Plus className={`w-5 h-5 stroke-[2.75] transition-transform duration-200 ${isAddMenuOpen ? 'rotate-45' : ''}`} />
-          </div>
-          <span className="font-bold text-sm tracking-wide">
-            {lang === 'FR' ? 'Ajouter un aliment' : '+ Add Item'}
-          </span>
+          <Plus className="w-7 h-7 stroke-[2.75] transition-transform duration-200" />
         </button>
       </div>
 

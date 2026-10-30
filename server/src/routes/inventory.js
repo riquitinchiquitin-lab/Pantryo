@@ -644,14 +644,14 @@ router.get("/model-status", async (req, res) => {
  */
 router.post("/upload-model", requireAdmin, async (req, res) => {
   try {
-    const { modelBase64, activate399Classes = true } = req.body;
+    const { modelBase64, activate399Classes = true, targetModel = "produce", customFilename } = req.body;
     if (!modelBase64) {
       return res.status(400).json({ success: false, error: "modelBase64 is required" });
     }
 
     const modelBuffer = Buffer.from(modelBase64, "base64");
-    if (modelBuffer.length < 5000 || modelBuffer.length > 30 * 1024 * 1024) {
-      return res.status(400).json({ success: false, error: "Invalid model file (size must be between 5KB and 30MB)" });
+    if (modelBuffer.length < 5000 || modelBuffer.length > 35 * 1024 * 1024) {
+      return res.status(400).json({ success: false, error: "Invalid model file (size must be between 5KB and 35MB)" });
     }
 
     const modelDir = path.resolve(process.cwd(), "public/models/grocery_model");
@@ -659,22 +659,26 @@ router.post("/upload-model", requireAdmin, async (req, res) => {
       fs.mkdirSync(modelDir, { recursive: true });
     }
 
-    const modelPath = path.join(modelDir, "grocery_model.onnx");
+    const isRetail = targetModel === "retail" || targetModel === "superc";
+    const filename = customFilename || (isRetail ? "superc_grocery_model.onnx" : "grocery_model.onnx");
+    const modelPath = path.join(modelDir, filename);
     fs.writeFileSync(modelPath, modelBuffer);
 
     // Also mirror to dist if dist exists
     const distModelDir = path.resolve(process.cwd(), "dist/models/grocery_model");
     if (fs.existsSync(distModelDir)) {
-      fs.writeFileSync(path.join(distModelDir, "grocery_model.onnx"), modelBuffer);
+      fs.writeFileSync(path.join(distModelDir, filename), modelBuffer);
     }
 
-    // Activate classes_399.txt if requested
-    const p399 = path.join(modelDir, "classes_399.txt");
-    const pActive = path.join(modelDir, "classes.txt");
-    if (activate399Classes && fs.existsSync(p399)) {
-      fs.copyFileSync(p399, pActive);
-      if (fs.existsSync(distModelDir)) {
-        fs.copyFileSync(p399, path.join(distModelDir, "classes.txt"));
+    // Activate classes_399.txt if requested for produce model
+    if (!isRetail && activate399Classes) {
+      const p399 = path.join(modelDir, "classes_399.txt");
+      const pActive = path.join(modelDir, "classes.txt");
+      if (fs.existsSync(p399)) {
+        fs.copyFileSync(p399, pActive);
+        if (fs.existsSync(distModelDir)) {
+          fs.copyFileSync(p399, path.join(distModelDir, "classes.txt"));
+        }
       }
     }
 
@@ -684,7 +688,11 @@ router.post("/upload-model", requireAdmin, async (req, res) => {
     const status = await getModelStatus();
     return res.json({
       success: true,
-      message: "Model uploaded and activated successfully!",
+      message: isRetail
+        ? "Canadian Retail & Super C Model deployed successfully!"
+        : "Produce & Herb 399-class ONNX Model deployed and activated successfully!",
+      targetModel,
+      filename,
       modelStatus: status,
     });
   } catch (err) {

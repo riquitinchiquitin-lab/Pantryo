@@ -204,7 +204,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
   const [geminiTestResult, setGeminiTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [settingsStatus, setSettingsStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  // Produce Vision AI Model (399 Classes) State
+  // Vision AI Models & Neural Engine State
   const [modelStatus, setModelStatus] = useState<{
     totalClasses?: number;
     modelName?: string;
@@ -212,7 +212,30 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     classes399Available?: boolean;
     totalMetadataEntries?: number;
     status?: string;
+    retailModel?: {
+      name?: string;
+      filename?: string;
+      available?: boolean;
+      fileSizeMB?: number;
+      totalClasses?: number;
+      classes?: string[];
+      path?: string;
+      status?: string;
+    };
+    recipeVision?: {
+      name?: string;
+      features?: string[];
+      status?: string;
+    };
+    geminiFallback?: {
+      name?: string;
+      mode?: string;
+      tokenOptimization?: string;
+      status?: string;
+    };
   } | null>(null);
+  const [modelUploadTarget, setModelUploadTarget] = useState<'produce' | 'retail'>('produce');
+  const [showProxmoxCliHelp, setShowProxmoxCliHelp] = useState(false);
   const [isUploadingModel, setIsUploadingModel] = useState(false);
   const [modelUploadMessage, setModelUploadMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const modelFileInputRef = useRef<HTMLInputElement>(null);
@@ -502,16 +525,23 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
           const res = await fetch('/api/v1/inventory/upload-model', {
             method: 'POST',
             headers: await getAdminHeaders({ 'Content-Type': 'application/json' }),
-            body: JSON.stringify({ modelBase64: base64, activate399Classes: true }),
+            body: JSON.stringify({
+              modelBase64: base64,
+              activate399Classes: modelUploadTarget === 'produce',
+              targetModel: modelUploadTarget,
+            }),
           });
           const data = await res.json();
           if (data.success) {
             setModelStatus(data.modelStatus);
+            const sizeStr = modelUploadTarget === 'produce'
+              ? `${data.modelStatus?.fileSizeMB || ''} Mo`
+              : `${data.modelStatus?.retailModel?.fileSizeMB || ''} Mo`;
             setModelUploadMessage({
               type: 'success',
               message: lang === 'FR'
-                ? `Modèle IA 399 classes déployé et activé avec succès (${data.modelStatus?.fileSizeMB || ''} Mo) !`
-                : `399-class AI model deployed and activated successfully (${data.modelStatus?.fileSizeMB || ''} MB)!`,
+                ? `Modèle ${modelUploadTarget === 'produce' ? 'Fruits & Légumes 399 classes' : 'Supermarché Canadien (Super C)'} déployé et activé (${sizeStr}) !`
+                : `Model ${modelUploadTarget === 'produce' ? 'Produce & Herbs (399 classes)' : 'Canadian Retail (Super C)'} deployed and activated successfully (${sizeStr})!`,
             });
           } else {
             setModelUploadMessage({
@@ -4081,57 +4111,152 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                   </div>
                 </div>
 
-                {/* 5. On-Device Produce Vision Model (399 Classes) */}
+                {/* 5. Vision AI Suite & Multi-Model Architecture (Produce 399 + Super C / Loblaw + Recipes) */}
                 <div className="p-5 rounded-2xl bg-white border border-[#E0D9C8] shadow-2xs space-y-4">
                   <div className="flex items-center justify-between pb-2 border-b border-[#F0EBE1] flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <Camera className="w-4 h-4 text-teal-800" />
                       <h3 className="font-bold text-[#0D3B37] text-xs uppercase tracking-wider">
-                        {lang === 'FR' ? '5. Modèle IA Produce Vision (399 Classes)' : '5. Produce Vision AI Model (399 Classes)'}
+                        {lang === 'FR'
+                          ? '5. Suite Vision IA & Modèles Neuronaux (399 Classes + Super C / Loblaw + Recettes)'
+                          : '5. Vision AI Suite & Neural Models (399 Produce + Super C / Loblaw + Recipes)'}
                       </h3>
                     </div>
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
                       <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                      <span>{lang === 'FR' ? '399 Classes & Métadonnées Prêtes' : '399 Classes & Metadata Ready'}</span>
+                      <span>{lang === 'FR' ? '3 Modèles & Pipeline Actifs' : '3 Active Vision Models Ready'}</span>
                     </span>
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-[#FAF7EE] border border-[#E0D9C8] space-y-2">
-                    <div className="flex items-center justify-between text-[11px] flex-wrap gap-2">
-                      <span className="font-bold text-[#0D3B37]">
-                        {lang === 'FR' ? 'Architecture du Modèle :' : 'Model Architecture:'}
-                      </span>
-                      <span className="font-mono text-teal-800 font-bold">
-                        MobileNetV2 (ONNX Runtime WASM • 399 Classes)
-                      </span>
+                  {/* Multi-Model Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* Model A: Produce 399 */}
+                    <div className="p-3.5 rounded-xl bg-[#FAF7EE] border border-[#E0D9C8] space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-[#0D3B37] text-xs flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                          {lang === 'FR' ? 'Modèle Fruits & Légumes (399 Classes)' : 'Produce & Herb Model (399 Classes)'}
+                        </span>
+                        <span className="font-mono text-[10px] bg-white px-2 py-0.5 rounded-md border border-[#E0D9C8] text-teal-800 font-bold">
+                          {modelStatus?.fileSizeMB || '10.41'} Mo
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-[#527470] space-y-1">
+                        <div>
+                          <strong className="text-[#0D3B37]">Fichier :</strong>{' '}
+                          <code className="text-[10px] bg-slate-100 px-1 py-0.5 rounded text-slate-700">grocery_model.onnx</code>
+                        </div>
+                        <div>
+                          <strong className="text-[#0D3B37]">{lang === 'FR' ? 'Architecture :' : 'Architecture:'}</strong>{' '}
+                          MobileNetV2 (ONNX Runtime WASM)
+                        </div>
+                        <div>
+                          <strong className="text-[#0D3B37]">{lang === 'FR' ? 'Couverture :' : 'Coverage:'}</strong>{' '}
+                          {lang === 'FR'
+                            ? '399 classes (Fichier Canadien CNF & Normes IFPS PLU)'
+                            : '399 classes (Canadian Nutrient File & IFPS PLU)'}
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between text-[11px] flex-wrap gap-2">
-                      <span className="font-bold text-[#0D3B37]">
-                        {lang === 'FR' ? 'Couverture Produit :' : 'Produce Coverage:'}
-                      </span>
-                      <span className="text-[#527470]">
+
+                    {/* Model B: Super C & Loblaw Retail */}
+                    <div className="p-3.5 rounded-xl bg-[#FAF7EE] border border-[#E0D9C8] space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-[#0D3B37] text-xs flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-teal-500"></span>
+                          {lang === 'FR' ? 'Supermarché Canadien (Super C & Loblaw)' : 'Canadian Retail Model (Super C & Loblaw)'}
+                        </span>
+                        <span className="font-mono text-[10px] bg-white px-2 py-0.5 rounded-md border border-[#E0D9C8] text-teal-800 font-bold">
+                          {modelStatus?.retailModel?.fileSizeMB || '4.69'} Mo
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-[#527470] space-y-1">
+                        <div>
+                          <strong className="text-[#0D3B37]">Fichier :</strong>{' '}
+                          <code className="text-[10px] bg-slate-100 px-1 py-0.5 rounded text-slate-700">superc_grocery_model.onnx</code>
+                        </div>
+                        <div>
+                          <strong className="text-[#0D3B37]">{lang === 'FR' ? 'Rayons :' : 'Aisles:'}</strong>{' '}
+                          9 rayons (Boulangerie, Épicerie, Boucherie, Laitiers, Surgelés...)
+                        </div>
+                        <div>
+                          <strong className="text-[#0D3B37]">{lang === 'FR' ? 'Marques :' : 'Brands:'}</strong>{' '}
+                          Selection, Irrésistibles, Sans Nom, PC, St-Méthode, Furlani
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Module C: Recipe Vision Archivist */}
+                    <div className="p-3 rounded-xl bg-white border border-[#E0D9C8] text-[11px] space-y-1">
+                      <div className="font-bold text-[#0D3B37] flex items-center gap-1.5">
+                        <ChefHat className="w-3.5 h-3.5 text-teal-800" />
+                        <span>{lang === 'FR' ? 'Archiviste de Recettes (OCR & Manuscrits)' : 'Recipe Vision Archivist (OCR & Cursive)'}</span>
+                      </div>
+                      <p className="text-[#527470] text-[10.5px]">
                         {lang === 'FR'
-                          ? '399 catégories (Fruits du monde, légumes asiatiques, herbes culinaires, baies fraîches)'
-                          : '399 categories (World fruits, Asian vegetables, culinary herbs, fresh berries)'}
-                      </span>
+                          ? 'Reconnaissance des livres de recettes imprimés et cahiers manuscrits (stylo bleu québécois) avec préservation des notes familiales.'
+                          : 'Scans printed cookbook pages & handwritten cursive notebook cards with family annotations preserved.'}
+                      </p>
                     </div>
-                    <div className="flex items-center justify-between text-[11px] flex-wrap gap-2">
-                      <span className="font-bold text-[#0D3B37]">
-                        {lang === 'FR' ? 'Fichiers Associés :' : 'Associated Artifacts:'}
-                      </span>
-                      <span className="font-mono text-[10px] text-slate-600">
-                        classes_399.txt • classes_metadata.json ({lang === 'FR' ? '399 entrées bilingues' : '399 bilingual entries'})
-                      </span>
+
+                    {/* Module D: Gemini Flash Fallback */}
+                    <div className="p-3 rounded-xl bg-white border border-[#E0D9C8] text-[11px] space-y-1">
+                      <div className="font-bold text-[#0D3B37] flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                        <span>{lang === 'FR' ? 'Relais Intelligent Nuage (Gemini Flash)' : 'Smart Cloud Fallback (Gemini Flash)'}</span>
+                      </div>
+                      <p className="text-[#527470] text-[10.5px]">
+                        {lang === 'FR'
+                          ? '0 jeton consommé lors d’une identification locale confiante. Relais automatique uniquement si la confiance est faible.'
+                          : '0 tokens used on confident on-device scans. Automatic cloud fallback only on low confidence (<60%).'}
+                      </p>
                     </div>
                   </div>
 
-                  {/* Upload new .onnx file */}
-                  <div className="space-y-2">
-                    <label className="font-bold text-[#0D3B37] block text-[11px]">
-                      {lang === 'FR'
-                        ? 'Téléverser ou Mettre à Jour le Modèle Entraîné (grocery_model.onnx)'
-                        : 'Deploy / Upload Trained ONNX Model (grocery_model.onnx)'}
-                    </label>
+                  {/* Deploy & Update ONNX Models */}
+                  <div className="pt-2 border-t border-[#F0EBE1] space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <label className="font-bold text-[#0D3B37] block text-[11px]">
+                        {lang === 'FR'
+                          ? 'Mettre à jour un modèle ONNX dans l’application :'
+                          : 'Update an ONNX Model in the Application:'}
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowProxmoxCliHelp(!showProxmoxCliHelp)}
+                        className="text-[11px] font-bold text-teal-800 hover:text-teal-950 flex items-center gap-1 self-start sm:self-auto cursor-pointer"
+                      >
+                        <Terminal className="w-3.5 h-3.5" />
+                        <span>{lang === 'FR' ? 'Commandes Proxmox CLI' : 'Proxmox CLI Commands'}</span>
+                      </button>
+                    </div>
+
+                    {/* Model Target Switcher */}
+                    <div className="flex gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => setModelUploadTarget('produce')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          modelUploadTarget === 'produce'
+                            ? 'bg-teal-800 text-white shadow-2xs'
+                            : 'bg-[#FAF7EE] text-[#0D3B37] border border-[#E0D9C8] hover:bg-[#F2ECE0]'
+                        }`}
+                      >
+                        🍏 {lang === 'FR' ? 'Modèle 399 Fruits & Légumes (grocery_model.onnx)' : '399 Produce & Herbs (grocery_model.onnx)'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setModelUploadTarget('retail')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          modelUploadTarget === 'retail'
+                            ? 'bg-teal-800 text-white shadow-2xs'
+                            : 'bg-[#FAF7EE] text-[#0D3B37] border border-[#E0D9C8] hover:bg-[#F2ECE0]'
+                        }`}
+                      >
+                        🛒 {lang === 'FR' ? 'Modèle Super C / Loblaw (superc_grocery_model.onnx)' : 'Super C / Loblaw (superc_grocery_model.onnx)'}
+                      </button>
+                    </div>
+
                     <div className="flex flex-col sm:flex-row items-center gap-3">
                       <input
                         type="file"
@@ -4154,22 +4279,43 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                         <span>
                           {isUploadingModel
                             ? (lang === 'FR' ? 'Déploiement en cours...' : 'Deploying...')
-                            : (lang === 'FR' ? 'Sélectionner grocery_model.onnx' : 'Select grocery_model.onnx')}
+                            : modelUploadTarget === 'produce'
+                            ? (lang === 'FR' ? 'Sélectionner nouveau grocery_model.onnx' : 'Select new grocery_model.onnx')
+                            : (lang === 'FR' ? 'Sélectionner nouveau superc_grocery_model.onnx' : 'Select new superc_grocery_model.onnx')}
                         </span>
                       </button>
 
                       <div className="text-[11px] text-[#527470]">
-                        {modelStatus?.fileSizeMB ? (
-                          <span>
-                            {lang === 'FR' ? 'Taille active :' : 'Active size:'}{' '}
-                            <strong className="text-[#0D3B37]">{modelStatus.fileSizeMB} Mo</strong> •{' '}
-                            {modelStatus.totalClasses} {lang === 'FR' ? 'classes actives' : 'active classes'}
-                          </span>
-                        ) : (
-                          <span>{lang === 'FR' ? 'Modèle ONNX prêt pour inférence locale' : 'ONNX model ready for local inference'}</span>
-                        )}
+                        <span>
+                          {lang === 'FR' ? 'Cible sélectionnée :' : 'Selected target :'}{' '}
+                          <code className="text-teal-900 font-bold font-mono">
+                            {modelUploadTarget === 'produce' ? 'grocery_model.onnx' : 'superc_grocery_model.onnx'}
+                          </code>
+                        </span>
                       </div>
                     </div>
+
+                    {/* Proxmox CLI Guidance Box */}
+                    {showProxmoxCliHelp && (
+                      <div className="p-3.5 rounded-xl bg-[#1E293B] text-slate-100 text-xs font-mono space-y-2 border border-slate-700">
+                        <div className="flex items-center justify-between text-slate-400 text-[11px] font-sans">
+                          <span>{lang === 'FR' ? 'Mise à jour directe dans le conteneur Proxmox :' : 'Direct update inside Proxmox LXC container:'}</span>
+                          <button
+                            type="button"
+                            onClick={() => setShowProxmoxCliHelp(false)}
+                            className="text-slate-400 hover:text-white"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <div className="text-[11px] text-emerald-400 font-mono select-all">
+                          cd /opt/pantryo/public/models/grocery_model<br />
+                          ls -lh<br />
+                          # {lang === 'FR' ? 'Pour copier depuis votre ordinateur vers Proxmox :' : 'To copy from your PC to Proxmox:'}<br />
+                          # scp mon_modele.onnx root@&lt;IP-PROXMOX&gt;:/opt/pantryo/public/models/grocery_model/grocery_model.onnx
+                        </div>
+                      </div>
+                    )}
 
                     {modelUploadMessage && (
                       <div

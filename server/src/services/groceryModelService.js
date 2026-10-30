@@ -94,6 +94,21 @@ export async function getModelStatus() {
   const stat = modelExists ? fs.statSync(MODEL_PATH) : null;
   const is399 = classes.length >= 350;
 
+  // Canadian Retail & Super C Model details
+  const supercModelPath = path.resolve(process.cwd(), "public/models/grocery_model/superc_grocery_model.onnx");
+  const supercLabelsPath = path.resolve(process.cwd(), "public/models/grocery_model/superc_labels.json");
+  const hasSupercModel = fs.existsSync(supercModelPath);
+  const supercStat = hasSupercModel ? fs.statSync(supercModelPath) : null;
+  let supercClasses = [];
+  if (fs.existsSync(supercLabelsPath)) {
+    try {
+      const labelsObj = JSON.parse(fs.readFileSync(supercLabelsPath, "utf8"));
+      supercClasses = Object.values(labelsObj);
+    } catch (e) {
+      supercClasses = ["boissons", "boulangerie", "fruits-legumes", "garde-manger", "laitiers", "surgeles", "viandes"];
+    }
+  }
+
   return {
     success: true,
     modelName: is399
@@ -111,6 +126,30 @@ export async function getModelStatus() {
     fileSizeMB: stat ? +(stat.size / (1024 * 1024)).toFixed(2) : 0,
     modelFilePath: "/models/grocery_model/grocery_model.onnx",
     classesFilePath: "/models/grocery_model/classes.txt",
+    // Canadian Super C & Loblaw Model
+    retailModel: {
+      name: "Canadian Supermarket Retail Classifier (Super C & Loblaw)",
+      filename: "superc_grocery_model.onnx",
+      available: hasSupercModel,
+      fileSizeMB: supercStat ? +(supercStat.size / (1024 * 1024)).toFixed(2) : 0,
+      totalClasses: supercClasses.length || 9,
+      classes: supercClasses,
+      path: "/models/grocery_model/superc_grocery_model.onnx",
+      status: hasSupercModel ? "ready" : "missing",
+    },
+    // Recipe Vision Engine status
+    recipeVision: {
+      name: "Recipe Vision Archivist & OCR Engine",
+      features: ["Cookbook Multi-Column", "Cursive Blue Pen Handwriting", "Quebec French & English", "Inventory Cross-Matching"],
+      status: "active",
+    },
+    // Cloud fallback status
+    geminiFallback: {
+      name: "Google Gemini Flash Vision Fallback",
+      mode: "Automatic on low-confidence (<60%)",
+      tokenOptimization: "0 cloud tokens on confident local match",
+      status: process.env.GEMINI_API_KEY ? "configured" : "unconfigured",
+    },
     lastChecked: new Date().toISOString(),
     error: sessionError,
   };
