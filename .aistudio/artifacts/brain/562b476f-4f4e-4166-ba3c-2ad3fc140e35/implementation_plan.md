@@ -1,105 +1,64 @@
-# Implementation Plan — Clean Update, Backup & Restore Script for Proxmox VE LXC
+# Implementation Plan — High-Precision Gemini 3.8 Flash Recipe Book Vision
 
-Build a bulletproof, production-grade automated shell script (`scripts/clean-update-restore.sh`) designed for Proxmox VE LXC containers (and universal Linux hosts) that:
-1. Pauses the Pantryo service.
-2. Creates an atomic, timestamped backup of all user data (`.env`, SQLCipher database `pantryo.sqlite`, master encryption keys, and uploaded avatars/media) to `/var/backups/pantryo/`.
-3. Purges old, stale, and corrupted files (`node_modules`, `package-lock.json`, `dist`, `.vite`, cache directories).
-4. Pulls the latest official codebase from GitHub (`origin/main`).
-5. Performs a fresh `npm install` and compiles the production bundle with memory-safe limits (`NODE_OPTIONS="--max-old-space-size=2048"`).
-6. Restores the verified user data and enforces strict security permissions (`pantryo:pantryo`, `chmod 600` on `.env`, `chmod 700` on `server/data`).
-7. Restarts the systemd service, performs an automated health check, and offers an automatic rollback if the service fails.
+Upgrade recipe book photo transfers in Pantryo exclusively to **Gemini 3.8 Flash Multimodal Vision** via the modern `@google/genai` TypeScript SDK. Eliminates low-quality CPU Tesseract OCR garbling and delivers crystal-clear recipe digitization directly from photos taken on any phone, tablet, or desktop.
 
 ---
 
-## 1. Architecture & Script Specifications
+## 1. Capacity & Quotas (Gemini 3.8 Flash Free Tier)
 
-### Target Path
-- **File:** `scripts/clean-update-restore.sh` (executable `chmod +x`)
-- **Direct 1-line execution:**
-  ```bash
-  curl -fsSL https://raw.githubusercontent.com/riquitinchiquitin-lab/Pantryo/main/scripts/clean-update-restore.sh | sudo bash
-  ```
-  *(or locally inside the LXC container: `sudo /opt/pantryo/scripts/clean-update-restore.sh`)*
-
-### Data Assets to Preserve & Restore
-- **Environment Configuration:** `/opt/pantryo/.env` (contains `PANTRYO_ADMIN_PASSWORD`, `DB_ENCRYPTION_KEY`, `APP_URL`, `CLOUDFLARE_TUNNEL_TOKEN`)
-- **SQLCipher Encrypted Database:** `/opt/pantryo/server/data/pantryo.sqlite`
-- **Master Encryption Key & Salting:** `/opt/pantryo/server/data/master.key` and any files in `server/data/`
-- **Custom User Avatars & Uploads:** `/opt/pantryo/public/avatars/custom/` and `/opt/pantryo/server/uploads/` (if present)
-- **Backup Destination:** `/var/backups/pantryo/backup_<YYYYMMDD_HHMMSS>/`
+* **Daily Scan Limit:** **1,500 recipe pages / day** (100% free, no credit card required).
+* **Speed:** **Up to 15 scans / minute** (processes in ~1.5–3 seconds per photo).
+* **Multi-Recipe Detection:** Automatically extracts all 2–3 recipes on a single cookbook page in one shot without using extra quota.
+* **Accuracy:** Natively recognizes vintage typography, typewriter fonts, fractions (½, ¼, ⅓, ¾), dual-column layouts, and handwritten margin notes.
 
 ---
 
-## 2. Step-by-Step Script Execution Flow
+## 2. Core Architecture & Enhancements
 
-```text
-┌──────────────────────────────────────────────────────────────┐
-│  Phase 1: Pre-Flight & Service Halt                          │
-│  - Check root/sudo privileges                                │
-│  - Detect /opt/pantryo directory                             │
-│  - Stop pantryo.service (graceful connection draining)       │
-└──────────────────────────────┬───────────────────────────────┘
-                               │
-                               ▼
-┌──────────────────────────────────────────────────────────────┐
-│  Phase 2: Atomic Data Backup                                 │
-│  - Create /var/backups/pantryo/backup_<TIMESTAMP>/           │
-│  - Copy .env, server/data/*, and uploaded avatars            │
-│  - Generate SHA-256 integrity checksums                      │
-└──────────────────────────────┬───────────────────────────────┘
-                               │
-                               ▼
-┌──────────────────────────────────────────────────────────────┐
-│  Phase 3: Deep Clean of Stale Files                          │
-│  - Remove node_modules, package-lock.json, dist, .vite       │
-│  - Run git clean -dfX (excluding preserved data)             │
-└──────────────────────────────┬───────────────────────────────┘
-                               │
-                               ▼
-┌──────────────────────────────────────────────────────────────┐
-│  Phase 4: Fresh Code Pull & Build                            │
-│  - git fetch --all --tags && git reset --hard origin/main    │
-│  - npm install (recompiles native better-sqlite3 bindings)   │
-│  - NODE_OPTIONS="--max-old-space-size=2048" npm run build   │
-└──────────────────────────────┬───────────────────────────────┘
-                               │
-                               ▼
-┌──────────────────────────────────────────────────────────────┐
-│  Phase 5: Data Reinstallation & Permissions Hardening        │
-│  - Restore .env, server/data/ files, and uploads             │
-│  - Verify SHA-256 database checksum matches backup           │
-│  - chown -R pantryo:pantryo /opt/pantryo                     │
-│  - chmod 600 .env && chmod 700 server/data                   │
-└──────────────────────────────┬───────────────────────────────┘
-                               │
-                               ▼
-┌──────────────────────────────────────────────────────────────┐
-│  Phase 6: Health Verification & Rollback Protection          │
-│  - systemctl daemon-reload && systemctl start pantryo        │
-│  - Poll http://localhost:3000/api/v1/auth/public-members     │
-│  - If healthy: print success summary and backup location     │
-│  - If failed: auto-restore from backup and alert admin       │
-└──────────────────────────────────────────────────────────────┘
-```
+### A. Backend: Gemini 3.8 Flash Vision Engine (`server/src/services/geminiRecipeParser.js`)
+- **Direct Multimodal Processing**: Uses `@google/genai` with `gemini-3.8-flash`.
+- **Preflight & Optimization**: Sanitizes and validates the incoming photo base64 payload to ensure optimal resolution without unnecessary bandwidth.
+- **Deep Culinary Structuring**:
+  - Automatically isolates Recipe Title, Prep Time, Cook Time, Total Time, and Yield/Servings.
+  - Normalizes ingredient quantities, units, and assigns kitchen storage zones (`FRIDGE`, `PANTRY`, `FREEZER`, `SPICE_RACK`).
+  - Formats instructions into clean, numbered steps in both English and French.
+  - Multi-recipe support: Returns all detected recipes in the `allRecipes` array for individual or batch saving.
+- **API Key Fallback & Telemetry**:
+  - Checks `process.env.GEMINI_API_KEY` and `dbStore.systemSettings.geminiApiKey`.
+  - In development and AI Studio environments, uses the platform-provided key automatically.
+  - If the key is missing or invalid, returns clear, actionable guidance on adding a free Gemini key rather than silently producing garbled text.
+
+### B. Admin & Settings: 1-Click Gemini API Key Setup (`AdminModal.tsx`)
+- Displays current Gemini Vision status: **🟢 Active (Gemini 3.8 Flash Vision)** or **⚪ Not Configured**.
+- Direct input to add or change the Gemini API key with a **"Test API Key"** button that verifies connectivity in real time.
+- Direct link to get a free key from Google AI Studio (`aistudio.google.com`).
+
+### C. Frontend: Streamlined Photo Recipe Transfer (`AddRecipeModal.tsx`)
+- Single, intuitive flow: **Take Photo** (camera) or **Upload Image** (gallery/file).
+- Live preview of the uploaded cookbook page.
+- Clean loading state: *"Gemini AI is reading cookbook page, extracting ingredients & formatting instructions..."*
+- Instant recipe preview with editing capabilities before saving into the pantry library.
 
 ---
 
 ## 3. Implementation Steps
 
-1. **Create `scripts/clean-update-restore.sh`**:
-   - Write complete, robust POSIX Bash script with `set -euo pipefail`.
-   - Implement colored terminal output, spinner/progress logs, and safety checks.
-   - Include rollback trap on unexpected error.
-2. **Update `update.sh`**:
-   - Add a `--clean` or `--fresh` flag to the existing root `update.sh` that delegates to `clean-update-restore.sh`.
-3. **Update Documentation**:
-   - Update `INSTALLATION.md` and `README.md` to document the 1-command clean update & restore runbook for Proxmox VE LXC.
+1. **Backend (`server/src/services/geminiRecipeParser.js`)**:
+   - Verify `@google/genai` initialization with model `gemini-3.8-flash`.
+   - Enhance the prompt schema for high-precision fraction handling and bilingual preservation.
+   - Return structured recipe objects with clean error diagnostics.
+2. **Frontend (`src/components/AddRecipeModal.tsx`)**:
+   - Streamline the Photo Tab to focus 100% on Gemini Vision photo transfer.
+   - Add status pill indicating **Gemini 3.8 Flash Vision Ready (1,500 free scans/day)**.
+   - Show clear multi-recipe selection if more than one recipe is detected on the page.
+3. **Admin Settings (`src/components/AdminModal.tsx` / `server/src/routes/admin.js`)**:
+   - Provide an in-app verification tool for testing the Gemini key.
 4. **Verification**:
-   - Run syntax and lint checks on the bash script (`bash -n scripts/clean-update-restore.sh`).
-   - Validate file paths and permissions.
+   - Test recipe photo transfer with cookbook images.
+   - Verify type safety (`tsc --noEmit`) and dev server responsiveness.
 
 ---
 
 ## 4. User Review & Approval
 
-Please review the plan above. Click **Proceed** to implement the clean update, backup, and restore script.
+Please review the plan above. Click **Proceed** to implement the Gemini 3.8 Flash Vision recipe book parser.

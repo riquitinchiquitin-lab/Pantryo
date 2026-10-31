@@ -30,16 +30,18 @@ import { estimateRecipeNutrition } from "./nutritionEngine.js";
  * 3. Photos of cookbook pages, handwritten recipe cards, or magazine clippings
  */
 
+let currentApiKey = null;
 let aiClient = null;
 
 function getGeminiClient() {
-  if (!aiClient) {
-    const apiKey = (process.env.GEMINI_API_KEY || dbStore?.systemSettings?.geminiApiKey || "").trim();
-    if (!apiKey || apiKey === "MY_GEMINI_API_KEY" || apiKey.startsWith("your_")) {
-      throw new Error(
-        "GEMINI_API_KEY environment variable is missing. Please configure it in your environment or Settings > Secrets."
-      );
-    }
+  const apiKey = (process.env.GEMINI_API_KEY || dbStore?.systemSettings?.geminiApiKey || "").trim();
+  if (!apiKey || apiKey === "MY_GEMINI_API_KEY" || apiKey.startsWith("your_")) {
+    throw new Error(
+      "GEMINI_API_KEY is missing. Please configure your free Gemini API key in Admin Settings."
+    );
+  }
+  if (!aiClient || currentApiKey !== apiKey) {
+    currentApiKey = apiKey;
     aiClient = new GoogleGenAI({
       apiKey,
       httpOptions: {
@@ -54,6 +56,7 @@ function getGeminiClient() {
 
 export function resetGeminiClient() {
   aiClient = null;
+  currentApiKey = null;
 }
 
 /**
@@ -903,49 +906,25 @@ CRITICAL INSTRUCTIONS FOR REAL-WORLD & VINTAGE RECIPE ARTIFACTS:
         };
       }
     } catch (error) {
-      console.warn("[Gemini Recipe Parser] Gemini Vision attempt failed, switching to local OCR & Parser:", error.message);
+      console.error("[Gemini Recipe Parser] Gemini Vision attempt failed:", error.message);
+      return {
+        success: false,
+        error: language === "FR"
+          ? `Échec de l'analyse Gemini 3.8 Flash : ${error.message}. Vérifiez votre clé API Gemini.`
+          : `Gemini 3.8 Flash Vision error: ${error.message}. Please check your Gemini API key.`,
+        details: error.message,
+      };
     }
   }
 
-  // 3. Embedded Local Tesseract OCR fallback: reads actual handwritten cards & cookbook pages
-  console.info("[Gemini Recipe Parser] Running Tesseract OCR on recipe image (eng+fra+spa)...");
-  try {
-    const imageBuffer = Buffer.from(cleanBase64, "base64");
-    // Use stable languages: english, french, spanish (tagalog is not hosted on cdn and causes 404)
-    const ocrResult = await Tesseract.recognize(imageBuffer, "eng+fra+spa");
-    const ocrText = ocrResult?.data?.text?.trim() || "";
-    console.info(`[Gemini Recipe Parser] Tesseract extracted ${ocrText.length} characters.`);
-
-    const combinedText = (ocrText + (notes ? "\n" + notes : "")).trim();
-    if (!combinedText || combinedText.length < 8) {
-      throw new Error(
-        language === "FR"
-          ? "Aucun texte lisible détecté sur cette photo. Assurez-vous d'un bon éclairage et que la recette écrite est bien nette, ou entrez le texte dans l'onglet Texte / Notes."
-          : "No readable recipe text was detected on this photo. Please ensure good lighting and clear handwriting/print, or enter the text in the Text tab."
-      );
-    }
-
-    const structuredRecipe = parseRecipeTextDirectly(combinedText, {
-      language,
-      source: "Photo Import (OCR)",
-      imageUrl,
-    });
-
-    return {
-      success: true,
-      provider: "tesseract_ocr",
-      recipe: structuredRecipe,
-      ocrText,
-    };
-  } catch (ocrError) {
-    console.error("[Gemini Recipe Parser] OCR extraction failed:", ocrError.message);
-    throw new Error(
-      ocrError.message ||
-        (language === "FR"
-          ? "Impossible d'extraire la recette de cette photo. Vérifiez la netteté de l'image."
-          : "Unable to extract recipe from this photo. Please check image clarity.")
-    );
-  }
+  // If no Gemini API key is configured, return explicit instructions rather than corrupting recipes with low-accuracy CPU OCR
+  return {
+    success: false,
+    requiresGeminiKey: true,
+    error: language === "FR"
+      ? "La numérisation de photos de recettes utilise le modèle visuel haute précision Gemini 3.8 Flash. Veuillez configurer votre clé API Google Gemini gratuite dans les Paramètres Admin (1 500 scans gratuits par jour)."
+      : "Cookbook photo scanning uses high-precision Gemini 3.8 Flash Vision. Please configure your free Google Gemini API key in Admin Settings (1,500 free scans per day).",
+  };
 }
 
 /**

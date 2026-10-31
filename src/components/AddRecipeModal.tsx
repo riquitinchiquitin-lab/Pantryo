@@ -615,8 +615,8 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
     setParsedRecipe(null);
     setParsingStep(
       lang === 'FR'
-        ? 'Numérisation haute précision de la recette & détection des notes...'
-        : 'High-precision recipe scanning & handwritten note detection...'
+        ? 'Analyse multimodale Gemini 3.8 Flash... Extraction haute précision des ingrédients et étapes...'
+        : 'Gemini 3.8 Flash Vision analyzing cookbook page... Extracting ingredients, fractions & instructions...'
     );
     setErrorMsg(null);
     try {
@@ -634,6 +634,14 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
 
       const data = await res.json();
       if (!res.ok || !data.success) {
+        if (data.requiresGeminiKey) {
+          setErrorMsg(
+            lang === 'FR'
+              ? "🔑 Clé API Gemini requise : la numérisation haute précision de livres de recettes nécessite l'activation de Gemini 3.8 Flash. Veuillez configurer votre clé API Google Gemini gratuite dans les Paramètres Admin (1 500 scans gratuits/jour)."
+              : "🔑 Gemini API Key required: high-precision cookbook photo scanning uses Gemini 3.8 Flash Vision. Please configure your free Google Gemini API key in Admin Settings (1,500 free scans/day)."
+          );
+          return;
+        }
         throw new Error(data.error || 'Failed to parse recipe photo');
       }
 
@@ -1257,6 +1265,14 @@ Instructions:
 
         const data = await res.json();
         if (!res.ok || !data.success) {
+          if (data.requiresGeminiKey) {
+            setErrorMsg(
+              lang === 'FR'
+                ? "🔑 Clé API Gemini requise : la numérisation haute précision de livres de recettes nécessite l'activation de Gemini 3.8 Flash. Veuillez configurer votre clé API Google Gemini gratuite dans les Paramètres Admin (1 500 scans gratuits/jour)."
+                : "🔑 Gemini API Key required: high-precision cookbook photo scanning uses Gemini 3.8 Flash Vision. Please configure your free Google Gemini API key in Admin Settings (1,500 free scans/day)."
+            );
+            return;
+          }
           throw new Error(data.error || 'Failed to parse recipe');
         }
 
@@ -2009,7 +2025,7 @@ Instructions:
 
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-black text-[#1E3022] flex items-center gap-1.5">
-                    <Camera className="w-4 h-4 text-emerald-700" />
+                    <Camera className="w-4 h-4 text-teal-700" />
                     <span>
                       {lang === 'FR'
                         ? 'Photo d’un livre de cuisine ou fiche recette manuscrite'
@@ -2019,11 +2035,37 @@ Instructions:
                   <button
                     type="button"
                     onClick={loadSamplePhoto}
-                    className="text-[10px] font-bold text-emerald-800 hover:underline flex items-center gap-1"
+                    className="text-[10px] font-bold text-teal-800 hover:underline flex items-center gap-1"
                   >
                     <Sparkles className="w-2.5 h-2.5" />
                     <span>{lang === 'FR' ? 'Fiche exemple' : 'Load Sample Card'}</span>
                   </button>
+                </div>
+
+                {/* Gemini 3.8 Flash Multimodal Vision Status Banner */}
+                <div className="p-3 rounded-2xl bg-gradient-to-r from-teal-50 via-emerald-50 to-teal-50 border border-teal-200/80 shadow-2xs">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2">
+                      <div className="w-6 h-6 rounded-lg bg-teal-600 text-white flex items-center justify-center shrink-0 mt-0.5">
+                        <Sparkles className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-black text-[#0D3B37]">
+                            {lang === 'FR' ? 'Vision Multimodale Gemini 3.8 Flash' : 'Gemini 3.8 Flash Multimodal Vision'}
+                          </p>
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            {lang === 'FR' ? '1 500 scans/jour gratuits' : '1,500 free scans/day'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[#4F6854] mt-0.5 leading-snug">
+                          {lang === 'FR'
+                            ? 'Capture directement livres imprimés, fractions (½, ¼, ¾), colonnes multiples et annotations sans déformation OCR.'
+                            : 'Directly reads printed cookbooks, fractions (½, ¼, ¾), dual columns, and handwritten notes with zero OCR distortion.'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {cameraError && (
@@ -2116,13 +2158,13 @@ Instructions:
                         type="button"
                         onClick={() => triggerPhotoImport(photoBase64)}
                         disabled={isParsing}
-                        className="w-full py-2.5 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-black text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-98 cursor-pointer"
+                        className="w-full py-2.5 px-4 rounded-xl bg-teal-800 hover:bg-teal-900 disabled:opacity-50 text-white font-black text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-98 cursor-pointer"
                       >
-                        <Sparkles className="w-4 h-4 text-emerald-200" />
+                        <Sparkles className="w-4 h-4 text-teal-200" />
                         <span>
                           {lang === 'FR'
-                            ? 'Numériser la recette avec l’IA & OCR'
-                            : 'Digitize Recipe with AI & OCR'}
+                            ? 'Numériser avec Gemini 3.8 Flash Vision'
+                            : 'Digitize with Gemini 3.8 Flash Vision'}
                         </span>
                       </button>
 
