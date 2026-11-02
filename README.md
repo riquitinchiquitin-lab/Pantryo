@@ -273,7 +273,7 @@ sudo bash /opt/pantryo/scripts/clean-update-restore.sh
 sudo bash /opt/pantryo/update.sh --clean
 ```
 
-*This script automatically halts the service, creates an atomic backup of `.env`, the encrypted SQLite database (`server/data/*`), and uploads to `/var/backups/pantryo/`, wipes old build artifacts, pulls the latest release, builds cleanly with safe memory allocation, restores your data, enforces strict permissions, and restarts `pantryo.service` with automatic rollback protection.*
+*This script automatically halts the service, creates an atomic backup of `.env`, the encrypted SQLite database (`server/data/*`), and uploads to `/var/backups/pantryo/` (retaining strictly the 3 latest backups and purging older snapshots), wipes old build artifacts, pulls the latest release, builds cleanly with safe memory allocation, restores your data, enforces strict permissions, and restarts `pantryo.service` with automatic rollback protection.*
 
 ---
 

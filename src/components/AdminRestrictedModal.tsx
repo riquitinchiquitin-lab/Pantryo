@@ -415,7 +415,7 @@ export const AdminRestrictedModal: React.FC<AdminRestrictedModalProps> = ({
                     className="p-1 rounded-md text-slate-500 hover:text-slate-800 hover:bg-slate-100 cursor-pointer transition-colors"
                     title={showPassword ? (lang === 'FR' ? 'Masquer' : 'Hide') : (lang === 'FR' ? 'Afficher' : 'View')}
                   >
-                    {showPassword ? <EyeOff className="w-3.5 h-3.5 text-teal-700" /> : <Eye className="w-3.5 h-3.5" />}
+                    {showPassword ? <Eye className="w-3.5 h-3.5 text-teal-700" /> : <EyeOff className="w-3.5 h-3.5 text-slate-400" />}
                   </button>
                   <button
                     type="button"

@@ -365,12 +365,13 @@ pct exec <CT_ID> -- bash -c "curl -fsSL https://raw.githubusercontent.com/riquit
 #### What This Automated Script Does:
 1. **Halts the Service:** Gracefully stops `pantryo.service`.
 2. **Atomic Backup:** Creates a timestamped archive at `/var/backups/pantryo/backup_<TIMESTAMP>/` containing your `.env`, SQLCipher encrypted SQLite database (`server/data/*`), master encryption keys, custom uploads, and SHA-256 integrity checksums.
-3. **Purges Old Files:** Wipes `node_modules`, `package-lock.json`, `dist`, `.vite`, and build caches.
-4. **Pulls Latest Release:** Resets repository to the latest official `origin/main` release.
-5. **Fresh Install & Safe Build:** Runs `npm install` and `NODE_OPTIONS="--max-old-space-size=2048" npm run build`.
-6. **Restores User Data:** Automatically copies your `.env`, database, and uploads back into place, and verifies cryptographic integrity.
-7. **Hardens Permissions:** Enforces `pantryo:pantryo` ownership, `chmod 600` on `.env`, and `chmod 700` on `server/data`.
-8. **Restarts & Health Checks:** Reloads systemd, starts `pantryo.service`, and performs a health-check probe with automatic rollback protection if anything fails.
+3. **Backup Retention & Rotation:** Strictly preserves the 3 latest backups in `/var/backups/pantryo` and automatically purges older snapshots to keep server storage lean and prevent disk exhaustion on Proxmox LXCs and Raspberry Pis.
+4. **Purges Stale Build Artifacts:** Wipes `node_modules`, `package-lock.json`, `dist`, `.vite`, and build caches.
+5. **Pulls Latest Release:** Resets repository to the latest official `origin/main` release.
+6. **Fresh Install & Safe Build:** Runs `npm install` and `NODE_OPTIONS="--max-old-space-size=2048" npm run build`.
+7. **Restores User Data:** Automatically copies your `.env`, database, and uploads back into place, and verifies cryptographic integrity.
+8. **Hardens Permissions:** Enforces `pantryo:pantryo` ownership, `chmod 600` on `.env`, and `chmod 700` on `server/data`.
+9. **Restarts & Health Checks:** Reloads systemd, starts `pantryo.service`, and performs a health-check probe with automatic rollback protection if anything fails.
 
 ---
 

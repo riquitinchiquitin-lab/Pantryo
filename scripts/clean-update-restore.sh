@@ -6,12 +6,13 @@
 # Workflow:
 #  1. Halts the pantryo systemd service.
 #  2. Creates an atomic backup of user data (.env, SQLCipher DB, master key, uploads).
-#  3. Purges old, stale, and corrupted files (node_modules, dist, cache, lockfiles).
-#  4. Pulls latest official release from GitHub (origin/main).
-#  5. Performs clean npm install & memory-safe production build.
-#  6. Reinstalls and verifies your database and settings.
-#  7. Hardens permissions (chmod 600 .env, 700 server/data) & starts pantryo.service.
-#  8. Verifies service health with automatic rollback protection.
+#  3. Prunes backup archives, strictly keeping the 3 latest backups and purging the rest.
+#  4. Purges old, stale, and corrupted files (node_modules, dist, cache, lockfiles).
+#  5. Pulls latest official release from GitHub (origin/main).
+#  6. Performs clean npm install & memory-safe production build.
+#  7. Reinstalls and verifies your database and settings.
+#  8. Hardens permissions (chmod 600 .env, 700 server/data) & starts pantryo.service.
+#  9. Verifies service health with automatic rollback protection.
 # ==============================================================================
 set -euo pipefail
 
@@ -33,6 +34,7 @@ TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BACKUP_DIR="${BACKUP_ROOT}/backup_${TIMESTAMP}"
 SERVICE_NAME="pantryo"
 PORT="${PORT:-3000}"
+MAX_BACKUPS="${MAX_BACKUPS:-3}"
 
 echo -e "${CYAN}${BOLD}"
 echo "========================================================================"
@@ -41,6 +43,7 @@ echo "========================================================================"
 echo -e "${NC}"
 echo -e "Target Directory : ${GREEN}${INSTALL_DIR}${NC}"
 echo -e "Backup Target    : ${YELLOW}${BACKUP_DIR}${NC}"
+echo -e "Retention Policy : ${CYAN}Retain strictly ${MAX_BACKUPS} latest backups (purge older)${NC}"
 echo -e "Timestamp        : $(date)\n"
 
 # ------------------------------------------------------------------------------
@@ -66,7 +69,7 @@ cd "$INSTALL_DIR"
 # ------------------------------------------------------------------------------
 # 2. Halt Service
 # ------------------------------------------------------------------------------
-echo -e "${CYAN}[1/7] Halting background service (${SERVICE_NAME})...${NC}"
+echo -e "${CYAN}[1/8] Halting background service (${SERVICE_NAME})...${NC}"
 if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
   systemctl stop "$SERVICE_NAME"
   echo -e "${GREEN}✓ ${SERVICE_NAME} service gracefully stopped.${NC}"
@@ -77,7 +80,7 @@ fi
 # ------------------------------------------------------------------------------
 # 3. Create Atomic Backup of All User Data
 # ------------------------------------------------------------------------------
-echo -e "\n${CYAN}[2/7] Creating atomic backup of user data...${NC}"
+echo -e "\n${CYAN}[2/8] Creating atomic backup of user data...${NC}"
 mkdir -p "$BACKUP_DIR/data"
 mkdir -p "$BACKUP_DIR/uploads"
 
@@ -142,9 +145,48 @@ rollback_on_failure() {
 trap rollback_on_failure EXIT
 
 # ------------------------------------------------------------------------------
-# 4. Deep Clean Stale & Corrupted Files
+# 4. Backup Retention Management: Retain 3 Latest, Purge the Rest
 # ------------------------------------------------------------------------------
-echo -e "\n${CYAN}[3/7] Cleaning old dependencies, lockfiles, and build artifacts...${NC}"
+purge_old_backups() {
+  local max_keep="${1:-$MAX_BACKUPS}"
+  if [ ! -d "$BACKUP_ROOT" ]; then
+    return 0
+  fi
+
+  echo -e "\n${CYAN}[3/8] Managing backup retention in ${BACKUP_ROOT}...${NC}"
+  echo -e "  ↳ Policy: Retaining strictly the ${BOLD}${max_keep} latest backups${NC}, purging older snapshots."
+
+  local count=0
+  local purged_count=0
+
+  # Scan directories and archive files matching backup_*
+  # Sort in reverse chronological order (newest timestamp first)
+  while IFS= read -r item; do
+    [ -z "$item" ] && continue
+    count=$((count + 1))
+    if [ "$count" -gt "$max_keep" ]; then
+      echo -e "${YELLOW}  🗑  Purging old backup archive: $(basename "$item")${NC}"
+      rm -rf "$item"
+      purged_count=$((purged_count + 1))
+    else
+      echo -e "  ${GREEN}✓ Retaining latest backup (${count}/${max_keep}):${NC} $(basename "$item")"
+    fi
+  done < <(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 \( -type d -name "backup_*" -o -type f -name "backup_*" \) | sort -r)
+
+  if [ "$purged_count" -gt 0 ]; then
+    echo -e "${GREEN}✓ Successfully purged ${purged_count} older snapshot(s). Exactly ${max_keep} latest backups preserved.${NC}"
+  else
+    echo -e "${GREEN}✓ Total backup count (${count}) is within the retention limit of ${max_keep}.${NC}"
+  fi
+}
+
+# Run retention cleanup immediately so disk space is reclaimed before npm build
+purge_old_backups "$MAX_BACKUPS"
+
+# ------------------------------------------------------------------------------
+# 5. Deep Clean Stale & Corrupted Files
+# ------------------------------------------------------------------------------
+echo -e "\n${CYAN}[4/8] Cleaning old dependencies, lockfiles, and build artifacts...${NC}"
 rm -rf \
   "$INSTALL_DIR/node_modules" \
   "$INSTALL_DIR/package-lock.json" \
@@ -158,9 +200,9 @@ rm -rf \
 echo -e "${GREEN}✓ Stale build artifacts and temporary files purged.${NC}"
 
 # ------------------------------------------------------------------------------
-# 5. Fetch & Reset to Latest Official Release
+# 6. Fetch & Reset to Latest Official Release
 # ------------------------------------------------------------------------------
-echo -e "\n${CYAN}[4/7] Pulling latest updates from GitHub...${NC}"
+echo -e "\n${CYAN}[5/8] Pulling latest updates from GitHub...${NC}"
 if [ -d "$INSTALL_DIR/.git" ]; then
   git config --global --add safe.directory "$INSTALL_DIR" 2>/dev/null || true
   git fetch --all --tags --prune
@@ -173,20 +215,20 @@ else
 fi
 
 # ------------------------------------------------------------------------------
-# 6. Install Dependencies & Build Production Bundle
+# 7. Install Dependencies & Build Production Bundle
 # ------------------------------------------------------------------------------
-echo -e "\n${CYAN}[5/7] Installing fresh NPM dependencies...${NC}"
+echo -e "\n${CYAN}[6/8] Installing fresh NPM dependencies...${NC}"
 # Rebuild native modules including better-sqlite3-multiple-ciphers
 npm install --include=dev --no-audit
 
-echo -e "\n${CYAN}[6/7] Compiling production bundle (Vite + esbuild server)...${NC}"
+echo -e "\n${CYAN}[7/8] Compiling production bundle (Vite + esbuild server)...${NC}"
 # Use 2048MB heap limit to prevent out-of-memory errors on Proxmox 512MB/1GB LXCs
 NODE_OPTIONS="--max-old-space-size=2048" npm run build
 
 # ------------------------------------------------------------------------------
-# 7. Reinstall Preserved User Data & Enforce Security Permissions
+# 8. Reinstall Preserved User Data & Enforce Security Permissions
 # ------------------------------------------------------------------------------
-echo -e "\n${CYAN}[7/7] Reinstalling preserved data & hardening permissions...${NC}"
+echo -e "\n${CYAN}[8/8] Reinstalling preserved data & hardening permissions...${NC}"
 
 # Restore .env
 if [ -f "$BACKUP_DIR/.env" ]; then
@@ -254,7 +296,8 @@ if [ "$HEALTHY" = true ]; then
   echo -e "${GREEN}${BOLD}========================================================================${NC}"
   echo -e "Service Status   : ${GREEN}$(systemctl is-active "$SERVICE_NAME")${NC}"
   echo -e "Local Access     : ${CYAN}http://localhost:${PORT}${NC}"
-  echo -e "Backup Preserved : ${YELLOW}${BACKUP_DIR}${NC}"
+  echo -e "Backup Target    : ${YELLOW}${BACKUP_DIR}${NC}"
+  echo -e "Backup Retention : ${GREEN}Strictly 3 latest preserved in ${BACKUP_ROOT} (older purged)${NC}"
   echo -e "Integrity Check  : ${GREEN}PASS (All database files and credentials verified)${NC}"
   echo -e "${GREEN}========================================================================${NC}\n"
 else

@@ -394,9 +394,9 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
                   className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
                   {showPassword ? (
-                    <EyeOff className="w-4 h-4" />
+                    <Eye className="w-4 h-4 text-teal-800" />
                   ) : (
-                    <Eye className="w-4 h-4" />
+                    <EyeOff className="w-4 h-4 text-slate-400" />
                   )}
                 </button>
               </div>

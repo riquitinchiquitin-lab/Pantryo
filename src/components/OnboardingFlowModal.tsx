@@ -348,7 +348,7 @@ export const OnboardingFlowModal: React.FC<OnboardingFlowModalProps> = ({
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? <Eye className="w-4 h-4 text-teal-800" /> : <EyeOff className="w-4 h-4 text-slate-400" />}
                 </button>
               </div>
             </div>
@@ -371,7 +371,7 @@ export const OnboardingFlowModal: React.FC<OnboardingFlowModalProps> = ({
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
-                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showConfirmPassword ? <Eye className="w-4 h-4 text-teal-800" /> : <EyeOff className="w-4 h-4 text-slate-400" />}
                 </button>
               </div>
             </div>

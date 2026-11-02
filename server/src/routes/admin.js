@@ -223,7 +223,8 @@ router.post("/set-encryption-key", requireAdmin, (req, res) => {
  */
 router.get("/settings", requireAdmin, (req, res) => {
   try {
-    const settings = dbStore.getSystemSettings();
+    const reveal = req.query.reveal === "true" || req.query.unmask === "true";
+    const settings = dbStore.getSystemSettings(reveal);
     res.json(settings);
   } catch (err) {
     res.status(500).json({ error: err.message });

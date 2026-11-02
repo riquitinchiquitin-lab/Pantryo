@@ -151,7 +151,7 @@ export const NistPasswordValidator: React.FC<NistPasswordValidatorProps> = ({
               className="p-1 rounded-lg bg-white dark:bg-slate-700 hover:bg-slate-50 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 transition-colors shrink-0 cursor-pointer"
               title={previewVisible ? (lang === 'FR' ? 'Masquer le mot de passe' : 'Hide password') : (lang === 'FR' ? 'Afficher le mot de passe' : 'View password')}
             >
-              {previewVisible ? <EyeOff className="w-3.5 h-3.5 text-teal-700" /> : <Eye className="w-3.5 h-3.5 text-slate-600" />}
+              {previewVisible ? <Eye className="w-3.5 h-3.5 text-teal-700" /> : <EyeOff className="w-3.5 h-3.5 text-slate-600" />}
             </button>
             <div className="font-mono text-xs font-semibold text-slate-800 dark:text-slate-100 truncate select-all">
               {previewVisible ? password : '•'.repeat(Math.min(password.length, 28))}

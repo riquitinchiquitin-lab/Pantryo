@@ -900,6 +900,66 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     }
   };
 
+  const handleToggleShowGeminiKey = async () => {
+    const nextState = !showGeminiKey;
+    setShowGeminiKey(nextState);
+    if (nextState && settings.geminiApiKey && settings.geminiApiKey.includes('•')) {
+      try {
+        const res = await fetch('/api/v1/admin/settings?reveal=true', {
+          headers: await getAdminHeaders(),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.geminiApiKey && !data.geminiApiKey.includes('•')) {
+            setSettings((prev) => ({ ...prev, geminiApiKey: data.geminiApiKey }));
+          }
+        }
+      } catch (e) {
+        console.warn('Failed revealing Gemini key:', e);
+      }
+    }
+  };
+
+  const handleToggleShowTunnelToken = async () => {
+    const nextState = !showTunnelToken;
+    setShowTunnelToken(nextState);
+    if (nextState && settings.cloudflareTunnelToken && settings.cloudflareTunnelToken.includes('•')) {
+      try {
+        const res = await fetch('/api/v1/admin/settings?reveal=true', {
+          headers: await getAdminHeaders(),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.cloudflareTunnelToken && !data.cloudflareTunnelToken.includes('•')) {
+            setSettings((prev) => ({ ...prev, cloudflareTunnelToken: data.cloudflareTunnelToken }));
+          }
+        }
+      } catch (e) {
+        console.warn('Failed revealing tunnel token:', e);
+      }
+    }
+  };
+
+  const handleToggleShowDbSettingsKey = async () => {
+    const nextState = !showDbSettingsKey;
+    setShowDbSettingsKey(nextState);
+    if (nextState && settings.dbEncryptionKey && settings.dbEncryptionKey.includes('•')) {
+      try {
+        const res = await fetch('/api/v1/admin/settings?reveal=true', {
+          headers: await getAdminHeaders(),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.dbEncryptionKey && !data.dbEncryptionKey.includes('•')) {
+            setSettings((prev) => ({ ...prev, dbEncryptionKey: data.dbEncryptionKey }));
+          }
+        }
+      } catch (e) {
+        console.warn('Failed revealing DB key:', e);
+      }
+    }
+  };
+
   const prevIsOpenRef = useRef(false);
 
   useEffect(() => {
@@ -1518,9 +1578,9 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                         type="button"
                         onClick={() => setShowDbKeyInput(!showDbKeyInput)}
                         className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
-                        title={showDbKeyInput ? 'Masquer' : 'Afficher'}
+                        title={showDbKeyInput ? (lang === 'FR' ? 'Masquer' : 'Hide') : (lang === 'FR' ? 'Afficher' : 'Show')}
                       >
-                        {showDbKeyInput ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        {showDbKeyInput ? <Eye className="w-3.5 h-3.5 text-teal-800" /> : <EyeOff className="w-3.5 h-3.5 text-slate-400" />}
                       </button>
                       <button
                         type="button"
@@ -1625,9 +1685,9 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                             type="button"
                             onClick={() => setShowBackupPassphrase(!showBackupPassphrase)}
                             className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
-                            title={showBackupPassphrase ? 'Masquer' : 'Afficher'}
+                            title={showBackupPassphrase ? (lang === 'FR' ? 'Masquer' : 'Hide') : (lang === 'FR' ? 'Afficher' : 'Show')}
                           >
-                            {showBackupPassphrase ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            {showBackupPassphrase ? <Eye className="w-3.5 h-3.5 text-teal-800" /> : <EyeOff className="w-3.5 h-3.5 text-slate-400" />}
                           </button>
                           <button
                             type="button"
@@ -1760,8 +1820,9 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                             type="button"
                             onClick={() => setShowRestorePassphrase(!showRestorePassphrase)}
                             className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                            title={showRestorePassphrase ? (lang === 'FR' ? 'Masquer' : 'Hide') : (lang === 'FR' ? 'Afficher' : 'Show')}
                           >
-                            {showRestorePassphrase ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            {showRestorePassphrase ? <Eye className="w-3.5 h-3.5 text-amber-700" /> : <EyeOff className="w-3.5 h-3.5 text-slate-400" />}
                           </button>
                         </div>
                       </div>
@@ -2259,7 +2320,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                             className="p-1 rounded-lg hover:bg-slate-200 text-slate-600 transition-colors cursor-pointer"
                             title={showNewUserPassword ? (lang === 'FR' ? 'Masquer le mot de passe' : 'Hide password') : (lang === 'FR' ? 'Afficher le mot de passe' : 'View password')}
                           >
-                            {showNewUserPassword ? <EyeOff className="w-4 h-4 text-teal-800" /> : <Eye className="w-4 h-4" />}
+                            {showNewUserPassword ? <Eye className="w-4 h-4 text-teal-800" /> : <EyeOff className="w-4 h-4 text-slate-400" />}
                           </button>
                           {newUserPassword && (
                             <button
@@ -2427,7 +2488,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                           className="p-1 rounded-lg hover:bg-slate-200 text-slate-600 transition-colors cursor-pointer"
                           title={showNewPasswordValue ? (lang === 'FR' ? 'Masquer le mot de passe' : 'Hide password') : (lang === 'FR' ? 'Afficher le mot de passe' : 'View password')}
                         >
-                          {showNewPasswordValue ? <EyeOff className="w-4 h-4 text-teal-800" /> : <Eye className="w-4 h-4" />}
+                          {showNewPasswordValue ? <Eye className="w-4 h-4 text-teal-800" /> : <EyeOff className="w-4 h-4 text-slate-400" />}
                         </button>
                         {newPasswordValue && (
                           <button
@@ -3443,11 +3504,11 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                             <button
                               type="button"
-                              onClick={() => setShowTunnelToken(!showTunnelToken)}
-                              className="p-1 rounded-md text-slate-400 hover:text-slate-700"
-                              title={showTunnelToken ? 'Hide' : 'Show'}
+                              onClick={handleToggleShowTunnelToken}
+                              className="p-1 rounded-md text-slate-400 hover:text-slate-700 cursor-pointer"
+                              title={showTunnelToken ? (lang === 'FR' ? 'Masquer le jeton' : 'Hide token') : (lang === 'FR' ? 'Afficher le jeton' : 'Show token')}
                             >
-                              {showTunnelToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                              {showTunnelToken ? <Eye className="w-3.5 h-3.5 text-blue-700" /> : <EyeOff className="w-3.5 h-3.5 text-slate-400" />}
                             </button>
                             {settings.cloudflareTunnelToken && (
                               <button
@@ -3958,10 +4019,11 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                         />
                         <button
                           type="button"
-                          onClick={() => setShowGeminiKey(!showGeminiKey)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                          onClick={handleToggleShowGeminiKey}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                          title={showGeminiKey ? (lang === 'FR' ? 'Masquer la clé' : 'Hide key') : (lang === 'FR' ? 'Afficher la clé' : 'Show key')}
                         >
-                          {showGeminiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          {showGeminiKey ? <Eye className="w-4 h-4 text-teal-800" /> : <EyeOff className="w-4 h-4 text-slate-400" />}
                         </button>
                       </div>
 
@@ -4276,10 +4338,11 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                           />
                           <button
                             type="button"
-                            onClick={() => setShowDbSettingsKey(!showDbSettingsKey)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                            onClick={handleToggleShowDbSettingsKey}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                            title={showDbSettingsKey ? (lang === 'FR' ? 'Masquer la clé' : 'Hide key') : (lang === 'FR' ? 'Afficher la clé' : 'Show key')}
                           >
-                            {showDbSettingsKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            {showDbSettingsKey ? <Eye className="w-4 h-4 text-teal-800" /> : <EyeOff className="w-4 h-4 text-slate-400" />}
                           </button>
                         </div>
 
