@@ -254,6 +254,41 @@ router.post("/settings", requireAdmin, (req, res) => {
 });
 
 /**
+ * POST /api/v1/admin/set-gemini-key
+ * Direct save endpoint for the Google Gemini API Key
+ */
+router.post("/set-gemini-key", requireAdmin, (req, res) => {
+  try {
+    const { apiKey } = req.body;
+    if (apiKey === undefined || typeof apiKey !== "string") {
+      return res.status(400).json({ error: "Clé API invalide." });
+    }
+    const cleanKey = apiKey.trim();
+    if (cleanKey.includes("•")) {
+      return res.status(400).json({ error: "Veuillez entrer la clé en texte clair sans caractères masqués (•)." });
+    }
+
+    dbStore.systemSettings.geminiApiKey = cleanKey;
+    process.env.GEMINI_API_KEY = cleanKey;
+    syncEnvFile({ GEMINI_API_KEY: cleanKey });
+    dbStore.persistToEncryptedDisk();
+
+    resetVisionGemini();
+    resetRecipeGemini();
+
+    res.json({
+      success: true,
+      message: cleanKey 
+        ? "Clé API Google Gemini enregistrée avec succès et synchronisée dans le fichier .env !" 
+        : "Clé API Google Gemini réinitialisée.",
+      hasGeminiKey: Boolean(cleanKey),
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
  * POST /api/v1/admin/test-gemini
  * Verifies connectivity of the configured Google Gemini API Key
  */
@@ -274,18 +309,38 @@ router.post("/test-gemini", requireAdmin, async (req, res) => {
       },
     });
 
-    const response = await testClient.models.generateContent({
-      model: "gemini-3.8-flash",
-      contents: "Respond with the word 'OK' to test connectivity.",
-    });
+    let usedModel = "gemini-3.8-flash";
+    let response;
+    try {
+      response = await testClient.models.generateContent({
+        model: "gemini-3.8-flash",
+        contents: "Respond with the word 'OK' to test connectivity.",
+      });
+    } catch (primaryErr) {
+      const is503 =
+        primaryErr.message &&
+        (primaryErr.message.includes("503") ||
+          primaryErr.message.includes("high demand") ||
+          primaryErr.message.includes("UNAVAILABLE"));
+      if (is503) {
+        console.warn("[Admin Route] gemini-3.8-flash experienced temporary high demand (503), retrying test via gemini-3.1-flash-lite...");
+        usedModel = "gemini-3.1-flash-lite";
+        response = await testClient.models.generateContent({
+          model: "gemini-3.1-flash-lite",
+          contents: "Respond with the word 'OK' to test connectivity.",
+        });
+      } else {
+        throw primaryErr;
+      }
+    }
 
     const reply = response?.text?.trim() || "OK";
     resetVisionGemini();
     resetRecipeGemini();
     res.json({
       success: true,
-      message: "Connexion API Gemini validée avec succès ! Les fonctionnalités Vision & Recettes IA sont opérationnelles.",
-      model: "gemini-3.8-flash",
+      message: `Connexion API Gemini validée avec succès (${usedModel}) ! Les fonctionnalités Vision & Recettes IA sont opérationnelles.`,
+      model: usedModel,
       reply,
     });
   } catch (err) {
@@ -296,13 +351,22 @@ router.post("/test-gemini", requireAdmin, async (req, res) => {
         err.message.includes("rate-limits") ||
         err.message.includes("429"));
 
+    const isHighDemand =
+      err.message &&
+      (err.message.includes("503") ||
+        err.message.includes("high demand") ||
+        err.message.includes("UNAVAILABLE"));
+
     const friendlyError = isQuotaExceeded
       ? "Quota ou limite d'appels de l'API Gemini atteinte (Resource Exhausted). Les moteurs hors-ligne et OCR restent 100% actifs. Veuillez vérifier vos quotas sur ai.google.dev."
+      : isHighDemand
+      ? "Les serveurs Google Gemini subissent un pic temporaire de forte demande (Code 503). Votre clé est enregistrée et valide, réessayez dans quelques secondes."
       : `Échec du test de clé Gemini: ${err.message || "Clé invalide."}`;
 
     res.status(400).json({
       success: false,
       isQuotaExceeded: Boolean(isQuotaExceeded),
+      isHighDemand: Boolean(isHighDemand),
       error: friendlyError,
     });
   }

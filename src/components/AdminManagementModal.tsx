@@ -693,19 +693,31 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     }
   };
 
-  const handleSaveSettings = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveSettings = async (e?: React.FormEvent | React.MouseEvent) => {
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+    }
     setIsSavingSettings(true);
     setSettingsStatus(null);
     try {
+      const payload: any = {
+        ...settings,
+        hostingMode: selectedHostingMode,
+        reverseProxyType: selectedReverseProxy,
+      };
+      if (settings.geminiApiKey && settings.geminiApiKey.includes('•')) {
+        delete payload.geminiApiKey;
+      }
+      if (settings.cloudflareTunnelToken && settings.cloudflareTunnelToken.includes('•')) {
+        delete payload.cloudflareTunnelToken;
+      }
+      if (settings.dbEncryptionKey && settings.dbEncryptionKey.includes('•')) {
+        delete payload.dbEncryptionKey;
+      }
       const res = await fetch('/api/v1/admin/settings', {
         method: 'POST',
         headers: await getAdminHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({
-          ...settings,
-          hostingMode: selectedHostingMode,
-          reverseProxyType: selectedReverseProxy,
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -730,10 +742,69 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
     }
   };
 
+  const [isSavingGeminiKey, setIsSavingGeminiKey] = useState(false);
+  const [geminiSaveResult, setGeminiSaveResult] = useState<{
+    success: boolean;
+    message: string;
+  } | null>(null);
+
+  const handleSaveGeminiKey = async () => {
+    setIsSavingGeminiKey(true);
+    setGeminiSaveResult(null);
+    try {
+      if (!settings.geminiApiKey || settings.geminiApiKey.includes('•')) {
+        throw new Error(
+          lang === 'FR'
+            ? 'Veuillez saisir votre clé API en clair (sans points masqués).'
+            : 'Please enter your API key in plain text without masked bullets.'
+        );
+      }
+      const res = await fetch('/api/v1/admin/set-gemini-key', {
+        method: 'POST',
+        headers: await getAdminHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ apiKey: settings.geminiApiKey.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to save Gemini API key');
+      }
+      setGeminiSaveResult({
+        success: true,
+        message:
+          data.message ||
+          (lang === 'FR'
+            ? '✓ Clé API Google Gemini enregistrée avec succès dans la base et le fichier .env !'
+            : '✓ Google Gemini API Key saved and synced to .env successfully!'),
+      });
+      setSettings((prev) => ({
+        ...prev,
+        hasGeminiKey: true,
+      }));
+      fetchSettings();
+    } catch (err: any) {
+      setGeminiSaveResult({
+        success: false,
+        message: err.message || (lang === 'FR' ? 'Erreur de sauvegarde de la clé.' : 'Failed to save key.'),
+      });
+    } finally {
+      setIsSavingGeminiKey(false);
+    }
+  };
+
   const handleTestGeminiKey = async () => {
     setIsTestingGemini(true);
     setGeminiTestResult(null);
     try {
+      // Auto-save the key first if a new unmasked key was entered
+      if (settings.geminiApiKey && !settings.geminiApiKey.includes('•')) {
+        await fetch('/api/v1/admin/set-gemini-key', {
+          method: 'POST',
+          headers: await getAdminHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ apiKey: settings.geminiApiKey.trim() }),
+        });
+        setSettings((prev) => ({ ...prev, hasGeminiKey: true }));
+      }
+
       const res = await fetch('/api/v1/admin/test-gemini', {
         method: 'POST',
         headers: await getAdminHeaders({ 'Content-Type': 'application/json' }),
@@ -757,10 +828,19 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
         rawMsg.includes('resource_exhausted') ||
         rawMsg.includes('quota') ||
         rawMsg.includes('rate-limits');
+      const is503 =
+        rawMsg.includes('503') ||
+        rawMsg.includes('high demand') ||
+        rawMsg.includes('UNAVAILABLE');
+
       const cleanMsg = isQuota
         ? (lang === 'FR'
             ? "Quota de l'API Gemini dépassé (Resource Exhausted). Les moteurs hors-ligne et OCR restent actifs."
             : 'Gemini API quota exceeded. Offline and local OCR engines remain fully active.')
+        : is503
+        ? (lang === 'FR'
+            ? 'Pic de forte demande temporaire sur Google Gemini (Code 503). Votre clé est enregistrée ; réessayez dans quelques instants.'
+            : 'Temporary high-demand spike on Google Gemini (503). Your key is saved; please retry shortly.')
         : (rawMsg || (lang === 'FR' ? 'Échec du test de connexion' : 'Connection test failed'));
 
       setGeminiTestResult({
@@ -3070,6 +3150,20 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                           : (lang === 'FR' ? 'Réseau Local' : 'Local LAN')}
                       </span>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={handleSaveSettings}
+                      disabled={isSavingSettings}
+                      className="px-4 py-1.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 disabled:opacity-50 cursor-pointer ml-auto"
+                    >
+                      {isSavingSettings ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Save className="w-3.5 h-3.5" />
+                      )}
+                      <span>{lang === 'FR' ? 'Enregistrer les Paramètres' : 'Save Settings'}</span>
+                    </button>
                   </div>
                 </div>
 
@@ -3127,13 +3221,25 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                     <label className="font-bold text-[#0D3B37] block text-[11px]">
                       {lang === 'FR' ? 'Nom Affiché de la Cuisine (KITCHEN_NAME)' : 'Kitchen Display Name (KITCHEN_NAME)'}
                     </label>
-                    <input
-                      type="text"
-                      value={settings.kitchenName || ''}
-                      onChange={(e) => setSettings({ ...settings, kitchenName: e.target.value })}
-                      placeholder="Your Kitchen"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-[#D5CEBD] bg-[#FAF7EE] focus:bg-white focus:outline-teal-800 text-xs font-bold text-[#0D3B37]"
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={settings.kitchenName || ''}
+                        onChange={(e) => setSettings({ ...settings, kitchenName: e.target.value })}
+                        placeholder="Your Kitchen"
+                        className="flex-1 px-3.5 py-2.5 rounded-xl border border-[#D5CEBD] bg-[#FAF7EE] focus:bg-white focus:outline-teal-800 text-xs font-bold text-[#0D3B37]"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSaveSettings}
+                        disabled={isSavingSettings}
+                        className="px-4 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-xs disabled:opacity-50"
+                        title={lang === 'FR' ? 'Enregistrer le nom' : 'Save kitchen name'}
+                      >
+                        {isSavingSettings ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                        <span>{lang === 'FR' ? 'Enregistrer le Nom' : 'Save Name'}</span>
+                      </button>
+                    </div>
                     <p className="text-[10px] text-[#527470]">
                       {lang === 'FR'
                         ? 'Ce nom s’affiche dans toute l’application, sur mobile et dans le fichier .env (KITCHEN_NAME).'
@@ -3390,6 +3496,20 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                             )}
                             <span>{lang === 'FR' ? 'Tester Connectivité' : 'Test Endpoint'}</span>
                           </button>
+                          <button
+                            type="button"
+                            onClick={handleSaveSettings}
+                            disabled={isSavingSettings}
+                            className="px-3.5 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer shrink-0 shadow-2xs"
+                            title={lang === 'FR' ? 'Enregistrer les paramètres réseau' : 'Save network settings'}
+                          >
+                            {isSavingSettings ? (
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Save className="w-3.5 h-3.5" />
+                            )}
+                            <span>{lang === 'FR' ? 'Enregistrer' : 'Save'}</span>
+                          </button>
                         </div>
                         <p className="text-[10px] text-blue-800/80">
                           {lang === 'FR'
@@ -3544,6 +3664,20 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                                 <CheckCircle2 className="w-3.5 h-3.5" />
                               )}
                               <span>{lang === 'FR' ? 'Tester Connectivité' : 'Test Endpoint'}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleSaveSettings}
+                              disabled={isSavingSettings}
+                              className="px-3.5 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer shrink-0 shadow-2xs"
+                              title={lang === 'FR' ? 'Enregistrer les paramètres réseau' : 'Save network settings'}
+                            >
+                              {isSavingSettings ? (
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Save className="w-3.5 h-3.5" />
+                              )}
+                              <span>{lang === 'FR' ? 'Enregistrer' : 'Save'}</span>
                             </button>
                           </div>
                           <p className="text-[10px] text-purple-900/80">
@@ -3833,9 +3967,24 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
 
                       <button
                         type="button"
+                        onClick={handleSaveGeminiKey}
+                        disabled={isSavingGeminiKey || !settings.geminiApiKey || settings.geminiApiKey.includes('•')}
+                        className="px-3.5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center gap-1.5 transition-colors disabled:opacity-40 cursor-pointer shrink-0 shadow-xs"
+                        title={lang === 'FR' ? 'Enregistrer directement la clé' : 'Directly save key'}
+                      >
+                        {isSavingGeminiKey ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Save className="w-3.5 h-3.5" />
+                        )}
+                        <span>{lang === 'FR' ? 'Enregistrer la Clé' : 'Save Key'}</span>
+                      </button>
+
+                      <button
+                        type="button"
                         onClick={handleTestGeminiKey}
                         disabled={isTestingGemini || (!settings.geminiApiKey && !settings.hasGeminiKey)}
-                        className="px-4 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer shrink-0"
+                        className="px-3.5 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer shrink-0 shadow-xs"
                       >
                         {isTestingGemini ? (
                           <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -3845,6 +3994,23 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                         <span>{lang === 'FR' ? 'Tester la Clé' : 'Test Key'}</span>
                       </button>
                     </div>
+
+                    {geminiSaveResult && (
+                      <div
+                        className={`p-3 rounded-xl text-xs flex items-center gap-2 mt-2 ${
+                          geminiSaveResult.success
+                            ? 'bg-emerald-50 border border-emerald-200 text-emerald-900'
+                            : 'bg-rose-50 border border-rose-200 text-rose-900'
+                        }`}
+                      >
+                        {geminiSaveResult.success ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        ) : (
+                          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                        )}
+                        <span className="flex-1 font-medium">{geminiSaveResult.message}</span>
+                      </div>
+                    )}
 
                     {geminiTestResult && (
                       <div
@@ -3959,7 +4125,21 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 pt-1">
+                      <div className="flex items-center gap-2 pt-1 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={handleSaveSettings}
+                          disabled={isSavingSettings}
+                          className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
+                          title={lang === 'FR' ? 'Enregistrer les paramètres du serveur Gemma local' : 'Save local Gemma server settings'}
+                        >
+                          {isSavingSettings ? (
+                            <RefreshCw className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Save className="w-3 h-3" />
+                          )}
+                          <span>{lang === 'FR' ? 'Enregistrer Serveur Gemma' : 'Save Gemma Server'}</span>
+                        </button>
                         <button
                           type="button"
                           onClick={handleTestLocalGemma}
@@ -4011,26 +4191,36 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                     <label className="font-bold text-[#0D3B37] block text-[11px]">
                       {lang === 'FR' ? 'URL API Client Mobile (EXPO_PUBLIC_API_URL)' : 'Expo Mobile API URL (EXPO_PUBLIC_API_URL)'}
                     </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={settings.expoPublicApiUrl}
-                        onChange={(e) => setSettings({ ...settings, expoPublicApiUrl: e.target.value })}
-                        placeholder="https://pantryo.example.com/api/v1/inventory"
-                        className="flex-1 px-3.5 py-2.5 rounded-xl border border-[#D5CEBD] bg-[#FAF7EE] focus:bg-white focus:outline-teal-800 text-xs text-[#0D3B37]"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const base = (settings.appUrl || 'http://localhost:3000').replace(/\/+$/, '');
-                          setSettings({ ...settings, expoPublicApiUrl: `${base}/api/v1/inventory` });
-                        }}
-                        className="px-3.5 py-2.5 rounded-xl bg-[#FAF7EE] hover:bg-[#EFEAE0] border border-[#D5CEBD] text-[#0D3B37] font-bold text-xs shrink-0 cursor-pointer"
-                        title={lang === 'FR' ? 'Générer depuis APP_URL' : 'Derive from APP_URL'}
-                      >
-                        {lang === 'FR' ? 'Dériver d’APP_URL' : 'Derive from APP_URL'}
-                      </button>
-                    </div>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={settings.expoPublicApiUrl}
+                          onChange={(e) => setSettings({ ...settings, expoPublicApiUrl: e.target.value })}
+                          placeholder="https://pantryo.example.com/api/v1/inventory"
+                          className="flex-1 px-3.5 py-2.5 rounded-xl border border-[#D5CEBD] bg-[#FAF7EE] focus:bg-white focus:outline-teal-800 text-xs text-[#0D3B37]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const base = (settings.appUrl || 'http://localhost:3000').replace(/\/+$/, '');
+                            setSettings({ ...settings, expoPublicApiUrl: `${base}/api/v1/inventory` });
+                          }}
+                          className="px-3.5 py-2.5 rounded-xl bg-[#FAF7EE] hover:bg-[#EFEAE0] border border-[#D5CEBD] text-[#0D3B37] font-bold text-xs shrink-0 cursor-pointer"
+                          title={lang === 'FR' ? 'Générer depuis APP_URL' : 'Derive from APP_URL'}
+                        >
+                          {lang === 'FR' ? 'Dériver d’APP_URL' : 'Derive from APP_URL'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSaveSettings}
+                          disabled={isSavingSettings}
+                          className="px-3.5 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs shrink-0 cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                          title={lang === 'FR' ? 'Enregistrer l’URL de l’API mobile' : 'Save mobile API endpoint'}
+                        >
+                          {isSavingSettings ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                          <span>{lang === 'FR' ? 'Enregistrer' : 'Save'}</span>
+                        </button>
+                      </div>
                     <p className="text-[10px] text-[#527470]">
                       {lang === 'FR'
                         ? 'Point d’accès utilisé par les applications iOS et Android développées avec Expo React Native pour synchroniser l’inventaire.'
@@ -4107,6 +4297,19 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                           ? 'Attention : la modification de cette clé chiffre instantanément la base de données SQLCipher avec la nouvelle clé.'
                           : 'Notice: changing this key immediately re-encrypts the SQLCipher database storage on disk.'}
                       </p>
+                    </div>
+
+                    <div className="flex justify-end pt-1">
+                      <button
+                        type="button"
+                        onClick={handleSaveSettings}
+                        disabled={isSavingSettings}
+                        className="px-4 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                        title={lang === 'FR' ? 'Enregistrer les paramètres de base de données' : 'Save database settings'}
+                      >
+                        {isSavingSettings ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                        <span>{lang === 'FR' ? 'Enregistrer Paramètres BDD' : 'Save Database Settings'}</span>
+                      </button>
                     </div>
                   </div>
                 </div>

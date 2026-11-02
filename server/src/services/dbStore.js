@@ -1267,6 +1267,9 @@ class EncryptedDatabaseStore {
         : (this.systemSettings?.cloudflareTunnelToken || process.env.CLOUDFLARE_TUNNEL_TOKEN ? "••••••••••••••••" : ""),
       hasTunnelToken: Boolean(this.systemSettings?.cloudflareTunnelToken || process.env.CLOUDFLARE_TUNNEL_TOKEN),
       expoPublicApiUrl: this.systemSettings?.expoPublicApiUrl || process.env.EXPO_PUBLIC_API_URL || "",
+      localVisionUrl: this.systemSettings?.localVisionUrl || process.env.LOCAL_GEMMA_URL || "",
+      localVisionModel: this.systemSettings?.localVisionModel || "paligemma",
+      aiVisionProvider: this.systemSettings?.aiVisionProvider || (this.systemSettings?.localVisionUrl ? "local_gemma" : "gemini"),
       databaseUrl: this.systemSettings?.databaseUrl || process.env.DATABASE_URL || "",
       port: parseInt(this.systemSettings?.port || process.env.PORT || "3000", 10),
       dbEncryptionKey: includeSensitiveKeys ? rawKey : maskedKey,
@@ -1289,7 +1292,11 @@ class EncryptedDatabaseStore {
     if (updates.kitchenName !== undefined && updates.kitchenName.trim()) {
       const val = updates.kitchenName.trim();
       this.updateHouseholdName(val);
+      this.systemSettings.kitchenName = val;
+      process.env.KITCHEN_NAME = val;
+      process.env.VITE_KITCHEN_NAME = val;
       envSyncObj.KITCHEN_NAME = val;
+      envSyncObj.VITE_KITCHEN_NAME = val;
     }
 
     if (updates.appUrl !== undefined) {
@@ -1301,9 +1308,12 @@ class EncryptedDatabaseStore {
 
     if (updates.geminiApiKey !== undefined) {
       const val = updates.geminiApiKey.trim();
-      this.systemSettings.geminiApiKey = val;
-      process.env.GEMINI_API_KEY = val;
-      envSyncObj.GEMINI_API_KEY = val;
+      // Never overwrite the active key with masked bullets (e.g. ••••••••)
+      if (!val.includes("•")) {
+        this.systemSettings.geminiApiKey = val;
+        process.env.GEMINI_API_KEY = val;
+        envSyncObj.GEMINI_API_KEY = val;
+      }
     }
 
     if (updates.hostingMode !== undefined) {
@@ -1323,9 +1333,11 @@ class EncryptedDatabaseStore {
 
     if (updates.cloudflareTunnelToken !== undefined) {
       const val = updates.cloudflareTunnelToken.trim();
-      this.systemSettings.cloudflareTunnelToken = val;
-      process.env.CLOUDFLARE_TUNNEL_TOKEN = val;
-      envSyncObj.CLOUDFLARE_TUNNEL_TOKEN = val;
+      if (!val.includes("•")) {
+        this.systemSettings.cloudflareTunnelToken = val;
+        process.env.CLOUDFLARE_TUNNEL_TOKEN = val;
+        envSyncObj.CLOUDFLARE_TUNNEL_TOKEN = val;
+      }
     }
 
     if (updates.expoPublicApiUrl !== undefined) {
@@ -1333,6 +1345,22 @@ class EncryptedDatabaseStore {
       this.systemSettings.expoPublicApiUrl = val;
       process.env.EXPO_PUBLIC_API_URL = val;
       envSyncObj.EXPO_PUBLIC_API_URL = val;
+    }
+
+    if (updates.localVisionUrl !== undefined) {
+      const val = updates.localVisionUrl.trim();
+      this.systemSettings.localVisionUrl = val;
+      process.env.LOCAL_GEMMA_URL = val;
+      envSyncObj.LOCAL_GEMMA_URL = val;
+    }
+
+    if (updates.localVisionModel !== undefined) {
+      const val = updates.localVisionModel.trim();
+      this.systemSettings.localVisionModel = val;
+    }
+
+    if (updates.aiVisionProvider !== undefined) {
+      this.systemSettings.aiVisionProvider = updates.aiVisionProvider;
     }
 
     if (updates.databaseUrl !== undefined) {
@@ -1351,10 +1379,10 @@ class EncryptedDatabaseStore {
 
     if (updates.dbEncryptionKey !== undefined && updates.dbEncryptionKey.trim().length >= 16) {
       const newKey = updates.dbEncryptionKey.trim();
-      if (newKey !== this.getActiveKey()) {
+      if (!newKey.includes("•") && newKey !== this.getActiveKey()) {
         this.setEncryptionKey(newKey);
+        envSyncObj.DB_ENCRYPTION_KEY = newKey;
       }
-      envSyncObj.DB_ENCRYPTION_KEY = newKey;
     }
 
     this.systemSettings.updatedAt = new Date().toISOString();
