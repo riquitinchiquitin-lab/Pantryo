@@ -4,7 +4,7 @@ import fs from "fs";
 import os from "os";
 import dns from "dns";
 import { pathToFileURL } from "url";
-import { dbStore } from "../services/dbStore.js";
+import { dbStore, syncEnvFile } from "../services/dbStore.js";
 import { validatePasswordNist } from "../services/nistPasswordValidator.js";
 import { rateLimiter } from "../services/rateLimiter.js";
 import { resetGeminiClient as resetVisionGemini } from "../services/geminiVision.js";
@@ -268,10 +268,8 @@ router.post("/set-gemini-key", requireAdmin, (req, res) => {
       return res.status(400).json({ error: "Veuillez entrer la clé en texte clair sans caractères masqués (•)." });
     }
 
-    dbStore.systemSettings.geminiApiKey = cleanKey;
-    process.env.GEMINI_API_KEY = cleanKey;
+    dbStore.updateSystemSettings({ geminiApiKey: cleanKey });
     syncEnvFile({ GEMINI_API_KEY: cleanKey });
-    dbStore.persistToEncryptedDisk();
 
     resetVisionGemini();
     resetRecipeGemini();
