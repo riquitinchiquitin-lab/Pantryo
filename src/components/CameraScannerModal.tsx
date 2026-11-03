@@ -141,6 +141,29 @@ interface SessionItem {
   isValidatedByGemini?: boolean;
   geminiTokens?: { totalTokens: number; promptTokens: number; candidateTokens: number; imageTokens?: number };
   verificationNote?: string;
+  reconciliation?: {
+    isAlreadyInInventory: boolean;
+    matchConfidence?: number;
+    matchReason?: string;
+    existingItem?: {
+      id: string;
+      name: string;
+      quantity: number;
+      unit: string;
+      locationId?: string;
+      locationName?: string;
+      categoryId?: string;
+      expirationDate?: string;
+      daysRemaining?: number | null;
+      notes?: string;
+    } | null;
+    currentStock: number;
+    suggestedAction: string;
+    canonicalBrand?: string | null;
+    calibratedCategory?: string;
+    calibratedShelfLifeDays?: number;
+    calibratedStorageLocation?: string;
+  };
 }
 
 interface SamplePresetItem {
@@ -499,6 +522,43 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
       );
     } catch (e) {
       console.warn('Failed to update item correction', e);
+    }
+  };
+
+  // Reconcile Increment: 1-click update to existing inventory stock
+  const handleReconcileIncrement = async (itemId: string) => {
+    try {
+      const res = await fetch('/api/v1/inventory/reconcile-increment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemId, incrementBy: 1, userId: currentUser.id }),
+      });
+      const data = await res.json();
+      if (data.success && data.item) {
+        onItemAdded(data.item);
+        showToast(
+          lang === 'FR'
+            ? `✓ Stock mis à jour : "${data.item.name}" (+1 ➔ ${data.newQuantity} ${data.item.unit})`
+            : `✓ Stock updated: "${data.item.name}" (+1 ➔ ${data.newQuantity} ${data.item.unit})`,
+          'success',
+          4000
+        );
+        if (inspectingItem && inspectingItem.reconciliation?.existingItem?.id === itemId) {
+          setInspectingItem({
+            ...inspectingItem,
+            reconciliation: {
+              ...inspectingItem.reconciliation,
+              currentStock: data.newQuantity,
+              existingItem: {
+                ...inspectingItem.reconciliation.existingItem,
+                quantity: data.newQuantity,
+              },
+            },
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('Reconcile increment error:', err);
     }
   };
 
@@ -946,64 +1006,109 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
         }
       }
 
-      // Priority 3.5: Two-Tier ONNX Edge Vision Microservice (Super C Department & 399 Produce)
+      // Priority 3.2: High-Precision Global & Canadian Package Matching (Catalog Fallback)
+      if (items.length === 0 && packageMatch && packageMatch.matched) {
+        const isFr = lang === 'FR';
+        items = [
+          {
+            name: isFr ? packageMatch.nameFr : packageMatch.nameEn,
+            nameFr: packageMatch.nameFr,
+            nameEn: packageMatch.nameEn,
+            brand: packageMatch.brand,
+            category: packageMatch.category,
+            quantity: 1,
+            unit: packageMatch.containerBadge.short,
+            netContent: packageMatch.standardNetQuantity,
+            packagingFormat: `${packageMatch.containerBadge.icon} ${packageMatch.containerBadge.label} • ${packageMatch.standardNetQuantity}`,
+            recommendedLocation: packageMatch.defaultLocation,
+            estimatedShelfLifeDays: packageMatch.shelfLifeDays,
+            unopenedShelfLifeDays: packageMatch.shelfLifeDays,
+            openedShelfLifeDays: Math.round(packageMatch.shelfLifeDays / 10) || 7,
+            monthsFrozenShelfLife: packageMatch.monthsFrozenShelfLife,
+            dietaryBadges: [
+              `${packageMatch.regionBadge.flag} ${packageMatch.regionBadge.label}`,
+              packageMatch.containerBadge.label,
+            ],
+            storageTip: packageMatch.storageTip,
+            confidence: packageMatch.confidence,
+            detectedText: packageMatch.displaySubtitle,
+            barcode: packageMatch.barcode,
+          },
+        ];
+        winningMethod = 'packaging';
+        winningMethodLabel = packageMatch.sourceLabel;
+      }
+
+      // Priority 3.5: Two-Tier ONNX Edge Vision Microservice (Only when a specific food/produce item is detected)
       if (
-        (items.length === 0 || isProduce) &&
+        items.length === 0 &&
         visionData &&
         visionData.success &&
-        (visionData.produce?.detected || isProduce || (visionData.department && visionData.department.confidence >= 0.35))
+        visionData.source !== 'microservice_offline' &&
+        visionData.source !== 'fallback_internal' &&
+        visionData.produce?.detected &&
+        visionData.produce?.label_fr
       ) {
         const prod = visionData.produce;
         const dept = visionData.department;
         const isFr = lang === 'FR';
 
-        const labelFr = prod?.label_fr || dept?.name_fr || 'Produit d’épicerie';
-        const labelEn = prod?.label_en || dept?.name_en || 'Grocery item';
+        const labelFr = prod.label_fr;
+        const labelEn = prod.label_en || labelFr;
         const chosenName = isFr ? labelFr : labelEn;
-        const chosenCategory = dept?.pantryo_category || (prod ? 'Produce' : 'Pantry Staples');
-        const defaultLoc = (dept?.default_location as any) || (chosenCategory === 'Produce' ? 'Fridge' : 'Pantry');
+        const nameLower = (chosenName || '').toLowerCase().trim();
+        const isGenericName = ['produce', 'fruits & légumes', 'fruits & legumes', 'grocery item', 'article d’épicerie', 'aliment'].includes(nameLower);
 
-        items = [
-          {
-            name: chosenName,
-            nameFr: labelFr,
-            nameEn: labelEn,
-            category: chosenCategory,
-            quantity: 1,
-            unit: 'pcs',
-            recommendedLocation: defaultLoc,
-            estimatedShelfLifeDays: chosenCategory === 'Produce' ? 7 : 30,
-            monthsFrozenShelfLife: 6,
-            brand: dept?.name_fr || 'Super C',
-            packagingFormat: isFr ? 'Produit d’épicerie frais' : 'Fresh grocery product',
-            dietaryBadges: [dept?.name_fr || 'Super C', isFr ? 'Vision ONNX' : 'ONNX Vision'],
-            storageTip: isFr
-              ? 'Conserver dans l’espace approprié (réfrigérateur ou garde-manger).'
-              : 'Store in appropriate area (refrigerator or pantry).',
-            storageReason: isFr
-              ? `Reconnu par IA ONNX à 2 niveaux (${dept?.name_fr || 'Rayon'})`
-              : `Identified by two-tier ONNX edge vision (${dept?.name_en || 'Aisle'})`,
-            confidence: prod?.confidence || dept?.confidence || 0.75,
-            alternatives: prod?.alternatives || dept?.alternatives || [],
-          },
-        ];
-        winningMethod = 'produce';
-        winningMethodLabel = isFr
-          ? `Vision ONNX : ${dept?.name_fr || 'Fruits & Légumes'}`
-          : `ONNX Vision: ${dept?.name_en || 'Produce'}`;
+        if (!isGenericName) {
+          const chosenCategory = dept?.pantryo_category || 'Produce';
+          const defaultLoc = (dept?.default_location as any) || (chosenCategory === 'Produce' ? 'Fridge' : 'Pantry');
+
+          items = [
+            {
+              name: chosenName,
+              nameFr: labelFr,
+              nameEn: labelEn,
+              category: chosenCategory,
+              quantity: 1,
+              unit: 'pcs',
+              recommendedLocation: defaultLoc,
+              estimatedShelfLifeDays: chosenCategory === 'Produce' ? 7 : 30,
+              monthsFrozenShelfLife: 6,
+              brand: dept?.name_fr || 'Produits frais',
+              packagingFormat: isFr ? 'Produit frais en vrac' : 'Fresh loose produce',
+              dietaryBadges: [dept?.name_fr || 'Produits frais', isFr ? 'Vision ONNX' : 'ONNX Vision'],
+              storageTip: isFr
+                ? 'Conserver dans l’espace approprié (réfrigérateur ou garde-manger).'
+                : 'Store in appropriate area (refrigerator or pantry).',
+              storageReason: isFr
+                ? `Reconnu par IA ONNX (${dept?.name_fr || 'Rayon'})`
+                : `Identified by ONNX edge vision (${dept?.name_en || 'Aisle'})`,
+              confidence: prod?.confidence || 0.80,
+              alternatives: prod?.alternatives || dept?.alternatives || [],
+            },
+          ];
+          winningMethod = 'produce';
+          winningMethodLabel = isFr
+            ? `Vision ONNX : ${chosenName}`
+            : `ONNX Vision: ${chosenName}`;
+        }
       }
 
       // Priority 4: Verified Optical PLU Sticker or High-Confidence Fresh Produce Vision
       if (items.length === 0) {
+        const prod = onDeviceVisionResult?.item;
+        const prodNameLower = (prod?.name || '').toLowerCase().trim();
+        const isGenericProduce = ['produce', 'fruits & légumes', 'fruits & legumes', 'fresh produce', 'fruit/légume frais'].includes(prodNameLower);
+
         const isVerifiedProduce = Boolean(
           onDeviceVisionResult &&
           onDeviceVisionResult.isProduce &&
-          onDeviceVisionResult.item &&
-          (onDeviceVisionResult.sourceMethod === 'plu_sticker' || onDeviceVisionResult.confidence >= 0.50)
+          prod &&
+          !isGenericProduce &&
+          (onDeviceVisionResult.sourceMethod === 'plu_sticker' || onDeviceVisionResult.confidence >= 0.70)
         );
 
-        if (isVerifiedProduce && onDeviceVisionResult && onDeviceVisionResult.item) {
-          const prod = onDeviceVisionResult.item;
+        if (isVerifiedProduce && prod) {
           items = [
             {
               name: prod.name,
@@ -1135,12 +1240,12 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
         return true;
       });
 
-      // Automatic Gemini Fallback on Low Confidence (< 0.60 or when no confident match was found)
+      // Automatic Gemini Fallback on Low Confidence (only when not already processed by Gemini or rate-limited)
       let autoGeminiValidated = false;
       let autoGeminiTokens: any = null;
       let autoVerificationNote = '';
 
-      if (filteredItems.length === 0 || (filteredItems[0] && (filteredItems[0].confidence || 0) < 0.60)) {
+      if (!serverData?.rateLimited && serverData?.detectionMethod !== 'gemini_vision' && (filteredItems.length === 0 || (filteredItems[0] && (filteredItems[0].confidence || 0) < 0.60))) {
         try {
           console.info('[Pantryo Scanner] Low confidence or unknown item. Triggering automatic Gemini 3.8 Flash fallback...');
           const valRes = await fetch('/api/v1/inventory/gemini-validate', {
@@ -1208,12 +1313,26 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
         return;
       }
 
-      // Automatically save each recognized item to the database in the background!
+      // Automatically save or reconcile each recognized item with local database
       const addedThisBatch: SessionItem[] = [];
       for (const itemCandidate of filteredItems) {
         try {
           itemCandidate.imageUrl = compressedDataUrl;
-          const savedItem = await saveCandidateToInventory(itemCandidate);
+          const recon = (itemCandidate as any).reconciliation;
+          let savedItem: InventoryItem;
+
+          if (recon?.isAlreadyInInventory && recon.existingItem?.id) {
+            // Reconciled with existing inventory: increment stock instead of creating duplicate item
+            const incRes = await fetch('/api/v1/inventory/reconcile-increment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ itemId: recon.existingItem.id, incrementBy: itemCandidate.quantity || 1, userId: currentUser.id }),
+            });
+            const incData = await incRes.json();
+            savedItem = incData.item || recon.existingItem;
+          } else {
+            savedItem = await saveCandidateToInventory(itemCandidate);
+          }
           onItemAdded(savedItem);
 
           const sessionEntry: SessionItem = {
@@ -1242,11 +1361,14 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
             imageUrl: compressedDataUrl,
             confidence: itemCandidate.confidence,
             identifiedMethod: winningMethod,
-            identifiedMethodLabel: winningMethodLabel,
+            identifiedMethodLabel: recon?.isAlreadyInInventory
+              ? (lang === 'FR' ? '🔄 Rapproché BD locale (+1 stock)' : '🔄 Local DB Match (+1 stock)')
+              : winningMethodLabel,
             alternatives: itemCandidate.alternatives,
             isValidatedByGemini: autoGeminiValidated || (itemCandidate as any).isValidatedByGemini,
             geminiTokens: autoGeminiTokens || (itemCandidate as any).geminiTokens,
             verificationNote: autoVerificationNote || (itemCandidate as any).verificationNote,
+            reconciliation: recon,
           };
 
           addedThisBatch.push(sessionEntry);
@@ -1311,7 +1433,17 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
       });
       const data = await res.json();
       if (!res.ok || !data.success || !data.item) {
-        throw new Error(data.error || 'Gemini validation service unreachable');
+        if (data?.rateLimited) {
+          showToast(
+            lang === 'FR'
+              ? '⚠️ Limite de requêtes Gemini atteinte (5 requêtes/min). Veuillez patienter quelques secondes.'
+              : '⚠️ Gemini rate limit reached (5 requests/min). Please wait a few seconds.',
+            'info',
+            6000
+          );
+          return;
+        }
+        throw new Error(data?.message || data?.error || 'Gemini validation service unreachable');
       }
 
       const v = data.item;
@@ -2394,6 +2526,41 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                       </p>
                     </div>
                   </div>
+
+                  {/* Local Database Reconciliation & Stock Match Card */}
+                  {inspectingItem.reconciliation && inspectingItem.reconciliation.isAlreadyInInventory && inspectingItem.reconciliation.existingItem && (
+                    <div className="p-3.5 rounded-2xl bg-amber-50/95 border-2 border-amber-300 text-xs shadow-2xs animate-fade-in flex flex-col gap-2.5">
+                      <div className="flex items-start gap-2.5">
+                        <span className="text-xl shrink-0">🥫</span>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-black text-amber-950 text-xs">
+                              {lang === 'FR' ? 'Déjà dans votre garde-manger !' : 'Already in your inventory!'}
+                            </p>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-200 text-amber-900 border border-amber-300">
+                              {inspectingItem.reconciliation.currentStock} {inspectingItem.reconciliation.existingItem.unit || (lang === 'FR' ? 'en stock' : 'in stock')}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-amber-900 mt-0.5 leading-relaxed">
+                            {lang === 'FR'
+                              ? `Rapproché avec "${inspectingItem.reconciliation.existingItem.name}" dans votre inventaire local.`
+                              : `Reconciled with "${inspectingItem.reconciliation.existingItem.name}" in your local inventory.`}
+                            {inspectingItem.reconciliation.matchReason && ` (${inspectingItem.reconciliation.matchReason})`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 pt-1 border-t border-amber-200">
+                        <button
+                          type="button"
+                          onClick={() => handleReconcileIncrement(inspectingItem.reconciliation!.existingItem!.id)}
+                          className="flex-1 py-2 px-3 rounded-xl bg-amber-700 hover:bg-amber-800 text-white font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-95 transition-all"
+                        >
+                          <Plus className="w-4 h-4" />
+                          {lang === 'FR' ? '+1 Ajouter au stock existant' : '+1 Add to existing stock'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Gemini Flash AI Validation Status Badge */}
                   {inspectingItem.isValidatedByGemini && (

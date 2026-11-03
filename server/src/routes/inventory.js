@@ -11,6 +11,8 @@ import { getBilingualNames, translateFoodItem, isTextFrench } from "../services/
 import { requireAdmin } from "./admin.js";
 import { requireAuth } from "../services/sessionTokenService.js";
 import { getModelStatus, classifyTensor, getModelClasses, resetModelSession } from "../services/groceryModelService.js";
+import { recordMonitoredPhoto } from "../services/photoMonitor.js";
+import { reconcileItemsWithLocalDb } from "../services/inventoryReconciler.js";
 
 const router = express.Router();
 
@@ -170,6 +172,33 @@ let activityLogs = [];
 // Strict Session Authentication Guard: All inventory endpoints require a valid authenticated session token
 router.use(requireAuth);
 
+// Active Photo Scanner Monitoring Pipeline:
+// Saves incoming product photos, measures recognition performance, and records structured audit events.
+router.use(["/scan", "/scan-produce", "/scan-flyer", "/scan-receipt-photo", "/vision-classify"], (req, res, next) => {
+  if (req.method !== "POST" || !req.body?.imageBase64) {
+    return next();
+  }
+  const startTime = Date.now();
+  const originalJson = res.json.bind(res);
+  res.json = (body) => {
+    try {
+      recordMonitoredPhoto({
+        route: req.originalUrl || `/api/v1/inventory${req.path}`,
+        imageBase64: req.body.imageBase64,
+        mimeType: req.body.mimeType || "image/jpeg",
+        language: req.body.language || "EN",
+        result: res.statusCode < 400 ? body : null,
+        error: res.statusCode >= 400 ? (body?.error || body?.details || "Scan processing error") : null,
+        durationMs: Date.now() - startTime,
+      });
+    } catch (e) {
+      console.warn("[Inventory Route] Photo monitor middleware warning:", e.message);
+    }
+    return originalJson(body);
+  };
+  next();
+});
+
 /**
  * POST /api/v1/inventory/scan
  * Handles photo upload (base64 string or multipart), calls Gemini Vision service,
@@ -198,10 +227,14 @@ router.post("/scan", async (req, res) => {
     if (isApiKeyConfigured) {
       try {
         const result = await analyzeFoodImage(imageBase64, mimeType, language);
-        console.log(`[Pantryo Scan] ✅ Detected item: "${result.item?.name}" (method: ${result.detectionMethod || 'Gemini Vision'}, confidence: ${result.confidence})`);
-        return res.status(200).json(result);
+        if (result && result.success && result.items && result.items.length > 0) {
+          console.log(`[Pantryo Scan] ✅ Detected ${result.items.length} item(s) (method: ${result.detectionMethod || 'Gemini Vision'})`);
+          return res.status(200).json(result);
+        } else if (result && result.rateLimited) {
+          console.warn("[Inventory Route] Gemini rate limit reached (429), attempting local OCR fallback...");
+        }
       } catch (err) {
-        console.warn("[Inventory Route] Gemini vision call failed, falling back to OCR & catalog:", err.message);
+        console.warn("[Inventory Route] Gemini vision call note:", err.message);
       }
     }
 
@@ -366,16 +399,20 @@ router.post("/scan", async (req, res) => {
             });
           }
 
-          const summaryText = isFr
-            ? `Détecté : ${candidates.map(c => c.name).join(", ")} (${candidates.length} article(s))`
-            : `Detected: ${candidates.map(c => c.name).join(", ")} (${candidates.length} item(s))`;
+          const reconciledCandidates = reconcileItemsWithLocalDb(candidates, language);
+          const hasExistingMatch = reconciledCandidates.some((i) => i.reconciliation?.isAlreadyInInventory);
 
           return res.status(200).json({
             success: true,
             identifiedMethod: "packaging",
-            summary: summaryText,
-            itemsCount: candidates.length,
-            items: candidates,
+            detectionMethod: "canadian_packaging_fallback",
+            summary: isFr
+              ? `🥫 Emballage québécois / canadien identifié : ${reconciledCandidates[0]?.name || "Produit d'épicerie"}`
+              : `🥫 Canadian grocery packaging identified: ${reconciledCandidates[0]?.name || "Grocery item"}`,
+            itemsCount: reconciledCandidates.length,
+            items: reconciledCandidates,
+            detectedText: ocrText,
+            hasReconciliationMatches: hasExistingMatch,
             demoMode: true,
             scannedAt: new Date().toISOString(),
           });
@@ -391,6 +428,7 @@ router.post("/scan", async (req, res) => {
         : "No food label or item text detected in this photo. Please take a clearer photo or use the Super C flyer mode.",
       itemsCount: 0,
       items: [],
+      detectedText: ocrText || "",
       scannedAt: new Date().toISOString(),
     });
   } catch (error) {
@@ -401,6 +439,65 @@ router.post("/scan", async (req, res) => {
       error: "AI Vision analysis failed",
       details: error.message,
     });
+  }
+});
+
+/**
+ * POST /api/v1/inventory/reconcile-increment
+ * 1-click quantity increment when Gemini Vision / Local DB identifies an item already in inventory.
+ */
+router.post("/reconcile-increment", (req, res) => {
+  try {
+    const { itemId, incrementBy = 1, userId = "usr_admin" } = req.body;
+    if (!itemId) {
+      return res.status(400).json({ success: false, error: "itemId is required" });
+    }
+
+    const itemIndex = itemsStore.findIndex((i) => i.id === itemId);
+    if (itemIndex === -1) {
+      return res.status(404).json({ success: false, error: "Item not found in inventory." });
+    }
+
+    const currentItem = itemsStore[itemIndex];
+    const prevQty = Number(currentItem.quantity) || 1;
+    const newQty = prevQty + (Number(incrementBy) || 1);
+
+    const updatedItem = {
+      ...currentItem,
+      quantity: newQty,
+      updatedAt: new Date().toISOString(),
+    };
+
+    itemsStore[itemIndex] = updatedItem;
+    syncItemsToEncryptedDisk();
+
+    const user = USERS.find((u) => u.id === userId) || { name: "Household Member" };
+    activityLogs.unshift({
+      id: `log_${Date.now()}`,
+      action: "ITEM_INCREMENTED",
+      details: {
+        itemName: updatedItem.name,
+        prevQuantity: prevQty,
+        newQuantity: newQty,
+        unit: updatedItem.unit,
+        updatedBy: user.name,
+      },
+      itemId: updatedItem.id,
+      userId,
+      householdId: updatedItem.householdId,
+      createdAt: new Date().toISOString(),
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Stock mis à jour : "${updatedItem.name}" (${prevQty} ➔ ${newQty} ${updatedItem.unit})`,
+      item: updatedItem,
+      previousQuantity: prevQty,
+      newQuantity: newQty,
+    });
+  } catch (err) {
+    console.error("[Inventory Route] /reconcile-increment error:", err);
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -838,32 +935,14 @@ router.post("/vision-classify", async (req, res) => {
       });
     }
 
-    // Resilient Fallback: If vision service is not running or unreachable, return structured fallback
+    // Resilient Fallback: If vision service is not running or unreachable, return offline indicator
     return res.json({
-      success: true,
-      source: "fallback_internal",
-      department: {
-        slug: "fruits-legumes",
-        pantryo_category: "Produce",
-        name_fr: "Fruits & Légumes",
-        name_en: "Produce",
-        confidence: 0.65,
-        alternatives: [
-          { slug: "garde-manger", name_fr: "Garde-manger", name_en: "Pantry Staples", confidence: 0.20 },
-          { slug: "produits-laitiers-oeufs", name_fr: "Produits laitiers & Œufs", name_en: "Dairy & Eggs", confidence: 0.10 }
-        ]
-      },
+      success: false,
+      source: "microservice_offline",
+      department: null,
       produce: null,
-      candidateItem: {
-        name: isFr ? "Article d'épicerie" : "Grocery item",
-        nameFr: "Article d'épicerie",
-        nameEn: "Grocery item",
-        category: "Produce",
-        confidence: 0.60,
-        brand: "Super C",
-        recommendedLocation: "Fridge",
-        alternatives: [],
-      },
+      candidateItem: null,
+      message: "Edge ONNX microservice is offline",
     });
   } catch (err) {
     console.error("[Vision Classify Route] Error:", err);

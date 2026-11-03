@@ -91,6 +91,46 @@ export const GLOBAL_PACKAGE_CATALOG: GlobalPackageItem[] = [
   // 🇨🇦 / 🇺🇸 NORTH AMERICA (Canada & US)
   // ==========================================
   {
+    id: 'na_chocolats_favoris_fondue_lait',
+    region: 'NORTH_AMERICA',
+    brand: 'Chocolats Favoris',
+    nameFr: 'Fondue au chocolat au lait Chocolats Favoris (215 g)',
+    nameEn: 'Chocolats Favoris Milk Chocolate Fondue (215 g)',
+    containerType: 'CAN',
+    standardNetQuantity: '215 g',
+    category: 'Garde-manger',
+    categoryEn: 'Pantry Staples',
+    defaultLocation: 'Pantry',
+    shelfLifeDays: 365,
+    monthsFrozenShelfLife: 6,
+    keywords: [
+      'chocolats', 'favoris', 'fondue', 'chocolat', 'lait', 'milk', 'chocolate',
+      'classique', 'original', '215g', '215', 'depuis', '1979', 'can'
+    ],
+    storageTipFr: 'Conserver au garde-manger. Chauffer 20 min dans l\'eau bouillante ou au micro-ondes sans couvercle. Réfrigérer après ouverture.',
+    storageTip: 'Store in pantry. Heat can for 20 mins in boiling water bath or microwave without metal lid. Refrigerate after opening.',
+  },
+  {
+    id: 'na_life_smart_beef_broth',
+    region: 'NORTH_AMERICA',
+    brand: 'Life Smart / Mieux-être',
+    nameFr: 'Bouillon de bœuf Life Smart / Mieux-être 60% moins de sodium (946 mL)',
+    nameEn: 'Life Smart Beef Broth 60% Less Sodium (946 mL)',
+    containerType: 'CARTON',
+    standardNetQuantity: '946 ml',
+    category: 'Garde-manger',
+    categoryEn: 'Pantry Staples',
+    defaultLocation: 'Pantry',
+    shelfLifeDays: 365,
+    monthsFrozenShelfLife: 6,
+    keywords: [
+      'life', 'smart', 'mieux-etre', 'mieux-être', 'beef', 'broth', 'bouillon', 'boeuf', 'bœuf',
+      'sodium', '60%', 'less', 'moins', '946ml', '946', 'selection', 'fat free', 'low calorie'
+    ],
+    storageTipFr: 'Garder au garde-manger. Bien revisser le bouchon et réfrigérer après ouverture (consommer en 7 à 10 jours).',
+    storageTip: 'Store in pantry. Tightly reseal screw cap and refrigerate after opening (use within 7-10 days).',
+  },
+  {
     id: 'na_habitant_pea_soup',
     region: 'NORTH_AMERICA',
     brand: 'Habitant',

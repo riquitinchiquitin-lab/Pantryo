@@ -1,64 +1,109 @@
-# Implementation Plan — High-Precision Gemini 3.8 Flash Recipe Book Vision
+# Implementation Plan: Gemini Vision Upgrade, Local DB Reconciliation & Canadian Packaging Fallback
 
-Upgrade recipe book photo transfers in Pantryo exclusively to **Gemini 3.8 Flash Multimodal Vision** via the modern `@google/genai` TypeScript SDK. Eliminates low-quality CPU Tesseract OCR garbling and delivers crystal-clear recipe digitization directly from photos taken on any phone, tablet, or desktop.
-
----
-
-## 1. Capacity & Quotas (Gemini 3.8 Flash Free Tier)
-
-* **Daily Scan Limit:** **1,500 recipe pages / day** (100% free, no credit card required).
-* **Speed:** **Up to 15 scans / minute** (processes in ~1.5–3 seconds per photo).
-* **Multi-Recipe Detection:** Automatically extracts all 2–3 recipes on a single cookbook page in one shot without using extra quota.
-* **Accuracy:** Natively recognizes vintage typography, typewriter fonts, fractions (½, ¼, ⅓, ¾), dual-column layouts, and handwritten margin notes.
+Address poor food recognition on photo imports by integrating Gemini Vision (`gemini-2.5-flash` / `gemini-3.8-flash`), **comparing and reconciling extracted data against the local SQLite database**, and providing an enhanced Canadian packaging fallback for offline resilience.
 
 ---
 
-## 2. Core Architecture & Enhancements
+## User Review Required
 
-### A. Backend: Gemini 3.8 Flash Vision Engine (`server/src/services/geminiRecipeParser.js`)
-- **Direct Multimodal Processing**: Uses `@google/genai` with `gemini-3.8-flash`.
-- **Preflight & Optimization**: Sanitizes and validates the incoming photo base64 payload to ensure optimal resolution without unnecessary bandwidth.
-- **Deep Culinary Structuring**:
-  - Automatically isolates Recipe Title, Prep Time, Cook Time, Total Time, and Yield/Servings.
-  - Normalizes ingredient quantities, units, and assigns kitchen storage zones (`FRIDGE`, `PANTRY`, `FREEZER`, `SPICE_RACK`).
-  - Formats instructions into clean, numbered steps in both English and French.
-  - Multi-recipe support: Returns all detected recipes in the `allRecipes` array for individual or batch saving.
-- **API Key Fallback & Telemetry**:
-  - Checks `process.env.GEMINI_API_KEY` and `dbStore.systemSettings.geminiApiKey`.
-  - In development and AI Studio environments, uses the platform-provided key automatically.
-  - If the key is missing or invalid, returns clear, actionable guidance on adding a free Gemini key rather than silently producing garbled text.
-
-### B. Admin & Settings: 1-Click Gemini API Key Setup (`AdminModal.tsx`)
-- Displays current Gemini Vision status: **🟢 Active (Gemini 3.8 Flash Vision)** or **⚪ Not Configured**.
-- Direct input to add or change the Gemini API key with a **"Test API Key"** button that verifies connectivity in real time.
-- Direct link to get a free key from Google AI Studio (`aistudio.google.com`).
-
-### C. Frontend: Streamlined Photo Recipe Transfer (`AddRecipeModal.tsx`)
-- Single, intuitive flow: **Take Photo** (camera) or **Upload Image** (gallery/file).
-- Live preview of the uploaded cookbook page.
-- Clean loading state: *"Gemini AI is reading cookbook page, extracting ingredients & formatting instructions..."*
-- Instant recipe preview with editing capabilities before saving into the pantry library.
+> [!IMPORTANT]
+> **Key Enhancements in this Revision**:
+> 1. **Post-Extraction Local DB Comparison & Reconciliation**:
+>    - Once Gemini Vision extracts product metadata (Brand, Name, Quantity/Unit, Category, Barcode/UPC), it will immediately query the local SQLite database.
+>    - **Inventory Matching**: Checks if the user already has this item in stock. If found, the scanner displays *"Already in Pantry (X units in stock)"* with a 1-click **"Add +1 to Existing"** or **"Add New Batch"** option.
+>    - **Catalog & Canonical Data Reconciliation**: Cross-references local product references (Canadian grocery catalog, calibrated shelf lives, storage location defaults) to eliminate slight naming variations and guarantee accurate pantry tracking.
+> 2. **Vision Engine & Model Resilience**:
+>    - Connects Gemini Vision via configured Admin API Key with automatic retry on temporary 503 high-demand errors.
+> 3. **Bilingual Canadian Packaging Fallback**:
+>    - If the API key is not configured or network is unavailable, the local packaging analyzer recognizes Metro (`Selection`), Loblaws (`No Name`, `PC`), Sobeys (`Compliments`), and Pharmaprix (`Life Smart`) without OCR noise (`aad`).
 
 ---
 
-## 3. Implementation Steps
+## 1. Monitored Photo Benchmark & Extraction
 
-1. **Backend (`server/src/services/geminiRecipeParser.js`)**:
-   - Verify `@google/genai` initialization with model `gemini-3.8-flash`.
-   - Enhance the prompt schema for high-precision fraction handling and bilingual preservation.
-   - Return structured recipe objects with clean error diagnostics.
-2. **Frontend (`src/components/AddRecipeModal.tsx`)**:
-   - Streamline the Photo Tab to focus 100% on Gemini Vision photo transfer.
-   - Add status pill indicating **Gemini 3.8 Flash Vision Ready (1,500 free scans/day)**.
-   - Show clear multi-recipe selection if more than one recipe is detected on the page.
-3. **Admin Settings (`src/components/AdminModal.tsx` / `server/src/routes/admin.js`)**:
-   - Provide an in-app verification tool for testing the Gemini key.
-4. **Verification**:
-   - Test recipe photo transfer with cookbook images.
-   - Verify type safety (`tsc --noEmit`) and dev server responsiveness.
+Comparison based on the two real photos recently imported in `/server/data/monitored_photos/`:
+
+| Photo / Item | Current OCR Output | Gemini Vision Extraction | Local DB Reconciled Match |
+| :--- | :--- | :--- | :--- |
+| **Photo 1: Can of Tomato Sauce**<br>`scan_1793717469131_g4ubp` | **"a Selection aad, SAUCE"**<br>*(34% conf, noisy gibberish)* | **"Sauce tomate Sélection / Selection Tomato Sauce"**<br>*Brand:* `Sélection`<br>*Size:* `398 mL`<br>*Category:* `Garde-manger / Conserves` | **Exact/Fuzzy Match in Local DB**<br>- Matches canonical `Sauce tomate (Sélection)`<br>- Standard storage: `Pantry`<br>- Default shelf life: `730 days`<br>- Action: If in inventory, shows *"+1 to current stock (2 available)"* |
+| **Photo 2: Beef Broth Carton**<br>`scan_1793717493011_sg4xz` | **FAILED**<br>*(No food label detected)* | **"Bouillon de bœuf Life Smart / Mieux-être"**<br>*Brand:* `Life Smart`<br>*Size:* `946 mL`<br>*Category:* `Soupes & Bouillons` | **Catalog Enriched in Local DB**<br>- Matches `Bouillon de bœuf (Life Smart)`<br>- Storage: `Pantry` (refrigerate after opening)<br>- Default shelf life: `365 days` |
 
 ---
 
-## 4. User Review & Approval
+## 2. Technical Architecture & Implementation Steps
 
-Please review the plan above. Click **Proceed** to implement the Gemini 3.8 Flash Vision recipe book parser.
+### Step 1: Gemini Vision AI Extraction Pipeline
+- **File**: `server/src/services/geminiService.js` & `server/src/services/visionScanner.js`
+- Read active Gemini API key from SQLite `system_settings` or `process.env.GEMINI_API_KEY`.
+- Use `gemini-2.5-flash` with structured JSON output:
+  ```json
+  {
+    "brand": "Sélection",
+    "productName": "Sauce tomate",
+    "fullName": "Sauce tomate Sélection / Selection Tomato Sauce",
+    "quantity": 398,
+    "unit": "mL",
+    "category": "Canned Goods",
+    "suggestedStorage": "pantry",
+    "shelfLifeDays": 730,
+    "barcode": null
+  }
+  ```
+- Implement retry logic with exponential backoff for HTTP 503 / 429 errors.
+
+### Step 2: Local Database Comparison & Reconciliation Engine
+- **File**: `server/src/services/inventoryReconciler.js` (New Service)
+- When Gemini Vision (or the fallback) produces an extracted item:
+  1. **Query Current Inventory (`inventory` table)**:
+     - Search by exact/fuzzy title match, brand match, or barcode (UPC).
+     - If matched: return `existingItem: { id, name, quantity, unit, location, expiryDate, daysRemaining }`.
+     - Flag `matchType: "existing_inventory" | "new_item"`.
+  2. **Query Canonical Food Catalog (`food_catalog` / standard presets)**:
+     - Calibrate expiry dates based on historical user data or Canadian pantry shelf-life tables.
+     - Harmonize French/English naming to the user's preferred language.
+     - Normalize storage location (`pantry`, `fridge`, `freezer`).
+  3. **Return Combined Payload** in `/api/v1/inventory/scan`:
+     ```json
+     {
+       "success": true,
+       "extracted": { ... },
+       "reconciliation": {
+         "isAlreadyInInventory": true,
+         "existingItemId": 14,
+         "currentStock": 2,
+         "suggestedAction": "increment_quantity",
+         "canonicalName": "Sauce tomate Sélection",
+         "matchedBrand": "Sélection"
+       }
+     }
+     ```
+
+### Step 3: Enhanced Canadian Packaging Fallback
+- **File**: `server/src/services/packagingAnalyzer.js`
+- Filter OCR noise tokens (e.g. `aad`, lone characters, misread punctuation).
+- Add Canadian private label lexicon: Metro/Super C (`Selection`, `Irrésistibles`), Loblaw/Maxi (`No Name`, `Sans Nom`, `President's Choice`), Sobeys (`Compliments`), Pharmaprix (`Life Smart`).
+- Fuzzy match curved and low-contrast labels against 250+ standard grocery terms.
+
+### Step 4: Scanner UI Enhancements
+- **Files**: `src/components/CameraInventoryScannerModal.tsx`, `src/components/ProduceScannerModal.tsx`
+- **Reconciliation Banner**:
+  - If item exists in inventory:
+    - Display alert: *"🥫 You already have 2 cans of this in your Pantry (exp. Dec 2026)"*
+    - Two clear action buttons: **[+1 Add to Existing]** (increments count instantly) vs **[Add as Separate Batch]** (new expiry date).
+  - If new item:
+    - Pre-filled form with Gemini's high-confidence brand, size (`398 mL`), and shelf-life preset ready for 1-tap confirmation.
+- **Engine Status Pill**:
+  - 🟢 *Gemini Vision Active + Local DB Match*
+  - 🟡 *Canadian Packaging Matcher (Offline)*
+
+---
+
+## 3. Verification & Testing Plan
+
+1. **Monitored Photos Test**:
+   - Run verification test feeding `scan_1793717469131_g4ubp` and `scan_1793717493011_sg4xz` into the reconciliation pipeline.
+   - Verify that tomato sauce matches existing pantry stock or correctly proposes catalog addition without `aad` noise.
+2. **Build and Type Validation**:
+   - Run `compile_applet` and `lint_applet` to verify TypeScript and server stability.
+3. **End-to-End User Flow**:
+   - Verify that scanning a known item triggers the "+1 to existing stock" prompt.

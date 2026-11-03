@@ -4,6 +4,7 @@ import { parseQuebecReceiptText } from "./quebecReceiptParser.js";
 import { getBilingualNames, translateFoodItem } from "./foodTranslator.js";
 import { analyzePackagingText, analyzeMultiItemPackagingText, extractPackagingBadges } from "./packagingAnalyzer.js";
 import { dbStore } from "./dbStore.js";
+import { reconcileItemsWithLocalDb } from "./inventoryReconciler.js";
 
 /**
  * Pantryo - Gemini Flash Vision Service
@@ -12,31 +13,35 @@ import { dbStore } from "./dbStore.js";
  * and return structured inventory data.
  */
 
-// Lazy-initialized Gemini client
+// Lazy-initialized Gemini client with dynamic key tracking
 let aiClient = null;
+let activeClientApiKey = null;
 
 function getGeminiClient() {
-  if (!aiClient) {
-    const apiKey = (process.env.GEMINI_API_KEY || dbStore?.systemSettings?.geminiApiKey || "").trim();
-    if (!apiKey || apiKey === "MY_GEMINI_API_KEY" || apiKey.startsWith("your_")) {
-      throw new Error(
-        "GEMINI_API_KEY is missing or unconfigured. Please configure it in your environment or Admin Settings."
-      );
-    }
+  const currentKey = (process.env.GEMINI_API_KEY || dbStore?.systemSettings?.geminiApiKey || "").trim();
+  if (!currentKey || currentKey === "MY_GEMINI_API_KEY" || currentKey.startsWith("your_")) {
+    throw new Error(
+      "GEMINI_API_KEY is missing or unconfigured. Please configure it in your environment or Admin Settings."
+    );
+  }
+
+  if (!aiClient || activeClientApiKey !== currentKey) {
     aiClient = new GoogleGenAI({
-      apiKey,
+      apiKey: currentKey,
       httpOptions: {
         headers: {
           "User-Agent": "aistudio-build",
         },
       },
     });
+    activeClientApiKey = currentKey;
   }
   return aiClient;
 }
 
 export function resetGeminiClient() {
   aiClient = null;
+  activeClientApiKey = null;
 }
 
 /**
@@ -168,8 +173,8 @@ Translate item names and categories to ${language === "FR" ? "French" : "English
   try {
     console.log(`[Pantryo Vision] Starting image analysis. Base64 length: ${cleanBase64.length} chars, mimeType: ${mimeType}`);
     
-    // Modern Gemini Flash model candidates (gemini-3.8-flash, gemini-3.6-flash, gemini-flash-latest)
-    const modelCandidates = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-flash-latest"];
+    // Official Gemini Flash models per gemini-api guidelines with automatic fallback
+    const modelCandidates = ["gemini-3.8-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"];
     let response = null;
     let lastError = null;
 
@@ -355,7 +360,17 @@ Translate item names and categories to ${language === "FR" ? "French" : "English
         }
       } catch (modelErr) {
         lastError = modelErr;
-        console.warn(`[Pantryo Vision] Model ${modelName} with structured schema failed: ${modelErr.message || modelErr}. Trying unstructured prompt fallback...`);
+        const errMsg = String(modelErr?.message || modelErr || "");
+        const isQuota429 = errMsg.includes("429") || errMsg.includes("RESOURCE_EXHAUSTED") || errMsg.includes("Quota exceeded");
+        const isNotFound404 = errMsg.includes("404") || errMsg.includes("NOT_FOUND") || errMsg.includes("not found");
+        const isUnavailable503 = errMsg.includes("503") || errMsg.includes("UNAVAILABLE") || errMsg.includes("high demand");
+
+        if (isQuota429 || isNotFound404 || isUnavailable503) {
+          console.warn(`[Pantryo Vision] Model ${modelName} encountered ${isQuota429 ? "quota limit (429)" : (isNotFound404 ? "not found (404)" : "high demand (503)")}. Moving directly to next model candidate...`);
+          continue;
+        }
+
+        console.warn(`[Pantryo Vision] Model ${modelName} with structured schema failed: ${errMsg}. Trying unstructured prompt fallback...`);
         
         try {
           response = await ai.models.generateContent({
@@ -476,11 +491,17 @@ Translate item names and categories to ${language === "FR" ? "French" : "English
       };
     });
 
+    // Compare and reconcile extracted data with local SQLite inventory & Canadian database
+    const reconciledItems = reconcileItemsWithLocalDb(normalizedItems, language);
+    const hasExistingMatch = reconciledItems.some((i) => i.reconciliation?.isAlreadyInInventory);
+
     return {
       success: true,
-      summary: parsedData.summary || `Identified ${normalizedItems.length} item(s).`,
-      itemsCount: normalizedItems.length,
-      items: normalizedItems,
+      summary: parsedData.summary || `Identified ${reconciledItems.length} item(s).`,
+      itemsCount: reconciledItems.length,
+      items: reconciledItems,
+      detectionMethod: "gemini_vision",
+      hasReconciliationMatches: hasExistingMatch,
       scannedAt: now.toISOString(),
     };
   } catch (error) {
@@ -505,13 +526,19 @@ Translate item names and categories to ${language === "FR" ? "French" : "English
             };
           });
 
+          // Reconcile fallback items with local database
+          const reconciledFallback = reconcileItemsWithLocalDb(itemsWithDates, language);
+          const hasExistingMatch = reconciledFallback.some((i) => i.reconciliation?.isAlreadyInInventory);
+
           return {
             success: true,
             summary: isFr
-              ? `Reconnaissance locale réussie (${itemsWithDates.length} article(s) détecté(s)).`
-              : `Local vision recognition completed (${itemsWithDates.length} item(s) detected).`,
-            itemsCount: itemsWithDates.length,
-            items: itemsWithDates,
+              ? `Reconnaissance locale canadienne (${reconciledFallback.length} article(s) détecté(s)).`
+              : `Local Canadian packaging match (${reconciledFallback.length} item(s) detected).`,
+            itemsCount: reconciledFallback.length,
+            items: reconciledFallback,
+            detectionMethod: "canadian_packaging_fallback",
+            hasReconciliationMatches: hasExistingMatch,
             demoMode: true,
             scannedAt: now.toISOString(),
           };
@@ -521,7 +548,21 @@ Translate item names and categories to ${language === "FR" ? "French" : "English
       console.warn("[Pantryo Vision] Local fallback OCR also failed:", fallbackErr.message);
     }
 
-    throw new Error(`Failed to parse food image with Gemini Vision: ${error.message}`);
+    const isFr = (language || "EN").toUpperCase() === "FR";
+    const isRateLimited = error?.message && (error.message.includes("429") || error.message.includes("RESOURCE_EXHAUSTED") || error.message.includes("Quota exceeded"));
+
+    return {
+      success: false,
+      summary: isRateLimited
+        ? (isFr ? "Limite de requêtes atteinte sur Gemini (Free Tier: 5 requêtes/min). Veuillez patienter 15 secondes." : "Gemini API rate limit reached (Free Tier: 5 req/min). Please wait 15 seconds.")
+        : (isFr ? "Aucun aliment reconnu dans cette photo. Assurez-vous que le produit est bien cadré et lisible." : "No food item recognized in this photo. Please make sure the product is centered and clearly readable."),
+      itemsCount: 0,
+      items: [],
+      detectionMethod: isRateLimited ? "rate_limited" : "none_detected",
+      rateLimited: isRateLimited,
+      error: error?.message || null,
+      scannedAt: new Date().toISOString(),
+    };
   }
 }
 
@@ -616,7 +657,7 @@ Output ALL deals in the 'items' array with bilingual names (nameFr and nameEn).`
     required: ["summary", "items"],
   };
 
-  const modelCandidates = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-flash-latest"];
+  const modelCandidates = ["gemini-3.8-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"];
   let response = null;
   let lastError = null;
 
@@ -1100,7 +1141,7 @@ ${cleanedText}`;
     required: ["summary", "items"],
   };
 
-  const modelCandidates = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-flash-latest"];
+  const modelCandidates = ["gemini-3.8-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"];
   let response = null;
   let lastError = null;
 
@@ -1451,7 +1492,7 @@ INSTRUCTIONS:
     required: ["summary", "items"],
   };
 
-  const modelCandidates = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-flash-latest"];
+  const modelCandidates = ["gemini-3.8-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"];
   let response = null;
   let lastError = null;
 
@@ -1664,27 +1705,62 @@ Return the confirmed or corrected item in ${isFr ? 'French' : 'English'}.`;
     required: ["isValidMatch", "name", "category", "recommendedLocation", "estimatedShelfLifeDays", "confidence"],
   };
 
-  const response = await ai.models.generateContent({
-    model: "gemini-3.8-flash",
-    contents: {
-      parts: [
-        {
-          inlineData: {
-            mimeType: mimeType || "image/jpeg",
-            data: cleanBase64,
-          },
+  const candidateModels = ["gemini-3.8-flash", "gemini-3.1-flash-lite"];
+  let response = null;
+  let usedModel = "gemini-3.8-flash";
+  let lastErr = null;
+
+  for (const modelName of candidateModels) {
+    try {
+      usedModel = modelName;
+      response = await ai.models.generateContent({
+        model: modelName,
+        contents: {
+          parts: [
+            {
+              inlineData: {
+                mimeType: mimeType || "image/jpeg",
+                data: cleanBase64,
+              },
+            },
+            {
+              text: promptText,
+            },
+          ],
         },
-        {
-          text: promptText,
+        config: {
+          temperature: 0.1,
+          responseMimeType: "application/json",
+          responseSchema: validationSchema,
         },
-      ],
-    },
-    config: {
-      temperature: 0.1,
-      responseMimeType: "application/json",
-      responseSchema: validationSchema,
-    },
-  });
+      });
+
+      if (response && response.text) {
+        break;
+      }
+    } catch (err) {
+      lastErr = err;
+      const errMsg = String(err?.message || err || "");
+      const is429 = errMsg.includes("429") || errMsg.includes("RESOURCE_EXHAUSTED");
+      console.warn(`[Pantryo Validate] Model ${modelName} error (${is429 ? '429 Rate Limit' : errMsg}). Advancing to next candidate...`);
+    }
+  }
+
+  if (!response || !response.text) {
+    const is429 = lastErr?.message && (lastErr.message.includes("429") || lastErr.message.includes("RESOURCE_EXHAUSTED"));
+    return {
+      success: false,
+      rateLimited: is429,
+      model: usedModel,
+      verified: false,
+      item: currentCandidate || null,
+      message: is429
+        ? (isFr ? "Limite de quota Gemini atteinte (5 requêtes/min). Candidat local préservé." : "Gemini quota limit reached (5 req/min). Local candidate preserved.")
+        : (isFr ? "Validation IA non disponible." : "AI validation temporarily unavailable."),
+      tokenUsage: { promptTokens: 0, candidateTokens: 0, totalTokens: 0, imageTokens: 0 },
+      scannedAt: new Date().toISOString(),
+    };
+  }
 
   let sanitizedJson = (response.text || "").trim();
   if (sanitizedJson.startsWith("```json")) {
@@ -1703,7 +1779,7 @@ Return the confirmed or corrected item in ${isFr ? 'French' : 'English'}.`;
 
   return {
     success: true,
-    model: "gemini-3.8-flash",
+    model: usedModel,
     verified: true,
     item: {
       ...parsed,

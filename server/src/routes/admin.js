@@ -13,6 +13,7 @@ import {
   getAuthenticatedUserFromRequest,
   issueSessionToken,
 } from "../services/sessionTokenService.js";
+import { getMonitoredScans, getPhotoFilePath } from "../services/photoMonitor.js";
 
 const router = express.Router();
 
@@ -1667,6 +1668,37 @@ router.post("/logout", (req, res) => {
     success: true,
     message: "Logged out successfully",
   });
+});
+
+/**
+ * GET /api/v1/admin/monitored-photos
+ * Lists recently monitored product scans with inspection metadata
+ */
+router.get("/monitored-photos", requireAdmin, (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
+  const scans = getMonitoredScans(limit);
+  res.json({
+    success: true,
+    count: scans.length,
+    scans,
+  });
+});
+
+/**
+ * GET /api/v1/admin/monitored-photos/:filename
+ * Streams the saved photo file for inspection
+ */
+router.get("/monitored-photos/:filename", requireAdmin, (req, res) => {
+  const { filename } = req.params;
+  const filePath = getPhotoFilePath(filename);
+  if (!filePath) {
+    return res.status(404).json({ error: "Photo not found or pruned." });
+  }
+  const ext = path.extname(filePath).toLowerCase();
+  const mime = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
+  res.setHeader("Content-Type", mime);
+  res.setHeader("Cache-Control", "private, max-age=3600");
+  res.sendFile(filePath);
 });
 
 export default router;

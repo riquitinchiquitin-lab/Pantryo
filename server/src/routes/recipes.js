@@ -12,11 +12,38 @@ import {
 import { dbStore } from "../services/dbStore.js";
 import { estimateRecipeNutrition } from "../services/nutritionEngine.js";
 import { requireAuth } from "../services/sessionTokenService.js";
+import { recordMonitoredPhoto } from "../services/photoMonitor.js";
 
 const router = express.Router();
 
 // Strict Session Authentication Guard: All recipe and meal planning routes require a valid session token
 router.use(requireAuth);
+
+// Photo monitor interceptor for recipe photo parsing
+router.use(["/ai-parse", "/parse-photo", "/parse-recipe-card", "/parse"], (req, res, next) => {
+  if (req.method !== "POST" || !req.body?.imageBase64) {
+    return next();
+  }
+  const startTime = Date.now();
+  const originalJson = res.json.bind(res);
+  res.json = (body) => {
+    try {
+      recordMonitoredPhoto({
+        route: req.originalUrl || `/api/v1/recipes${req.path}`,
+        imageBase64: req.body.imageBase64,
+        mimeType: req.body.mimeType || "image/jpeg",
+        language: req.body.language || "EN",
+        result: res.statusCode < 400 ? body : null,
+        error: res.statusCode >= 400 ? (body?.error || "Recipe parse error") : null,
+        durationMs: Date.now() - startTime,
+      });
+    } catch (e) {
+      console.warn("[Recipes Route] Photo monitor middleware warning:", e.message);
+    }
+    return originalJson(body);
+  };
+  next();
+});
 
 /**
  * POST /api/v1/recipes/estimate-nutrition

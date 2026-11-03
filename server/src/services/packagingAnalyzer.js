@@ -27,7 +27,26 @@ export const KNOWN_BRANDS = [
   { pattern: /(?:jardin\s*de\s*nos\s*mara[iî]chers|our\s*harvest\s*best)/i, brand: "Our Harvest Best / Jardin de nos maraîchers" },
   { pattern: /(?:personnelle\b)/i, brand: "Personnelle" },
 
+  // Loblaw / Provigo / Maxi / No Frills / Superstore Private Brands
+  { pattern: /(?:sans\s*nom|no\s*name|jaune\s*sans\s*nom)/i, brand: "Sans Nom / No Name" },
+  { pattern: /(?:le\s*choix\s*du\s*pr[eé]sident|president'?s\s*choice|\bpc\s*organics|\bpc\b)/i, brand: "Le Choix du Président / PC" },
+  { pattern: /(?:farmer'?s\s*market)/i, brand: "Farmer's Market" },
+
+  // Sobeys / IGA / FreshCo Private Brands
+  { pattern: /(?:compliments\b)/i, brand: "Compliments" },
+  { pattern: /(?:panache\b)/i, brand: "Panache" },
+  { pattern: /(?:signal\b)/i, brand: "Signal" },
+
+  // Walmart Canada Private Brands
+  { pattern: /(?:great\s*value\b)/i, brand: "Great Value" },
+  { pattern: /(?:notre\s*excellence|our\s*finest)/i, brand: "Notre Excellence / Our Finest" },
+  { pattern: /(?:your\s*fresh\s*market)/i, brand: "Your Fresh Market" },
+
+  // Costco Wholesale
+  { pattern: /(?:kirkland\s*signature|kirkland\b)/i, brand: "Kirkland Signature" },
+
   // Quebec & Canadian National Supermarket Brands
+  { pattern: /(?:chocolats?\s*favoris|chocolat\s*favoris)/i, brand: "Chocolats Favoris" },
   { pattern: /(?:st[- ]?hubert|saint[- ]?hubert)/i, brand: "St-Hubert" },
   { pattern: /(?:clark\b)/i, brand: "Clark" },
   { pattern: /(?:la\s*cage\b)/i, brand: "La Cage" },
@@ -1926,6 +1945,146 @@ export const QUEBEC_GROCERY_CATALOG = [
     freezerTipEn: "Do not freeze in metal can.",
   },
   {
+    keywords: [
+      "sauce tomate", "tomato sauce", "selection sauce", "selection tomato sauce",
+      "sauce tomate selection", "sauce aux tomates", "sauce a spaghetti", "puree de tomates",
+      "tomato paste", "pate de tomate", "sauce tomate 398", "398 ml", "selection aad sauce",
+      "selection sauce tomate"
+    ],
+    nameFr: "Sauce tomate Sélection (398 mL)",
+    nameEn: "Selection Tomato Sauce (398 mL)",
+    brand: "Sélection",
+    gradeOrigin: "PRODUIT DU CANADA • QUALITÉ SUPÉRIEURE",
+    packagingFormatFr: "Boîte de conserve métallique 398 mL",
+    packagingFormatEn: "Metal can 398 mL",
+    dietaryBadges: ["Circulaire Super C", "Sélection", "Sans agents de conservation artificiels"],
+    price: "$0.99 - $1.29 (398 mL)",
+    netContent: "398 mL",
+    quantity: 398,
+    unit: "mL",
+    categoryFr: "Garde-manger / Conserves",
+    categoryEn: "Canned Goods",
+    recommendedLocation: "Pantry",
+    unopenedLocationFr: "Garde-manger (Endroit sec et frais)",
+    openedLocationFr: "Réfrigérateur (Transférer hors de la conserve métallique)",
+    unopenedLocationEn: "Pantry (Dry and cool shelf)",
+    openedLocationEn: "Fridge (Transfer out of tin can into sealed container)",
+    unopenedShelfLifeDays: 730,
+    openedShelfLifeDays: 5,
+    estimatedShelfLifeDays: 730,
+    monthsFrozenShelfLife: 3,
+    storageReasonFr: "Conserve hermétique métallique de longue durée (2 ans). Ne jamais conserver dans la boîte métallique ouverte au frigo (risque d'oxydation de l'étain).",
+    storageReasonEn: "Hermetically sealed tin can stores for 2+ years. Never store in open tin in fridge.",
+    storageTipFr: "Après ouverture, transvaser immédiatement dans un contenant en verre ou plastique hermétique et consommer sous 5 jours.",
+    storageTipEn: "Transfer leftovers immediately into a sealed glass or plastic container; refrigerate up to 5 days.",
+    freezerTipFr: "Peut se congeler dans un bocal en laissant 2 cm d'espace d'expansion.",
+    freezerTipEn: "Freeze in airtight container leaving 1 inch headspace for liquid expansion.",
+  },
+  {
+    keywords: [
+      "bouillon de boeuf", "beef broth", "bouillon de bœuf", "life smart", "life smart bouillon",
+      "mieux-etre", "mieux-être", "bouillon mieux-etre", "bouillon de boeuf life smart",
+      "bouillon boeuf 946", "946 ml", "carton bouillon", "60% moins de sodium", "less sodium beef broth"
+    ],
+    nameFr: "Bouillon de bœuf Life Smart / Mieux-être (946 mL)",
+    nameEn: "Life Smart Beef Broth 60% Less Sodium (946 mL)",
+    brand: "Life Smart / Mieux-être",
+    gradeOrigin: "PRODUIT DU CANADA • 60% MOINS DE SODIUM",
+    packagingFormatFr: "Brique Tetra Pak en carton recyclable avec bouchon dévissable 946 mL",
+    packagingFormatEn: "Tetra Pak aseptic carton with screw-cap 946 mL",
+    dietaryBadges: ["60% Moins de sodium", "Sans arômes artificiels", "Prêt à servir"],
+    price: "$1.99 - $2.49 (946 mL)",
+    netContent: "946 mL",
+    quantity: 946,
+    unit: "mL",
+    categoryFr: "Garde-manger",
+    categoryEn: "Pantry Staples",
+    recommendedLocation: "Pantry",
+    unopenedLocationFr: "Garde-manger (Température ambiante)",
+    openedLocationFr: "Réfrigérateur (Bien revisser le bouchon hermétique)",
+    unopenedLocationEn: "Pantry (Room temperature)",
+    openedLocationEn: "Fridge (Tightly resealed screw-cap)",
+    unopenedShelfLifeDays: 365,
+    openedShelfLifeDays: 7,
+    estimatedShelfLifeDays: 365,
+    monthsFrozenShelfLife: 6,
+    storageReasonFr: "Conditionné en brique aseptique Tetra Pak de longue conservation. Conserver au réfrigérateur après ouverture.",
+    storageReasonEn: "Aseptic Tetra Pak packaging keeps broth fresh at room temp until opened. Refrigerate promptly once opened.",
+    storageTipFr: "Garder au garde-manger. Une fois ouvert, bien revisser le bouchon, réfrigérer et consommer dans les 7 à 10 jours.",
+    storageTipEn: "Store in pantry. After breaking seal, refrigerate with cap tight and use within 7-10 days.",
+    freezerTipFr: "Congeler les surplus dans un bac à glaçons pour doser facilement dans les sauces et mijotés.",
+    freezerTipEn: "Freeze remaining broth in silicone ice cube trays for easy one-cube flavor boosts.",
+  },
+  {
+    keywords: [
+      "chocolats favoris", "chocolat favoris", "fondue au chocolat", "milk chocolate fondue",
+      "fondue au chocolat au lait", "classique lait", "original milk", "fondue favoris",
+      "fondue", "chocolat", "215 g", "215g"
+    ],
+    nameFr: "Fondue au chocolat au lait Chocolats Favoris (215 g)",
+    nameEn: "Chocolats Favoris Milk Chocolate Fondue (215 g)",
+    brand: "Chocolats Favoris",
+    gradeOrigin: "ALIMENTS PRÉPARÉS AU QUÉBEC • CACAO DURABLE",
+    packagingFormatFr: "Boîte de conserve métallique 215 g avec couvercle facile à ouvrir",
+    packagingFormatEn: "Metal pull-tab tin can 215 g",
+    dietaryBadges: ["Aliments préparés au Québec", "Cacao équitable", "Prêt en 20 min"],
+    price: "$6.99 - $7.99 (215 g)",
+    netContent: "215 g",
+    quantity: 215,
+    unit: "g",
+    categoryFr: "Garde-manger",
+    categoryEn: "Pantry Staples",
+    recommendedLocation: "Pantry",
+    unopenedLocationFr: "Garde-manger (Température ambiante)",
+    openedLocationFr: "Réfrigérateur (Conserver dans son contenant fermé)",
+    unopenedLocationEn: "Pantry (Room temperature)",
+    openedLocationEn: "Fridge (Resealed container)",
+    unopenedShelfLifeDays: 365,
+    openedShelfLifeDays: 30,
+    estimatedShelfLifeDays: 365,
+    monthsFrozenShelfLife: 6,
+    storageReasonFr: "Conserve scellée très stable au garde-manger. Après réchauffage et ouverture, conserver au frigo.",
+    storageReasonEn: "Sealed shelf-stable can for pantry. Once warmed and opened, refrigerate.",
+    storageTipFr: "Faire chauffer la boîte au bain-marie dans l'eau bouillante pendant 20 minutes (ou au micro-ondes sans couvercle). Tremper fruits frais, guimauves et biscuits.",
+    storageTipEn: "Heat can in boiling water bath for 20 minutes or microwave (without metal lid). Dip fresh fruit, marshmallows, and pretzels.",
+    freezerTipFr: "La congélation n'est pas recommandée pour le chocolat en boîte.",
+    freezerTipEn: "Freezing not recommended for canned chocolate fondue.",
+  },
+  {
+    keywords: [
+      "bouillon de poulet", "chicken broth", "chicken stock", "bouillon poulet",
+      "bouillon de legumes", "vegetable broth"
+    ],
+    nameFr: "Bouillon de poulet ou légumes assaisonné (946 mL)",
+    nameEn: "Chicken or Vegetable Broth (946 mL)",
+    brand: "Sélection / Campbell's / Compliments",
+    gradeOrigin: "PRODUIT DU CANADA",
+    packagingFormatFr: "Brique Tetra Pak 946 mL avec bouchon refermable",
+    packagingFormatEn: "Tetra Pak carton 946 mL with screw cap",
+    dietaryBadges: ["Bouillon assaisonné", "Prêt à l'emploi"],
+    price: "$1.99 (946 mL)",
+    netContent: "946 mL",
+    quantity: 946,
+    unit: "mL",
+    categoryFr: "Garde-manger",
+    categoryEn: "Pantry Staples",
+    recommendedLocation: "Pantry",
+    unopenedLocationFr: "Garde-manger",
+    openedLocationFr: "Réfrigérateur (Bien refermé)",
+    unopenedLocationEn: "Pantry",
+    openedLocationEn: "Fridge (Resealed cap)",
+    unopenedShelfLifeDays: 365,
+    openedShelfLifeDays: 7,
+    estimatedShelfLifeDays: 365,
+    monthsFrozenShelfLife: 6,
+    storageReasonFr: "Stable au garde-manger non ouvert. Réfrigérer dès l'ouverture.",
+    storageReasonEn: "Shelf-stable unopened. Refrigerate immediately after opening.",
+    storageTipFr: "Garder au frais après ouverture et utiliser dans les 7 à 10 jours.",
+    storageTipEn: "Refrigerate after opening and use within 7 to 10 days.",
+    freezerTipFr: "Congeler dans des bacs à glaçons.",
+    freezerTipEn: "Freeze in ice cube trays for easy measuring.",
+  },
+  {
     keywords: ["soupe st-hubert", "st-hubert", "bouillon selection", "st hubert", "soupe poulet et nouilles"],
     nameFr: "Soupe en conserve St-Hubert ou bouillon Sélection",
     nameEn: "St-Hubert Canned Soup or Selection Broth",
@@ -2500,6 +2659,29 @@ export function findCatalogMatch(text) {
   if (!text) return null;
   const lower = text.toLowerCase();
 
+  // 1. High-precision specialized match: Chocolats Favoris Chocolate Fondue
+  const isFondueChocolate =
+    /(?:fondue\s*au\s*chocolat|chocolats?\s*favoris|fondue\s*chocolat|milk\s*chocolate\s*fondue|classique\s*lait)/i.test(lower) ||
+    (/(?:fondue|chocolat)/i.test(lower) && /(?:favoris|1979|classique|lait|milk|215)/i.test(lower));
+  if (isFondueChocolate) {
+    const fondueItem = QUEBEC_GROCERY_CATALOG.find((it) => it.brand === "Chocolats Favoris");
+    if (fondueItem) return fondueItem;
+  }
+
+  // 2. High-precision specialized match: Beef Broth (Life Smart / Mieux-être / Selection)
+  const hasBeefSignal = /(?:beef|b\s*e\s*e|boeuf|bœuf)/i.test(lower);
+  const hasBrothSignal = /(?:broth|bouillon)/i.test(lower);
+  const hasSodiumOrLifeSmart = /(?:life\s*smart|mieux[- ]?[eê]tre|60%|sodium|946)/i.test(lower);
+
+  if (
+    (hasBeefSignal && hasBrothSignal) ||
+    (hasBrothSignal && hasSodiumOrLifeSmart) ||
+    (hasBeefSignal && /(?:60%|sodium|946\s*m)/i.test(lower))
+  ) {
+    const brothItem = QUEBEC_GROCERY_CATALOG.find((it) => it.brand.includes("Life Smart") && it.keywords.includes("beef broth"));
+    if (brothItem) return brothItem;
+  }
+
   const isYogurtQuery = /(?:yogourt|yogurt|yaourt|oikos|iogo|iögo|astro|activia|liberte|liberté|kefir|skyr|chobani)/i.test(lower);
 
   let bestMatch = null;
@@ -2612,7 +2794,24 @@ export function analyzePackagingText(rawText, preferredLanguage = "FR") {
 
   // 2. Generic heuristics if not in catalog
   const firstLine = text.split(/\r?\n/)[0]?.trim() || "";
-  const cleanTitle = firstLine.replace(/[^a-zA-Z0-9\sÀ-ÿñÑ'-]/g, "").trim().slice(0, 45);
+  let cleanTitle = firstLine.replace(/[^a-zA-Z0-9\sÀ-ÿñÑ'-]/g, "").trim().slice(0, 45);
+
+  // Strip obvious OCR gibberish fragments like "aad", lone letters, and noise tokens
+  cleanTitle = cleanTitle
+    .replace(/\b(?:aad|f1|1!|oe|ee|ae|aE|ot|oa|aad,)\b/gi, "")
+    .replace(/^\s*[a-zA-Z]\s+/i, "") // strip leading lone single letter (e.g. "a Selection" -> "Selection")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  // If brand is detected and common pantry items (sauce, broth) are present, formulate pristine title
+  if (badges.brand && /(?:sauce|tomate|tomato)/i.test(lower)) {
+    cleanTitle = lang === "FR" ? `${badges.brand} Sauce tomate` : `${badges.brand} Tomato Sauce`;
+  } else if (badges.brand && /(?:bouillon|broth)/i.test(lower)) {
+    const isBeef = /(?:boeuf|bœuf|beef)/i.test(lower);
+    cleanTitle = lang === "FR"
+      ? `${badges.brand} Bouillon de ${isBeef ? "bœuf" : "poulet"}`
+      : `${badges.brand} ${isBeef ? "Beef" : "Chicken"} Broth`;
+  }
 
   // Check for fresh produce keywords in the whole text (e.g. mango, mangue, PLU stickers)
   if (/(?:mangue|mango|ataulfo|tommy\s*atkins|4051|4959|4312)/i.test(lower)) {
@@ -2787,7 +2986,13 @@ export function analyzeMultiItemPackagingText(rawText, preferredLanguage = "FR")
   const foundItems = [];
   const seenNames = new Set();
 
-  // First pass: scan the full catalog for matches in the whole text block
+  // First pass: check if the whole text block matches a specific catalog product directly
+  const fullTextMatch = analyzePackagingText(rawText, lang);
+  if (fullTextMatch && fullTextMatch.confidence >= 0.85) {
+    return [fullTextMatch];
+  }
+
+  // Second pass: scan the full catalog for matches in the whole text block
   for (const catalogItem of QUEBEC_GROCERY_CATALOG) {
     for (const kw of catalogItem.keywords) {
       if (rawText.toLowerCase().includes(kw)) {

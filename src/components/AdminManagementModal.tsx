@@ -903,19 +903,25 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
   const handleToggleShowGeminiKey = async () => {
     const nextState = !showGeminiKey;
     setShowGeminiKey(nextState);
-    if (nextState && settings.geminiApiKey && settings.geminiApiKey.includes('•')) {
-      try {
-        const res = await fetch('/api/v1/admin/settings?reveal=true', {
-          headers: await getAdminHeaders(),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.geminiApiKey && !data.geminiApiKey.includes('•')) {
-            setSettings((prev) => ({ ...prev, geminiApiKey: data.geminiApiKey }));
+    if (nextState) {
+      if (!settings.geminiApiKey || settings.geminiApiKey.includes('•')) {
+        try {
+          const res = await fetch('/api/v1/admin/settings?reveal=true', {
+            headers: await getAdminHeaders(),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.geminiApiKey && !data.geminiApiKey.includes('•')) {
+              setSettings((prev) => ({ ...prev, geminiApiKey: data.geminiApiKey }));
+            }
           }
+        } catch (e) {
+          console.warn('Failed revealing Gemini key:', e);
         }
-      } catch (e) {
-        console.warn('Failed revealing Gemini key:', e);
+      }
+    } else {
+      if (settings.hasGeminiKey) {
+        setSettings((prev) => ({ ...prev, geminiApiKey: '••••••••••••••••••••••••••••••••••••••••' }));
       }
     }
   };
@@ -923,19 +929,25 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
   const handleToggleShowTunnelToken = async () => {
     const nextState = !showTunnelToken;
     setShowTunnelToken(nextState);
-    if (nextState && settings.cloudflareTunnelToken && settings.cloudflareTunnelToken.includes('•')) {
-      try {
-        const res = await fetch('/api/v1/admin/settings?reveal=true', {
-          headers: await getAdminHeaders(),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.cloudflareTunnelToken && !data.cloudflareTunnelToken.includes('•')) {
-            setSettings((prev) => ({ ...prev, cloudflareTunnelToken: data.cloudflareTunnelToken }));
+    if (nextState) {
+      if (!settings.cloudflareTunnelToken || settings.cloudflareTunnelToken.includes('•')) {
+        try {
+          const res = await fetch('/api/v1/admin/settings?reveal=true', {
+            headers: await getAdminHeaders(),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.cloudflareTunnelToken && !data.cloudflareTunnelToken.includes('•')) {
+              setSettings((prev) => ({ ...prev, cloudflareTunnelToken: data.cloudflareTunnelToken }));
+            }
           }
+        } catch (e) {
+          console.warn('Failed revealing tunnel token:', e);
         }
-      } catch (e) {
-        console.warn('Failed revealing tunnel token:', e);
+      }
+    } else {
+      if (settings.hasTunnelToken) {
+        setSettings((prev) => ({ ...prev, cloudflareTunnelToken: '••••••••••••••••' }));
       }
     }
   };
@@ -943,19 +955,27 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
   const handleToggleShowDbSettingsKey = async () => {
     const nextState = !showDbSettingsKey;
     setShowDbSettingsKey(nextState);
-    if (nextState && settings.dbEncryptionKey && settings.dbEncryptionKey.includes('•')) {
-      try {
-        const res = await fetch('/api/v1/admin/settings?reveal=true', {
-          headers: await getAdminHeaders(),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.dbEncryptionKey && !data.dbEncryptionKey.includes('•')) {
-            setSettings((prev) => ({ ...prev, dbEncryptionKey: data.dbEncryptionKey }));
+    if (nextState) {
+      if (!settings.dbEncryptionKey || settings.dbEncryptionKey.includes('•')) {
+        try {
+          const res = await fetch('/api/v1/admin/settings?reveal=true', {
+            headers: await getAdminHeaders(),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.dbEncryptionKey && !data.dbEncryptionKey.includes('•')) {
+              setSettings((prev) => ({ ...prev, dbEncryptionKey: data.dbEncryptionKey }));
+            }
           }
+        } catch (e) {
+          console.warn('Failed revealing DB key:', e);
         }
-      } catch (e) {
-        console.warn('Failed revealing DB key:', e);
+      }
+    } else {
+      if (settings.dbEncryptionKey && !settings.dbEncryptionKey.includes('•')) {
+        const raw = settings.dbEncryptionKey;
+        const masked = raw.length >= 8 ? `${raw.substring(0, 4)}••••••••••••••••${raw.substring(raw.length - 4)}` : '••••••••••••••••';
+        setSettings((prev) => ({ ...prev, dbEncryptionKey: masked }));
       }
     }
   };
@@ -3508,7 +3528,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                               className="p-1 rounded-md text-slate-400 hover:text-slate-700 cursor-pointer"
                               title={showTunnelToken ? (lang === 'FR' ? 'Masquer le jeton' : 'Hide token') : (lang === 'FR' ? 'Afficher le jeton' : 'Show token')}
                             >
-                              {showTunnelToken ? <Eye className="w-3.5 h-3.5 text-blue-700" /> : <EyeOff className="w-3.5 h-3.5 text-slate-400" />}
+                              {showTunnelToken ? <EyeOff className="w-3.5 h-3.5 text-blue-700" /> : <Eye className="w-3.5 h-3.5 text-slate-400 hover:text-blue-700" />}
                             </button>
                             {settings.cloudflareTunnelToken && (
                               <button
@@ -4023,7 +4043,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                           className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
                           title={showGeminiKey ? (lang === 'FR' ? 'Masquer la clé' : 'Hide key') : (lang === 'FR' ? 'Afficher la clé' : 'Show key')}
                         >
-                          {showGeminiKey ? <Eye className="w-4 h-4 text-teal-800" /> : <EyeOff className="w-4 h-4 text-slate-400" />}
+                          {showGeminiKey ? <EyeOff className="w-4 h-4 text-teal-800" /> : <Eye className="w-4 h-4 text-slate-400 hover:text-teal-800" />}
                         </button>
                       </div>
 
@@ -4342,7 +4362,7 @@ export const AdminManagementModal: React.FC<AdminManagementModalProps> = ({
                             className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
                             title={showDbSettingsKey ? (lang === 'FR' ? 'Masquer la clé' : 'Hide key') : (lang === 'FR' ? 'Afficher la clé' : 'Show key')}
                           >
-                            {showDbSettingsKey ? <Eye className="w-4 h-4 text-teal-800" /> : <EyeOff className="w-4 h-4 text-slate-400" />}
+                            {showDbSettingsKey ? <EyeOff className="w-4 h-4 text-teal-800" /> : <Eye className="w-4 h-4 text-slate-400 hover:text-teal-800" />}
                           </button>
                         </div>
 
