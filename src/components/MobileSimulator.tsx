@@ -83,6 +83,7 @@ import {
 } from '../utils/i18n';
 import { useAlertToast } from '../contexts/AlertToastContext';
 import { getItemDisplayName, formatLocalizedQuantityUnit } from '../utils/foodTranslator';
+import { useAutoUpdate } from '../hooks/useAutoUpdate';
 
 const INITIAL_GROCERY_ITEMS: GroceryCartItem[] = [];
 
@@ -912,6 +913,33 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
     }
   }, [currentUser?.id]);
 
+  // Automatic Server Synchronizer & Live Update Engine
+  const isUserBusy = Boolean(
+    isScannerOpen ||
+    isAddEditModalOpen ||
+    isAdminModalOpen ||
+    isAdminRestrictedOpen ||
+    isImportLeftoverOpen ||
+    isRecipeAddModalOpen ||
+    isAvatarModalOpen ||
+    isPasteReceiptOpen ||
+    isSessionCookingOpen
+  );
+
+  const {
+    updateAvailable,
+    isReloading,
+    applyUpdateNow,
+  } = useAutoUpdate({
+    isUserBusy,
+    checkIntervalMs: 20000,
+    onDataMutated: () => {
+      fetchInventory();
+      fetchPlannedMeals();
+      fetchHouseholdMembers();
+    },
+  });
+
   const handleAddMeal = async (mealData: Omit<PlannedMeal, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
       const res = await fetch('/api/v1/inventory/household/hh_pantryo_main/meals', {
@@ -1438,6 +1466,35 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
           </div>
         </div>
       </header>
+
+      {/* Auto-Update Notification Banner (When a server update is detected) */}
+      {updateAvailable && !isReloading && (
+        <div className="bg-emerald-800 text-white px-3 sm:px-5 py-2 flex items-center justify-between gap-3 text-xs shadow-md shrink-0 border-b border-emerald-900 transition-all">
+          <div className="flex items-center gap-2 font-medium">
+            <Sparkles className="w-4 h-4 text-emerald-300 animate-pulse shrink-0" />
+            <span>
+              {lang === 'FR'
+                ? 'Une nouvelle version de l’application est disponible.'
+                : 'A new version of Pantryo is available.'}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={applyUpdateNow}
+            className="px-3 py-1 bg-white hover:bg-emerald-50 text-emerald-900 rounded-full font-bold text-xs transition-all active:scale-95 cursor-pointer shadow-xs whitespace-nowrap"
+          >
+            {lang === 'FR' ? 'Mettre à jour' : 'Update Now'}
+          </button>
+        </div>
+      )}
+
+      {/* Reloading Overlay when applying fresh server version */}
+      {isReloading && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 bg-emerald-900/95 backdrop-blur-md text-white text-xs font-bold rounded-full shadow-2xl flex items-center gap-2.5 border border-emerald-700 pointer-events-none animate-pulse">
+          <RefreshCw className="w-4 h-4 animate-spin text-emerald-300" />
+          <span>{lang === 'FR' ? 'Mise à jour en cours...' : 'Updating to latest version...'}</span>
+        </div>
+      )}
 
       {/* Main Scrollable View */}
       <div className="flex-1 overflow-y-auto px-3 sm:px-5 pt-1.5 pb-28 xl:pb-16 space-y-2.5 sm:space-y-3.5">

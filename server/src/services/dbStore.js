@@ -908,6 +908,7 @@ class EncryptedDatabaseStore {
       updatedAt: new Date().toISOString(),
     };
     this.systemSettings = null;
+    this.dataVersion = Date.now();
 
     this.init();
   }
@@ -1180,6 +1181,8 @@ class EncryptedDatabaseStore {
       if (!fs.existsSync(DATA_DIR)) {
         fs.mkdirSync(DATA_DIR, { recursive: true });
       }
+
+      this.dataVersion = Date.now();
 
       const snapshot = {
         schemaVersion: "1.0",
@@ -1968,6 +1971,17 @@ class EncryptedDatabaseStore {
       serverTime: new Date().toISOString(),
     };
   }
+
+  getDataVersion() {
+    return this.dataVersion || Date.now();
+  }
+
+  recordDataMutation() {
+    this.dataVersion = Date.now();
+    return this.dataVersion;
+  }
 }
 
 export const dbStore = new EncryptedDatabaseStore();
+export const getDataVersion = () => dbStore.getDataVersion();
+export const recordDataMutation = () => dbStore.recordDataMutation();

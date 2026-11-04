@@ -48,6 +48,22 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// Purge all caches and skipWaiting on message
+self.addEventListener('message', (event) => {
+  if (!event.data) return;
+  if (event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  } else if (event.data.type === 'PURGE_CACHE') {
+    event.waitUntil(
+      caches.keys().then((keys) => {
+        return Promise.all(keys.map((k) => caches.delete(k)));
+      }).then(() => {
+        return self.skipWaiting();
+      })
+    );
+  }
+});
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
@@ -73,7 +89,7 @@ self.addEventListener('fetch', (event) => {
   // This is mandatory for Chromium PWA installability criteria
   if (req.mode === 'navigate') {
     event.respondWith(
-      fetch(req)
+      fetch(req, { cache: 'no-cache' })
         .then((networkRes) => {
           if (networkRes && networkRes.status === 200) {
             const clone = networkRes.clone();

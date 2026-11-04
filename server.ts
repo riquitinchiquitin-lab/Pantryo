@@ -22,7 +22,44 @@ process.on("unhandledRejection", (reason, promise) => {
   console.error("[Pantryo Server] Unhandled rejection at:", promise, "reason:", reason);
 });
 
+import child_process from "child_process";
 import { getModelStatus } from "./server/src/services/groceryModelService.js";
+import { getDataVersion } from "./server/src/services/dbStore.js";
+
+const SERVER_BOOT_TIME = new Date().toISOString();
+let cachedGitRev: string | null = null;
+
+function getGitRev(): string {
+  if (cachedGitRev) return cachedGitRev;
+  try {
+    const rev = child_process.execSync("git rev-parse --short HEAD 2>/dev/null", { encoding: "utf8" }).trim();
+    if (rev) {
+      cachedGitRev = rev;
+      return rev;
+    }
+  } catch (_) {}
+  cachedGitRev = "pantryo-latest";
+  return cachedGitRev;
+}
+
+function getBuildId(): string {
+  let assetMtime = 0;
+  const distHtml = path.join(process.cwd(), "dist", "index.html");
+  const distServer = path.join(process.cwd(), "dist", "server.cjs");
+  const rootHtml = path.join(process.cwd(), "index.html");
+
+  if (fs.existsSync(distHtml)) {
+    assetMtime = Math.max(assetMtime, fs.statSync(distHtml).mtimeMs);
+  }
+  if (fs.existsSync(distServer)) {
+    assetMtime = Math.max(assetMtime, fs.statSync(distServer).mtimeMs);
+  }
+  if (fs.existsSync(rootHtml)) {
+    assetMtime = Math.max(assetMtime, fs.statSync(rootHtml).mtimeMs);
+  }
+  const git = getGitRev();
+  return `${git}-${Math.round(assetMtime)}-${SERVER_BOOT_TIME}`;
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -209,6 +246,23 @@ app.get("/api/health", (req, res) => {
     service: "Kitchen Komrade API Server",
     timestamp: new Date().toISOString(),
     geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
+  });
+});
+
+// App Version & Auto-Update status endpoint (no-cache so client always sees freshest server state)
+app.get(["/api/v1/system/version", "/api/version"], (req, res) => {
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  res.json({
+    status: "ok",
+    service: "Pantryo",
+    version: process.env.npm_package_version || "1.0.0",
+    buildId: getBuildId(),
+    gitCommit: getGitRev(),
+    serverStartTime: SERVER_BOOT_TIME,
+    dataVersion: getDataVersion(),
+    timestamp: new Date().toISOString(),
   });
 });
 
