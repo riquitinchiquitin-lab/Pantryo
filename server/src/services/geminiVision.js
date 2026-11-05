@@ -2,9 +2,24 @@ import { GoogleGenAI, Type } from "@google/genai";
 import Tesseract from "tesseract.js";
 import { parseQuebecReceiptText } from "./quebecReceiptParser.js";
 import { getBilingualNames, translateFoodItem } from "./foodTranslator.js";
-import { analyzePackagingText, analyzeMultiItemPackagingText, extractPackagingBadges } from "./packagingAnalyzer.js";
+import { analyzePackagingText, analyzeMultiItemPackagingText, extractPackagingBadges, extractCanadianExpiryDate } from "./packagingAnalyzer.js";
 import { dbStore } from "./dbStore.js";
 import { reconcileItemsWithLocalDb } from "./inventoryReconciler.js";
+
+// 24-hour Perceptual Image Content Cache (prevents duplicate API queries on re-scans)
+const scanImageCache = new Map();
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+function computeImageSignature(base64Str) {
+  let hash = 0;
+  const len = base64Str.length;
+  const step = Math.max(1, Math.floor(len / 400));
+  for (let i = 0; i < len; i += step) {
+    hash = ((hash << 5) - hash) + base64Str.charCodeAt(i);
+    hash |= 0;
+  }
+  return `${len}_${(hash >>> 0).toString(16)}`;
+}
 
 /**
  * Pantryo - Gemini Flash Vision Service
@@ -61,6 +76,18 @@ export async function analyzeFoodImage(base64Data, mimeType = "image/jpeg", lang
 
   if (cleanBase64.length === 0) {
     throw new Error("Invalid image payload: base64 string is empty after normalization.");
+  }
+
+  // 1. Check instant 24-hr perceptual content hash cache
+  const imageSig = computeImageSignature(cleanBase64);
+  const cached = scanImageCache.get(imageSig);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    console.log(`[Pantryo Vision] Cache hit for image signature ${imageSig}. Returning instant match without API usage.`);
+    return {
+      ...cached.data,
+      fromCache: true,
+      scannedAt: new Date().toISOString(),
+    };
   }
 
   const ai = getGeminiClient();
@@ -495,7 +522,7 @@ Translate item names and categories to ${language === "FR" ? "French" : "English
     const reconciledItems = reconcileItemsWithLocalDb(normalizedItems, language);
     const hasExistingMatch = reconciledItems.some((i) => i.reconciliation?.isAlreadyInInventory);
 
-    return {
+    const resultPayload = {
       success: true,
       summary: parsedData.summary || `Identified ${reconciledItems.length} item(s).`,
       itemsCount: reconciledItems.length,
@@ -504,6 +531,9 @@ Translate item names and categories to ${language === "FR" ? "French" : "English
       hasReconciliationMatches: hasExistingMatch,
       scannedAt: now.toISOString(),
     };
+
+    scanImageCache.set(imageSig, { data: resultPayload, timestamp: Date.now() });
+    return resultPayload;
   } catch (error) {
     console.warn("[Pantryo - Gemini Vision Note]:", error.message, "- Trying offline OCR & Quebec packaging analyzer fallback...");
 
@@ -513,15 +543,26 @@ Translate item names and categories to ${language === "FR" ? "French" : "English
       const ocrText = ocrResult?.data?.text?.trim() || "";
 
       if (ocrText && ocrText.length > 3) {
-        const fallbackItems = analyzeMultiItemPackagingText(ocrText, language);
+        // Try both multi-item and single-item direct catalog match
+        let fallbackItems = analyzeMultiItemPackagingText(ocrText, language);
+        if (!fallbackItems || fallbackItems.length === 0) {
+          const singleItem = analyzePackagingText(ocrText, language);
+          if (singleItem && singleItem.confidence >= 0.70) {
+            fallbackItems = [singleItem];
+          }
+        }
+
         if (fallbackItems && fallbackItems.length > 0) {
           const isFr = (language || "EN").toUpperCase() === "FR";
           const now = new Date();
+          const printedExpFromOcr = extractCanadianExpiryDate(ocrText);
+
           const itemsWithDates = fallbackItems.map((fi) => {
             const days = fi.estimatedShelfLifeDays || 7;
-            const targetExp = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+            const targetExp = printedExpFromOcr ? new Date(printedExpFromOcr) : new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
             return {
               ...fi,
+              printedExpirationDate: printedExpFromOcr || fi.printedExpirationDate || null,
               suggestedExpirationDate: targetExp.toISOString().split("T")[0],
             };
           });
@@ -530,7 +571,7 @@ Translate item names and categories to ${language === "FR" ? "French" : "English
           const reconciledFallback = reconcileItemsWithLocalDb(itemsWithDates, language);
           const hasExistingMatch = reconciledFallback.some((i) => i.reconciliation?.isAlreadyInInventory);
 
-          return {
+          const fallbackPayload = {
             success: true,
             summary: isFr
               ? `Reconnaissance locale canadienne (${reconciledFallback.length} article(s) détecté(s)).`
@@ -542,24 +583,43 @@ Translate item names and categories to ${language === "FR" ? "French" : "English
             demoMode: true,
             scannedAt: now.toISOString(),
           };
+
+          scanImageCache.set(imageSig, { data: fallbackPayload, timestamp: Date.now() });
+          return fallbackPayload;
         }
       }
     } catch (fallbackErr) {
-      console.warn("[Pantryo Vision] Local fallback OCR also failed:", fallbackErr.message);
+      console.warn("[Pantryo Vision] Local fallback OCR note:", fallbackErr.message);
     }
 
     const isFr = (language || "EN").toUpperCase() === "FR";
-    const isRateLimited = error?.message && (error.message.includes("429") || error.message.includes("RESOURCE_EXHAUSTED") || error.message.includes("Quota exceeded"));
+    const isRateLimited = Boolean(
+      error?.message &&
+      (error.message.includes("429") ||
+       error.message.includes("RESOURCE_EXHAUSTED") ||
+       error.message.includes("Quota exceeded") ||
+       error.message.includes("quota"))
+    );
+
+    let retryDelaySeconds = 15;
+    if (isRateLimited) {
+      const delayMatch = String(error?.message || "").match(/retry in\s+([0-9.]+)\s*s/i) ||
+                         String(error?.message || "").match(/retryDelay["':\s]+([0-9]+)s/i);
+      if (delayMatch && delayMatch[1]) {
+        retryDelaySeconds = Math.max(3, Math.ceil(parseFloat(delayMatch[1])));
+      }
+    }
 
     return {
       success: false,
       summary: isRateLimited
-        ? (isFr ? "Limite de requêtes atteinte sur Gemini (Free Tier: 5 requêtes/min). Veuillez patienter 15 secondes." : "Gemini API rate limit reached (Free Tier: 5 req/min). Please wait 15 seconds.")
+        ? (isFr ? `Limite de requêtes atteinte sur Gemini (Free Tier: 5 req/min). Réessai dans ${retryDelaySeconds}s...` : `Gemini API rate limit reached (Free Tier: 5 req/min). Retrying in ${retryDelaySeconds}s...`)
         : (isFr ? "Aucun aliment reconnu dans cette photo. Assurez-vous que le produit est bien cadré et lisible." : "No food item recognized in this photo. Please make sure the product is centered and clearly readable."),
       itemsCount: 0,
       items: [],
       detectionMethod: isRateLimited ? "rate_limited" : "none_detected",
       rateLimited: isRateLimited,
+      retryDelaySeconds: isRateLimited ? retryDelaySeconds : undefined,
       error: error?.message || null,
       scannedAt: new Date().toISOString(),
     };

@@ -124,6 +124,8 @@ interface SessionItem {
   unopenedShelfLifeDays?: number;
   openedShelfLifeDays?: number;
   estimatedShelfLifeDays?: number;
+  expirationDate?: string;
+  printedExpirationDate?: string;
   storageTip?: string;
   freezerTip?: string;
   storageReason?: string;
@@ -445,6 +447,54 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
   const [editItemName, setEditItemName] = useState('');
   const [editItemCategory, setEditItemCategory] = useState('Produce');
   const [isValidatingWithGemini, setIsValidatingWithGemini] = useState(false);
+  // Grocery Haul Rapid Scan & Quota Countdown State
+  const [isHaulMode, setIsHaulMode] = useState(false);
+  const [rateLimitCountdown, setRateLimitCountdown] = useState<number | null>(null);
+  const [pendingRetryPhoto, setPendingRetryPhoto] = useState<string | null>(null);
+
+  // Audio chime & vibration for successful recognition
+  const playScanChime = () => {
+    try {
+      if (typeof window !== 'undefined' && ((window as any).AudioContext || (window as any).webkitAudioContext)) {
+        const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+        osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12); // A5
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.25);
+      }
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate([40, 30, 60]);
+      }
+    } catch (_) {}
+  };
+
+  // Timer countdown effect for Gemini 429 quota recovery
+  useEffect(() => {
+    if (rateLimitCountdown === null || rateLimitCountdown <= 0) return;
+    const interval = setInterval(() => {
+      setRateLimitCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(interval);
+          if (pendingRetryPhoto) {
+            const photoToRetry = pendingRetryPhoto;
+            setPendingRetryPhoto(null);
+            processPhotoInBackground(photoToRetry);
+          }
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [rateLimitCountdown, pendingRetryPhoto]);
 
   // Sync inputs whenever inspectingItem changes
   useEffect(() => {
@@ -881,6 +931,20 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
       let items: ScannedItemCandidate[] = [];
       let winningMethod: 'barcode' | 'produce' | 'receipt' | 'packaging' | 'flyer' = 'packaging';
       let winningMethodLabel = lang === 'FR' ? 'Aliment emballé canadien' : 'Canadian packaged grocery';
+
+      // Smart 429 Quota Delay Handling: If Gemini hit quota and no items returned yet
+      if (serverData?.rateLimited && (!serverData.items || serverData.items.length === 0)) {
+        const retrySec = serverData.retryDelaySeconds || 15;
+        setRateLimitCountdown(retrySec);
+        setPendingRetryPhoto(compressedDataUrl);
+        showToast(
+          lang === 'FR'
+            ? `⏳ Quota gratuit Gemini atteint (5 req/min). Réessai automatique dans ${retrySec}s...`
+            : `⏳ Gemini Free quota reached (5 req/min). Auto-retrying in ${retrySec}s...`,
+          'info',
+          6000
+        );
+      }
 
       // Global Package Training & 5-Region Recognition Engine
       const candidateTokens = `${serverData?.detectedText || ''} ${serverData?.items?.[0]?.name || ''} ${serverData?.items?.[0]?.brand || ''} ${serverData?.summary || ''}`;
@@ -1355,6 +1419,8 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
             unopenedShelfLifeDays: itemCandidate.unopenedShelfLifeDays,
             openedShelfLifeDays: itemCandidate.openedShelfLifeDays,
             estimatedShelfLifeDays: itemCandidate.estimatedShelfLifeDays,
+            expirationDate: itemCandidate.printedExpirationDate || (itemCandidate as any).suggestedExpirationDate || savedItem.expirationDate || undefined,
+            printedExpirationDate: itemCandidate.printedExpirationDate || undefined,
             storageTip: itemCandidate.storageTip,
             freezerTip: itemCandidate.freezerTip,
             storageReason: itemCandidate.storageReason,
@@ -1378,16 +1444,26 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
       }
 
       if (addedThisBatch.length > 0) {
+        playScanChime();
         setSessionItems((prev) => [...addedThisBatch, ...prev]);
-        setInspectingItem(addedThisBatch[0]);
+        if (!isHaulMode) {
+          setInspectingItem(addedThisBatch[0]);
+        }
         const namesSummary = addedThisBatch.map((i) => i.name).join(', ');
         showToast(
           lang === 'FR'
             ? `✓ [Auto-Détecté : ${winningMethodLabel}] ${namesSummary}`
             : `✓ [Auto-Detected: ${winningMethodLabel}] ${namesSummary}`,
           'success',
-          6000
+          isHaulMode ? 3500 : 6000
         );
+
+        if (isHaulMode) {
+          // Haul Mode: keep camera prompt ready after short delay for continuous rapid grocery unpacking
+          setTimeout(() => {
+            cameraInputRef.current?.click();
+          }, 800);
+        }
       }
     } catch (err: any) {
       console.error('Background photo scan error:', err);
@@ -2400,7 +2476,55 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
 
           {/* PHOTO OR RECIPE MODE (Simplified & Continuous) */}
           {(activeMode === 'photo' || activeMode === 'recipe') && (
-            <div className="flex flex-col items-center space-y-4">
+            <div className="flex flex-col items-center space-y-3">
+              {/* Rate Limit Countdown Banner */}
+              {rateLimitCountdown !== null && rateLimitCountdown > 0 && (
+                <div className="w-full p-3.5 rounded-2xl bg-amber-500/10 border-2 border-amber-500/40 text-amber-900 flex items-center justify-between gap-3 text-xs shadow-xs animate-pulse">
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="w-4 h-4 animate-spin text-amber-600 shrink-0" />
+                    <span className="font-bold">
+                      {lang === 'FR'
+                        ? `Quota Gemini atteint. Nouvel essai automatique dans ${rateLimitCountdown}s...`
+                        : `Gemini quota limit reached. Auto-retrying in ${rateLimitCountdown}s...`}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (pendingRetryPhoto) {
+                        const p = pendingRetryPhoto;
+                        setRateLimitCountdown(null);
+                        setPendingRetryPhoto(null);
+                        processPhotoInBackground(p);
+                      }
+                    }}
+                    className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-full font-bold text-xs shadow-2xs whitespace-nowrap cursor-pointer"
+                  >
+                    {lang === 'FR' ? 'Réessayer' : 'Retry'}
+                  </button>
+                </div>
+              )}
+
+              {/* Grocery Haul Mode Toggle Switch */}
+              <div className="w-full flex items-center justify-between p-2.5 px-4 rounded-2xl bg-white border border-[#D5E1D2] shadow-2xs">
+                <div className="flex items-center gap-2 text-xs font-black text-[#0D3B37]">
+                  <ShoppingBag className="w-4 h-4 text-emerald-700" />
+                  <span>{lang === 'FR' ? 'Mode Épicerie Rapide (Haul continu)' : 'Grocery Haul Mode (Continuous)'}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsHaulMode(!isHaulMode)}
+                  className={`px-3 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                    isHaulMode
+                      ? 'bg-emerald-700 text-white border-emerald-800 shadow-xs'
+                      : 'bg-[#FAF7EE] text-[#527470] border-[#D5E1D2] hover:bg-emerald-50'
+                  }`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${isHaulMode ? 'bg-emerald-300 animate-ping' : 'bg-slate-400'}`} />
+                  <span>{isHaulMode ? (lang === 'FR' ? 'ACTIF' : 'ACTIVE') : (lang === 'FR' ? 'Désactivé' : 'Off')}</span>
+                </button>
+              </div>
+
               {/* Clean Camera Capture Shutter Card */}
               <div className="w-full relative rounded-3xl bg-white border-2 border-teal-700/20 hover:border-teal-600 p-6 flex flex-col items-center text-center transition-all shadow-xs">
                 {/* Large Shutter Buttons */}
@@ -2675,6 +2799,24 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                             </td>
                             <td className="py-2 px-3 font-medium text-[#1F3323]">
                               {getLocalizedPackaging(inspectingItem.packagingFormat, lang)}
+                            </td>
+                          </tr>
+                        )}
+
+                        {inspectingItem.expirationDate && (
+                          <tr className="bg-emerald-50/70">
+                            <td className="py-2 px-3 font-bold text-emerald-950">
+                              {lang === 'FR' ? '📅 Date d’expiration (BB/MA)' : '📅 Expiration Date (BB/MA)'}
+                            </td>
+                            <td className="py-2 px-3 font-bold text-emerald-900">
+                              <span className="px-2.5 py-1 rounded-lg bg-emerald-200 text-emerald-950 font-mono text-[11px] font-black border border-emerald-300 inline-flex items-center gap-1.5 shadow-2xs">
+                                <span>{inspectingItem.expirationDate}</span>
+                                {inspectingItem.printedExpirationDate && (
+                                  <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.2 rounded bg-emerald-700 text-white font-sans">
+                                    {lang === 'FR' ? 'Estampillé' : 'Stamped'}
+                                  </span>
+                                )}
+                              </span>
                             </td>
                           </tr>
                         )}
@@ -4103,12 +4245,20 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
             id="scanner-done-footer-btn"
             type="button"
             onClick={onClose}
-            className="px-6 py-2.5 rounded-2xl bg-[#0E766E] hover:bg-[#0B5C56] text-white font-black text-xs shadow-md transition-all active:scale-95 flex items-center gap-1.5"
+            className={`px-6 py-2.5 rounded-2xl text-white font-black text-xs shadow-md transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer ${
+              isHaulMode && sessionItems.length > 0
+                ? 'bg-emerald-700 hover:bg-emerald-800 ring-2 ring-emerald-400'
+                : 'bg-[#0E766E] hover:bg-[#0B5C56]'
+            }`}
           >
             <Check className="w-4 h-4 stroke-[2.5]" />
             <span>
               {sessionItems.length > 0
-                ? lang === 'FR'
+                ? isHaulMode
+                  ? lang === 'FR'
+                    ? `🛒 Ranger tout le haul (${sessionItems.length})`
+                    : `🛒 Stock all grocery haul (${sessionItems.length})`
+                  : lang === 'FR'
                   ? `Terminer (${sessionItems.length} article${sessionItems.length > 1 ? 's' : ''})`
                   : `Done (${sessionItems.length} item${sessionItems.length > 1 ? 's' : ''})`
                 : lang === 'FR'

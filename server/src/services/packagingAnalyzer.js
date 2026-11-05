@@ -2751,8 +2751,9 @@ export function analyzePackagingText(rawText, preferredLanguage = "FR") {
       monthsFrozenShelfLife: catalogEntry.monthsFrozenShelfLife,
       storageReason: isFr ? catalogEntry.storageReasonFr : catalogEntry.storageReasonEn,
       storageTip: isFr ? catalogEntry.storageTipFr : catalogEntry.storageTipEn,
-      freezerTip: isFr ? catalogEntry.freezerTipFr : catalogEntry.freezerTipEn,
       detectedText: text,
+      printedExpirationDate: extractCanadianExpiryDate(text),
+      suggestedExpirationDate: extractCanadianExpiryDate(text) || undefined,
       confidence: 0.98,
     };
   }
@@ -3033,4 +3034,47 @@ export function analyzeMultiItemPackagingText(rawText, preferredLanguage = "FR")
   }
 
   return foundItems;
+}
+
+/**
+ * Canadian Bilingual Expiry Date Stamp OCR Parser (Health Canada / CFIA standard)
+ * Supports standard codes: BB/MA, MEILLEUR AVANT, BEST BEFORE, EXP,
+ * and 2-letter Canadian bilingual months: JA, FE, MR, AL, MA, JN, JL, AU, SE, OC, NO, DE
+ */
+export const CANADIAN_MONTHS = {
+  JA: "01", FE: "02", "FÉ": "02", MR: "03", AL: "04",
+  MA: "05", JN: "06", JL: "07", AU: "08", SE: "09",
+  OC: "10", NO: "11", DE: "12"
+};
+
+export function extractCanadianExpiryDate(text) {
+  if (!text || typeof text !== "string") return null;
+  const clean = text.toUpperCase();
+
+  // Pattern A: Year (2 or 4 digits) + Canadian Month (2 letters) + Day (1-2 digits)
+  // e.g. '26 OC 14', '2026 OC 14', 'BB/MA 26 OC 14', 'BB 2027 MR 05'
+  const matchA = clean.match(/(?:(?:BB|MA|BEST\s*BEFORE|MEILLEUR\s*AVANT|EXP|EXPIRATION)[\s/.:]*)?(?:20)?(2[4-9]|[3-9][0-9])[\s./-]+(JA|FE|FÉ|MR|AL|MA|JN|JL|AU|SE|OC|NO|DE)[\s./-]+(0?[1-9]|[12][0-9]|3[01])\b/);
+  if (matchA) {
+    const yr = matchA[1].length === 2 ? `20${matchA[1]}` : matchA[1];
+    const mo = CANADIAN_MONTHS[matchA[2]];
+    const day = matchA[3].padStart(2, "0");
+    return `${yr}-${mo}-${day}`;
+  }
+
+  // Pattern B: Day + Month + Year: '14 OC 2026' or '14 OC 26'
+  const matchB = clean.match(/(?:(?:BB|MA|EXP)[\s/.:]*)?(0?[1-9]|[12][0-9]|3[01])[\s./-]+(JA|FE|FÉ|MR|AL|MA|JN|JL|AU|SE|OC|NO|DE)[\s./-]+(?:20)?(2[4-9]|[3-9][0-9])\b/);
+  if (matchB) {
+    const day = matchB[1].padStart(2, "0");
+    const mo = CANADIAN_MONTHS[matchB[2]];
+    const yr = matchB[3].length === 2 ? `20${matchB[3]}` : matchB[3];
+    return `${yr}-${mo}-${day}`;
+  }
+
+  // Pattern C: Standard ISO/Numeric: '2026-11-20' or '2026/11/20'
+  const matchC = clean.match(/(?:(?:BB|MA|EXP)[\s/.:]*)?(202[4-9]|203[0-9])[\s./-]+(0[1-9]|1[0-2])[\s./-]+(0[1-9]|[12][0-9]|3[01])\b/);
+  if (matchC) {
+    return `${matchC[1]}-${matchC[2]}-${matchC[3]}`;
+  }
+
+  return null;
 }

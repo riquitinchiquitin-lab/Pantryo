@@ -1596,6 +1596,41 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               </button>
             </div>
 
+            {/* "COOK FIRST" EXPIRATION & LEFTOVERS PRIORITY STRIP */}
+            {(expiringItems.length > 0 || leftoversCount > 0) && (
+              <div className="p-3.5 rounded-[20px] bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-rose-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs animate-fadeIn">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-700 flex items-center justify-center shrink-0">
+                    <Flame className="w-4 h-4 text-amber-600 animate-pulse" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black text-amber-950">
+                        {lang === 'FR' ? 'À cuisiner en priorité' : 'Cook First Priority'}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-900 border border-amber-500/30">
+                        {expiringItems.length + (leftoversCount > 0 ? leftoversCount : 0)} {lang === 'FR' ? 'urgents' : 'items'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-amber-900/80 truncate">
+                      {lang === 'FR'
+                        ? `${expiringItems.map((i) => i.name).slice(0, 3).join(', ')}${expiringItems.length > 3 ? '...' : ''} à consommer rapidement pour éviter le gaspillage.`
+                        : `${expiringItems.map((i) => i.name).slice(0, 3).join(', ')}${expiringItems.length > 3 ? '...' : ''} expire soon. Cook to prevent waste.`}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveNav('cooking')}
+                  className="px-3.5 py-1.5 rounded-full bg-amber-600 hover:bg-amber-700 text-white font-black text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-xs cursor-pointer shrink-0"
+                >
+                  <ChefHat className="w-3.5 h-3.5" />
+                  <span>{lang === 'FR' ? 'Cuisiner ce soir' : 'Cook Tonight'}</span>
+                </button>
+              </div>
+            )}
+
             {/* Unified Search, Filter & View Mode Bar */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
