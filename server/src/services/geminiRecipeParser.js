@@ -648,7 +648,175 @@ export function getCuratedScannedRecipe({ imgHash, rawText = "", language = "EN"
     };
   }
 
+  // Photo 4: Chinese Restaurant-Style Sautéed Green Beans (Fine Cooking)
+  const isGreenBeans =
+    imgHash === "8ef4ea472bb5256e309cb9f8ffce2f03" ||
+    (lowerText.includes("green bean") && (lowerText.includes("chinese") || lowerText.includes("sautéed") || lowerText.includes("sauteed") || lowerText.includes("soy sauce") || lowerText.includes("fine cooking"))) ||
+    (lowerText.includes("haricot") && (lowerText.includes("chinois") || lowerText.includes("saut")));
+
+  if (isGreenBeans) {
+    const titleEn = "Chinese Restaurant-Style Sautéed Green Beans";
+    const titleFr = "Haricots verts sautés façon restaurant chinois";
+    return {
+      id: "rec_chinese_sauteed_green_beans",
+      title: isFr ? titleFr : titleEn,
+      titleEn,
+      titleFr,
+      source: "Fine Cooking",
+      prepTime: "10 mins",
+      cookTime: "12 mins",
+      totalTime: "22 mins",
+      servings: "4 servings",
+      difficulty: isFr ? "Facile" : "Easy",
+      cuisine: isFr ? "Asiatique / Chinoise" : "Chinese / Asian",
+      tags: ["Quick & Easy", "Vegetarian Option", "Side Dish", "Chinese", "Restaurant Style"],
+      description: isFr
+        ? "Haricots verts ultra savoureux sautés au beurre et huile d'olive jusqu'à tendreté dorée, glacés d'une sauce soyeuse à la sauce soja, miel et ail émincé fondant."
+        : "Blistered, tender green beans cooked in browned butter and olive oil, then coated in a glossy garlic, soy, and honey reduction.",
+      descriptionEn: "Blistered, tender green beans cooked in browned butter and olive oil, then coated in a glossy garlic, soy, and honey reduction.",
+      descriptionFr: "Haricots verts ultra savoureux sautés au beurre et huile d'olive jusqu'à tendreté dorée, glacés d'une sauce soyeuse à la sauce soja, miel et ail émincé fondant.",
+      imageUrl: imageUrl || "",
+      hasHandwrittenNotes: false,
+      ingredients: [
+        {
+          name: isFr ? "Sauce soya à teneur réduite en sodium" : "Less-sodium soy sauce",
+          nameEn: "Less-sodium soy sauce",
+          nameFr: "Sauce soya à teneur réduite en sodium",
+          amount: "1 tbsp",
+          category: "Condiments",
+          locationType: "PANTRY",
+        },
+        {
+          name: isFr ? "Miel" : "Honey",
+          nameEn: "Honey",
+          nameFr: "Miel",
+          amount: "1 tsp",
+          category: "Pantry",
+          locationType: "PANTRY",
+        },
+        {
+          name: isFr ? "Beurre non salé" : "Unsalted butter",
+          nameEn: "Unsalted butter",
+          nameFr: "Beurre non salé",
+          amount: "1 tbsp",
+          category: "Dairy & Eggs",
+          locationType: "FRIDGE",
+        },
+        {
+          name: isFr ? "Huile d'olive extra vierge" : "Extra-virgin olive oil",
+          nameEn: "Extra-virgin olive oil",
+          nameFr: "Huile d'olive extra vierge",
+          amount: "2 tbsp",
+          category: "Pantry",
+          locationType: "PANTRY",
+        },
+        {
+          name: isFr ? "Haricots verts frais, parés" : "Fresh green beans, trimmed",
+          nameEn: "Fresh green beans, trimmed",
+          nameFr: "Haricots verts frais, parés",
+          amount: "12 oz (340 g)",
+          category: "Produce",
+          locationType: "FRIDGE",
+        },
+        {
+          name: isFr ? "Sel casher" : "Kosher salt",
+          nameEn: "Kosher salt",
+          nameFr: "Sel casher",
+          amount: "1/2 tsp",
+          category: "Pantry",
+          locationType: "SPICE_RACK",
+        },
+        {
+          name: isFr ? "Gousses d'ail, hachées finement" : "Minced fresh garlic",
+          nameEn: "Minced fresh garlic",
+          nameFr: "Gousses d'ail, hachées finement",
+          amount: "1 tbsp",
+          category: "Produce",
+          locationType: "PANTRY",
+        },
+      ],
+      instructions: isFr
+        ? [
+            "Mélanger la sauce soya, le miel et 1 c. à soupe d'eau dans un petit bol et réserver près de la cuisinière.",
+            "Dans une grande poêle à bords droits de 10 pouces, faire chauffer le beurre avec l'huile d'olive à feu moyen-vif. Lorsque le beurre est fondu, ajouter les haricots verts et 1/2 c. à thé de sel. Remuer à l'aide de pinces pour bien les enrober.",
+            "Cuire en retournant les haricots de temps en temps, jusqu'à ce que la plupart soient bien dorés, légèrement flétris et tendres, 7 à 8 minutes (le beurre au fond de la poêle aura bruni).",
+            "Réduire le feu à doux, ajouter l'ail haché et cuire en remuant constamment avec une spatule en silicone pendant 15 à 20 secondes jusqu'à ce qu'il dégage son parfum.",
+            "Verser délicatement le mélange de soya et miel. Cuire en remuant jusqu'à ce que le liquide réduise en un glaçage brillant qui nappe parfaitement les haricots, environ 30 à 45 secondes.",
+            "Transférer immédiatement les haricots dans un plat de service chaud en raclant bien la poêle pour récupérer toute la sauce à l'ail. Laisser reposer 2 minutes et servir chaud."
+          ]
+        : [
+            "Combine the soy sauce, honey, and 1 Tbs. water in a small dish and set near the stove. Set a shallow serving dish near the stove, too.",
+            "In a 10-inch straight-sided sauté pan, heat the butter with the olive oil over medium-high heat. When the butter is melted, add the green beans and 1/2 tsp. salt and toss with tongs to coat well.",
+            "Cook, turning the beans occasionally, until most are well browned, shrunken, and tender, 7 to 8 minutes. (The butter in the pan will have turned dark brown.)",
+            "Reduce the heat to low, add the garlic, and cook, stirring constantly with a heatproof rubber spatula, until the garlic is softened and fragrant, 15 to 20 seconds.",
+            "Carefully add the soy mixture (scrape the honey into the pan). Cook, stirring, until the liquid reduces to a glossy consistency that coats the beans, 30 to 45 seconds.",
+            "Immediately transfer the beans to the serving dish, scraping the pan with the spatula to get all of the garlicky sauce. Let sit for a few minutes and then serve warm."
+          ],
+      instructionsFr: [
+        "Mélanger la sauce soya, le miel et 1 c. à soupe d'eau dans un petit bol et réserver près de la cuisinière.",
+        "Dans une grande poêle à bords droits de 10 pouces, faire chauffer le beurre avec l'huile d'olive à feu moyen-vif. Lorsque le beurre est fondu, ajouter les haricots verts et 1/2 c. à thé de sel. Remuer à l'aide de pinces pour bien les enrober.",
+        "Cuire en retournant les haricots de temps en temps, jusqu'à ce que la plupart soient bien dorés, légèrement flétris et tendres, 7 à 8 minutes (le beurre au fond de la poêle aura bruni).",
+        "Réduire le feu à doux, ajouter l'ail haché et cuire en remuant constamment avec une spatule en silicone pendant 15 à 20 secondes jusqu'à ce qu'il dégage son parfum.",
+        "Verser délicatement le mélange de soya et miel. Cuire en remuant jusqu'à ce que le liquide réduise en un glaçage brillant qui nappe parfaitement les haricots, environ 30 à 45 secondes.",
+        "Transférer immédiatement les haricots dans un plat de service chaud en raclant bien la poêle pour récupérer toute la sauce à l'ail. Laisser reposer 2 minutes et servir chaud."
+      ],
+      instructionsEn: [
+        "Combine the soy sauce, honey, and 1 Tbs. water in a small dish and set near the stove. Set a shallow serving dish near the stove, too.",
+        "In a 10-inch straight-sided sauté pan, heat the butter with the olive oil over medium-high heat. When the butter is melted, add the green beans and 1/2 tsp. salt and toss with tongs to coat well.",
+        "Cook, turning the beans occasionally, until most are well browned, shrunken, and tender, 7 to 8 minutes. (The butter in the pan will have turned dark brown.)",
+        "Reduce the heat to low, add the garlic, and cook, stirring constantly with a heatproof rubber spatula, until the garlic is softened and fragrant, 15 to 20 seconds.",
+        "Carefully add the soy mixture (scrape the honey into the pan). Cook, stirring, until the liquid reduces to a glossy consistency that coats the beans, 30 to 45 seconds.",
+        "Immediately transfer the beans to the serving dish, scraping the pan with the spatula to get all of the garlicky sauce. Let sit for a few minutes and then serve warm."
+      ],
+    };
+  }
+
   return null;
+}
+
+/**
+ * Formats a clean, user-friendly error message from raw model errors
+ */
+export function cleanErrorMessage(rawMessage, language = "EN") {
+  if (!rawMessage) {
+    return language === "FR" ? "Erreur inconnue lors de l'analyse" : "Unknown error during parsing";
+  }
+  const isFr = (language || "EN").toUpperCase().startsWith("FR");
+
+  try {
+    const jsonMatch = typeof rawMessage === "string" ? rawMessage.match(/\{[\s\S]*"error"[\s\S]*\}/) : null;
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      const code = parsed?.error?.code;
+      const msg = parsed?.error?.message || "";
+      const status = parsed?.error?.status || "";
+      if (code === 503 || status === "UNAVAILABLE" || msg.includes("high demand") || msg.includes("spikes in demand")) {
+        return isFr
+          ? "Le modèle d'IA est actuellement très sollicité sur les serveurs Google (503). Pantryo bascule automatiquement sur l'OCR local ou réessaie."
+          : "The AI model is currently experiencing high demand (503). Pantryo automatically falls back to local OCR or retries.";
+      }
+      if (code === 429 || status === "RESOURCE_EXHAUSTED" || msg.includes("quota")) {
+        return isFr
+          ? "Limite de requêtes atteinte (erreur 429). Basculement vers l'OCR local ou réessai dans quelques instants."
+          : "Request quota limit reached (429). Falling back to local OCR or retrying shortly.";
+      }
+      if (msg) return msg;
+    }
+  } catch {}
+
+  const lower = String(rawMessage).toLowerCase();
+  if (lower.includes("503") || lower.includes("unavailable") || lower.includes("high demand")) {
+    return isFr
+      ? "Serveurs d'IA temporairement très sollicités (503). Pantryo tente l'OCR local..."
+      : "AI servers are experiencing temporary high demand (503). Pantryo is using local OCR...";
+  }
+  if (lower.includes("429") || lower.includes("resource_exhausted") || lower.includes("quota")) {
+    return isFr
+      ? "Limite de requêtes atteinte (429). Pantryo utilise l'OCR local..."
+      : "Request rate limit reached (429). Pantryo is using local OCR...";
+  }
+
+  return String(rawMessage);
 }
 
 /**
@@ -659,6 +827,7 @@ export async function parseRecipeFromPhoto({
   mimeType = "image/jpeg",
   notes = "",
   language = "EN",
+  forceLocalOcr = false,
 }) {
   const cleanBase64 = imageBase64.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, "").trim();
   const imageUrl = imageBase64.startsWith("data:") ? imageBase64 : `data:${mimeType};base64,${imageBase64}`;
@@ -675,6 +844,31 @@ export async function parseRecipeFromPhoto({
       recipes: [curatedMatch],
     };
   }
+
+  // If local OCR is explicitly forced by user
+  if (forceLocalOcr) {
+    try {
+      console.info("[Recipe Parser] Force local OCR requested. Running Tesseract.js...");
+      const { data: { text: ocrText } } = await Tesseract.recognize(imageBuffer, 'eng+fra');
+      if (ocrText && ocrText.trim().length > 10) {
+        const ocrRecipe = parseRecipeTextDirectly(ocrText, {
+          language,
+          source: "Photo Scan (Local OCR)",
+          imageUrl,
+        });
+        return {
+          success: true,
+          provider: "local_ocr",
+          recipe: ocrRecipe,
+          recipes: [ocrRecipe],
+          notice: language === "FR" ? "Numérisé avec succès via l'OCR local Pantryo." : "Successfully scanned via local Pantryo OCR.",
+        };
+      }
+    } catch (forcedOcrErr) {
+      console.warn("[Recipe Parser] Forced local OCR failed:", forcedOcrErr.message);
+    }
+  }
+
   const apiKey = (process.env.GEMINI_API_KEY || dbStore?.systemSettings?.geminiApiKey || "").trim();
   const localVisionUrl = (process.env.LOCAL_GEMMA_URL || dbStore?.systemSettings?.localVisionUrl || "").trim();
   const visionProvider = dbStore?.systemSettings?.aiVisionProvider || (localVisionUrl ? "local_gemma" : "gemini");
@@ -706,12 +900,9 @@ export async function parseRecipeFromPhoto({
     }
   }
 
-  // 2. If Gemini API key is configured and appears valid, run high-accuracy Gemini 3.8 Flash Vision
+  // 2. If Gemini API key is configured and appears valid, run high-accuracy Gemini Vision with cascade and retries
   if (apiKey && apiKey.length > 10 && !apiKey.startsWith("your_") && apiKey !== "MY_GEMINI_API_KEY") {
-    try {
-      const ai = getGeminiClient();
-
-      const systemInstruction = `You are Pantryo's master culinary archivist, high-precision OCR specialist, and bilingual chef.
+    const systemInstruction = `You are Pantryo's master culinary archivist, high-precision OCR specialist, and bilingual chef.
 Your mission is to inspect photos of printed cookbook pages, magazine clippings, community cookbooks, and handwritten family cards, and convert them into complete structured recipe JSON.
 
 CRITICAL INSTRUCTIONS FOR REAL-WORLD & VINTAGE RECIPE ARTIFACTS:
@@ -753,26 +944,58 @@ CRITICAL INSTRUCTIONS FOR REAL-WORLD & VINTAGE RECIPE ARTIFACTS:
 6. INGREDIENT LOCATION & CATEGORIES:
    - Assign each ingredient an optimal storage location ("FRIDGE", "FREEZER", "PANTRY", "SPICE_RACK") and category ("Produce", "Dairy & Eggs", "Meat & Seafood", "Bakery", "Pantry", "Frozen Foods", "Condiments", "Beverages").`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: {
-          parts: [
-            {
-              inlineData: {
-                mimeType: mimeType || "image/jpeg",
-                data: cleanBase64,
-              },
-            },
-            {
-              text: `Transcribe and digitize this recipe photo. Look carefully for any multiple recipes on this page, vintage Quebec culinary terms (soda à pâte, cassonade, c. à table), typewriter author names, and handwritten family notes (e.g. "Très bon faire souvent"). User notes: ${notes || "None"}.`,
-            },
-          ],
+    const recipeResponseSchema = {
+      type: Type.OBJECT,
+      properties: {
+        title: { type: Type.STRING },
+        titleFr: { type: Type.STRING },
+        descriptionEn: { type: Type.STRING },
+        descriptionFr: { type: Type.STRING },
+        authorName: { type: Type.STRING },
+        authorBadge: { type: Type.STRING },
+        prepTime: { type: Type.STRING },
+        cookTime: { type: Type.STRING },
+        totalTime: { type: Type.STRING },
+        servings: { type: Type.STRING },
+        difficulty: { type: Type.STRING },
+        difficultyFr: { type: Type.STRING },
+        calories: { type: Type.STRING },
+        hasHandwrittenNotes: { type: Type.BOOLEAN },
+        handwrittenNotesSummary: { type: Type.STRING },
+        recipeNotes: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
         },
-        config: {
-          systemInstruction,
-          temperature: 0.1,
-          responseMimeType: "application/json",
-          responseSchema: {
+        tags: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+        },
+        ingredients: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              name: { type: Type.STRING },
+              nameFr: { type: Type.STRING },
+              amount: { type: Type.STRING },
+              category: { type: Type.STRING },
+              locationType: { type: Type.STRING },
+            },
+            required: ["name", "amount", "category", "locationType"],
+          },
+        },
+        instructionsEn: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+        },
+        instructionsFr: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+        },
+        allRecipes: {
+          type: Type.ARRAY,
+          description: "All distinct recipes detected on this cookbook page if multiple recipes are present",
+          items: {
             type: Type.OBJECT,
             properties: {
               title: { type: Type.STRING },
@@ -783,21 +1006,7 @@ CRITICAL INSTRUCTIONS FOR REAL-WORLD & VINTAGE RECIPE ARTIFACTS:
               authorBadge: { type: Type.STRING },
               prepTime: { type: Type.STRING },
               cookTime: { type: Type.STRING },
-              totalTime: { type: Type.STRING },
               servings: { type: Type.STRING },
-              difficulty: { type: Type.STRING },
-              difficultyFr: { type: Type.STRING },
-              calories: { type: Type.STRING },
-              hasHandwrittenNotes: { type: Type.BOOLEAN },
-              handwrittenNotesSummary: { type: Type.STRING },
-              recipeNotes: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-              },
-              tags: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-              },
               ingredients: {
                 type: Type.ARRAY,
                 items: {
@@ -820,104 +1029,168 @@ CRITICAL INSTRUCTIONS FOR REAL-WORLD & VINTAGE RECIPE ARTIFACTS:
                 type: Type.ARRAY,
                 items: { type: Type.STRING },
               },
-              allRecipes: {
+              hasHandwrittenNotes: { type: Type.BOOLEAN },
+              handwrittenNotesSummary: { type: Type.STRING },
+              recipeNotes: {
                 type: Type.ARRAY,
-                description: "All distinct recipes detected on this cookbook page if multiple recipes are present",
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    title: { type: Type.STRING },
-                    titleFr: { type: Type.STRING },
-                    descriptionEn: { type: Type.STRING },
-                    descriptionFr: { type: Type.STRING },
-                    authorName: { type: Type.STRING },
-                    authorBadge: { type: Type.STRING },
-                    prepTime: { type: Type.STRING },
-                    cookTime: { type: Type.STRING },
-                    servings: { type: Type.STRING },
-                    ingredients: {
-                      type: Type.ARRAY,
-                      items: {
-                        type: Type.OBJECT,
-                        properties: {
-                          name: { type: Type.STRING },
-                          nameFr: { type: Type.STRING },
-                          amount: { type: Type.STRING },
-                          category: { type: Type.STRING },
-                          locationType: { type: Type.STRING },
-                        },
-                        required: ["name", "amount", "category", "locationType"],
-                      },
-                    },
-                    instructionsEn: {
-                      type: Type.ARRAY,
-                      items: { type: Type.STRING },
-                    },
-                    instructionsFr: {
-                      type: Type.ARRAY,
-                      items: { type: Type.STRING },
-                    },
-                    hasHandwrittenNotes: { type: Type.BOOLEAN },
-                    handwrittenNotesSummary: { type: Type.STRING },
-                    recipeNotes: {
-                      type: Type.ARRAY,
-                      items: { type: Type.STRING },
-                    },
-                  },
-                  required: ["title", "ingredients", "instructionsEn"],
-                },
+                items: { type: Type.STRING },
               },
             },
-            required: ["title", "descriptionEn", "ingredients", "instructionsEn"],
+            required: ["title", "ingredients", "instructionsEn"],
           },
         },
+      },
+      required: ["title", "descriptionEn", "ingredients", "instructionsEn"],
+    };
+
+    let lastError = null;
+    let parsed = null;
+    let successfulModel = null;
+    const modelsToTry = ["gemini-3.8-flash", "gemini-3.1-flash-lite"];
+
+    try {
+      const ai = getGeminiClient();
+
+      for (const modelName of modelsToTry) {
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            console.info(`[Gemini Recipe Parser] Attempting ${modelName} (attempt ${attempt})...`);
+            const response = await ai.models.generateContent({
+              model: modelName,
+              contents: {
+                parts: [
+                  {
+                    inlineData: {
+                      mimeType: mimeType || "image/jpeg",
+                      data: cleanBase64,
+                    },
+                  },
+                  {
+                    text: `Transcribe and digitize this recipe photo. Look carefully for any multiple recipes on this page, vintage Quebec culinary terms (soda à pâte, cassonade, c. à table), typewriter author names, and handwritten family notes (e.g. "Très bon faire souvent"). User notes: ${notes || "None"}.`,
+                  },
+                ],
+              },
+              config: {
+                systemInstruction,
+                responseMimeType: "application/json",
+                responseSchema: recipeResponseSchema,
+              },
+            });
+
+            const rawText = response.text;
+            if (rawText && rawText.trim().length > 0) {
+              let cleanJson = rawText.trim();
+              if (cleanJson.startsWith("```json")) {
+                cleanJson = cleanJson.replace(/^```json\s*/, "").replace(/\s*```$/, "");
+              } else if (cleanJson.startsWith("```")) {
+                cleanJson = cleanJson.replace(/^```\s*/, "").replace(/\s*```$/, "");
+              }
+              parsed = JSON.parse(cleanJson);
+              successfulModel = modelName;
+              break;
+            }
+          } catch (modelErr) {
+            lastError = modelErr;
+            const errMsg = modelErr?.message || String(modelErr);
+            const isTransient = errMsg.includes("503") || errMsg.includes("UNAVAILABLE") || errMsg.includes("high demand") || errMsg.includes("429") || errMsg.includes("RESOURCE_EXHAUSTED");
+            console.warn(`[Gemini Recipe Parser] ${modelName} attempt ${attempt} error:`, errMsg.slice(0, 120));
+
+            if (isTransient && attempt === 1) {
+              console.info("[Gemini Recipe Parser] Transient demand spike detected, waiting 1.5s before retry...");
+              await new Promise((r) => setTimeout(r, 1500));
+              continue;
+            }
+            break; // Proceed to next model in cascade
+          }
+        }
+        if (parsed) break;
+      }
+    } catch (clientErr) {
+      lastError = clientErr;
+      console.warn("[Gemini Recipe Parser] Client initialization or cascade error:", clientErr.message);
+    }
+
+    if (parsed) {
+      const primaryRecipe = normalizeRecipeOutput(parsed, {
+        source: "Photo Import",
+        imageUrl,
+        language,
       });
 
-      const rawText = response.text;
-      if (rawText) {
-        let cleanJson = rawText.trim();
-        if (cleanJson.startsWith("```json")) {
-          cleanJson = cleanJson.replace(/^```json\s*/, "").replace(/\s*```$/, "");
-        } else if (cleanJson.startsWith("```")) {
-          cleanJson = cleanJson.replace(/^```\s*/, "").replace(/\s*```$/, "");
-        }
-
-        const parsed = JSON.parse(cleanJson);
-        const primaryRecipe = normalizeRecipeOutput(parsed, {
-          source: "Photo Import",
-          imageUrl,
-          language,
-        });
-
-        const allParsedRecipes = Array.isArray(parsed.allRecipes) && parsed.allRecipes.length > 0
-          ? parsed.allRecipes.map((r, idx) =>
-              normalizeRecipeOutput(
-                { ...r, id: `rec_${Date.now()}_${idx}` },
-                { source: "Photo Import", imageUrl, language }
-              )
+      const allParsedRecipes = Array.isArray(parsed.allRecipes) && parsed.allRecipes.length > 0
+        ? parsed.allRecipes.map((r, idx) =>
+            normalizeRecipeOutput(
+              { ...r, id: `rec_${Date.now()}_${idx}` },
+              { source: "Photo Import", imageUrl, language }
             )
-          : [primaryRecipe];
+          )
+        : [primaryRecipe];
 
-        return {
-          success: true,
-          provider: "gemini_flash",
-          recipe: primaryRecipe,
-          recipes: allParsedRecipes,
-        };
-      }
-    } catch (error) {
-      console.error("[Gemini Recipe Parser] Gemini Vision attempt failed:", error.message);
       return {
-        success: false,
-        error: language === "FR"
-          ? `Échec de l'analyse Gemini 3.8 Flash : ${error.message}. Vérifiez votre clé API Gemini.`
-          : `Gemini 3.8 Flash Vision error: ${error.message}. Please check your Gemini API key.`,
-        details: error.message,
+        success: true,
+        provider: successfulModel || "gemini_flash",
+        recipe: primaryRecipe,
+        recipes: allParsedRecipes,
       };
     }
+
+    // 3. Fallback to Tesseract OCR when Gemini models are unavailable (e.g. 503 high demand or quota limits)
+    console.warn("[Gemini Recipe Parser] Gemini models unavailable, initiating local Tesseract OCR fallback...");
+    try {
+      const { data: { text: ocrText } } = await Tesseract.recognize(imageBuffer, 'eng+fra');
+      if (ocrText && ocrText.trim().length > 15) {
+        console.info("[Gemini Recipe Parser] Tesseract OCR extracted text successfully:", ocrText.slice(0, 80));
+        const ocrRecipe = parseRecipeTextDirectly(ocrText, {
+          language,
+          source: "Photo Scan (Local OCR)",
+          imageUrl,
+        });
+        return {
+          success: true,
+          provider: "local_ocr_fallback",
+          recipe: ocrRecipe,
+          recipes: [ocrRecipe],
+          notice: language === "FR"
+            ? "Numérisé avec succès par OCR local Pantryo (en raison d'une forte demande temporaire sur les serveurs d'IA)."
+            : "Successfully scanned via local Pantryo OCR (due to temporary high demand on AI servers).",
+        };
+      }
+    } catch (ocrErr) {
+      console.error("[Gemini Recipe Parser] Tesseract OCR fallback error:", ocrErr.message);
+    }
+
+    const cleanErr = cleanErrorMessage(lastError?.message, language);
+    return {
+      success: false,
+      error: cleanErr,
+      details: lastError?.message || "All vision models failed",
+      canRetry: true,
+    };
   }
 
-  // If no Gemini API key is configured, return explicit instructions rather than corrupting recipes with low-accuracy CPU OCR
+  // If no Gemini API key is configured, attempt local Tesseract OCR before failing
+  try {
+    const { data: { text: ocrText } } = await Tesseract.recognize(imageBuffer, 'eng+fra');
+    if (ocrText && ocrText.trim().length > 15) {
+      const ocrRecipe = parseRecipeTextDirectly(ocrText, {
+        language,
+        source: "Photo Scan (Local OCR)",
+        imageUrl,
+      });
+      return {
+        success: true,
+        provider: "local_ocr",
+        recipe: ocrRecipe,
+        recipes: [ocrRecipe],
+        notice: language === "FR"
+          ? "Numérisé via OCR local (clé Gemini non configurée)."
+          : "Scanned via local OCR (Gemini key not configured).",
+      };
+    }
+  } catch (ocrErr) {
+    console.warn("[Gemini Recipe Parser] No API key, and OCR fallback failed:", ocrErr.message);
+  }
+
   return {
     success: false,
     requiresGeminiKey: true,

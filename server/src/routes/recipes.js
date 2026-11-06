@@ -90,6 +90,7 @@ router.post("/ai-parse", async (req, res) => {
       mimeType = "image/jpeg",
       notes = "",
       language = "EN",
+      forceLocalOcr = false,
     } = req.body;
 
     if (mode === "photo") {
@@ -105,6 +106,7 @@ router.post("/ai-parse", async (req, res) => {
         mimeType,
         notes,
         language,
+        forceLocalOcr,
       });
 
       return res.status(200).json(result);

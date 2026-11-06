@@ -243,10 +243,105 @@ export function normalizeRecipe(recipe: any, activeLang: 'EN' | 'FR' = 'FR'): Ri
   };
 }
 
+export interface BatchRecipeItem {
+  id: string;
+  name: string;
+  previewUrl: string;
+  status: 'queued' | 'scanning' | 'done' | 'error';
+  recipe: RicardoRecipe | null;
+  error?: string | null;
+  modelProvider?: string;
+}
+
+export function cleanDisplayError(rawErr: any, lang: 'EN' | 'FR'): { text: string; isHighDemand: boolean; isRateLimited: boolean } {
+  const str = typeof rawErr === 'string' ? rawErr : rawErr?.message || '';
+  const isFr = lang === 'FR';
+
+  let code: number | undefined;
+  let status: string | undefined;
+  let msg: string = str;
+
+  try {
+    const jsonMatch = str.match(/\{[\s\S]*"error"[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      code = parsed?.error?.code;
+      status = parsed?.error?.status;
+      msg = parsed?.error?.message || '';
+    }
+  } catch {}
+
+  const lower = (str + ' ' + msg).toLowerCase();
+  const isHighDemand = code === 503 || status === 'UNAVAILABLE' || lower.includes('503') || lower.includes('high demand') || lower.includes('spikes in demand');
+  const isRateLimited = code === 429 || status === 'RESOURCE_EXHAUSTED' || lower.includes('429') || lower.includes('quota') || lower.includes('rate-limit');
+
+  if (isHighDemand) {
+    return {
+      text: isFr
+        ? "Les serveurs d'IA Gemini sont temporairement très sollicités (erreur 503). Pantryo tente l'OCR local ou vous pouvez réessayer."
+        : "Gemini AI servers are temporarily experiencing high demand (503). You can retry or use local OCR.",
+      isHighDemand: true,
+      isRateLimited: false,
+    };
+  }
+
+  if (isRateLimited) {
+    return {
+      text: isFr
+        ? "Limite de requêtes atteinte sur le forfait gratuit (429). Réessai dans quelques secondes ou utilisez l'OCR local."
+        : "Minute request rate limit reached on Free Tier (429). Retrying in a few seconds or use local OCR.",
+      isHighDemand: false,
+      isRateLimited: true,
+    };
+  }
+
+  return {
+    text: msg || str || (isFr ? 'Erreur lors de l’analyse' : 'Error parsing recipe'),
+    isHighDemand: false,
+    isRateLimited: false,
+  };
+}
+
+export function readFileAsCompressedDataUri(file: File): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        const maxDim = 1600;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.9));
+        } else {
+          resolve(event.target?.result as string);
+        }
+      };
+      img.onerror = () => resolve(event.target?.result as string);
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 interface AddRecipeModalProps {
   isOpen: boolean;
   onClose: () => void;
   onRecipeSaved: (recipe: RicardoRecipe) => void;
+  onBatchRecipesSaved?: (recipes: RicardoRecipe[]) => void;
   lang?: 'EN' | 'FR';
   initialTab?: 'url' | 'youtube' | 'text' | 'photo';
   autoOpenCam?: boolean;
@@ -258,6 +353,7 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
   isOpen,
   onClose,
   onRecipeSaved,
+  onBatchRecipesSaved,
   lang: propLang,
   initialTab = 'url',
   autoOpenCam = false,
@@ -308,7 +404,18 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
   const [isParsing, setIsParsing] = useState(false);
   const [parsingStep, setParsingStep] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<{ text: string; isHighDemand: boolean; isRateLimited: boolean } | null>(null);
+  const [retryCountdown, setRetryCountdown] = useState<number | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
+
+  // Continuous scanning session state: recipes saved during this open session
+  const [sessionSavedRecipes, setSessionSavedRecipes] = useState<RicardoRecipe[]>([]);
+  const [showSessionRecap, setShowSessionRecap] = useState(false);
+
+  // Batch multi-photo scan queue
+  const [batchQueue, setBatchQueue] = useState<BatchRecipeItem[]>([]);
+  const [activeBatchIndex, setActiveBatchIndex] = useState<number>(0);
+  const [isProcessingBatch, setIsProcessingBatch] = useState<boolean>(false);
 
   // Multi-recipe page detection state (e.g. Five Roses page 69 with 3 recipes)
   const [detectedMultiRecipes, setDetectedMultiRecipes] = useState<RicardoRecipe[]>([]);
@@ -608,17 +715,38 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
     startLiveCamera(nextFacing);
   };
 
+  // Auto-retry countdown effect on high demand
+  useEffect(() => {
+    if (retryCountdown === null) return;
+    if (retryCountdown <= 0) {
+      setRetryCountdown(null);
+      if (photoBase64 && !parsedRecipe && !isParsing) {
+        triggerPhotoImport(photoBase64, false);
+      }
+      return;
+    }
+    const timer = setTimeout(() => {
+      setRetryCountdown((prev) => (prev !== null ? prev - 1 : null));
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [retryCountdown, photoBase64, parsedRecipe, isParsing]);
+
   // Snap photo from in-app live camera viewfinder
   // Function to execute photo parsing immediately
-  const triggerPhotoImport = async (base64Data: string) => {
+  const triggerPhotoImport = async (base64Data: string, forceLocalOcr: boolean = false) => {
     setIsParsing(true);
     setParsedRecipe(null);
     setParsingStep(
-      lang === 'FR'
-        ? 'Analyse multimodale Gemini 3.8 Flash... Extraction haute précision des ingrédients et étapes...'
-        : 'Gemini 3.8 Flash Vision analyzing cookbook page... Extracting ingredients, fractions & instructions...'
+      forceLocalOcr
+        ? (lang === 'FR' ? 'Numérisation par OCR local Pantryo en cours...' : 'Scanning with local Pantryo OCR...')
+        : (lang === 'FR'
+            ? 'Analyse multimodale Gemini 3.8 Flash... Extraction haute précision des ingrédients et étapes...'
+            : 'Gemini 3.8 Flash Vision analyzing cookbook page... Extracting ingredients, fractions & instructions...')
     );
     setErrorMsg(null);
+    setErrorDetails(null);
+    setRetryCountdown(null);
+
     try {
       const res = await fetch('/api/v1/recipes/ai-parse', {
         method: 'POST',
@@ -629,6 +757,7 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
           imageBase64: base64Data,
           mimeType: 'image/jpeg',
           autoTranslate: autoTranslateOnImport,
+          forceLocalOcr,
         }),
       });
 
@@ -642,11 +771,21 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
           );
           return;
         }
-        throw new Error(data.error || 'Failed to parse recipe photo');
+        const cleaned = cleanDisplayError(data.error || 'Failed to parse recipe photo', lang);
+        setErrorMsg(cleaned.text);
+        setErrorDetails(cleaned);
+        if (cleaned.isHighDemand) {
+          setRetryCountdown(5);
+        }
+        return;
       }
 
       const normalized = normalizeRecipe(data.recipe, lang);
       setParsedRecipe(normalized);
+
+      if (data.notice) {
+        showToast(data.notice, 'info');
+      }
 
       // Multi-recipe detection support
       if (Array.isArray(data.recipes) && data.recipes.length > 1) {
@@ -676,11 +815,184 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
       }
     } catch (err: any) {
       console.error('AI Parse/Import failed:', err);
-      setErrorMsg(err.message || 'Error communicating with AI service');
+      const cleaned = cleanDisplayError(err, lang);
+      setErrorMsg(cleaned.text);
+      setErrorDetails(cleaned);
+      if (cleaned.isHighDemand) {
+        setRetryCountdown(5);
+      }
     } finally {
       setIsParsing(false);
       setParsingStep('');
     }
+  };
+
+  // Continuous scan: save current recipe and immediately trigger next scan without leaving modal
+  const handleSaveAndSnapNext = async () => {
+    if (!parsedRecipe) return;
+
+    const recipeId = parsedRecipe.id || `rec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const recipeToPersist: RicardoRecipe = {
+      ...parsedRecipe,
+      id: recipeId,
+      isCustom: true,
+      updatedAt: new Date().toISOString(),
+      createdAt: parsedRecipe.createdAt || new Date().toISOString(),
+      ingredients: (parsedRecipe.ingredients || []).map((ing, idx) =>
+        normalizeRecipeIngredient(ing, idx)
+      ),
+    };
+
+    let savedItem = recipeToPersist;
+    try {
+      const endpoint = '/api/v1/recipes/custom';
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(recipeToPersist),
+      });
+      const data = await res.json();
+      if (data.success && data.recipe) {
+        savedItem = data.recipe;
+      }
+    } catch (err) {
+      console.warn('Backend save failed, using local save:', err);
+    }
+
+    onRecipeSaved(savedItem);
+    setSessionSavedRecipes((prev) => [savedItem, ...prev]);
+
+    const titleSaved = getRecipeDisplayTitle(savedItem, lang);
+    showToast(
+      lang === 'FR'
+        ? `✅ « ${titleSaved} » enregistrée ! (${sessionSavedRecipes.length + 1} dans cette session). Prêt pour la suivante !`
+        : `✅ "${titleSaved}" saved! (${sessionSavedRecipes.length + 1} in this session). Ready for the next one!`,
+      'success'
+    );
+
+    // Reset current photo state to allow immediate next capture
+    setParsedRecipe(null);
+    setPhotoBase64(null);
+    setErrorMsg(null);
+    setErrorDetails(null);
+    setDetectedMultiRecipes([]);
+    setActiveTab('photo');
+
+    // Trigger next camera snap after short delay
+    setTimeout(() => {
+      cameraAppInputRef.current?.click();
+    }, 250);
+  };
+
+  // Process batch of multiple photos sequentially
+  const processBatchQueue = async (items: BatchRecipeItem[], startIndex: number = 0) => {
+    if (items.length === 0) return;
+    setIsProcessingBatch(true);
+
+    const updatedQueue = [...items];
+
+    for (let i = startIndex; i < updatedQueue.length; i++) {
+      const current = updatedQueue[i];
+      if (current.status === 'done') continue;
+
+      current.status = 'scanning';
+      setBatchQueue([...updatedQueue]);
+      setActiveBatchIndex(i);
+
+      try {
+        const res = await fetch('/api/v1/recipes/ai-parse', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mode: 'photo',
+            language: lang,
+            imageBase64: current.previewUrl,
+            mimeType: 'image/jpeg',
+            autoTranslate: autoTranslateOnImport,
+          }),
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success && data.recipe) {
+          const normalized = normalizeRecipe(data.recipe, lang);
+          current.status = 'done';
+          current.recipe = normalized;
+          current.modelProvider = data.provider;
+          // Set this recipe as current preview if none currently selected
+          setParsedRecipe((prev) => prev || normalized);
+        } else {
+          current.status = 'error';
+          current.error = data.error || 'Failed to scan';
+        }
+      } catch (err: any) {
+        current.status = 'error';
+        current.error = err.message || 'Network error';
+      }
+
+      setBatchQueue([...updatedQueue]);
+
+      // Pause 750ms between items to respect rate limits
+      if (i < updatedQueue.length - 1) {
+        await new Promise((r) => setTimeout(r, 750));
+      }
+    }
+
+    setIsProcessingBatch(false);
+    const successCount = updatedQueue.filter((x) => x.status === 'done').length;
+    showToast(
+      lang === 'FR'
+        ? `🎉 Lot terminé : ${successCount} sur ${updatedQueue.length} recettes prêtes !`
+        : `🎉 Batch complete: ${successCount} of ${updatedQueue.length} recipes ready!`,
+      successCount > 0 ? 'success' : 'warning'
+    );
+  };
+
+  // Save all successfully parsed recipes from the batch queue
+  const handleSaveAllBatchRecipes = async () => {
+    const readyItems = batchQueue.filter((item) => item.status === 'done' && item.recipe);
+    if (readyItems.length === 0) return;
+
+    const savedList: RicardoRecipe[] = [];
+    for (const item of readyItems) {
+      if (!item.recipe) continue;
+      const rec = item.recipe;
+      const recipeId = rec.id || `rec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const recipeToPersist: RicardoRecipe = {
+        ...rec,
+        id: recipeId,
+        isCustom: true,
+        updatedAt: new Date().toISOString(),
+        createdAt: rec.createdAt || new Date().toISOString(),
+      };
+
+      try {
+        await fetch('/api/v1/recipes/custom', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(recipeToPersist),
+        });
+      } catch (e) {
+        console.warn('Batch recipe backend save error:', e);
+      }
+
+      savedList.push(recipeToPersist);
+      onRecipeSaved(recipeToPersist);
+    }
+
+    if (onBatchRecipesSaved) {
+      onBatchRecipesSaved(savedList);
+    }
+
+    setSessionSavedRecipes((prev) => [...savedList, ...prev]);
+    showToast(
+      lang === 'FR'
+        ? `✨ ${savedList.length} recettes enregistrées dans votre cuisine !`
+        : `✨ All ${savedList.length} recipes saved to your kitchen!`,
+      'success'
+    );
+    setBatchQueue([]);
+    setParsedRecipe(null);
+    onClose();
   };
 
   // 1-Click Vintage sample loader for authentic vintage cookbook pages
@@ -748,12 +1060,17 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
     stopLiveCamera();
   };
 
-  // Handle files selected from native camera input or gallery
+  // Handle files selected from native camera input or gallery (supports single and batch)
   const handlePhotoPicked = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    // Reset value so snapping the same angle again triggers onChange
+    if (files.length > 1) {
+      handleBatchPhotosPicked(e);
+      return;
+    }
+
+    const file = files[0];
     e.target.value = '';
 
     const reader = new FileReader();
@@ -790,6 +1107,42 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
       img.src = event.target?.result as string;
     };
     reader.readAsDataURL(file);
+  };
+
+  // Batch multi-photo selection handler
+  const handleBatchPhotosPicked = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    if (files.length === 1) {
+      handlePhotoPicked(e);
+      return;
+    }
+
+    const fileList = Array.from(files);
+    e.target.value = '';
+
+    setErrorMsg(null);
+    setErrorDetails(null);
+    setParsedRecipe(null);
+    setPhotoBase64(null);
+
+    const items: BatchRecipeItem[] = [];
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
+      const previewUrl = await readFileAsCompressedDataUri(file);
+      items.push({
+        id: `batch-${Date.now()}-${i}-${Math.random().toString(36).substring(2, 6)}`,
+        name: file.name.replace(/\.[^/.]+$/, ''),
+        previewUrl,
+        status: 'queued',
+        recipe: null,
+      });
+    }
+
+    setBatchQueue(items);
+    setActiveBatchIndex(0);
+    processBatchQueue(items, 0);
   };
 
   // Stop camera when closing modal or switching tabs
@@ -1424,12 +1777,103 @@ Instructions:
         </button>
       </header>
 
+      {/* Active Continuous Scanning Session Ribbon */}
+      {sessionSavedRecipes.length > 0 && (
+        <div className="bg-emerald-50 border-b border-emerald-200 px-4 py-2.5 flex items-center justify-between text-xs shrink-0 animate-fade-in">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 animate-pulse" />
+            <span className="font-bold text-emerald-950">
+              {lang === 'FR'
+                ? `📚 Session active : ${sessionSavedRecipes.length} recette${sessionSavedRecipes.length > 1 ? 's' : ''} enregistrée${sessionSavedRecipes.length > 1 ? 's' : ''} en continu`
+                : `📚 Continuous scan session: ${sessionSavedRecipes.length} recipe${sessionSavedRecipes.length > 1 ? 's' : ''} saved`}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowSessionRecap(!showSessionRecap)}
+              className="text-emerald-800 underline text-[11px] font-bold cursor-pointer"
+            >
+              {showSessionRecap
+                ? (lang === 'FR' ? 'Masquer la liste' : 'Hide list')
+                : (lang === 'FR' ? 'Voir le récapitulatif' : 'View recap')}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-2.5 py-1 rounded-full bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-bold shadow-2xs transition-colors cursor-pointer"
+            >
+              {lang === 'FR' ? 'Terminer' : 'Done'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Session Recap Drawer */}
+      {showSessionRecap && sessionSavedRecipes.length > 0 && (
+        <div className="bg-[#FAFBF9] border-b border-emerald-200 p-3 text-xs shrink-0 max-h-48 overflow-y-auto space-y-1.5 animate-fade-in">
+          <p className="text-[10px] font-black uppercase tracking-wider text-emerald-900">
+            {lang === 'FR' ? 'Recettes enregistrées dans cette session :' : 'Recipes saved in this session:'}
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {sessionSavedRecipes.map((r, idx) => (
+              <span
+                key={r.id || idx}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-100/80 border border-emerald-300 text-emerald-950 font-bold text-[11px]"
+              >
+                <Check className="w-3 h-3 text-emerald-700" />
+                <span>{getRecipeDisplayTitle(r, lang)}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 max-w-3xl mx-auto w-full">
         {errorMsg && (
-          <div className="mb-4 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2.5">
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-            <span className="leading-snug">{errorMsg}</span>
+          <div className="mb-4 p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-950 text-xs shadow-2xs space-y-2.5 animate-fade-in">
+            <div className="flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="font-bold leading-snug">{errorMsg}</p>
+                {errorDetails?.isHighDemand && (
+                  <p className="text-[11px] text-amber-800 mt-1 leading-relaxed">
+                    {lang === 'FR'
+                      ? 'Les serveurs Google Gemini connaissent actuellement un pic de demande temporaire. Vous pouvez réessayer automatiquement ou utiliser l’OCR local immédiat.'
+                      : 'Google Gemini servers are currently experiencing a temporary demand spike. You can retry or use immediate local OCR.'}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {photoBase64 && (
+              <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-amber-200">
+                <button
+                  type="button"
+                  onClick={() => triggerPhotoImport(photoBase64, false)}
+                  disabled={isParsing}
+                  className="px-3.5 py-1.5 rounded-xl bg-amber-700 hover:bg-amber-800 text-white text-[11px] font-bold flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>
+                    {retryCountdown !== null
+                      ? `${lang === 'FR' ? 'Réessai dans' : 'Retrying in'} ${retryCountdown}s...`
+                      : (lang === 'FR' ? 'Réessayer maintenant' : 'Retry Now')}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => triggerPhotoImport(photoBase64, true)}
+                  disabled={isParsing}
+                  className="px-3.5 py-1.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-[11px] font-bold flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
+                >
+                  <Zap className="w-3 h-3 text-amber-300" />
+                  <span>{lang === 'FR' ? 'Numériser avec l’OCR local Pantryo' : 'Scan with Local Pantryo OCR'}</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -2019,7 +2463,8 @@ Instructions:
                   type="file"
                   ref={galleryInputRef}
                   accept="image/*"
-                  onChange={handlePhotoPicked}
+                  multiple
+                  onChange={handleBatchPhotosPicked}
                   className="hidden"
                 />
 
@@ -2067,6 +2512,134 @@ Instructions:
                     </div>
                   </div>
                 </div>
+
+                {/* Batch Queue Dashboard (when multiple recipes are being scanned in a row) */}
+                {batchQueue.length > 0 && (
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-300 shadow-2xs space-y-3 animate-fade-in">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Layers className="w-4 h-4 text-teal-700" />
+                        <h4 className="text-xs font-black text-teal-950">
+                          {lang === 'FR'
+                            ? `Numérisation en lot (${batchQueue.filter((x) => x.status === 'done').length}/${batchQueue.length} prêtes)`
+                            : `Batch Scan Queue (${batchQueue.filter((x) => x.status === 'done').length}/${batchQueue.length} ready)`}
+                        </h4>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => galleryInputRef.current?.click()}
+                          className="text-[10px] font-bold text-teal-800 hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>{lang === 'FR' ? 'Ajouter des photos' : 'Add photos'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBatchQueue([]);
+                            setActiveBatchIndex(0);
+                          }}
+                          className="text-[10px] text-rose-600 hover:underline font-bold cursor-pointer"
+                        >
+                          {lang === 'FR' ? 'Vider' : 'Clear'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                      <div
+                        className="bg-teal-600 h-full transition-all duration-300 rounded-full"
+                        style={{
+                          width: `${(batchQueue.filter((x) => x.status === 'done').length / batchQueue.length) * 100}%`,
+                        }}
+                      />
+                    </div>
+
+                    {/* Horizontal scroll of batch items */}
+                    <div className="flex gap-2.5 overflow-x-auto pb-1 pt-1">
+                      {batchQueue.map((item, idx) => {
+                        const isSelected = activeBatchIndex === idx;
+                        return (
+                          <div
+                            key={item.id}
+                            onClick={() => {
+                              setActiveBatchIndex(idx);
+                              if (item.recipe) {
+                                setParsedRecipe(item.recipe);
+                              }
+                            }}
+                            className={`p-2 rounded-xl border flex items-center gap-2.5 shrink-0 cursor-pointer transition-all ${
+                              isSelected
+                                ? 'bg-white border-teal-600 shadow-xs ring-2 ring-teal-500/20'
+                                : 'bg-white/80 border-slate-200 hover:border-teal-400'
+                            }`}
+                            style={{ minWidth: '180px', maxWidth: '220px' }}
+                          >
+                            <img
+                              src={item.previewUrl}
+                              alt={item.name}
+                              className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[11px] font-black text-slate-800 truncate">
+                                {item.recipe ? getRecipeDisplayTitle(item.recipe, lang) : item.name}
+                              </p>
+                              <div className="flex items-center gap-1 mt-0.5">
+                                {item.status === 'scanning' && (
+                                  <span className="text-[9px] font-bold text-teal-700 flex items-center gap-1">
+                                    <Sparkles className="w-2.5 h-2.5 animate-spin" />
+                                    <span>{lang === 'FR' ? 'Analyse...' : 'Scanning...'}</span>
+                                  </span>
+                                )}
+                                {item.status === 'done' && (
+                                  <span className="text-[9px] font-black text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded-full flex items-center gap-0.5">
+                                    <Check className="w-2.5 h-2.5" />
+                                    <span>{lang === 'FR' ? 'Prête' : 'Ready'}</span>
+                                  </span>
+                                )}
+                                {item.status === 'queued' && (
+                                  <span className="text-[9px] text-slate-500 font-bold">
+                                    {lang === 'FR' ? 'En attente' : 'Queued'}
+                                  </span>
+                                )}
+                                {item.status === 'error' && (
+                                  <span className="text-[9px] font-bold text-rose-700 bg-rose-100 px-1.5 py-0.2 rounded-full">
+                                    {lang === 'FR' ? 'Erreur' : 'Error'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Batch Action Buttons */}
+                    <div className="flex items-center justify-between pt-1">
+                      <p className="text-[10px] text-teal-900 font-medium">
+                        {lang === 'FR'
+                          ? 'Cliquez sur une vignette pour voir ou ajuster les ingrédients avant d’enregistrer.'
+                          : 'Click any thumbnail to inspect ingredients before saving.'}
+                      </p>
+                      {batchQueue.some((x) => x.status === 'done') && (
+                        <button
+                          type="button"
+                          onClick={handleSaveAllBatchRecipes}
+                          className="px-3.5 py-1.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-black flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all cursor-pointer"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-teal-200" />
+                          <span>
+                            {lang === 'FR'
+                              ? `Enregistrer tout le lot (${batchQueue.filter((x) => x.status === 'done').length})`
+                              : `Save All in Batch (${batchQueue.filter((x) => x.status === 'done').length})`}
+                          </span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {cameraError && (
                   <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold flex items-center gap-2">
@@ -2184,8 +2757,43 @@ Instructions:
                     </div>
                   </div>
                 ) : (
-                  /* 3. Action Hub for Snapping Written Recipes */
+                  /* 3. Action Hub for Snapping Written Recipes & Batch Imports */
                   <div className="space-y-3 py-1">
+                    {/* BATCH SCAN MULTIPLE RECIPES PROMINENT CARD */}
+                    <div className="p-4 rounded-2xl bg-gradient-to-r from-teal-900 via-[#1E3022] to-emerald-950 text-white shadow-md border border-teal-700/60 flex flex-col sm:flex-row items-center justify-between gap-3">
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 flex items-center justify-center shrink-0 mt-0.5">
+                          <Layers className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-black text-white">
+                              {lang === 'FR'
+                                ? 'Numériser plusieurs recettes d’affilée'
+                                : 'Scan Multiple Recipes in a Row'}
+                            </span>
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 text-[10px] font-black uppercase tracking-wider border border-emerald-400/30">
+                              {lang === 'FR' ? 'Mode Lot Multi-Photos' : 'Batch Photo Scan'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-emerald-100/80 mt-1 leading-snug">
+                            {lang === 'FR'
+                              ? 'Sélectionnez plusieurs photos de pages de livre ou fiches dans votre galerie. L’IA les traite en file d’attente sans interruption.'
+                              : 'Select multiple cookbook or card photos from your gallery at once. Gemini parses them in a seamless queue.'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => galleryInputRef.current?.click()}
+                        className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all cursor-pointer shrink-0"
+                      >
+                        <Layers className="w-4 h-4 stroke-[2.5]" />
+                        <span>{lang === 'FR' ? 'Sélectionner le lot (Photos)' : 'Select Batch of Photos'}</span>
+                      </button>
+                    </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {/* Native Camera App Launcher */}
                       <button
@@ -2201,8 +2809,8 @@ Instructions:
                         </span>
                         <span className="text-[11px] text-emerald-100 opacity-90 leading-tight">
                           {lang === 'FR'
-                            ? 'Déclenche l’appareil photo natif de votre téléphone'
-                            : 'Directly launches your phone’s camera shutter'}
+                            ? 'Prendre une photo avec l’appareil photo du téléphone'
+                            : 'Snap a single recipe with phone camera'}
                         </span>
                       </button>
 
@@ -2227,14 +2835,14 @@ Instructions:
                     </div>
 
                     {/* Gallery or File Picker fallback */}
-                    <div className="text-center pt-1">
+                    <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
                       <button
                         type="button"
                         onClick={() => galleryInputRef.current?.click()}
                         className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-[#CADBC7] hover:border-emerald-600 bg-white text-[#1E3022] text-xs font-bold transition-all shadow-2xs hover:bg-[#F8FAF6] cursor-pointer"
                       >
                         <Upload className="w-3.5 h-3.5 text-emerald-700" />
-                        <span>{lang === 'FR' ? 'Choisir une photo dans la galerie / fichiers' : 'Pick photo from gallery / files'}</span>
+                        <span>{lang === 'FR' ? 'Choisir des photos dans la galerie (Simple ou Multiple)' : 'Pick photos from gallery (Single or Multiple)'}</span>
                       </button>
                     </div>
 
@@ -3426,22 +4034,58 @@ Instructions:
             </span>
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={handleConfirmSave}
-            className="px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black flex items-center gap-2 shadow-md active:scale-95 transition-all cursor-pointer"
-          >
-            <Check className="w-4 h-4 stroke-[3]" />
-            <span>
-              {recipeToEdit
-                ? lang === 'FR'
-                  ? 'Enregistrer les modifications'
-                  : 'Save Changes'
-                : lang === 'FR'
-                ? 'Enregistrer dans ma cuisine'
-                : 'Save Recipe to My Kitchen'}
-            </span>
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* If in photo mode or batch mode, give continuous scan option: Save & Snap Next */}
+            {(activeTab === 'photo' || batchQueue.length > 0) && (
+              <button
+                type="button"
+                onClick={handleSaveAndSnapNext}
+                className="px-4 py-2.5 rounded-xl bg-[#0F3831] hover:bg-[#07241F] text-emerald-200 hover:text-white text-xs font-black flex items-center gap-2 border border-emerald-500/40 shadow-sm active:scale-95 transition-all cursor-pointer"
+                title={lang === 'FR' ? 'Enregistre cette recette et ouvre immédiatement la caméra pour la suivante' : 'Saves this recipe and immediately opens camera for the next one'}
+              >
+                <Camera className="w-4 h-4 stroke-[2.5] text-emerald-400" />
+                <span>
+                  {lang === 'FR'
+                    ? '📸 Enregistrer & Scanner la suivante'
+                    : '📸 Save & Snap Next'}
+                </span>
+              </button>
+            )}
+
+            {/* If batch items are loaded and ready, allow saving entire batch */}
+            {batchQueue.length > 0 && batchQueue.some((x) => x.status === 'done') && (
+              <button
+                type="button"
+                onClick={handleSaveAllBatchRecipes}
+                className="px-4 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-black flex items-center gap-2 shadow-sm active:scale-95 transition-all cursor-pointer"
+              >
+                <Layers className="w-4 h-4" />
+                <span>
+                  {lang === 'FR'
+                    ? `Tout enregistrer (${batchQueue.filter((x) => x.status === 'done').length})`
+                    : `Save All (${batchQueue.filter((x) => x.status === 'done').length})`}
+                </span>
+              </button>
+            )}
+
+            {/* Save & Finish button */}
+            <button
+              type="button"
+              onClick={handleConfirmSave}
+              className="px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black flex items-center gap-2 shadow-md active:scale-95 transition-all cursor-pointer"
+            >
+              <Check className="w-4 h-4 stroke-[3]" />
+              <span>
+                {recipeToEdit
+                  ? lang === 'FR'
+                    ? 'Enregistrer les modifications'
+                    : 'Save Changes'
+                  : lang === 'FR'
+                  ? 'Enregistrer & Terminer'
+                  : 'Save & Finish'}
+              </span>
+            </button>
+          </div>
         )}
       </footer>
     </div>
