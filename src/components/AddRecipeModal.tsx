@@ -253,7 +253,7 @@ export interface BatchRecipeItem {
   modelProvider?: string;
 }
 
-export function cleanDisplayError(rawErr: any, lang: 'EN' | 'FR'): { text: string; isHighDemand: boolean; isRateLimited: boolean } {
+export function cleanDisplayError(rawErr: any, lang: 'EN' | 'FR'): { text: string; isHighDemand: boolean; isRateLimited: boolean; isHtmlOrTimeout: boolean } {
   const str = typeof rawErr === 'string' ? rawErr : rawErr?.message || '';
   const isFr = lang === 'FR';
 
@@ -274,14 +274,16 @@ export function cleanDisplayError(rawErr: any, lang: 'EN' | 'FR'): { text: strin
   const lower = (str + ' ' + msg).toLowerCase();
   const isHighDemand = code === 503 || status === 'UNAVAILABLE' || lower.includes('503') || lower.includes('high demand') || lower.includes('spikes in demand');
   const isRateLimited = code === 429 || status === 'RESOURCE_EXHAUSTED' || lower.includes('429') || lower.includes('quota') || lower.includes('rate-limit');
+  const isHtmlOrTimeout = lower.includes('<!doctype') || lower.includes('unexpected token') || lower.includes('not valid json') || lower.includes('gateway timeout') || lower.includes('504') || lower.includes('502') || lower.includes('bad gateway');
 
   if (isHighDemand) {
     return {
       text: isFr
-        ? "Les serveurs d'IA Gemini sont temporairement très sollicités (erreur 503). Pantryo tente l'OCR local ou vous pouvez réessayer."
-        : "Gemini AI servers are temporarily experiencing high demand (503). You can retry or use local OCR.",
+        ? "Les serveurs d'IA Gemini sont temporairement très sollicités (erreur 503). Pantryo bascule automatiquement sur l'OCR local ou vous pouvez réessayer."
+        : "Gemini AI servers are temporarily experiencing high demand (503). Pantryo automatically falls back to local OCR or you can retry.",
       isHighDemand: true,
       isRateLimited: false,
+      isHtmlOrTimeout: false,
     };
   }
 
@@ -292,6 +294,18 @@ export function cleanDisplayError(rawErr: any, lang: 'EN' | 'FR'): { text: strin
         : "Minute request rate limit reached on Free Tier (429). Retrying in a few seconds or use local OCR.",
       isHighDemand: false,
       isRateLimited: true,
+      isHtmlOrTimeout: false,
+    };
+  }
+
+  if (isHtmlOrTimeout) {
+    return {
+      text: isFr
+        ? "Le serveur d'IA n'a pas répondu à temps ou le réseau est saturé. Pantryo a activé l'OCR local pour numériser votre recette sans dépendre du cloud."
+        : "The AI server did not respond in time or network is busy. Pantryo enabled local OCR to digitize your recipe directly offline.",
+      isHighDemand: false,
+      isRateLimited: false,
+      isHtmlOrTimeout: true,
     };
   }
 
@@ -299,6 +313,7 @@ export function cleanDisplayError(rawErr: any, lang: 'EN' | 'FR'): { text: strin
     text: msg || str || (isFr ? 'Erreur lors de l’analyse' : 'Error parsing recipe'),
     isHighDemand: false,
     isRateLimited: false,
+    isHtmlOrTimeout: false,
   };
 }
 
@@ -761,9 +776,29 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        if (data.requiresGeminiKey) {
+      // Safely read response text and parse JSON (prevents SyntaxError on HTML errors)
+      const responseText = await res.text();
+      let data: any = null;
+      try {
+        data = JSON.parse(responseText);
+      } catch (jsonErr) {
+        console.warn('[AddRecipeModal] Non-JSON response from recipe ai-parse:', res.status, responseText.slice(0, 160));
+      }
+
+      if (!res.ok || !data || !data.success) {
+        // If remote AI failed or returned an HTML error/timeout, automatically fallback to local OCR
+        if (!forceLocalOcr) {
+          console.info('[AddRecipeModal] Remote AI call returned error or non-JSON. Automatically failing over to local OCR...');
+          showToast(
+            lang === 'FR'
+              ? 'Basculement automatique vers l’OCR local Pantryo...'
+              : 'Failing over to local Pantryo OCR...',
+            'info'
+          );
+          return triggerPhotoImport(base64Data, true);
+        }
+
+        if (data?.requiresGeminiKey) {
           setErrorMsg(
             lang === 'FR'
               ? "🔑 Clé API Gemini requise : la numérisation haute précision de livres de recettes nécessite l'activation de Gemini 3.8 Flash. Veuillez configurer votre clé API Google Gemini gratuite dans les Paramètres Admin (1 500 scans gratuits/jour)."
@@ -771,7 +806,9 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
           );
           return;
         }
-        const cleaned = cleanDisplayError(data.error || 'Failed to parse recipe photo', lang);
+
+        const rawError = data?.error || (responseText.length > 200 ? 'Server busy or response timed out' : responseText) || 'Failed to parse recipe photo';
+        const cleaned = cleanDisplayError(rawError, lang);
         setErrorMsg(cleaned.text);
         setErrorDetails(cleaned);
         if (cleaned.isHighDemand) {
@@ -797,8 +834,7 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
         showToast(
           lang === 'FR'
             ? `📚 ${normalizedList.length} recettes distinctes détectées sur cette page !`
-            : `📚 ${normalizedList.length} distinct recipes detected on this page!`,
-          'info'
+            : `📚 ${normalizedList.length} distinct recipes detected on this page!`
         );
       } else {
         setDetectedMultiRecipes([]);
@@ -815,6 +851,17 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
       }
     } catch (err: any) {
       console.error('AI Parse/Import failed:', err);
+      // If network fetch failed and local OCR has not been tried yet, automatically try local OCR
+      if (!forceLocalOcr) {
+        console.info('[AddRecipeModal] Network exception during remote AI parse. Automatically failing over to local OCR...');
+        showToast(
+          lang === 'FR'
+            ? 'Réseau occupé : basculement vers l’OCR local Pantryo...'
+            : 'Network busy: failing over to local Pantryo OCR...',
+          'info'
+        );
+        return triggerPhotoImport(base64Data, true);
+      }
       const cleaned = cleanDisplayError(err, lang);
       setErrorMsg(cleaned.text);
       setErrorDetails(cleaned);
@@ -912,17 +959,46 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
           }),
         });
 
-        const data = await res.json();
-        if (res.ok && data.success && data.recipe) {
+        let data: any = null;
+        try {
+          const text = await res.text();
+          data = JSON.parse(text);
+        } catch {
+          data = null;
+        }
+
+        // Automatic failover to local OCR if cloud endpoint returned error, 503, or HTML
+        if (!res.ok || !data?.success || !data?.recipe) {
+          try {
+            const fallbackRes = await fetch('/api/v1/recipes/ai-parse', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                mode: 'photo',
+                language: lang,
+                imageBase64: current.previewUrl,
+                mimeType: 'image/jpeg',
+                autoTranslate: autoTranslateOnImport,
+                forceLocalOcr: true,
+              }),
+            });
+            const fallbackText = await fallbackRes.text();
+            data = JSON.parse(fallbackText);
+          } catch {
+            // fallback attempt finished
+          }
+        }
+
+        if (data && data.success && data.recipe) {
           const normalized = normalizeRecipe(data.recipe, lang);
           current.status = 'done';
           current.recipe = normalized;
-          current.modelProvider = data.provider;
+          current.modelProvider = data.provider || 'local_ocr';
           // Set this recipe as current preview if none currently selected
           setParsedRecipe((prev) => prev || normalized);
         } else {
           current.status = 'error';
-          current.error = data.error || 'Failed to scan';
+          current.error = data?.error || 'Failed to scan';
         }
       } catch (err: any) {
         current.status = 'error';

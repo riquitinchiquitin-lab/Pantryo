@@ -208,7 +208,15 @@ const HIGH_CAPACITY_PREFIXES = [
 ];
 
 app.use((req, res, next) => {
-  const isHighCap = HIGH_CAPACITY_PREFIXES.some((prefix) => req.path.startsWith(prefix));
+  const isHighCap =
+    req.path.startsWith("/api/v1/recipes") ||
+    req.path.startsWith("/api/recipes") ||
+    req.path.startsWith("/api/v1/inventory") ||
+    req.path.startsWith("/api/inventory") ||
+    req.path.startsWith("/api/v1/admin") ||
+    req.path.startsWith("/api/admin") ||
+    HIGH_CAPACITY_PREFIXES.some((prefix) => req.path.startsWith(prefix));
+
   if (isHighCap) {
     highCapacityJsonParser(req, res, (err) => {
       if (err) return next(err);
@@ -272,6 +280,23 @@ app.use("/api", (req, res) => {
     error: `API endpoint not found: ${req.method} ${req.path}`,
     status: 404,
   });
+});
+
+// Explicit JSON error-handling middleware for API requests (never send HTML error pages for /api/*)
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error("[Pantryo Server API Error]", err?.message || err);
+  if (req.path.startsWith("/api") || req.originalUrl?.startsWith("/api")) {
+    const statusCode = err.status || err.statusCode || (err.type === "entity.too.large" ? 413 : 500);
+    return res.status(statusCode).json({
+      success: false,
+      error: err.type === "entity.too.large"
+        ? "Photo payload exceeds allowable size (50MB). Please select a compressed photo."
+        : (err.message || "Internal server error occurred"),
+      status: statusCode,
+      details: err.message,
+    });
+  }
+  next(err);
 });
 
 // Universal install scripts for Raspberry Pi, Debian, Ubuntu, Proxmox & Linux distributions

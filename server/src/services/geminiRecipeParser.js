@@ -1095,12 +1095,13 @@ CRITICAL INSTRUCTIONS FOR REAL-WORLD & VINTAGE RECIPE ARTIFACTS:
             const isTransient = errMsg.includes("503") || errMsg.includes("UNAVAILABLE") || errMsg.includes("high demand") || errMsg.includes("429") || errMsg.includes("RESOURCE_EXHAUSTED");
             console.warn(`[Gemini Recipe Parser] ${modelName} attempt ${attempt} error:`, errMsg.slice(0, 120));
 
-            if (isTransient && attempt === 1) {
-              console.info("[Gemini Recipe Parser] Transient demand spike detected, waiting 1.5s before retry...");
-              await new Promise((r) => setTimeout(r, 1500));
+            if (isTransient && attempt === 1 && !errMsg.includes("503") && !errMsg.includes("UNAVAILABLE")) {
+              console.info("[Gemini Recipe Parser] Transient rate limit detected, waiting 1s before retry...");
+              await new Promise((r) => setTimeout(r, 1000));
               continue;
             }
-            break; // Proceed to next model in cascade
+            // If 503 high demand or attempt 2, proceed immediately to next model in cascade
+            break;
           }
         }
         if (parsed) break;
