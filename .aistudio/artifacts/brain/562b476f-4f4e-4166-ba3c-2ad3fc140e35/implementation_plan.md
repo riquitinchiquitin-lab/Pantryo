@@ -1,109 +1,135 @@
-# Implementation Plan: Gemini Vision Upgrade, Local DB Reconciliation & Canadian Packaging Fallback
+# Local-First OCR & Gemini Dual-Stage Recipe Pipeline
 
-Address poor food recognition on photo imports by integrating Gemini Vision (`gemini-2.5-flash` / `gemini-3.8-flash`), **comparing and reconciling extracted data against the local SQLite database**, and providing an enhanced Canadian packaging fallback for offline resilience.
+Transform the recipe photo ingestion pipeline to run **Local OCR first** for immediate, offline-resilient recipe extraction, followed by **Gemini AI double-checking** to correct typos, standardize fractions/measurements, enrich bilingual descriptions, and categorize ingredients.
 
 ---
 
-## User Review Required
+## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> **Key Enhancements in this Revision**:
-> 1. **Post-Extraction Local DB Comparison & Reconciliation**:
->    - Once Gemini Vision extracts product metadata (Brand, Name, Quantity/Unit, Category, Barcode/UPC), it will immediately query the local SQLite database.
->    - **Inventory Matching**: Checks if the user already has this item in stock. If found, the scanner displays *"Already in Pantry (X units in stock)"* with a 1-click **"Add +1 to Existing"** or **"Add New Batch"** option.
->    - **Catalog & Canonical Data Reconciliation**: Cross-references local product references (Canadian grocery catalog, calibrated shelf lives, storage location defaults) to eliminate slight naming variations and guarantee accurate pantry tracking.
-> 2. **Vision Engine & Model Resilience**:
->    - Connects Gemini Vision via configured Admin API Key with automatic retry on temporary 503 high-demand errors.
-> 3. **Bilingual Canadian Packaging Fallback**:
->    - If the API key is not configured or network is unavailable, the local packaging analyzer recognizes Metro (`Selection`), Loblaws (`No Name`, `PC`), Sobeys (`Compliments`), and Pharmaprix (`Life Smart`) without OCR noise (`aad`).
+> **Key Architecture Decisions**:
+> 1. **Local OCR First as the Baseline**:
+>    - Every photo scan immediately runs through local high-speed OCR (`Tesseract.js`).
+>    - This guarantees zero failure on cloud outages, zero HTTP 503 high-demand errors, and immediate initial recipe display without waiting on remote network calls.
+> 2. **Gemini AI Double-Check & Refinement Stage**:
+>    - Once local OCR extracts the raw recipe text, Pantryo sends the text and layout to Gemini (`gemini-3.8-flash` with instant `gemini-3.1-flash-lite` cascade).
+>    - Gemini acts as the culinary editor: fixing broken OCR glyphs (e.g. `l` vs `1`, `O` vs `0`, split fractions `1/2` vs `½`), normalizing cooking units (tablespoons, teaspoons, ounces, grams), classifying optimal storage (`FRIDGE`, `PANTRY`, `FREEZER`, `SPICE_RACK`), and generating bilingual French/English instructions.
+> 3. **Non-Blocking User Experience**:
+>    - The user sees the recipe populated immediately from local OCR.
+>    - While the user reviews the recipe, Gemini runs in the background. Once the double-check completes, a subtle toast and highlighted improvements appear with a 1-click "Apply Gemini Enhancements" toggle, or applied automatically based on user preference.
+>    - If Gemini is unreachable (503 demand spike or offline), the local OCR recipe remains 100% functional and ready to save.
 
 ---
 
-## 1. Monitored Photo Benchmark & Extraction
+## 1. Overview & Core Concept
 
-Comparison based on the two real photos recently imported in `/server/data/monitored_photos/`:
-
-| Photo / Item | Current OCR Output | Gemini Vision Extraction | Local DB Reconciled Match |
-| :--- | :--- | :--- | :--- |
-| **Photo 1: Can of Tomato Sauce**<br>`scan_1793717469131_g4ubp` | **"a Selection aad, SAUCE"**<br>*(34% conf, noisy gibberish)* | **"Sauce tomate Sélection / Selection Tomato Sauce"**<br>*Brand:* `Sélection`<br>*Size:* `398 mL`<br>*Category:* `Garde-manger / Conserves` | **Exact/Fuzzy Match in Local DB**<br>- Matches canonical `Sauce tomate (Sélection)`<br>- Standard storage: `Pantry`<br>- Default shelf life: `730 days`<br>- Action: If in inventory, shows *"+1 to current stock (2 available)"* |
-| **Photo 2: Beef Broth Carton**<br>`scan_1793717493011_sg4xz` | **FAILED**<br>*(No food label detected)* | **"Bouillon de bœuf Life Smart / Mieux-être"**<br>*Brand:* `Life Smart`<br>*Size:* `946 mL`<br>*Category:* `Soupes & Bouillons` | **Catalog Enriched in Local DB**<br>- Matches `Bouillon de bœuf (Life Smart)`<br>- Storage: `Pantry` (refrigerate after opening)<br>- Default shelf life: `365 days` |
+- **What It Does**: Replaces the fragile "cloud vision first, fallback to OCR" model with a robust "local OCR baseline first, Gemini AI double-check & refine" dual-stage pipeline.
+- **Target Audience**: Home cooks digitizing physical cookbooks, handwritten family cards, printed magazine clippings, or index card boxes who want fast, reliable scanning without cloud bottlenecks.
+- **Key Value**: Never lose a recipe scan to server 503 errors or gateway timeouts. Local OCR captures the recipe text in seconds, while Gemini elevates it into a pristine, structured, bilingual culinary record.
 
 ---
 
-## 2. Technical Architecture & Implementation Steps
+## 2. User Experience & Visual Design
 
-### Step 1: Gemini Vision AI Extraction Pipeline
-- **File**: `server/src/services/geminiService.js` & `server/src/services/visionScanner.js`
-- Read active Gemini API key from SQLite `system_settings` or `process.env.GEMINI_API_KEY`.
-- Use `gemini-2.5-flash` with structured JSON output:
-  ```json
-  {
-    "brand": "Sélection",
-    "productName": "Sauce tomate",
-    "fullName": "Sauce tomate Sélection / Selection Tomato Sauce",
-    "quantity": 398,
-    "unit": "mL",
-    "category": "Canned Goods",
-    "suggestedStorage": "pantry",
-    "shelfLifeDays": 730,
-    "barcode": null
-  }
-  ```
-- Implement retry logic with exponential backoff for HTTP 503 / 429 errors.
+### Key User Flows
 
-### Step 2: Local Database Comparison & Reconciliation Engine
-- **File**: `server/src/services/inventoryReconciler.js` (New Service)
-- When Gemini Vision (or the fallback) produces an extracted item:
-  1. **Query Current Inventory (`inventory` table)**:
-     - Search by exact/fuzzy title match, brand match, or barcode (UPC).
-     - If matched: return `existingItem: { id, name, quantity, unit, location, expiryDate, daysRemaining }`.
-     - Flag `matchType: "existing_inventory" | "new_item"`.
-  2. **Query Canonical Food Catalog (`food_catalog` / standard presets)**:
-     - Calibrate expiry dates based on historical user data or Canadian pantry shelf-life tables.
-     - Harmonize French/English naming to the user's preferred language.
-     - Normalize storage location (`pantry`, `fridge`, `freezer`).
-  3. **Return Combined Payload** in `/api/v1/inventory/scan`:
-     ```json
-     {
-       "success": true,
-       "extracted": { ... },
-       "reconciliation": {
-         "isAlreadyInInventory": true,
-         "existingItemId": 14,
-         "currentStock": 2,
-         "suggestedAction": "increment_quantity",
-         "canonicalName": "Sauce tomate Sélection",
-         "matchedBrand": "Sélection"
-       }
-     }
-     ```
+```
+[Snap / Upload Recipe Photo]
+             │
+             ▼
+[Stage 1: Local OCR Engine (Tesseract)] ──── Instant (1-3s)
+             │
+             ├─────────────────────────────────────────────┐
+             ▼                                             ▼
+[Recipe Editor Populates Immediately]          [Stage 2: Gemini Double-Check]
+- Title, Ingredients, Steps ready              - Corrects OCR typos
+- User can edit or save immediately            - Normalizes units & fractions
+             │                                 - Categorizes fridge/pantry zones
+             │                                 - Generates French/English text
+             │                                             │
+             ▼                                             ▼
+[Toast: "✨ Double-Checked by Gemini AI"] ◄─────────────────┘
+- Highlights refined ingredients & steps
+- User saves to kitchen with 1 click
+```
 
-### Step 3: Enhanced Canadian Packaging Fallback
-- **File**: `server/src/services/packagingAnalyzer.js`
-- Filter OCR noise tokens (e.g. `aad`, lone characters, misread punctuation).
-- Add Canadian private label lexicon: Metro/Super C (`Selection`, `Irrésistibles`), Loblaw/Maxi (`No Name`, `Sans Nom`, `President's Choice`), Sobeys (`Compliments`), Pharmaprix (`Life Smart`).
-- Fuzzy match curved and low-contrast labels against 250+ standard grocery terms.
-
-### Step 4: Scanner UI Enhancements
-- **Files**: `src/components/CameraInventoryScannerModal.tsx`, `src/components/ProduceScannerModal.tsx`
-- **Reconciliation Banner**:
-  - If item exists in inventory:
-    - Display alert: *"🥫 You already have 2 cans of this in your Pantry (exp. Dec 2026)"*
-    - Two clear action buttons: **[+1 Add to Existing]** (increments count instantly) vs **[Add as Separate Batch]** (new expiry date).
-  - If new item:
-    - Pre-filled form with Gemini's high-confidence brand, size (`398 mL`), and shelf-life preset ready for 1-tap confirmation.
-- **Engine Status Pill**:
-  - 🟢 *Gemini Vision Active + Local DB Match*
-  - 🟡 *Canadian Packaging Matcher (Offline)*
+### Visual Identity & Interface Refinements
+- **Dual-Stage Status Indicator**: A clean inline status indicator below the photo preview showing:
+  - Phase 1: `📄 Local OCR Extracted` (with extracted line count)
+  - Phase 2: `✨ Gemini AI Verified & Refined` (with count of typos corrected or units standardized)
+- **Zero-Pill Restraint**: Recipe metadata (servings, prep time, difficulty, tags) is displayed with quiet typographic rhythm and clean text dividers (`·`), completely avoiding cluttered candy badge enclosures.
+- **Manual "Re-check with Gemini" Button**: Located in the recipe editor header so users can re-trigger AI validation at any time if they make manual text changes.
 
 ---
 
-## 3. Verification & Testing Plan
+## 3. Key Product Decisions & Trade-Offs
 
-1. **Monitored Photos Test**:
-   - Run verification test feeding `scan_1793717469131_g4ubp` and `scan_1793717493011_sg4xz` into the reconciliation pipeline.
-   - Verify that tomato sauce matches existing pantry stock or correctly proposes catalog addition without `aad` noise.
-2. **Build and Type Validation**:
-   - Run `compile_applet` and `lint_applet` to verify TypeScript and server stability.
-3. **End-to-End User Flow**:
-   - Verify that scanning a known item triggers the "+1 to existing stock" prompt.
+- **Decision 1: Local OCR as Ground Truth vs. Cloud First**
+  - *Chosen Approach*: Run local OCR first on every photo, then pass the extracted text to Gemini for correction and structuring.
+  - *Why*: Eliminates the single point of failure where a busy Google AI server (503 high demand) prevents the user from capturing their recipe. The user always gets their recipe digitized regardless of network or API quotas.
+  - *Alternatives Considered*: Cloud-only vision (causes 503 errors and gateway timeouts during peak hours) or OCR-only (misses culinary context and fails on broken fractions).
+
+- **Decision 2: Text-Based Gemini Refinement vs. Full-Image Re-upload**
+  - *Chosen Approach*: Send the local OCR text along with the compressed thumbnail to Gemini for culinary editing.
+  - *Why*: Sending text requires 90% fewer tokens and network bandwidth than 10MB raw image buffers, drastically cutting response time from 15s to under 2s and preventing payload limits or timeout disconnects.
+
+- **Decision 3: Seamless Non-Blocking Review**
+  - *Chosen Approach*: Display the locally parsed recipe as soon as OCR finishes, while Gemini refines it in the background.
+  - *Why*: Users experience near-zero latency. They can start reading or adjusting ingredients immediately rather than staring at a loading spinner.
+
+---
+
+## 4. Technical Architecture & Data Strategy
+
+### System Diagram
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                          Client Browser (PWA)                          │
+│                                                                        │
+│   ┌────────────────────┐          ┌────────────────────────────────┐   │
+│   │ Camera / File Pick │ ───────► │ Local Canvas Image Optimizer   │   │
+│   └────────────────────┘          └───────────────┬────────────────┘   │
+│                                                   │                    │
+│                                                   ▼                    │
+│                                   ┌────────────────────────────────┐   │
+│                                   │ Client / Server Tesseract OCR  │   │
+│                                   │ (Raw Text Extraction)          │   │
+│                                   └───────────────┬────────────────┘   │
+│                                                   │                    │
+│                                    Parsed Recipe  │ Raw OCR Text       │
+│                                                   ▼                    │
+│                                   ┌────────────────────────────────┐   │
+│                                   │ Recipe Editor View (Immediate) │   │
+│                                   └───────────────┬────────────────┘   │
+└───────────────────────────────────────────────────┼────────────────────┘
+                                                    │
+                                                    ▼ POST /api/v1/recipes/ai-refine
+┌────────────────────────────────────────────────────────────────────────┐
+│                        Express Backend & AI Tier                       │
+│                                                                        │
+│   ┌────────────────────────────────────────────────────────────────┐   │
+│   │ Gemini Culinary Editor Service                                 │   │
+│   │ (gemini-3.8-flash -> gemini-3.1-flash-lite cascade)            │   │
+│   │                                                                │   │
+│   │ • Corrects OCR misreads (1/2 cup vs 12 cup, flour vs f1our)    │   │
+│   │ • Normalizes units (ml, g, oz, tbsp, tsp)                      │   │
+│   │ • Assigns storage locations (PANTRY, FRIDGE, FREEZER)          │   │
+│   │ • Bilingual translation (French/English)                       │   │
+│   └───────────────────────────────┬────────────────────────────────┘   │
+│                                   │                                    │
+│                                   ▼ Enhanced Structured Recipe         │
+│   ┌────────────────────────────────────────────────────────────────┐   │
+│   │ SQLCipher Database Store (Local Persistence)                   │   │
+│   └────────────────────────────────────────────────────────────────┘   │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+### Key API & Component Enhancements
+
+1. **New Refinement Endpoint**:
+   - `POST /api/v1/recipes/ai-refine`: Accepts extracted raw OCR text, language preference, and optional image thumbnail. Uses Gemini with a specialized proofreading & culinary standardization prompt.
+2. **Local OCR Pipeline Priority**:
+   - Updates `parseRecipeFromPhoto` to execute local OCR first, construct the baseline recipe model, and dispatch the background double-check to Gemini.
+3. **Editor Component Upgrade**:
+   - Updates `AddRecipeModal.tsx` to handle the dual-stage progression: showing instant OCR extraction, displaying an animated validation indicator, and applying Gemini corrections cleanly.

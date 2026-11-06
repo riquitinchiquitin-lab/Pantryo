@@ -100,6 +100,7 @@ export interface RicardoRecipe {
   tags: string[];
   suggestedPantryNeeds: string[];
   rawOcrText?: string;
+  validationStatus?: 'gemini_verified' | 'local_ocr_only' | 'curated_match';
   hasHandwrittenNotes?: boolean;
   handwrittenNotesSummary?: string;
   recipeNotes?: string[];

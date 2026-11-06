@@ -237,6 +237,8 @@ export function normalizeRecipe(recipe: any, activeLang: 'EN' | 'FR' = 'FR'): Ri
   const bilingual = ensureBilingualRecipe(recipe, activeLang);
   return {
     ...bilingual,
+    rawOcrText: recipe.rawOcrText || bilingual.rawOcrText,
+    validationStatus: recipe.validationStatus || bilingual.validationStatus,
     ingredients: (bilingual.ingredients || []).map((ing: any, idx: number) =>
       normalizeRecipeIngredient(ing, idx)
     ),
@@ -435,6 +437,9 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
   // Multi-recipe page detection state (e.g. Five Roses page 69 with 3 recipes)
   const [detectedMultiRecipes, setDetectedMultiRecipes] = useState<RicardoRecipe[]>([]);
   const [selectedMultiRecipeIndex, setSelectedMultiRecipeIndex] = useState(0);
+
+  // Gemini AI double-check and refinement state
+  const [isRefiningWithGemini, setIsRefiningWithGemini] = useState<boolean>(false);
 
   // Review & Edit state after AI has parsed or when editing existing recipe
   const [parsedRecipe, setParsedRecipe] = useState<RicardoRecipe | null>(() => {
@@ -755,8 +760,8 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
       forceLocalOcr
         ? (lang === 'FR' ? 'Numérisation par OCR local Pantryo en cours...' : 'Scanning with local Pantryo OCR...')
         : (lang === 'FR'
-            ? 'Analyse multimodale Gemini 3.8 Flash... Extraction haute précision des ingrédients et étapes...'
-            : 'Gemini 3.8 Flash Vision analyzing cookbook page... Extracting ingredients, fractions & instructions...')
+            ? 'Étape 1/2 : OCR local Pantryo... puis double-vérification Gemini IA...'
+            : 'Step 1/2: Local OCR extraction... then Gemini AI double-check...')
     );
     setErrorMsg(null);
     setErrorDetails(null);
@@ -820,7 +825,21 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
       const normalized = normalizeRecipe(data.recipe, lang);
       setParsedRecipe(normalized);
 
-      if (data.notice) {
+      if (data.validationStatus === 'gemini_verified') {
+        showToast(
+          lang === 'FR'
+            ? '✓ Recette numérisée par OCR et double-vérifiée par Gemini IA !'
+            : '✓ Recipe scanned via OCR and double-checked by Gemini AI!',
+          'success'
+        );
+      } else if (data.validationStatus === 'local_ocr_only') {
+        showToast(
+          lang === 'FR'
+            ? '📄 Recette extraite par OCR local Pantryo (Prête à cuisiner)'
+            : '📄 Recipe extracted via local Pantryo OCR (Ready to cook)',
+          'info'
+        );
+      } else if (data.notice) {
         showToast(data.notice, 'info');
       }
 
@@ -871,6 +890,81 @@ export const AddRecipeModal: React.FC<AddRecipeModalProps> = ({
     } finally {
       setIsParsing(false);
       setParsingStep('');
+    }
+  };
+
+  // Double check and refine an extracted recipe using Gemini AI
+  const handleDoubleCheckWithGemini = async (recipeTarget?: RicardoRecipe | null) => {
+    const target = recipeTarget || parsedRecipe;
+    if (!target) return;
+
+    setIsRefiningWithGemini(true);
+    showToast(
+      lang === 'FR'
+        ? '✨ Double-vérification par Gemini IA en cours...'
+        : '✨ Double-checking and calibrating with Gemini AI...',
+      'info'
+    );
+
+    try {
+      const res = await fetch('/api/v1/recipes/ai-refine', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipe: target,
+          rawOcrText: target.rawOcrText || '',
+          language: lang,
+          notes: target.hasHandwrittenNotes ? target.handwrittenNotesSummary : '',
+        }),
+      });
+
+      const responseText = await res.text();
+      let data: any = null;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.warn('[AddRecipeModal] Non-JSON response from ai-refine:', res.status, responseText.slice(0, 160));
+      }
+
+      if (!res.ok || !data || !data.success || !data.recipe) {
+        showToast(
+          data?.error || (lang === 'FR' ? 'Serveur d’IA occupé. La recette actuelle reste intacte.' : 'AI server busy. Current recipe kept intact.'),
+          'error'
+        );
+        return;
+      }
+
+      const refined = normalizeRecipe(data.recipe, lang);
+      if (refined) {
+        setParsedRecipe(refined);
+        if (detectedMultiRecipes.length > 0 && selectedMultiRecipeIndex >= 0) {
+          const updatedList = [...detectedMultiRecipes];
+          updatedList[selectedMultiRecipeIndex] = refined;
+          setDetectedMultiRecipes(updatedList);
+        }
+
+        if (data.validationStatus === 'gemini_verified') {
+          showToast(
+            lang === 'FR'
+              ? '✓ Recette double-vérifiée et optimisée par Gemini IA avec succès !'
+              : '✓ Recipe double-checked and calibrated by Gemini AI!',
+            'success'
+          );
+        } else {
+          showToast(
+            data.notice || (lang === 'FR' ? 'Recette validée.' : 'Recipe validated.'),
+            'info'
+          );
+        }
+      }
+    } catch (err: any) {
+      console.error('[AddRecipeModal] Gemini refine error:', err);
+      showToast(
+        err?.message || (lang === 'FR' ? 'Erreur lors de la vérification Gemini' : 'Gemini double-check error'),
+        'error'
+      );
+    } finally {
+      setIsRefiningWithGemini(false);
     }
   };
 
@@ -1680,10 +1774,10 @@ Instructions:
           payload.text = recipeText;
         } else if (activeTab === 'photo') {
           if (!photoBase64) {
-            throw new Error('Please upload or snap a photo of a recipe.');
+            throw new Error(lang === 'FR' ? 'Veuillez téléverser ou prendre une photo de recette.' : 'Please upload or snap a photo of a recipe.');
           }
-          payload.imageBase64 = photoBase64;
-          payload.mimeType = photoMimeType;
+          await triggerPhotoImport(photoBase64);
+          return;
         }
 
         const res = await fetch('/api/v1/recipes/ai-parse', {
@@ -1692,9 +1786,16 @@ Instructions:
           body: JSON.stringify(payload),
         });
 
-        const data = await res.json();
-        if (!res.ok || !data.success) {
-          if (data.requiresGeminiKey) {
+        const responseText = await res.text();
+        let data: any = null;
+        try {
+          data = JSON.parse(responseText);
+        } catch (e) {
+          console.warn('[AddRecipeModal] Non-JSON response from ai-parse:', res.status, responseText.slice(0, 160));
+        }
+
+        if (!res.ok || !data || !data.success) {
+          if (data?.requiresGeminiKey) {
             setErrorMsg(
               lang === 'FR'
                 ? "🔑 Clé API Gemini requise : la numérisation haute précision de livres de recettes nécessite l'activation de Gemini 3.8 Flash. Veuillez configurer votre clé API Google Gemini gratuite dans les Paramètres Admin (1 500 scans gratuits/jour)."
@@ -1702,7 +1803,7 @@ Instructions:
             );
             return;
           }
-          throw new Error(data.error || 'Failed to parse recipe');
+          throw new Error(data?.error || (responseText.length > 200 ? 'Server busy or response timed out' : responseText) || 'Failed to parse recipe');
         }
 
         const normalized = normalizeRecipe(data.recipe, lang);
@@ -2563,7 +2664,7 @@ Instructions:
                   </button>
                 </div>
 
-                {/* Gemini 3.8 Flash Multimodal Vision Status Banner */}
+                {/* Dual-Stage: Local OCR First + Gemini AI Double-Check */}
                 <div className="p-3 rounded-2xl bg-gradient-to-r from-teal-50 via-emerald-50 to-teal-50 border border-teal-200/80 shadow-2xs">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-start gap-2">
@@ -2573,16 +2674,16 @@ Instructions:
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="text-xs font-black text-[#0D3B37]">
-                            {lang === 'FR' ? 'Vision Multimodale Gemini 3.8 Flash' : 'Gemini 3.8 Flash Multimodal Vision'}
+                            {lang === 'FR' ? 'OCR Local + Double-Vérification Gemini IA' : 'Local OCR + Gemini AI Double-Check'}
                           </p>
                           <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                            {lang === 'FR' ? '1 500 scans/jour gratuits' : '1,500 free scans/day'}
+                            {lang === 'FR' ? 'Rapide & Anti-503' : 'Resilient • Instant OCR'}
                           </span>
                         </div>
                         <p className="text-[11px] text-[#4F6854] mt-0.5 leading-snug">
                           {lang === 'FR'
-                            ? 'Capture directement livres imprimés, fractions (½, ¼, ¾), colonnes multiples et annotations sans déformation OCR.'
-                            : 'Directly reads printed cookbooks, fractions (½, ¼, ¾), dual columns, and handwritten notes with zero OCR distortion.'}
+                            ? 'L’OCR local extrait instantanément le texte sans blocage serveur, puis Gemini IA double-vérifie les fractions (½, ¼, ¾), corrige les coquilles et assigne le rangement en cuisine.'
+                            : 'Local OCR extracts text instantly with zero 503 errors, then Gemini AI double-checks fractions (½, ¼, ¾), fixes typos, and assigns kitchen pantry storage.'}
                         </p>
                       </div>
                     </div>
@@ -2812,8 +2913,8 @@ Instructions:
                         <Sparkles className="w-4 h-4 text-teal-200" />
                         <span>
                           {lang === 'FR'
-                            ? 'Numériser avec Gemini 3.8 Flash Vision'
-                            : 'Digitize with Gemini 3.8 Flash Vision'}
+                            ? 'Extraire par OCR & Double-vérifier'
+                            : 'Extract via OCR & Double-Check'}
                         </span>
                       </button>
 
@@ -3101,6 +3202,105 @@ Instructions:
                 </button>
               </div>
             )}
+
+            {/* Dual-Stage Verification Status Banner (Local OCR + Gemini AI Double-Check) */}
+            <div
+              className={`p-3.5 rounded-2xl border shadow-2xs animate-fade-in flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                parsedRecipe.validationStatus === 'gemini_verified'
+                  ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
+                  : parsedRecipe.validationStatus === 'curated_match'
+                  ? 'bg-amber-50/80 border-amber-200 text-amber-950'
+                  : 'bg-teal-50/60 border-teal-200 text-teal-950'
+              }`}
+            >
+              <div className="flex items-start gap-2.5">
+                <div
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                    parsedRecipe.validationStatus === 'gemini_verified'
+                      ? 'bg-emerald-600 text-white shadow-2xs'
+                      : parsedRecipe.validationStatus === 'curated_match'
+                      ? 'bg-amber-600 text-white shadow-2xs'
+                      : 'bg-teal-600 text-white shadow-2xs'
+                  }`}
+                >
+                  {parsedRecipe.validationStatus === 'gemini_verified' ? (
+                    <Check className="w-4 h-4 stroke-[3]" />
+                  ) : parsedRecipe.validationStatus === 'curated_match' ? (
+                    <Sparkles className="w-4 h-4" />
+                  ) : (
+                    <FileText className="w-4 h-4" />
+                  )}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-black">
+                      {parsedRecipe.validationStatus === 'gemini_verified'
+                        ? (lang === 'FR' ? '✓ Double-vérifié par Gemini IA' : '✓ Double-Checked by Gemini AI')
+                        : parsedRecipe.validationStatus === 'curated_match'
+                        ? (lang === 'FR' ? '✨ Recette officielle vérifiée' : '✨ Verified Cookbook Match')
+                        : (lang === 'FR' ? '📄 Extrait par OCR Local Pantryo' : '📄 Extracted by Local Pantryo OCR')}
+                    </span>
+                    <span
+                      className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                        parsedRecipe.validationStatus === 'gemini_verified'
+                          ? 'bg-emerald-200/70 text-emerald-900 border border-emerald-300'
+                          : parsedRecipe.validationStatus === 'curated_match'
+                          ? 'bg-amber-200/70 text-amber-900 border border-amber-300'
+                          : 'bg-teal-200/70 text-teal-900 border border-teal-300'
+                      }`}
+                    >
+                      {parsedRecipe.validationStatus === 'gemini_verified'
+                        ? (lang === 'FR' ? 'IA Calibrée' : 'AI Calibrated')
+                        : parsedRecipe.validationStatus === 'curated_match'
+                        ? (lang === 'FR' ? 'Livre Référencé' : 'Referenced')
+                        : (lang === 'FR' ? 'OCR Local Prêt' : 'Local OCR Ready')}
+                    </span>
+                  </div>
+                  <p className="text-[11px] opacity-90 mt-0.5 leading-snug">
+                    {parsedRecipe.validationStatus === 'gemini_verified'
+                      ? (lang === 'FR'
+                          ? 'Texte brut extrait localement par OCR, puis calibré par Gemini (fractions unifiées, coquilles éliminées et zones de rangement FRIDGE / PANTRY / FREEZER assignées).'
+                          : 'Extracted locally via OCR with instant speed, then calibrated by Gemini (unified fractions, fixed typos, and assigned storage zones).')
+                      : parsedRecipe.validationStatus === 'curated_match'
+                      ? (lang === 'FR'
+                          ? 'Correspondance parfaite avec la recette officielle du livre de cuisine.'
+                          : 'Matched perfectly with the official cookbook entry.')
+                      : (lang === 'FR'
+                          ? 'Texte brut extrait par l’OCR local Pantryo (100% prêt à enregistrer). Vous pouvez aussi lancer la double-vérification Gemini :'
+                          : 'Raw text extracted by local Pantryo OCR (100% ready to save). You can also run Gemini double-check:')}
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Button: Double-check with Gemini */}
+              <button
+                type="button"
+                onClick={() => handleDoubleCheckWithGemini(parsedRecipe)}
+                disabled={isRefiningWithGemini}
+                className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 shadow-2xs active:scale-95 transition-all cursor-pointer shrink-0 disabled:opacity-60 ${
+                  parsedRecipe.validationStatus === 'gemini_verified'
+                    ? 'bg-white hover:bg-emerald-100/60 text-emerald-900 border border-emerald-300'
+                    : 'bg-[#1E3022] hover:bg-black text-white'
+                }`}
+                title={lang === 'FR' ? 'Vérifier et corriger avec Gemini IA' : 'Double-check and correct with Gemini AI'}
+              >
+                {isRefiningWithGemini ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                    <span>{lang === 'FR' ? 'Vérification IA...' : 'Double-checking...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>
+                      {parsedRecipe.validationStatus === 'gemini_verified'
+                        ? (lang === 'FR' ? 'Re-vérifier avec Gemini' : 'Re-check with Gemini')
+                        : (lang === 'FR' ? '✨ Double-vérifier avec Gemini' : '✨ Double-Check with Gemini')}
+                    </span>
+                  </>
+                )}
+              </button>
+            </div>
 
             {/* Handwritten Notes Detected & Merged Indicator */}
             {parsedRecipe.hasHandwrittenNotes && (
@@ -4104,6 +4304,10 @@ Instructions:
                 ? lang === 'FR'
                   ? 'Importer depuis le Web'
                   : 'Import Recipe from Web'
+                : activeTab === 'photo'
+                ? lang === 'FR'
+                  ? 'Extraire par OCR & Double-vérifier'
+                  : 'Extract via OCR & Double-Check'
                 : lang === 'FR'
                 ? 'Analyser avec l’IA Gemini'
                 : 'AI Parse Recipe with Gemini'}

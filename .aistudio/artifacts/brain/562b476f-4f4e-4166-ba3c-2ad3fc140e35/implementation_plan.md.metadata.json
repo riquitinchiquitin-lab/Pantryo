@@ -1,6 +1,6 @@
 {
-  "summary": "Revised implementation plan adding Local DB reconciliation and inventory matching after Gemini Vision AI extraction, including duplicate detection, quantity incrementing, and Canadian product catalog calibration.",
-  "updatedAt": "2026-11-03T14:58:12.626146425Z",
+  "summary": "Architecture and execution plan for the Local-First OCR & Gemini Dual-Stage Recipe Ingestion Pipeline. Runs local OCR immediately for zero-latency, offline-safe text extraction, followed by Gemini AI double-checking for typo correction, fractions standardization, unit normalization, bilingual metadata, and ingredient storage classification.",
+  "updatedAt": "2026-11-06T17:42:48.928809435Z",
   "requestFeedback": true,
   "userFacing": true
 }

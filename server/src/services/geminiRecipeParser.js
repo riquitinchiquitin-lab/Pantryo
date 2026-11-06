@@ -819,8 +819,240 @@ export function cleanErrorMessage(rawMessage, language = "EN") {
   return String(rawMessage);
 }
 
+// Shared structured JSON response schema for Gemini recipe parsing & refinement
+export const RECIPE_STRUCTURED_RESPONSE_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    title: { type: Type.STRING },
+    titleFr: { type: Type.STRING },
+    descriptionEn: { type: Type.STRING },
+    descriptionFr: { type: Type.STRING },
+    authorName: { type: Type.STRING },
+    authorBadge: { type: Type.STRING },
+    prepTime: { type: Type.STRING },
+    cookTime: { type: Type.STRING },
+    totalTime: { type: Type.STRING },
+    servings: { type: Type.STRING },
+    difficulty: { type: Type.STRING },
+    difficultyFr: { type: Type.STRING },
+    calories: { type: Type.STRING },
+    hasHandwrittenNotes: { type: Type.BOOLEAN },
+    handwrittenNotesSummary: { type: Type.STRING },
+    recipeNotes: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
+    },
+    tags: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
+    },
+    ingredients: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          name: { type: Type.STRING },
+          nameFr: { type: Type.STRING },
+          amount: { type: Type.STRING },
+          category: { type: Type.STRING },
+          locationType: { type: Type.STRING },
+        },
+        required: ["name", "amount", "category", "locationType"],
+      },
+    },
+    instructionsEn: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
+    },
+    instructionsFr: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
+    },
+    allRecipes: {
+      type: Type.ARRAY,
+      description: "All distinct recipes detected on this cookbook page if multiple recipes are present",
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING },
+          titleFr: { type: Type.STRING },
+          descriptionEn: { type: Type.STRING },
+          descriptionFr: { type: Type.STRING },
+          authorName: { type: Type.STRING },
+          authorBadge: { type: Type.STRING },
+          prepTime: { type: Type.STRING },
+          cookTime: { type: Type.STRING },
+          servings: { type: Type.STRING },
+          ingredients: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                name: { type: Type.STRING },
+                nameFr: { type: Type.STRING },
+                amount: { type: Type.STRING },
+                category: { type: Type.STRING },
+                locationType: { type: Type.STRING },
+              },
+              required: ["name", "amount", "category", "locationType"],
+            },
+          },
+          instructionsEn: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+          },
+          instructionsFr: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+          },
+          hasHandwrittenNotes: { type: Type.BOOLEAN },
+          handwrittenNotesSummary: { type: Type.STRING },
+          recipeNotes: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+          },
+        },
+        required: ["title", "ingredients", "instructionsEn"],
+      },
+    },
+  },
+  required: ["title", "descriptionEn", "ingredients", "instructionsEn"],
+};
+
+/**
+ * Double-checks, corrects typos, standardizes units, and enriches a parsed recipe using Gemini
+ */
+export async function refineRecipeWithGemini({
+  recipe,
+  rawOcrText = "",
+  language = "EN",
+  notes = "",
+}) {
+  const apiKey = (process.env.GEMINI_API_KEY || dbStore?.systemSettings?.geminiApiKey || "").trim();
+  const isFr = (language || "EN").toUpperCase().startsWith("FR");
+
+  if (!apiKey || apiKey.length < 10 || apiKey.startsWith("your_") || apiKey === "MY_GEMINI_API_KEY") {
+    return {
+      success: true,
+      recipe,
+      refined: false,
+      validationStatus: "local_ocr_only",
+      reason: "No Gemini API key configured",
+    };
+  }
+
+  const ai = getGeminiClient();
+
+  const systemInstruction = `You are Pantryo's master culinary editor, proofreader, and nutrition archivist.
+We have just executed local OCR on a physical recipe page or card. Your mission is to DOUBLE-CHECK, CORRECT, and ENRICH the recipe with culinary precision.
+
+YOUR MANDATE:
+1. Proofread & Correct OCR Optical Misreadings:
+   - Fix digit/letter confusion: e.g. "l tsp" -> "1 tsp", "1 2 cup" -> "1/2 cup", "f1our" -> "flour", "bovillon" -> "bouillon".
+   - Fix split fractions & typography: e.g. "1 1/2" -> "1 1/2", "1/2", "1/4", "3/4", "12 oz (340 g)".
+   - Fix French accents: e.g. "cuillere a soupe" -> "cuillère à soupe", "boeuf" -> "bœuf", "fraiche" -> "fraîche", "hache" -> "haché".
+2. Standardize Ingredients & Storage Zones:
+   - Provide clean name and exact quantity for every ingredient.
+   - Categorize each ingredient: "Produce", "Dairy & Eggs", "Meat & Seafood", "Bakery", "Pantry", "Frozen Foods", "Condiments", "Beverages".
+   - Assign optimal kitchen storage: "FRIDGE", "PANTRY", "FREEZER", or "SPICE_RACK".
+3. Polish Cooking Instructions:
+   - Break directions into clear, chronological numbered steps.
+   - Provide bilingual English (instructionsEn) and French (instructionsFr) steps.
+4. Harmonize Metadata:
+   - Infer or standardize prepTime, cookTime, totalTime, servings, and tags.
+   - Provide bilingual titles (titleEn, titleFr).
+   - Detect if there are handwritten pen notes or corrections (hasHandwrittenNotes).
+
+CRITICAL: Preserve all original ingredients and intended flavors. Output strict structured JSON conforming to the schema.`;
+
+  const prompt = `Please double-check, proofread, and refine this recipe extracted by local OCR:
+Current Recipe Title: ${recipe?.title || "Scanned Recipe"}
+Raw OCR Text:
+"""
+${(rawOcrText || "").slice(0, 4000) || JSON.stringify(recipe, null, 2)}
+"""
+
+Baseline Ingredients:
+${JSON.stringify(recipe?.ingredients || [], null, 2)}
+
+Baseline Cooking Steps:
+${JSON.stringify(recipe?.instructions || recipe?.instructionsEn || recipe?.instructionsFr || [], null, 2)}
+
+User Notes / Context: ${notes || "None"}
+
+Please output a thoroughly verified, polished recipe JSON conforming to the schema.`;
+
+  const modelsToTry = ["gemini-3.8-flash", "gemini-3.1-flash-lite"];
+  let parsed = null;
+  let successfulModel = null;
+
+  for (const modelName of modelsToTry) {
+    try {
+      console.info(`[Gemini Refine] Double-checking recipe with ${modelName}...`);
+      const response = await ai.models.generateContent({
+        model: modelName,
+        contents: prompt,
+        config: {
+          systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema: RECIPE_STRUCTURED_RESPONSE_SCHEMA,
+        },
+      });
+
+      const rawText = response.text;
+      if (rawText && rawText.trim().length > 0) {
+        let cleanJson = rawText.trim();
+        if (cleanJson.startsWith("```json")) {
+          cleanJson = cleanJson.replace(/^```json\s*/, "").replace(/\s*```$/, "");
+        } else if (cleanJson.startsWith("```")) {
+          cleanJson = cleanJson.replace(/^```\s*/, "").replace(/\s*```$/, "");
+        }
+        parsed = JSON.parse(cleanJson);
+        successfulModel = modelName;
+        break;
+      }
+    } catch (modelErr) {
+      const errMsg = modelErr?.message || String(modelErr);
+      console.warn(`[Gemini Refine] ${modelName} notice:`, errMsg.slice(0, 100));
+      // Cascade to gemini-3.1-flash-lite immediately
+      continue;
+    }
+  }
+
+  if (parsed) {
+    const refined = normalizeRecipeOutput(parsed, {
+      source: recipe?.source || "Photo Scan",
+      imageUrl: recipe?.imageUrl,
+      language,
+    });
+    return {
+      success: true,
+      recipe: refined,
+      refined: true,
+      provider: successfulModel || "gemini_double_check",
+      validationStatus: "gemini_verified",
+      correctionsNotice: isFr
+        ? "✨ Recette double-vérifiée et perfectionnée par l'IA Gemini (unités standardisées et étapes enrichies)."
+        : "✨ Recipe double-checked and perfected by Gemini AI (standardized units and enriched instructions).",
+    };
+  }
+
+  // If Gemini failed (503 high demand or quota), return baseline recipe safely
+  return {
+    success: true,
+    recipe,
+    refined: false,
+    provider: "local_ocr",
+    validationStatus: "local_ocr_only",
+    notice: isFr
+      ? "📄 Recette issue de l'OCR local (vérification IA ignorée ou temporairement indisponible)."
+      : "📄 Recipe from local OCR (AI double-check skipped or temporarily busy).",
+  };
+}
+
 /**
  * Parse recipe from an image (photo of cookbook, recipe card, or finished dish)
+ * Executes Local OCR FIRST for instant, offline-safe extraction, then double-checks with Gemini AI.
  */
 export async function parseRecipeFromPhoto({
   imageBase64,
@@ -828,13 +1060,14 @@ export async function parseRecipeFromPhoto({
   notes = "",
   language = "EN",
   forceLocalOcr = false,
+  skipGeminiRefine = false,
 }) {
   const cleanBase64 = imageBase64.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, "").trim();
   const imageUrl = imageBase64.startsWith("data:") ? imageBase64 : `data:${mimeType};base64,${imageBase64}`;
-
-  // Immediate check for curated matches via hash
   const imageBuffer = Buffer.from(cleanBase64, "base64");
   const imgHash = crypto.createHash("md5").update(imageBuffer).digest("hex");
+
+  // Immediate check for curated matches via image hash
   const curatedMatch = getCuratedScannedRecipe({ imgHash, language, imageUrl, notes });
   if (curatedMatch) {
     return {
@@ -842,362 +1075,198 @@ export async function parseRecipeFromPhoto({
       provider: "recipe_vision_archivist",
       recipe: curatedMatch,
       recipes: [curatedMatch],
+      validationStatus: "curated_match",
     };
   }
 
-  // If local OCR is explicitly forced by user
-  if (forceLocalOcr) {
-    try {
-      console.info("[Recipe Parser] Force local OCR requested. Running Tesseract.js...");
-      const { data: { text: ocrText } } = await Tesseract.recognize(imageBuffer, 'eng+fra');
-      if (ocrText && ocrText.trim().length > 10) {
-        const ocrRecipe = parseRecipeTextDirectly(ocrText, {
-          language,
-          source: "Photo Scan (Local OCR)",
-          imageUrl,
-        });
-        return {
-          success: true,
-          provider: "local_ocr",
-          recipe: ocrRecipe,
-          recipes: [ocrRecipe],
-          notice: language === "FR" ? "Numérisé avec succès via l'OCR local Pantryo." : "Successfully scanned via local Pantryo OCR.",
-        };
-      }
-    } catch (forcedOcrErr) {
-      console.warn("[Recipe Parser] Forced local OCR failed:", forcedOcrErr.message);
-    }
+  // STAGE 1: LOCAL OCR FIRST (Tesseract.js)
+  console.info("[Recipe Pipeline] STAGE 1: Running Local OCR on recipe image...");
+  let ocrText = "";
+  try {
+    const { data: { text } } = await Tesseract.recognize(imageBuffer, "eng+fra");
+    ocrText = text || "";
+    console.info(`[Recipe Pipeline] Local OCR extracted ${ocrText.trim().length} characters.`);
+  } catch (ocrErr) {
+    console.warn("[Recipe Pipeline] Local OCR warning:", ocrErr.message);
   }
 
-  const apiKey = (process.env.GEMINI_API_KEY || dbStore?.systemSettings?.geminiApiKey || "").trim();
-  const localVisionUrl = (process.env.LOCAL_GEMMA_URL || dbStore?.systemSettings?.localVisionUrl || "").trim();
-  const visionProvider = dbStore?.systemSettings?.aiVisionProvider || (localVisionUrl ? "local_gemma" : "gemini");
-
-  // 1. If Local Open-Source Gemma / PaliGemma endpoint is configured and active, try it first
-  if (visionProvider === "local_gemma" && localVisionUrl) {
-    try {
-      console.info(`[Gemma Vision] Attempting local open-source vision scan via ${localVisionUrl}...`);
-      const gemmaResult = await parseWithLocalGemma({
-        imageBase64: cleanBase64,
-        endpoint: localVisionUrl,
-        model: dbStore?.systemSettings?.localVisionModel || "paligemma",
-        notes,
-        language,
-      });
-      if (gemmaResult && gemmaResult.recipe) {
-        return {
-          success: true,
-          provider: "local_gemma",
-          recipe: normalizeRecipeOutput(gemmaResult.recipe, {
-            source: "Local Gemma Vision",
-            imageUrl,
-            language,
-          }),
-        };
-      }
-    } catch (gemmaErr) {
-      console.warn("[Gemma Vision] Local open-source Gemma scan failed, falling back to Gemini/Tesseract:", gemmaErr.message);
-    }
-  }
-
-  // 2. If Gemini API key is configured and appears valid, run high-accuracy Gemini Vision with cascade and retries
-  if (apiKey && apiKey.length > 10 && !apiKey.startsWith("your_") && apiKey !== "MY_GEMINI_API_KEY") {
-    const systemInstruction = `You are Pantryo's master culinary archivist, high-precision OCR specialist, and bilingual chef.
-Your mission is to inspect photos of printed cookbook pages, magazine clippings, community cookbooks, and handwritten family cards, and convert them into complete structured recipe JSON.
-
-CRITICAL INSTRUCTIONS FOR REAL-WORLD & VINTAGE RECIPE ARTIFACTS:
-1. VINTAGE QUEBEC & CANADIAN COOKBOOK ARCHITECTURE (e.g. Five Roses 1968, Cercle des Fermières, Purity Flour):
-   - MULTI-RECIPE PAGES:
-     Vintage cookbook pages frequently feature 2, 3, or more recipes on a single page (e.g. Page 69 with "Biscuits au beurre d'arachides", "Boules au beurre", and "Croquants à l'orange").
-     When multiple recipes appear on a page:
-     * Populate the primary or first recipe in the root object fields.
-     * Populate ALL distinct recipes detected on the page in the "allRecipes" array so the user can import each one individually or all at once!
-   - QUEBEC CULINARY VOCABULARY & INGREDIENT TRANSLATION:
-     * "soda à pâte" = Bicarbonate de soude / Baking soda (category: "Pantry", locationType: "PANTRY", storage: "pantry").
-     * "cassonade" = Cassonade (sucre brun) / Brown sugar (category: "Pantry", locationType: "PANTRY").
-     * "beurre d'arachides" = Beurre d'arachides / Peanut butter (category: "Pantry", locationType: "PANTRY").
-     * "farine Five Roses" = Farine Five Roses / All-purpose flour (category: "Pantry", locationType: "PANTRY").
-     * "farine d'avoine" or "flocons d'avoine" = Flocons d'avoine / Rolled oats (category: "Pantry", locationType: "PANTRY").
-     * "c. à table" = Cuillère à table / Tablespoon (tbsp).
-     * "c. à thé" = Cuillère à thé / Teaspoon (tsp).
-     * "chaudron" = Casserole / Saucepan (Stovetop boiling method, no-bake cookies).
-     * "noix concassées" = Noix hachées / Chopped walnuts or pecans.
-     * "douzaine" / "douzaines" = Dozen (e.g. "Donne 4½ à 5 douzaines" -> servings: "48-60 biscuits").
-     * "350°F" / "325°F" = Conventional oven temperature in Fahrenheit.
-
-2. TYPEWRITTEN COMMUNITY COOKBOOKS (e.g., Page 55, recipes by Shawn Perry, Kevin Lavoie):
-   - Author credits: When a contributor name is printed near the title (e.g. "Shawn Perry", "Kevin Lavoie"), extract into "authorName".
-   - Fractions typography: Accurately read typewriter fraction glyphs (½, ¼, ¾, 1½, 2½, 4½). Never drop fractions.
-   - Variation notes: Extract recipe notes such as "Note: On peut remplacer le cacao par 1/4 tasse de beurre d'arachides" into "recipeNotes".
-
-3. HANDWRITTEN PEN ANNOTATIONS & FAMILY RATINGS:
-   - Detect handwritten cursive, pen, or pencil notes written in margins or at the bottom (e.g. "Très bon faire souvent" = "Very good, make often!").
-   - Set "hasHandwrittenNotes": true.
-   - Put transcription into "handwrittenNotesSummary" and "recipeNotes".
-
-4. PLASTIC SLEEVES & SPECULAR GLARE:
-   - Extrapolate partially obscured words caused by plastic sleeves or reflections using culinary context.
-
-5. BILINGUAL EXCELLENCE (EN & FR):
-   - Provide titles, descriptions, ingredient names, and instructions in both English and French.
-
-6. INGREDIENT LOCATION & CATEGORIES:
-   - Assign each ingredient an optimal storage location ("FRIDGE", "FREEZER", "PANTRY", "SPICE_RACK") and category ("Produce", "Dairy & Eggs", "Meat & Seafood", "Bakery", "Pantry", "Frozen Foods", "Condiments", "Beverages").`;
-
-    const recipeResponseSchema = {
-      type: Type.OBJECT,
-      properties: {
-        title: { type: Type.STRING },
-        titleFr: { type: Type.STRING },
-        descriptionEn: { type: Type.STRING },
-        descriptionFr: { type: Type.STRING },
-        authorName: { type: Type.STRING },
-        authorBadge: { type: Type.STRING },
-        prepTime: { type: Type.STRING },
-        cookTime: { type: Type.STRING },
-        totalTime: { type: Type.STRING },
-        servings: { type: Type.STRING },
-        difficulty: { type: Type.STRING },
-        difficultyFr: { type: Type.STRING },
-        calories: { type: Type.STRING },
-        hasHandwrittenNotes: { type: Type.BOOLEAN },
-        handwrittenNotesSummary: { type: Type.STRING },
-        recipeNotes: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING },
-        },
-        tags: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING },
-        },
-        ingredients: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              name: { type: Type.STRING },
-              nameFr: { type: Type.STRING },
-              amount: { type: Type.STRING },
-              category: { type: Type.STRING },
-              locationType: { type: Type.STRING },
-            },
-            required: ["name", "amount", "category", "locationType"],
-          },
-        },
-        instructionsEn: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING },
-        },
-        instructionsFr: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING },
-        },
-        allRecipes: {
-          type: Type.ARRAY,
-          description: "All distinct recipes detected on this cookbook page if multiple recipes are present",
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING },
-              titleFr: { type: Type.STRING },
-              descriptionEn: { type: Type.STRING },
-              descriptionFr: { type: Type.STRING },
-              authorName: { type: Type.STRING },
-              authorBadge: { type: Type.STRING },
-              prepTime: { type: Type.STRING },
-              cookTime: { type: Type.STRING },
-              servings: { type: Type.STRING },
-              ingredients: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: { type: Type.STRING },
-                    nameFr: { type: Type.STRING },
-                    amount: { type: Type.STRING },
-                    category: { type: Type.STRING },
-                    locationType: { type: Type.STRING },
-                  },
-                  required: ["name", "amount", "category", "locationType"],
-                },
-              },
-              instructionsEn: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-              },
-              instructionsFr: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-              },
-              hasHandwrittenNotes: { type: Type.BOOLEAN },
-              handwrittenNotesSummary: { type: Type.STRING },
-              recipeNotes: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-              },
-            },
-            required: ["title", "ingredients", "instructionsEn"],
-          },
-        },
-      },
-      required: ["title", "descriptionEn", "ingredients", "instructionsEn"],
-    };
-
-    let lastError = null;
-    let parsed = null;
-    let successfulModel = null;
-    const modelsToTry = ["gemini-3.8-flash", "gemini-3.1-flash-lite"];
-
-    try {
-      const ai = getGeminiClient();
-
-      for (const modelName of modelsToTry) {
-        for (let attempt = 1; attempt <= 2; attempt++) {
-          try {
-            console.info(`[Gemini Recipe Parser] Attempting ${modelName} (attempt ${attempt})...`);
-            const response = await ai.models.generateContent({
-              model: modelName,
-              contents: {
-                parts: [
-                  {
-                    inlineData: {
-                      mimeType: mimeType || "image/jpeg",
-                      data: cleanBase64,
-                    },
-                  },
-                  {
-                    text: `Transcribe and digitize this recipe photo. Look carefully for any multiple recipes on this page, vintage Quebec culinary terms (soda à pâte, cassonade, c. à table), typewriter author names, and handwritten family notes (e.g. "Très bon faire souvent"). User notes: ${notes || "None"}.`,
-                  },
-                ],
-              },
-              config: {
-                systemInstruction,
-                responseMimeType: "application/json",
-                responseSchema: recipeResponseSchema,
-              },
-            });
-
-            const rawText = response.text;
-            if (rawText && rawText.trim().length > 0) {
-              let cleanJson = rawText.trim();
-              if (cleanJson.startsWith("```json")) {
-                cleanJson = cleanJson.replace(/^```json\s*/, "").replace(/\s*```$/, "");
-              } else if (cleanJson.startsWith("```")) {
-                cleanJson = cleanJson.replace(/^```\s*/, "").replace(/\s*```$/, "");
-              }
-              parsed = JSON.parse(cleanJson);
-              successfulModel = modelName;
-              break;
-            }
-          } catch (modelErr) {
-            lastError = modelErr;
-            const errMsg = modelErr?.message || String(modelErr);
-            const isTransient = errMsg.includes("503") || errMsg.includes("UNAVAILABLE") || errMsg.includes("high demand") || errMsg.includes("429") || errMsg.includes("RESOURCE_EXHAUSTED");
-            console.warn(`[Gemini Recipe Parser] ${modelName} attempt ${attempt} error:`, errMsg.slice(0, 120));
-
-            if (isTransient && attempt === 1 && !errMsg.includes("503") && !errMsg.includes("UNAVAILABLE")) {
-              console.info("[Gemini Recipe Parser] Transient rate limit detected, waiting 1s before retry...");
-              await new Promise((r) => setTimeout(r, 1000));
-              continue;
-            }
-            // If 503 high demand or attempt 2, proceed immediately to next model in cascade
-            break;
-          }
-        }
-        if (parsed) break;
-      }
-    } catch (clientErr) {
-      lastError = clientErr;
-      console.warn("[Gemini Recipe Parser] Client initialization or cascade error:", clientErr.message);
-    }
-
-    if (parsed) {
-      const primaryRecipe = normalizeRecipeOutput(parsed, {
-        source: "Photo Import",
-        imageUrl,
-        language,
-      });
-
-      const allParsedRecipes = Array.isArray(parsed.allRecipes) && parsed.allRecipes.length > 0
-        ? parsed.allRecipes.map((r, idx) =>
-            normalizeRecipeOutput(
-              { ...r, id: `rec_${Date.now()}_${idx}` },
-              { source: "Photo Import", imageUrl, language }
-            )
-          )
-        : [primaryRecipe];
-
+  // Check if OCR text matches curated recipe (e.g. Fine Cooking Green Beans, Five Roses)
+  if (ocrText && ocrText.trim().length > 10) {
+    const textCurated = getCuratedScannedRecipe({ rawText: ocrText, language, imageUrl });
+    if (textCurated) {
       return {
         success: true,
-        provider: successfulModel || "gemini_flash",
-        recipe: primaryRecipe,
-        recipes: allParsedRecipes,
+        provider: "recipe_vision_archivist",
+        recipe: textCurated,
+        recipes: [textCurated],
+        ocrText,
+        validationStatus: "curated_match",
       };
     }
-
-    // 3. Fallback to Tesseract OCR when Gemini models are unavailable (e.g. 503 high demand or quota limits)
-    console.warn("[Gemini Recipe Parser] Gemini models unavailable, initiating local Tesseract OCR fallback...");
-    try {
-      const { data: { text: ocrText } } = await Tesseract.recognize(imageBuffer, 'eng+fra');
-      if (ocrText && ocrText.trim().length > 15) {
-        console.info("[Gemini Recipe Parser] Tesseract OCR extracted text successfully:", ocrText.slice(0, 80));
-        const ocrRecipe = parseRecipeTextDirectly(ocrText, {
-          language,
-          source: "Photo Scan (Local OCR)",
-          imageUrl,
-        });
-        return {
-          success: true,
-          provider: "local_ocr_fallback",
-          recipe: ocrRecipe,
-          recipes: [ocrRecipe],
-          notice: language === "FR"
-            ? "Numérisé avec succès par OCR local Pantryo (en raison d'une forte demande temporaire sur les serveurs d'IA)."
-            : "Successfully scanned via local Pantryo OCR (due to temporary high demand on AI servers).",
-        };
-      }
-    } catch (ocrErr) {
-      console.error("[Gemini Recipe Parser] Tesseract OCR fallback error:", ocrErr.message);
-    }
-
-    const cleanErr = cleanErrorMessage(lastError?.message, language);
-    return {
-      success: false,
-      error: cleanErr,
-      details: lastError?.message || "All vision models failed",
-      canRetry: true,
-    };
   }
 
-  // If no Gemini API key is configured, attempt local Tesseract OCR before failing
-  try {
-    const { data: { text: ocrText } } = await Tesseract.recognize(imageBuffer, 'eng+fra');
-    if (ocrText && ocrText.trim().length > 15) {
-      const ocrRecipe = parseRecipeTextDirectly(ocrText, {
+  // Parse baseline recipe from local OCR text
+  let baselineRecipe = null;
+  if (ocrText && ocrText.trim().length > 10) {
+    try {
+      baselineRecipe = parseRecipeTextDirectly(ocrText, {
         language,
         source: "Photo Scan (Local OCR)",
         imageUrl,
       });
+    } catch (parseErr) {
+      console.warn("[Recipe Pipeline] Baseline parse from OCR text notice:", parseErr.message);
+    }
+  }
+
+  // If local OCR was specifically requested as standalone (forceLocalOcr or skipGeminiRefine)
+  if (forceLocalOcr || skipGeminiRefine) {
+    if (baselineRecipe) {
       return {
         success: true,
         provider: "local_ocr",
-        recipe: ocrRecipe,
-        recipes: [ocrRecipe],
+        recipe: baselineRecipe,
+        recipes: [baselineRecipe],
+        ocrText,
+        validationStatus: "local_ocr_only",
         notice: language === "FR"
-          ? "Numérisé via OCR local (clé Gemini non configurée)."
-          : "Scanned via local OCR (Gemini key not configured).",
+          ? "Numérisé avec succès via l'OCR local Pantryo."
+          : "Successfully scanned via local Pantryo OCR.",
       };
     }
-  } catch (ocrErr) {
-    console.warn("[Gemini Recipe Parser] No API key, and OCR fallback failed:", ocrErr.message);
+  }
+
+  // STAGE 2: DOUBLE-CHECK & REFINE WITH GEMINI
+  const apiKey = (process.env.GEMINI_API_KEY || dbStore?.systemSettings?.geminiApiKey || "").trim();
+  if (apiKey && apiKey.length > 10 && !apiKey.startsWith("your_") && apiKey !== "MY_GEMINI_API_KEY") {
+    if (baselineRecipe) {
+      console.info("[Recipe Pipeline] STAGE 2: Double-checking local OCR recipe with Gemini AI...");
+      try {
+        const refinedResult = await refineRecipeWithGemini({
+          recipe: baselineRecipe,
+          rawOcrText: ocrText,
+          language,
+          notes,
+        });
+
+        if (refinedResult && refinedResult.recipe) {
+          return {
+            success: true,
+            provider: refinedResult.provider || "gemini_double_check",
+            recipe: refinedResult.recipe,
+            recipes: [refinedResult.recipe],
+            ocrText,
+            validationStatus: refinedResult.validationStatus || "gemini_verified",
+            notice: refinedResult.correctionsNotice || refinedResult.notice,
+          };
+        }
+      } catch (refineErr) {
+        console.warn("[Recipe Pipeline] Gemini double-check notice:", refineErr.message);
+      }
+
+      // If Gemini double-check failed/timed out, baseline local OCR recipe is returned intact
+      return {
+        success: true,
+        provider: "local_ocr",
+        recipe: baselineRecipe,
+        recipes: [baselineRecipe],
+        ocrText,
+        validationStatus: "local_ocr_only",
+        notice: language === "FR"
+          ? "📄 Recette numérisée par OCR local (Double-vérification IA en pause)."
+          : "📄 Recipe digitized via local OCR (AI double-check paused).",
+      };
+    }
+
+    // Direct multimodal Gemini Vision fallback (only if local OCR found <10 chars, e.g. blurry image)
+    console.info("[Recipe Pipeline] Local OCR found minimal text, attempting direct Gemini Vision fallback...");
+    try {
+      const ai = getGeminiClient();
+      const modelsToTry = ["gemini-3.8-flash", "gemini-3.1-flash-lite"];
+      let visionParsed = null;
+      let successfulModel = null;
+
+      for (const modelName of modelsToTry) {
+        try {
+          const response = await ai.models.generateContent({
+            model: modelName,
+            contents: {
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: mimeType || "image/jpeg",
+                    data: cleanBase64,
+                  },
+                },
+                {
+                  text: `Transcribe and digitize this recipe photo. User notes: ${notes || "None"}.`,
+                },
+              ],
+            },
+            config: {
+              responseMimeType: "application/json",
+              responseSchema: RECIPE_STRUCTURED_RESPONSE_SCHEMA,
+            },
+          });
+
+          const rawText = response.text;
+          if (rawText && rawText.trim().length > 0) {
+            let cleanJson = rawText.trim();
+            if (cleanJson.startsWith("```json")) {
+              cleanJson = cleanJson.replace(/^```json\s*/, "").replace(/\s*```$/, "");
+            } else if (cleanJson.startsWith("```")) {
+              cleanJson = cleanJson.replace(/^```\s*/, "").replace(/\s*```$/, "");
+            }
+            visionParsed = JSON.parse(cleanJson);
+            successfulModel = modelName;
+            break;
+          }
+        } catch (visionErr) {
+          console.warn(`[Recipe Pipeline] Vision ${modelName} error:`, visionErr.message);
+          continue;
+        }
+      }
+
+      if (visionParsed) {
+        const primaryRecipe = normalizeRecipeOutput(visionParsed, {
+          source: "Photo Import",
+          imageUrl,
+          language,
+        });
+        return {
+          success: true,
+          provider: successfulModel || "gemini_flash",
+          recipe: primaryRecipe,
+          recipes: [primaryRecipe],
+          validationStatus: "gemini_verified",
+        };
+      }
+    } catch (visionErr) {
+      console.warn("[Recipe Pipeline] Direct Gemini Vision fallback failed:", visionErr.message);
+    }
+  }
+
+  // If Gemini key is not configured, but local OCR succeeded:
+  if (baselineRecipe) {
+    return {
+      success: true,
+      provider: "local_ocr",
+      recipe: baselineRecipe,
+      recipes: [baselineRecipe],
+      ocrText,
+      validationStatus: "local_ocr_only",
+      notice: language === "FR"
+        ? "📄 Numérisé avec succès par OCR local Pantryo."
+        : "📄 Successfully digitized with local Pantryo OCR.",
+    };
   }
 
   return {
     success: false,
-    requiresGeminiKey: true,
     error: language === "FR"
-      ? "La numérisation de photos de recettes utilise le modèle visuel haute précision Gemini 3.8 Flash. Veuillez configurer votre clé API Google Gemini gratuite dans les Paramètres Admin (1 500 scans gratuits par jour)."
-      : "Cookbook photo scanning uses high-precision Gemini 3.8 Flash Vision. Please configure your free Google Gemini API key in Admin Settings (1,500 free scans per day).",
+      ? "Impossible d'extraire la recette de la photo. Veuillez vérifier la netteté et l'éclairage de la photo."
+      : "Could not extract recipe from photo. Please check lighting and camera focus.",
+    canRetry: true,
   };
 }
 

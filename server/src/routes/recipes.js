@@ -3,6 +3,7 @@ import {
   parseRecipeFromText,
   parseRecipeFromPhoto,
   parseRecipeFromUrl,
+  refineRecipeWithGemini,
   translateRecipe,
   extractYouTubeId,
   generateSmartMealSuggestions,
@@ -141,6 +142,37 @@ router.post("/ai-parse", async (req, res) => {
       success: false,
       error: error.message || "Failed to parse recipe",
       details: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/v1/recipes/ai-refine
+ * Double-checks, corrects typos, and enriches a parsed recipe using Gemini AI
+ */
+router.post("/ai-refine", async (req, res) => {
+  try {
+    const { recipe, rawOcrText = "", language = "EN", notes = "" } = req.body;
+    if (!recipe && !rawOcrText) {
+      return res.status(400).json({
+        success: false,
+        error: "recipe or rawOcrText is required for AI double-checking.",
+      });
+    }
+
+    const result = await refineRecipeWithGemini({
+      recipe: recipe || { title: "Recipe", ingredients: [], instructions: [] },
+      rawOcrText,
+      language,
+      notes,
+    });
+
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error("[Recipes Route] /ai-refine failed:", error);
+    return res.status(400).json({
+      success: false,
+      error: error.message || "Failed to refine recipe with Gemini",
     });
   }
 });
