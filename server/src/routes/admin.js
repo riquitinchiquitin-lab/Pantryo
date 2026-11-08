@@ -14,6 +14,8 @@ import {
   issueSessionToken,
 } from "../services/sessionTokenService.js";
 import { getMonitoredScans, getPhotoFilePath } from "../services/photoMonitor.js";
+import { validateSafeExternalUrl, safeFetch } from "../services/ssrfGuard.js";
+
 
 const router = express.Router();
 
@@ -418,22 +420,15 @@ router.post("/test-domain", requireAdmin, async (req, res) => {
       targetUrl = `https://${targetUrl}`;
     }
 
-    const parsed = new URL(targetUrl);
+    // Comprehensive SSRF and anti-DNS rebinding validation
+    const cleanUrl = await validateSafeExternalUrl(targetUrl);
+    const parsed = new URL(cleanUrl);
     let resolvedIp = null;
 
-    // Perform DNS resolution first (if not an IP address or localhost)
-    if (!/^(localhost|127\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)$/i.test(parsed.hostname)) {
-      try {
-        const lookupResult = await dns.promises.lookup(parsed.hostname);
-        resolvedIp = lookupResult.address;
-      } catch (dnsErr) {
-        return res.status(400).json({
-          success: false,
-          hostname: parsed.hostname,
-          error: `Échec de résolution DNS pour '${parsed.hostname}' (${dnsErr.code || dnsErr.message}). Vérifiez que l'enregistrement A ou CNAME chez votre registraire ou Cloudflare est correctement configuré et propagé.`,
-        });
-      }
-    }
+    try {
+      const lookupResult = await dns.promises.lookup(parsed.hostname);
+      resolvedIp = lookupResult.address;
+    } catch (_) {}
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
@@ -441,14 +436,14 @@ router.post("/test-domain", requireAdmin, async (req, res) => {
     const startTime = Date.now();
     let response;
     try {
-      response = await fetch(targetUrl, {
+      response = await safeFetch(cleanUrl, {
         method: "HEAD",
         signal: controller.signal,
         headers: { "User-Agent": "Pantryo-Domain-Diagnostic/1.0" },
       });
     } catch (_) {
       // Fallback to GET if HEAD method is not allowed by upstream proxy
-      response = await fetch(targetUrl, {
+      response = await safeFetch(cleanUrl, {
         method: "GET",
         signal: controller.signal,
         headers: { "User-Agent": "Pantryo-Domain-Diagnostic/1.0" },

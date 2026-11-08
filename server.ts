@@ -82,10 +82,15 @@ app.use((req, res, next) => {
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("Permissions-Policy", "camera=(self), microphone=(), geolocation=()");
   res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+  const scriptCsp =
+    process.env.NODE_ENV === "production"
+      ? "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval';"
+      : "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval';";
   res.setHeader(
     "Content-Security-Policy",
-    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https: ws: wss: data: blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self';"
+    `default-src 'self'; ${scriptCsp} style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https: ws: wss: data: blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self';`
   );
+
   if (req.secure || req.headers["x-forwarded-proto"] === "https") {
     res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
   }
@@ -208,14 +213,7 @@ const HIGH_CAPACITY_PREFIXES = [
 ];
 
 app.use((req, res, next) => {
-  const isHighCap =
-    req.path.startsWith("/api/v1/recipes") ||
-    req.path.startsWith("/api/recipes") ||
-    req.path.startsWith("/api/v1/inventory") ||
-    req.path.startsWith("/api/inventory") ||
-    req.path.startsWith("/api/v1/admin") ||
-    req.path.startsWith("/api/admin") ||
-    HIGH_CAPACITY_PREFIXES.some((prefix) => req.path.startsWith(prefix));
+  const isHighCap = HIGH_CAPACITY_PREFIXES.some((prefix) => req.path.startsWith(prefix));
 
   if (isHighCap) {
     highCapacityJsonParser(req, res, (err) => {

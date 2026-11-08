@@ -1718,7 +1718,9 @@ class EncryptedDatabaseStore {
     // Check environment password for ADMIN role if configured
     const envAdminPass = (process.env.PANTRYO_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD || "").trim();
     if (!isValid && user.role === "ADMIN" && envAdminPass) {
-      if (cleanPassword === envAdminPass) {
+      const inputHash = crypto.createHash("sha256").update(cleanPassword).digest();
+      const envHash = crypto.createHash("sha256").update(envAdminPass).digest();
+      if (crypto.timingSafeEqual(inputHash, envHash)) {
         isValid = true;
         user.passwordHash = hashPassword(cleanPassword);
         this.persistToEncryptedDisk();
