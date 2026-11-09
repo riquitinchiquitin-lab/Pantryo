@@ -19,7 +19,7 @@
     "postinstall": "npm rebuild better-sqlite3-multiple-ciphers || true"
   },
   "dependencies": {
-    "@google/genai": "^2.32.0",
+    "@google/genai": "^3.0.0",
     "@simplewebauthn/browser": "^14.0.0",
     "@simplewebauthn/server": "^14.0.3",
     "@tensorflow-models/mobilenet": "^2.1.1",
