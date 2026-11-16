@@ -2575,209 +2575,6 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 })}
               </div>
             )}
-
-            {/* FLOATING BATCH ACTION BAR (When items are selected) */}
-            {selectedItemIds.size > 0 && (
-              <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-lg bg-teal-950/95 backdrop-blur-md text-white rounded-2xl px-4 py-3 shadow-2xl border border-teal-700 flex items-center justify-between gap-3 animate-fade-in">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-7 h-7 rounded-xl bg-teal-700 flex items-center justify-center font-bold text-xs shrink-0">
-                    {selectedItemIds.size}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-black truncate">
-                      {lang === 'FR'
-                        ? `${selectedItemIds.size} article(s) sélectionné(s)`
-                        : `${selectedItemIds.size} item(s) selected`}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleSelectAll}
-                      className="text-[10px] text-teal-300 hover:text-white underline cursor-pointer truncate block text-left"
-                    >
-                      {filteredItems.length > 0 && filteredItems.every((i) => selectedItemIds.has(i.id))
-                        ? (lang === 'FR' ? 'Tout désélectionner' : 'Deselect all')
-                        : (lang === 'FR' ? `Tout sélectionner (${filteredItems.length})` : `Select all (${filteredItems.length})`)}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                  {/* Bulk Move Category / Location */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setBulkMoveCategory('');
-                      setBulkMoveLocation('');
-                      setShowBulkMoveModal(true);
-                    }}
-                    disabled={isBulkMoving}
-                    className="py-1.5 px-2.5 sm:px-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-xs cursor-pointer disabled:opacity-50"
-                    title={lang === 'FR' ? 'Déplacer vers une autre catégorie' : 'Move to another category'}
-                  >
-                    <Layers className="w-3.5 h-3.5" />
-                    <span>{lang === 'FR' ? 'Déplacer' : 'Move'}</span>
-                  </button>
-
-                  {/* Bulk Use / Consume */}
-                  <button
-                    type="button"
-                    onClick={handleBulkConsume}
-                    disabled={isBulkConsuming}
-                    className="py-1.5 px-2.5 sm:px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-xs cursor-pointer disabled:opacity-50"
-                    title={lang === 'FR' ? 'Marquer comme utilisé / consommé' : 'Mark as used / consumed'}
-                  >
-                    <Check className="w-3.5 h-3.5 stroke-[3]" />
-                    <span>{isBulkConsuming ? '...' : (lang === 'FR' ? 'Utiliser' : 'Use')}</span>
-                  </button>
-
-                  {/* Bulk Delete */}
-                  <button
-                    type="button"
-                    onClick={() => setShowBulkDeleteConfirm(true)}
-                    disabled={isBulkDeleting}
-                    className="py-1.5 px-2.5 sm:px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-xs cursor-pointer disabled:opacity-50"
-                    title={lang === 'FR' ? 'Supprimer de l’inventaire' : 'Delete from inventory'}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">{isBulkDeleting ? '...' : (lang === 'FR' ? 'Supprimer' : 'Delete')}</span>
-                  </button>
-
-                  {/* Cancel / Deselect */}
-                  <button
-                    type="button"
-                    onClick={handleDeselectAll}
-                    className="p-1.5 rounded-xl bg-teal-900 hover:bg-teal-800 text-teal-200 hover:text-white transition-colors cursor-pointer"
-                    title={lang === 'FR' ? 'Annuler' : 'Cancel'}
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* BULK MOVE CATEGORY MODAL */}
-            {showBulkMoveModal && (
-              <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in">
-                <div className="bg-[#FAF7EE] text-[#133E3B] w-full max-w-md rounded-t-3xl sm:rounded-3xl border border-[#E5DFD0] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden animate-slide-up">
-                  <div className="px-5 py-4 bg-white border-b border-[#E8E2D5] flex items-center justify-between shrink-0">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-xl bg-teal-800 text-white flex items-center justify-center shrink-0">
-                        <Layers className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-sm text-[#0D3B37]">
-                          {lang === 'FR'
-                            ? `Déplacer ${selectedItemIds.size} article(s)`
-                            : `Move ${selectedItemIds.size} item(s)`}
-                        </h3>
-                        <p className="text-[11px] text-[#527470]">
-                          {lang === 'FR'
-                            ? 'Choisissez une nouvelle catégorie ou zone'
-                            : 'Pick a new category or storage compartment'}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowBulkMoveModal(false)}
-                      className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center cursor-pointer transition-colors"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto p-5 space-y-4">
-                    <div className="space-y-2">
-                      <p className="text-xs font-extrabold text-[#0D3B37] uppercase tracking-wider">
-                        {lang === 'FR' ? 'Catégorie cible' : 'Target Category'}
-                      </p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {ALL_FOOD_CATEGORIES.map((cat) => {
-                          const CatIcon = cat.icon;
-                          const isChosen = bulkMoveCategory === cat.name;
-                          return (
-                            <button
-                              key={cat.id}
-                              type="button"
-                              onClick={() =>
-                                setBulkMoveCategory((prev) => (prev === cat.name ? '' : cat.name))
-                              }
-                              className={`p-2.5 rounded-2xl border text-left flex items-center gap-2 transition-all cursor-pointer ${
-                                isChosen
-                                  ? 'bg-teal-800 text-white border-teal-800 shadow-xs'
-                                  : 'bg-white hover:bg-[#F5F2E8] border-[#E5DFD0] text-[#0D3B37]'
-                              }`}
-                            >
-                              <CatIcon className={`w-4 h-4 shrink-0 ${isChosen ? 'text-white' : 'text-teal-700'}`} />
-                              <span className="text-xs font-bold truncate">
-                                {getCategoryLocalizedName(cat.name, lang)}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <p className="text-xs font-extrabold text-[#0D3B37] uppercase tracking-wider">
-                        {lang === 'FR' ? 'Zone de stockage (optionnel)' : 'Storage Compartment (optional)'}
-                      </p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {[
-                          { key: 'Fridge', labelFr: 'Frigo', labelEn: 'Fridge' },
-                          { key: 'Freezer', labelFr: 'Congélateur', labelEn: 'Freezer' },
-                          { key: 'Pantry', labelFr: 'Garde-manger', labelEn: 'Pantry' },
-                          { key: 'Spice Rack', labelFr: 'Épices', labelEn: 'Spice Rack' },
-                        ].map((loc) => {
-                          const isChosen = bulkMoveLocation === loc.key;
-                          return (
-                            <button
-                              key={loc.key}
-                              type="button"
-                              onClick={() =>
-                                setBulkMoveLocation((prev) => (prev === loc.key ? '' : loc.key))
-                              }
-                              className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                                isChosen
-                                  ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
-                                  : 'bg-white hover:bg-[#F5F2E8] border-[#E5DFD0] text-[#0D3B37]'
-                              }`}
-                            >
-                              {lang === 'FR' ? loc.labelFr : loc.labelEn}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="px-5 py-3.5 bg-white border-t border-[#E8E2D5] flex items-center justify-end gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setShowBulkMoveModal(false)}
-                      className="py-2 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer transition-colors"
-                    >
-                      {lang === 'FR' ? 'Annuler' : 'Cancel'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleBulkMoveCategory}
-                      disabled={isBulkMoving || (!bulkMoveCategory && !bulkMoveLocation)}
-                      className="py-2 px-4 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 disabled:opacity-50"
-                    >
-                      <Check className="w-3.5 h-3.5 stroke-[3]" />
-                      <span>
-                        {isBulkMoving
-                          ? '...'
-                          : lang === 'FR'
-                          ? 'Déplacer les articles'
-                          : 'Move Items'}
-                      </span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
           </>
         )}
 
@@ -3292,6 +3089,209 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
           <Plus className="w-7 h-7 stroke-[2.75] transition-transform duration-200" />
         </button>
       </div>
+
+      {/* FLOATING BATCH ACTION BAR (When items are selected — positioned above mobile/tablet nav & desktop add dock) */}
+      {activeNav === 'home' && selectedItemIds.size > 0 && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-lg bg-teal-950/95 backdrop-blur-md text-white rounded-2xl px-4 py-3 shadow-2xl border border-teal-700 flex items-center justify-between gap-3 animate-fade-in">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 rounded-xl bg-teal-700 flex items-center justify-center font-bold text-xs shrink-0">
+              {selectedItemIds.size}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-black truncate">
+                {lang === 'FR'
+                  ? `${selectedItemIds.size} article(s) sélectionné(s)`
+                  : `${selectedItemIds.size} item(s) selected`}
+              </p>
+              <button
+                type="button"
+                onClick={handleSelectAll}
+                className="text-[10px] text-teal-300 hover:text-white underline cursor-pointer truncate block text-left"
+              >
+                {filteredItems.length > 0 && filteredItems.every((i) => selectedItemIds.has(i.id))
+                  ? (lang === 'FR' ? 'Tout désélectionner' : 'Deselect all')
+                  : (lang === 'FR' ? `Tout sélectionner (${filteredItems.length})` : `Select all (${filteredItems.length})`)}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Bulk Move Category / Location */}
+            <button
+              type="button"
+              onClick={() => {
+                setBulkMoveCategory('');
+                setBulkMoveLocation('');
+                setShowBulkMoveModal(true);
+              }}
+              disabled={isBulkMoving}
+              className="py-1.5 px-2.5 sm:px-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-xs cursor-pointer disabled:opacity-50"
+              title={lang === 'FR' ? 'Déplacer vers une autre catégorie' : 'Move to another category'}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>{lang === 'FR' ? 'Déplacer' : 'Move'}</span>
+            </button>
+
+            {/* Bulk Use / Consume */}
+            <button
+              type="button"
+              onClick={handleBulkConsume}
+              disabled={isBulkConsuming}
+              className="py-1.5 px-2.5 sm:px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-xs cursor-pointer disabled:opacity-50"
+              title={lang === 'FR' ? 'Marquer comme utilisé / consommé' : 'Mark as used / consumed'}
+            >
+              <Check className="w-3.5 h-3.5 stroke-[3]" />
+              <span>{isBulkConsuming ? '...' : (lang === 'FR' ? 'Utiliser' : 'Use')}</span>
+            </button>
+
+            {/* Bulk Delete */}
+            <button
+              type="button"
+              onClick={() => setShowBulkDeleteConfirm(true)}
+              disabled={isBulkDeleting}
+              className="py-1.5 px-2.5 sm:px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-xs cursor-pointer disabled:opacity-50"
+              title={lang === 'FR' ? 'Supprimer de l’inventaire' : 'Delete from inventory'}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{isBulkDeleting ? '...' : (lang === 'FR' ? 'Supprimer' : 'Delete')}</span>
+            </button>
+
+            {/* Cancel / Deselect */}
+            <button
+              type="button"
+              onClick={handleDeselectAll}
+              className="p-1.5 rounded-xl bg-teal-900 hover:bg-teal-800 text-teal-200 hover:text-white transition-colors cursor-pointer"
+              title={lang === 'FR' ? 'Annuler' : 'Cancel'}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* BULK MOVE CATEGORY MODAL */}
+      {showBulkMoveModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in">
+          <div className="bg-[#FAF7EE] text-[#133E3B] w-full max-w-md rounded-t-3xl sm:rounded-3xl border border-[#E5DFD0] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden animate-slide-up">
+            <div className="px-5 py-4 bg-white border-b border-[#E8E2D5] flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-teal-800 text-white flex items-center justify-center shrink-0">
+                  <Layers className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-[#0D3B37]">
+                    {lang === 'FR'
+                      ? `Déplacer ${selectedItemIds.size} article(s)`
+                      : `Move ${selectedItemIds.size} item(s)`}
+                  </h3>
+                  <p className="text-[11px] text-[#527470]">
+                    {lang === 'FR'
+                      ? 'Choisissez une nouvelle catégorie ou zone'
+                      : 'Pick a new category or storage compartment'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBulkMoveModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center cursor-pointer transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              <div className="space-y-2">
+                <p className="text-xs font-extrabold text-[#0D3B37] uppercase tracking-wider">
+                  {lang === 'FR' ? 'Catégorie cible' : 'Target Category'}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {ALL_FOOD_CATEGORIES.map((cat) => {
+                    const CatIcon = cat.icon;
+                    const isChosen = bulkMoveCategory === cat.name;
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() =>
+                          setBulkMoveCategory((prev) => (prev === cat.name ? '' : cat.name))
+                        }
+                        className={`p-2.5 rounded-2xl border text-left flex items-center gap-2 transition-all cursor-pointer ${
+                          isChosen
+                            ? 'bg-teal-800 text-white border-teal-800 shadow-xs'
+                            : 'bg-white hover:bg-[#F5F2E8] border-[#E5DFD0] text-[#0D3B37]'
+                        }`}
+                      >
+                        <CatIcon className={`w-4 h-4 shrink-0 ${isChosen ? 'text-white' : 'text-teal-700'}`} />
+                        <span className="text-xs font-bold truncate">
+                          {getCategoryLocalizedName(cat.name, lang)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-extrabold text-[#0D3B37] uppercase tracking-wider">
+                  {lang === 'FR' ? 'Zone de stockage (optionnel)' : 'Storage Compartment (optional)'}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { key: 'Fridge', labelFr: 'Frigo', labelEn: 'Fridge' },
+                    { key: 'Freezer', labelFr: 'Congélateur', labelEn: 'Freezer' },
+                    { key: 'Pantry', labelFr: 'Garde-manger', labelEn: 'Pantry' },
+                    { key: 'Spice Rack', labelFr: 'Épices', labelEn: 'Spice Rack' },
+                  ].map((loc) => {
+                    const isChosen = bulkMoveLocation === loc.key;
+                    return (
+                      <button
+                        key={loc.key}
+                        type="button"
+                        onClick={() =>
+                          setBulkMoveLocation((prev) => (prev === loc.key ? '' : loc.key))
+                        }
+                        className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                          isChosen
+                            ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                            : 'bg-white hover:bg-[#F5F2E8] border-[#E5DFD0] text-[#0D3B37]'
+                        }`}
+                      >
+                        {lang === 'FR' ? loc.labelFr : loc.labelEn}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="px-5 py-3.5 bg-white border-t border-[#E8E2D5] flex items-center justify-end gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowBulkMoveModal(false)}
+                className="py-2 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer transition-colors"
+              >
+                {lang === 'FR' ? 'Annuler' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkMoveCategory}
+                disabled={isBulkMoving || (!bulkMoveCategory && !bulkMoveLocation)}
+                className="py-2 px-4 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 disabled:opacity-50"
+              >
+                <Check className="w-3.5 h-3.5 stroke-[3]" />
+                <span>
+                  {isBulkMoving
+                    ? '...'
+                    : lang === 'FR'
+                    ? 'Déplacer les articles'
+                    : 'Move Items'}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Vision Scanner Modal */}
       <CameraScannerModal
