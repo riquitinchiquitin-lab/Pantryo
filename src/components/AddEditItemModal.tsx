@@ -22,6 +22,8 @@ import {
   Upload,
   Image as ImageIcon,
   Clipboard,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { InventoryItem, User, StorageType } from '../types';
 import { ALL_FOOD_CATEGORIES } from '../utils/foodVisuals';
