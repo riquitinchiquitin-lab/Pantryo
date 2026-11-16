@@ -1720,7 +1720,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
       )}
 
       {/* Main Scrollable View */}
-      <div className="flex-1 overflow-y-auto px-3 sm:px-5 pt-1.5 pb-28 xl:pb-16 space-y-2.5 sm:space-y-3.5">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 sm:px-5 pt-1.5 pb-28 xl:pb-16 space-y-2.5 sm:space-y-3.5">
         {/* VIEW: HOME INVENTORY */}
         {activeNav === 'home' && (
           <>
@@ -1843,21 +1843,21 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
 
             {/* "COOK FIRST" EXPIRATION & LEFTOVERS PRIORITY STRIP */}
             {(expiringItems.length > 0 || leftoversCount > 0) && (
-              <div className="p-3.5 rounded-[20px] bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-rose-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs animate-fadeIn">
-                <div className="flex items-center gap-2.5 min-w-0">
+              <div className="p-3.5 rounded-[20px] bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-rose-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs animate-fadeIn overflow-hidden">
+                <div className="flex items-center gap-2.5 min-w-0 w-full sm:w-auto sm:flex-1">
                   <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-700 flex items-center justify-center shrink-0">
                     <Flame className="w-4 h-4 text-amber-600 animate-pulse" />
                   </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs font-black text-amber-950">
                         {lang === 'FR' ? 'À cuisiner en priorité' : 'Cook First Priority'}
                       </span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-900 border border-amber-500/30">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-900 border border-amber-500/30 shrink-0">
                         {expiringItems.length + (leftoversCount > 0 ? leftoversCount : 0)} {lang === 'FR' ? 'urgents' : 'items'}
                       </span>
                     </div>
-                    <p className="text-[11px] text-amber-900/80 truncate">
+                    <p className="text-[11px] text-amber-900/80 line-clamp-2 break-words">
                       {lang === 'FR'
                         ? `${expiringItems.map((i) => i.name).slice(0, 3).join(', ')}${expiringItems.length > 3 ? '...' : ''} à consommer rapidement pour éviter le gaspillage.`
                         : `${expiringItems.map((i) => i.name).slice(0, 3).join(', ')}${expiringItems.length > 3 ? '...' : ''} expire soon. Cook to prevent waste.`}
@@ -1880,7 +1880,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 {/* Search Bar */}
-                <div className="relative flex-1">
+                <div className="relative flex-1 min-w-0">
                   <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#527470]" />
                   <input
                     type="text"
