@@ -1303,29 +1303,28 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
     try {
       const idsToDelete: string[] = [];
       const updatedMap = new Map<string, number>();
+      const updates: Array<{ id: string; quantity: number }> = [];
 
       for (const group of duplicateGroups) {
         const primary = group[0];
         const totalQty = Number(
           group.reduce((sum, g) => sum + (Number(g.quantity) || 1), 0).toFixed(3)
         );
-        await fetch(`/api/v1/inventory/item/${encodeURIComponent(primary.id)}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ quantity: totalQty, userId: currentUser?.id }),
-        });
+        updates.push({ id: primary.id, quantity: totalQty });
         updatedMap.set(primary.id, totalQty);
         for (let i = 1; i < group.length; i++) {
           idsToDelete.push(group[i].id);
         }
       }
 
-      if (idsToDelete.length > 0) {
-        await fetch('/api/v1/inventory/bulk-delete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ itemIds: idsToDelete }),
-        });
+      const res = await fetch('/api/v1/inventory/bulk-organize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates, deleteIds: idsToDelete, userId: currentUser?.id }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
       }
 
       const deleteSet = new Set(idsToDelete);
@@ -1355,18 +1354,21 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
     if (spicesInPantry.length === 0 || isOrganizing) return;
     setIsOrganizing(true);
     try {
-      const movedIds = new Set<string>();
-      for (const spice of spicesInPantry) {
-        const res = await fetch(`/api/v1/inventory/item/${encodeURIComponent(spice.id)}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            locationName: 'Spice Rack',
-            categoryName: 'Spices & Seasonings',
-            userId: currentUser?.id,
-          }),
-        });
-        if (res.ok) movedIds.add(spice.id);
+      const movedIds = new Set(spicesInPantry.map((s) => s.id));
+      const updates = spicesInPantry.map((spice) => ({
+        id: spice.id,
+        locationName: 'Spice Rack',
+        categoryName: 'Spices & Seasonings',
+      }));
+
+      const res = await fetch('/api/v1/inventory/bulk-organize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates, userId: currentUser?.id }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
       }
 
       setItems((prev) =>

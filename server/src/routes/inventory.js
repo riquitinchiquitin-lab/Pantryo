@@ -2374,6 +2374,93 @@ router.post("/bulk-delete", (req, res) => {
 });
 
 /**
+ * POST /api/v1/inventory/bulk-organize
+ * Atomically updates and/or deletes multiple inventory items in a single request and single disk sync.
+ */
+router.post("/bulk-organize", (req, res) => {
+  try {
+    const { updates = [], deleteIds = [], userId = "usr_admin" } = req.body;
+    const updateList = Array.isArray(updates) ? updates : [];
+    const deleteList = Array.isArray(deleteIds) ? deleteIds : [];
+
+    if (updateList.length === 0 && deleteList.length === 0) {
+      return res.status(400).json({ success: false, error: "No updates or deletions provided" });
+    }
+
+    const updateMap = new Map();
+    for (const u of updateList) {
+      if (u && u.id) updateMap.set(u.id, u);
+    }
+
+    let updatedCount = 0;
+    const nowIso = new Date().toISOString();
+
+    if (updateMap.size > 0) {
+      itemsStore = itemsStore.map((currentItem) => {
+        const patch = updateMap.get(currentItem.id);
+        if (!patch) return currentItem;
+
+        let resolvedLocationId = currentItem.locationId;
+        if (patch.locationName) {
+          const match = LOCATIONS.find(
+            (l) =>
+              l.name.toLowerCase() === patch.locationName.toLowerCase() ||
+              l.type.toLowerCase() === patch.locationName.toLowerCase()
+          );
+          if (match) resolvedLocationId = match.id;
+        }
+
+        let resolvedCategoryId = currentItem.categoryId;
+        if (patch.categoryName) {
+          const match = CATEGORIES.find((c) =>
+            c.name.toLowerCase().includes(patch.categoryName.toLowerCase())
+          );
+          if (match) resolvedCategoryId = match.id;
+        }
+
+        updatedCount++;
+        return {
+          ...currentItem,
+          quantity: patch.quantity !== undefined ? Number(patch.quantity) : currentItem.quantity,
+          locationId: resolvedLocationId,
+          categoryId: resolvedCategoryId,
+          updatedAt: nowIso,
+        };
+      });
+    }
+
+    let deletedCount = 0;
+    if (deleteList.length > 0) {
+      const deleteSet = new Set(deleteList);
+      const before = itemsStore.length;
+      itemsStore = itemsStore.filter((i) => !deleteSet.has(i.id));
+      deletedCount = before - itemsStore.length;
+    }
+
+    syncItemsToEncryptedDisk();
+
+    activityLogs.unshift({
+      id: `log_${Date.now()}`,
+      action: "INVENTORY_BULK_ORGANIZED",
+      details: { updatedCount, deletedCount, organizedBy: userId },
+      userId,
+      householdId: SEED_HOUSEHOLD_ID,
+      createdAt: nowIso,
+    });
+
+    return res.status(200).json({
+      success: true,
+      updatedCount,
+      deletedCount,
+      remainingCount: itemsStore.length,
+    });
+  } catch (err) {
+    console.error("[Inventory Route] /bulk-organize error:", err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * POST /api/v1/inventory/bulk-consume
  * Marks multiple items as used/consumed
  */
