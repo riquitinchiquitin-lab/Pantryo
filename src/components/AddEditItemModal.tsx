@@ -450,6 +450,10 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
           throw new Error(data.error || 'Failed to update item.');
         }
 
+        const daysLeft = expirationDate
+          ? Math.ceil((new Date(expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+          : itemToEdit.daysUntilExpiration;
+
         // Construct enriched item
         const updatedEnriched: InventoryItem = {
           ...itemToEdit,
@@ -465,6 +469,9 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
           categoryName,
           notes: payload.notes || null,
           expirationDate: payload.expirationDate || null,
+          daysUntilExpiration: daysLeft,
+          isExpiringSoon: daysLeft !== null && daysLeft <= 3 && daysLeft >= 0,
+          isExpired: daysLeft !== null && daysLeft < 0,
         };
 
         onSaved(updatedEnriched, false);

@@ -1776,7 +1776,7 @@ export const isNoiseItemName = (name) => {
 const syncItemsToEncryptedDisk = () => {
   itemsStore = (itemsStore || []).filter((item) => !isNoiseItemName(item.name));
   dbStore.items = itemsStore;
-  dbStore.persistToEncryptedDisk();
+  dbStore.schedulePersistToEncryptedDisk();
 };
 
 /**

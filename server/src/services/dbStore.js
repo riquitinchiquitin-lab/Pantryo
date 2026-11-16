@@ -1235,6 +1235,23 @@ class EncryptedDatabaseStore {
   }
 
   /**
+   * Coalesces rapid mutations and persists to disk asynchronously right after
+   * the current request cycle so API responses return immediately.
+   */
+  schedulePersistToEncryptedDisk(delayMs = 25) {
+    if (this._persistTimer) {
+      clearTimeout(this._persistTimer);
+    }
+    this._persistTimer = setTimeout(() => {
+      this._persistTimer = null;
+      this.persistToEncryptedDisk();
+    }, delayMs);
+    if (typeof this._persistTimer.unref === "function") {
+      this._persistTimer.unref();
+    }
+  }
+
+  /**
    * Retrieves operational system and network configuration settings
    */
   getSystemSettings(includeSensitiveKeys = false) {

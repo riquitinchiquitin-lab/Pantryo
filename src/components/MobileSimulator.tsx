@@ -846,8 +846,8 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   };
 
   // Fetch initial household inventory from backend API
-  const fetchInventory = async () => {
-    setIsLoading(true);
+  const fetchInventory = async (silent = false) => {
+    if (!silent) setIsLoading(true);
     try {
       const res = await fetch('/api/v1/inventory/household/hh_pantryo_main', {
         headers: { Accept: 'application/json' },
@@ -873,7 +873,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
     } catch (err) {
       console.warn('Note: Inventory using local initial state:', err);
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   };
 
@@ -1112,7 +1112,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
     if (!isNew && (savedItem.quantity <= 0 || savedItem.status === 'CONSUMED')) {
       promptDepletedItem(savedItem);
     }
-    fetchInventory();
+    fetchInventory(true);
   };
 
   const handleDeleteItem = async (itemId: string, itemName?: string) => {
