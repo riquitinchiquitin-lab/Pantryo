@@ -24,12 +24,17 @@ import {
   Clipboard,
 } from 'lucide-react';
 import { InventoryItem, User, StorageType } from '../types';
-import { ALL_FOOD_CATEGORIES, ALL_SUB_CATEGORIES, ALL_MEAT_SEAFOOD_SUBCATEGORIES } from '../utils/foodVisuals';
-import { useLanguage, getCategoryLocalizedName, getSubcategoryLocalizedName } from '../utils/i18n';
-import { ScrollableRow } from './ScrollableRow';
+import { ALL_FOOD_CATEGORIES } from '../utils/foodVisuals';
+import { useLanguage, getCategoryLocalizedName } from '../utils/i18n';
 import { estimateSmartShelfLife } from '../utils/smartExpirationRules';
 import { getBilingualNames, translateFoodItem } from '../utils/foodTranslator';
 import { useAlertToast } from '../contexts/AlertToastContext';
+import {
+  CATEGORY_TAXONOMY,
+  getCompatibleCategoriesForCompartment,
+  type FoodTypeOption,
+  type FoodCutOption,
+} from '../utils/foodTaxonomy';
 
 interface AddEditItemModalProps {
   isOpen: boolean;
@@ -179,6 +184,11 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
+  const [selectedCutId, setSelectedCutId] = useState<string | null>(null);
+  const [showAllCategories, setShowAllCategories] = useState(false);
+  const [isNameAutoFilled, setIsNameAutoFilled] = useState(false);
+  const [failedImgIds, setFailedImgIds] = useState<Record<string, boolean>>({});
 
   const cameraInputRef = React.useRef<HTMLInputElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -287,12 +297,17 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
       setImageMeta(null);
       const initialLoc = defaultLocationType || 'FRIDGE';
       setLocationType(initialLoc);
-      setCategoryName(initialLoc === 'SPICE_RACK' ? 'Spices & Seasonings' : 'Produce');
+      const compatible = getCompatibleCategoriesForCompartment(initialLoc, false);
+      setCategoryName(compatible[0] || (initialLoc === 'SPICE_RACK' ? 'Spices & Seasonings' : 'Produce'));
       setQuantity(1);
       setUnit('pcs');
       setExpirationDate(getDefaultExpiration(initialLoc));
       setNotes('');
     }
+    setSelectedTypeId(null);
+    setSelectedCutId(null);
+    setShowAllCategories(false);
+    setIsNameAutoFilled(false);
     setErrorMessage(null);
   }, [itemToEdit, isOpen, defaultLocationType]);
 
@@ -317,14 +332,66 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
 
   const handleLocationChange = (newLoc: 'FRIDGE' | 'FREEZER' | 'PANTRY' | 'SPICE_RACK') => {
     setLocationType(newLoc);
-    // If setting a new item and user hasn't typed custom date, auto-adjust default date or smart suggestion
+    const compatible = getCompatibleCategoriesForCompartment(newLoc, showAllCategories);
+    let nextCategory = categoryName;
+    if (!compatible.includes(categoryName)) {
+      nextCategory = compatible[0] || 'Produce';
+      setCategoryName(nextCategory);
+      setSelectedTypeId(null);
+      setSelectedCutId(null);
+      if (isNameAutoFilled) {
+        setName('');
+        setIsNameAutoFilled(false);
+      }
+    }
+    // If setting a new item, auto-adjust default date or smart suggestion
     if (!isEditing) {
       if (name.trim()) {
-        const smart = estimateSmartShelfLife(name, categoryName, newLoc);
+        const smart = estimateSmartShelfLife(name, nextCategory, newLoc);
         setExpirationDate(smart.suggestedDate);
       } else {
         setExpirationDate(getDefaultExpiration(newLoc));
       }
+    }
+  };
+
+  const handleCategorySelect = (nextCategory: string) => {
+    setCategoryName(nextCategory);
+    setSelectedTypeId(null);
+    setSelectedCutId(null);
+    if (!isEditing && isNameAutoFilled) {
+      setName('');
+      setIsNameAutoFilled(false);
+    }
+  };
+
+  const handleTypeSelect = (typeOpt: FoodTypeOption) => {
+    setSelectedTypeId(typeOpt.id);
+    setSelectedCutId(null);
+    // If this type has no sub-cuts, auto-fill the item name directly
+    if (!typeOpt.cuts || typeOpt.cuts.length === 0) {
+      const suggestedName = lang === 'FR' ? typeOpt.nameFr : typeOpt.nameEn;
+      if (!name.trim() || isNameAutoFilled) {
+        setName(suggestedName);
+        setIsNameAutoFilled(true);
+      }
+      if (!isEditing) {
+        const smart = estimateSmartShelfLife(suggestedName, categoryName, locationType);
+        setExpirationDate(smart.suggestedDate);
+      }
+    }
+  };
+
+  const handleCutSelect = (cutOpt: FoodCutOption) => {
+    setSelectedCutId(cutOpt.id);
+    const suggestedName = lang === 'FR' ? cutOpt.defaultItemFr : cutOpt.defaultItemEn;
+    if (!name.trim() || isNameAutoFilled) {
+      setName(suggestedName);
+      setIsNameAutoFilled(true);
+    }
+    if (!isEditing) {
+      const smart = estimateSmartShelfLife(suggestedName, categoryName, locationType);
+      setExpirationDate(smart.suggestedDate);
     }
   };
 
@@ -568,32 +635,16 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
             </div>
           )}
 
-          {/* Item Name */}
-          <div>
-            <label className="block text-xs font-bold text-[#0D3B37] mb-1">
-              {lang === 'FR' ? "Nom de l'aliment *" : 'Item Name *'}
-            </label>
-            <input
-              type="text"
-              required
-              autoFocus={!isEditing}
-              placeholder={lang === 'FR' ? 'ex. Pommes Honeycrisp bio, Bifteck de faux-filet...' : 'e.g. Organic Whole Milk, Greek Yogurt, Cheddar...'}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-2xl bg-white border border-[#D5E1D2] text-sm font-medium text-[#133E3B] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 shadow-2xs"
-            />
-          </div>
-
-          {/* Storage Location Selector */}
+          {/* 1. Storage Compartment Selector (First) */}
           <div>
             <label className="block text-xs font-bold text-[#0D3B37] mb-1.5">
-              {lang === 'FR' ? 'Compartiment de stockage' : 'Storage Compartment'}
+              {lang === 'FR' ? '1. Compartiment de stockage' : '1. Storage Compartment'}
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <button
                 type="button"
                 onClick={() => handleLocationChange('FRIDGE')}
-                className={`py-2.5 px-3 rounded-2xl border text-xs font-bold flex flex-col items-center justify-center gap-1 transition-all ${
+                className={`py-2.5 px-3 rounded-2xl border text-xs font-bold flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
                   locationType === 'FRIDGE'
                     ? 'bg-teal-700 text-white border-teal-700 shadow-xs ring-2 ring-teal-500/20'
                     : 'bg-white border-[#D5E1D2] text-[#2D4C46] hover:bg-teal-50/50'
@@ -606,7 +657,7 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
               <button
                 type="button"
                 onClick={() => handleLocationChange('FREEZER')}
-                className={`py-2.5 px-3 rounded-2xl border text-xs font-bold flex flex-col items-center justify-center gap-1 transition-all ${
+                className={`py-2.5 px-3 rounded-2xl border text-xs font-bold flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
                   locationType === 'FREEZER'
                     ? 'bg-blue-600 text-white border-blue-600 shadow-xs ring-2 ring-blue-400/20'
                     : 'bg-white border-[#D5E1D2] text-[#244563] hover:bg-blue-50/50'
@@ -619,7 +670,7 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
               <button
                 type="button"
                 onClick={() => handleLocationChange('PANTRY')}
-                className={`py-2.5 px-3 rounded-2xl border text-xs font-bold flex flex-col items-center justify-center gap-1 transition-all ${
+                className={`py-2.5 px-3 rounded-2xl border text-xs font-bold flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
                   locationType === 'PANTRY'
                     ? 'bg-amber-600 text-white border-amber-600 shadow-xs ring-2 ring-amber-400/20'
                     : 'bg-white border-[#D5E1D2] text-[#544122] hover:bg-amber-50/50'
@@ -632,7 +683,7 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
               <button
                 type="button"
                 onClick={() => handleLocationChange('SPICE_RACK')}
-                className={`py-2.5 px-3 rounded-2xl border text-xs font-bold flex flex-col items-center justify-center gap-1 transition-all ${
+                className={`py-2.5 px-3 rounded-2xl border text-xs font-bold flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
                   locationType === 'SPICE_RACK'
                     ? 'bg-orange-600 text-white border-orange-600 shadow-xs ring-2 ring-orange-400/20'
                     : 'bg-white border-[#D5E1D2] text-[#63381B] hover:bg-orange-50/50'
@@ -644,95 +695,216 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
             </div>
           </div>
 
-          {/* Category Selector with Web Pictures */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-bold text-[#0D3B37]">
-                {lang === 'FR' ? 'Catégorie alimentaire *' : 'Food Category *'}
-              </label>
-              <span className="text-[11px] text-[#527470]">
-                {lang === 'FR' ? 'Sélectionnez pour les conseils' : 'Select best match for storage tips'}
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-1.5 bg-white border border-[#D5E1D2] rounded-2xl">
-              {ALL_FOOD_CATEGORIES.map((cat) => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setCategoryName(cat.name)}
-                  className={`pl-1 pr-2.5 py-1 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 border ${
-                    categoryName === cat.name
-                      ? 'bg-[#0E766E] text-white border-[#0E766E] shadow-2xs'
-                      : 'bg-[#F2ECE0] border-[#E0D9C8] text-[#334D37] hover:bg-[#E5DDD0]'
-                  }`}
-                >
-                  <div className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 ${cat.bgColor} ${cat.textColor}`}>
-                    <cat.icon className="w-3.5 h-3.5" />
+          {/* 2. Smart-Filtered Food Category with Visual Photo Cards */}
+          {(() => {
+            const compatibleNames = getCompatibleCategoriesForCompartment(locationType, showAllCategories);
+            const visibleCategories = ALL_FOOD_CATEGORIES.filter((cat) =>
+              compatibleNames.includes(cat.name) || cat.name === categoryName
+            );
+            return (
+              <div>
+                <div className="flex items-center justify-between mb-1.5 gap-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <label className="block text-xs font-bold text-[#0D3B37]">
+                      {lang === 'FR' ? '2. Catégorie alimentaire *' : '2. Food Category *'}
+                    </label>
+                    {!showAllCategories && (
+                      <span className="px-2 py-0.5 rounded-full bg-[#EFE9DA] text-[#527470] text-[10px] font-bold">
+                        {visibleCategories.length} {lang === 'FR' ? 'compatibles' : 'compatible'}
+                      </span>
+                    )}
                   </div>
-                  <span>{getCategoryLocalizedName(cat.name, lang)}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAllCategories((prev) => !prev)}
+                    className="text-[11px] font-bold text-[#0E766E] hover:underline cursor-pointer shrink-0"
+                  >
+                    {showAllCategories
+                      ? (lang === 'FR' ? 'Filtrer par zone' : 'Filter by zone')
+                      : (lang === 'FR' ? 'Tout afficher' : 'Show all')}
+                  </button>
+                </div>
 
-          {/* Specific Cuts & Subcategories (Meat, Fish & Specialty types) */}
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                  {visibleCategories.map((cat) => {
+                    const isSelected = categoryName === cat.name;
+                    const hasPhoto = Boolean(cat.imageUrl) && !failedImgIds[cat.id];
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => handleCategorySelect(cat.name)}
+                        className={`group relative rounded-2xl overflow-hidden border text-left transition-all cursor-pointer bg-white shadow-2xs ${
+                          isSelected
+                            ? 'border-[#0E766E] ring-2 ring-[#0E766E]/25 shadow-xs'
+                            : 'border-[#E0D9C8] hover:border-teal-500'
+                        }`}
+                      >
+                        <div className="relative h-14 sm:h-16 w-full bg-[#F2ECE0] overflow-hidden">
+                          {hasPhoto ? (
+                            <img
+                              src={cat.imageUrl}
+                              alt={getCategoryLocalizedName(cat.name, lang)}
+                              loading="lazy"
+                              onError={() => setFailedImgIds((prev) => ({ ...prev, [cat.id]: true }))}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                          ) : (
+                            <div className={`w-full h-full flex items-center justify-center ${cat.bgColor} ${cat.textColor}`}>
+                              <cat.icon className="w-6 h-6" />
+                            </div>
+                          )}
+                          {isSelected && (
+                            <span className="absolute top-1 right-1 w-5 h-5 rounded-full bg-[#0E766E] text-white flex items-center justify-center shadow-xs">
+                              <Check className="w-3 h-3" />
+                            </span>
+                          )}
+                        </div>
+                        <div className={`px-2 py-1.5 text-center ${isSelected ? 'bg-[#0E766E] text-white' : 'bg-white text-[#133E3B]'}`}>
+                          <span className="block text-[11px] font-bold leading-tight truncate">
+                            {getCategoryLocalizedName(cat.name, lang)}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* 3 & 4. Cascading Drill-Down: Protein/Type -> Specific Cut/Variety */}
+          {(() => {
+            const typeOptions = CATEGORY_TAXONOMY[categoryName] || [];
+            if (typeOptions.length === 0) return null;
+            const activeType = typeOptions.find((tOpt) => tOpt.id === selectedTypeId) || null;
+            const cutOptions = activeType?.cuts || [];
+
+            return (
+              <div className="space-y-3">
+                {/* Level 1: Type / Protein */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-[#0D3B37]">
+                      {categoryName === 'Meat & Seafood'
+                        ? (lang === 'FR' ? '3. Type de viande / poisson' : '3. Select Protein Type')
+                        : (lang === 'FR' ? '3. Type d’aliment' : '3. Select Type')}
+                    </label>
+                    <span className="text-[11px] text-[#527470]">
+                      {lang === 'FR' ? 'Sélection rapide' : 'Quick select'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {typeOptions.map((typeOpt) => {
+                      const isSelected = selectedTypeId === typeOpt.id;
+                      const hasPhoto = Boolean(typeOpt.imageUrl) && !failedImgIds[typeOpt.id];
+                      return (
+                        <button
+                          key={typeOpt.id}
+                          type="button"
+                          onClick={() => handleTypeSelect(typeOpt)}
+                          className={`flex items-center gap-2 p-1.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#0E766E] text-white border-[#0E766E] shadow-xs'
+                              : 'bg-white border-[#E0D9C8] text-[#133E3B] hover:border-teal-500 shadow-2xs'
+                          }`}
+                        >
+                          <div className={`w-8 h-8 rounded-xl overflow-hidden shrink-0 flex items-center justify-center ${hasPhoto ? 'bg-slate-100' : `${typeOpt.bgColor} ${typeOpt.textColor}`}`}>
+                            {hasPhoto ? (
+                              <img
+                                src={typeOpt.imageUrl}
+                                alt={lang === 'FR' ? typeOpt.nameFr : typeOpt.nameEn}
+                                loading="lazy"
+                                onError={() => setFailedImgIds((prev) => ({ ...prev, [typeOpt.id]: true }))}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <typeOpt.icon className="w-4 h-4" />
+                            )}
+                          </div>
+                          <span className="text-[11px] font-bold leading-tight line-clamp-2">
+                            {lang === 'FR' ? typeOpt.nameFr : typeOpt.nameEn}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Level 2: Specific Cut / Variety */}
+                {cutOptions.length > 0 && (
+                  <div className="animate-fade-in">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-bold text-[#0D3B37]">
+                        {lang === 'FR'
+                          ? `4. Coupe ou variété (${activeType?.nameFr})`
+                          : `4. Select ${activeType?.nameEn} Cut / Variety`}
+                      </label>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {cutOptions.map((cutOpt) => {
+                        const isSelected = selectedCutId === cutOpt.id;
+                        const hasPhoto = Boolean(cutOpt.imageUrl) && !failedImgIds[cutOpt.id];
+                        return (
+                          <button
+                            key={cutOpt.id}
+                            type="button"
+                            onClick={() => handleCutSelect(cutOpt)}
+                            className={`pl-1.5 pr-3 py-1.5 rounded-full border flex items-center gap-2 transition-all cursor-pointer ${
+                              isSelected
+                                ? 'bg-[#0E766E] text-white border-[#0E766E] shadow-xs'
+                                : 'bg-white border-[#E0D9C8] text-[#133E3B] hover:border-teal-500 shadow-2xs'
+                            }`}
+                          >
+                            <div className={`w-6 h-6 rounded-full overflow-hidden shrink-0 flex items-center justify-center ${hasPhoto ? 'bg-slate-100' : `${cutOpt.bgColor} ${cutOpt.textColor}`}`}>
+                              {hasPhoto ? (
+                                <img
+                                  src={cutOpt.imageUrl}
+                                  alt={lang === 'FR' ? cutOpt.nameFr : cutOpt.nameEn}
+                                  loading="lazy"
+                                  onError={() => setFailedImgIds((prev) => ({ ...prev, [cutOpt.id]: true }))}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <cutOpt.icon className="w-3.5 h-3.5" />
+                              )}
+                            </div>
+                            <span className="text-xs font-bold">
+                              {lang === 'FR' ? cutOpt.nameFr : cutOpt.nameEn}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* 5. Item Name (Auto-filled from selection or custom typed) */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-xs font-bold text-[#0D3B37]">
-                {lang === 'FR' ? 'Coupe ou sous-catégorie spécifique' : 'Specific Cut or Subcategory'}
+                {lang === 'FR' ? "Nom de l'aliment *" : 'Item Name *'}
               </label>
-              <span className="text-[11px] text-teal-800 font-medium">
-                {lang === 'FR' ? 'Cliquer pour définir la coupe' : 'Click to select cut'}
-              </span>
+              {isNameAutoFilled && name.trim() && (
+                <span className="px-2 py-0.5 rounded-full bg-teal-50 text-[#0E766E] border border-teal-200 text-[10px] font-bold">
+                  {lang === 'FR' ? 'Pré-rempli' : 'Auto-filled'}
+                </span>
+              )}
             </div>
-            <ScrollableRow className="gap-2 pb-1.5 pt-0.5" gradientFrom="from-white" showChevrons={true}>
-              {(categoryName.includes('Meat') || categoryName.includes('Seafood')
-                ? ALL_MEAT_SEAFOOD_SUBCATEGORIES
-                : ALL_SUB_CATEGORIES
-              ).map((sub) => {
-                const isMatching = name.toLowerCase().includes(sub.name.toLowerCase());
-                return (
-                  <button
-                    key={sub.id}
-                    type="button"
-                    onClick={() => {
-                      if (!name.trim()) setName(sub.name);
-                      if (sub.parentCategoryId === 'cat_meat') {
-                        setCategoryName('Meat & Seafood');
-                      } else if (sub.parentCategoryId === 'cat_dairy') {
-                        setCategoryName('Dairy & Eggs');
-                      } else if (sub.parentCategoryId === 'cat_produce') {
-                        setCategoryName('Produce');
-                      } else if (sub.parentCategoryId === 'cat_bakery') {
-                        setCategoryName('Bakery');
-                      } else if (sub.parentCategoryId === 'cat_pantry') {
-                        setCategoryName('Pantry Staples');
-                      } else if (sub.parentCategoryId === 'cat_spices') {
-                        setCategoryName('Spices & Seasonings');
-                        handleLocationChange('SPICE_RACK');
-                      }
-                    }}
-                    className={`px-2.5 py-1.5 rounded-xl border flex items-center gap-2 shrink-0 transition-all text-left ${
-                      isMatching
-                        ? 'bg-teal-700 text-white border-teal-800 shadow-xs'
-                        : 'bg-white border-[#E0D9C8] hover:border-teal-500 text-[#133E3B] shadow-2xs'
-                    }`}
-                  >
-                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${sub.bgColor} ${sub.textColor}`}>
-                      <sub.icon className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <span className="block text-[11px] font-bold leading-tight truncate max-w-[130px]">
-                        {getSubcategoryLocalizedName(sub.name, lang)}
-                      </span>
-                      <span className={`block text-[9px] ${isMatching ? 'text-teal-200' : 'text-[#627C65]'}`}>
-                        {getSubcategoryLocalizedName(sub.badgeLabel || sub.name, lang)}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </ScrollableRow>
+            <input
+              type="text"
+              required
+              placeholder={lang === 'FR' ? 'ex. Poitrines de poulet, Lait entier, Cheddar...' : 'e.g. Chicken Breasts, Organic Whole Milk, Cheddar...'}
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setIsNameAutoFilled(false);
+              }}
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-white border border-[#D5E1D2] text-sm font-medium text-[#133E3B] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 shadow-2xs"
+            />
           </div>
 
           {/* Quantity and Unit */}
