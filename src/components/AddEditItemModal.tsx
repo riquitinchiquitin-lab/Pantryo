@@ -189,6 +189,7 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
   const [showAllCategories, setShowAllCategories] = useState(false);
   const [isNameAutoFilled, setIsNameAutoFilled] = useState(false);
   const [failedImgIds, setFailedImgIds] = useState<Record<string, boolean>>({});
+  const [showExtras, setShowExtras] = useState(false);
 
   const cameraInputRef = React.useRef<HTMLInputElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -1132,24 +1133,35 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
             )}
           </div>
 
-          {/* Item Photo (Optional, Client-side compressed) */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-[#0D3B37] flex items-center gap-1.5">
-                <Camera className="w-3.5 h-3.5 text-teal-700" />
-                <span>{lang === 'FR' ? 'Photo de l’aliment (Optionnel)' : 'Item Photo (Optional)'}</span>
-              </label>
-              {imageUrl && !imageUrl.includes('unsplash.com') && (
-                <button
-                  type="button"
-                  onClick={handleRemovePhoto}
-                  className="text-[11px] font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 transition-colors"
-                >
-                  <Trash2 className="w-3 h-3" />
-                  <span>{lang === 'FR' ? 'Retirer la photo' : 'Remove photo'}</span>
-                </button>
+          {/* Optional: Photo & Notes (Collapsible) */}
+          <div className="rounded-2xl bg-white border border-[#D5E1D2] shadow-2xs overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowExtras((prev) => !prev)}
+              className="w-full px-3.5 py-2.5 flex items-center justify-between text-left hover:bg-[#FAF7EE]/70 transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <Camera className="w-4 h-4 text-teal-700 shrink-0" />
+                <span className="text-xs font-bold text-[#0D3B37] truncate">
+                  {lang === 'FR' ? 'Optionnel : Photo & Notes' : 'Optional: Photo & Notes'}
+                </span>
+                {(imageUrl && !imageUrl.includes('unsplash.com')) && (
+                  <span className="px-1.5 py-0.5 rounded-full bg-teal-50 text-teal-800 border border-teal-200 text-[9px] font-bold">
+                    {lang === 'FR' ? 'Photo' : 'Photo'}
+                  </span>
+                )}
+                {notes.trim() && (
+                  <span className="px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[9px] font-bold">
+                    {lang === 'FR' ? 'Notes' : 'Notes'}
+                  </span>
+                )}
+              </div>
+              {showExtras ? (
+                <ChevronUp className="w-4 h-4 text-[#527470] shrink-0" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-[#527470] shrink-0" />
               )}
-            </div>
+            </button>
 
             <input
               type="file"
@@ -1167,65 +1179,89 @@ export const AddEditItemModal: React.FC<AddEditItemModalProps> = ({
               className="hidden"
             />
 
-            {imageUrl && !imageUrl.includes('unsplash.com') ? (
-              <div className="p-2.5 rounded-2xl bg-white border border-[#D5E1D2] flex items-center gap-3 shadow-2xs animate-fade-in">
-                <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 border border-slate-200 bg-slate-100 relative shadow-2xs">
-                  <img
-                    src={imageUrl}
-                    alt={name || 'Item'}
-                    className="w-full h-full object-cover"
+            {showExtras && (
+              <div className="px-3.5 pb-3.5 pt-1 border-t border-[#EFE9DA] space-y-3 animate-fade-in">
+                {/* Item Photo (Optional, Client-side compressed) */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-[#0D3B37] flex items-center gap-1.5">
+                      <Camera className="w-3.5 h-3.5 text-teal-700" />
+                      <span>{lang === 'FR' ? 'Photo de l’aliment' : 'Item Photo'}</span>
+                    </label>
+                    {imageUrl && !imageUrl.includes('unsplash.com') && (
+                      <button
+                        type="button"
+                        onClick={handleRemovePhoto}
+                        className="text-[11px] font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>{lang === 'FR' ? 'Retirer la photo' : 'Remove photo'}</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {imageUrl && !imageUrl.includes('unsplash.com') ? (
+                    <div className="p-2.5 rounded-2xl bg-[#FAF7EE] border border-[#D5E1D2] flex items-center gap-3 shadow-2xs">
+                      <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 border border-slate-200 bg-slate-100 relative shadow-2xs">
+                        <img
+                          src={imageUrl}
+                          alt={name || 'Item'}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-bold text-[#133E3B]">
+                            {lang === 'FR' ? 'Photo enregistrée' : 'Photo attached'}
+                          </span>
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-teal-50 text-teal-800 border border-teal-200">
+                            JPEG 1600px max
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[#556D58] mt-0.5">
+                          {imageMeta
+                            ? `${imageMeta.width}×${imageMeta.height} px • ${imageMeta.sizeKb} KB`
+                            : lang === 'FR' ? 'Image compressée et chiffrée' : 'Compressed & encrypted image'}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => cameraInputRef.current?.click()}
+                        className="py-2 px-3 rounded-2xl bg-[#FAF7EE] hover:bg-teal-50/70 border border-[#D5E1D2] hover:border-teal-500 text-xs font-bold text-[#133E3B] flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs active:scale-98"
+                      >
+                        <Camera className="w-4 h-4 text-teal-700 shrink-0" />
+                        <span>{lang === 'FR' ? 'Prendre photo' : 'Take Photo'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="py-2 px-3 rounded-2xl bg-[#FAF7EE] hover:bg-teal-50/70 border border-[#D5E1D2] hover:border-teal-500 text-xs font-bold text-[#133E3B] flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs active:scale-98"
+                      >
+                        <Upload className="w-4 h-4 text-teal-700 shrink-0" />
+                        <span>{lang === 'FR' ? 'Importer fichier' : 'Upload File'}</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <label className="block text-xs font-bold text-[#0D3B37] mb-1">
+                    {lang === 'FR' ? 'Notes / Conseils de conservation' : 'Notes / Storage Tips'}
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder={lang === 'FR' ? "ex. Étagère du milieu, ouvert mardi, biologique..." : "e.g. Keep on middle shelf, opened on Tuesday, organic..."}
+                    className="w-full px-3.5 py-2 rounded-2xl bg-[#FAF7EE] border border-[#D5E1D2] text-xs font-medium text-[#133E3B] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 shadow-2xs resize-none"
                   />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-xs font-bold text-[#133E3B]">
-                      {lang === 'FR' ? 'Photo enregistrée' : 'Photo attached'}
-                    </span>
-                    <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-teal-50 text-teal-800 border border-teal-200">
-                      JPEG 1600px max
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-[#556D58] mt-0.5">
-                    {imageMeta
-                      ? `${imageMeta.width}×${imageMeta.height} px • ${imageMeta.sizeKb} KB`
-                      : lang === 'FR' ? 'Image compressée et chiffrée' : 'Compressed & encrypted image'}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => cameraInputRef.current?.click()}
-                  className="py-2 px-3 rounded-2xl bg-white hover:bg-teal-50/70 border border-[#D5E1D2] hover:border-teal-500 text-xs font-bold text-[#133E3B] flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs active:scale-98"
-                >
-                  <Camera className="w-4 h-4 text-teal-700 shrink-0" />
-                  <span>{lang === 'FR' ? 'Prendre photo' : 'Take Photo'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="py-2 px-3 rounded-2xl bg-white hover:bg-teal-50/70 border border-[#D5E1D2] hover:border-teal-500 text-xs font-bold text-[#133E3B] flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs active:scale-98"
-                >
-                  <Upload className="w-4 h-4 text-teal-700 shrink-0" />
-                  <span>{lang === 'FR' ? 'Importer fichier' : 'Upload File'}</span>
-                </button>
               </div>
             )}
-          </div>
-
-          {/* Notes */}
-          <div>
-            <label className="block text-xs font-bold text-[#0D3B37] mb-1">
-              {lang === 'FR' ? 'Notes / Conseils de conservation (Facultatif)' : 'Notes / Storage Tips (Optional)'}
-            </label>
-            <textarea
-              rows={2}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder={lang === 'FR' ? "ex. Étagère du milieu, ouvert mardi, biologique..." : "e.g. Keep on middle shelf, opened on Tuesday, organic..."}
-              className="w-full px-3.5 py-2 rounded-2xl bg-white border border-[#D5E1D2] text-xs font-medium text-[#133E3B] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 shadow-2xs resize-none"
-            />
           </div>
 
           {/* Actions - M3 Buttons */}
