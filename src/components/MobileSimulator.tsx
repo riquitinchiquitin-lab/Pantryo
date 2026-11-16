@@ -386,6 +386,18 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   const [isBentoCompact, setIsBentoCompact] = useState<boolean>(true);
   const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(new Set());
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+  const [groupByCategory, setGroupByCategory] = useState<boolean>(true);
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
+  const [isOrganizing, setIsOrganizing] = useState<boolean>(false);
+
+  const toggleCategoryCollapse = (catKey: string) => {
+    setCollapsedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(catKey)) next.delete(catKey);
+      else next.add(catKey);
+      return next;
+    });
+  };
 
   // Kitchen Name State (customizable in app or .env)
   const [kitchenName, setKitchenName] = useState<string>(() => {
@@ -1239,6 +1251,17 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
     return true;
   });
 
+  const groupedFilteredItems = React.useMemo(() => {
+    const groups = new Map<string, InventoryItem[]>();
+    for (const item of filteredItems) {
+      const catLabel = getCategoryLocalizedName(item.categoryName || 'Other', lang);
+      const list = groups.get(catLabel) || [];
+      list.push(item);
+      groups.set(catLabel, list);
+    }
+    return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [filteredItems, lang]);
+
   const expiringItems = items.filter((i) => i.isExpiringSoon || (i.daysUntilExpiration !== null && i.daysUntilExpiration <= 3));
   const fridgeCount = items.filter((i) => i.locationType === 'FRIDGE').length;
   const pantryCount = items.filter((i) => i.locationType === 'PANTRY').length;
@@ -1247,6 +1270,131 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
     (i) => i.locationType === 'SPICE_RACK' || (i.categoryName || '').toLowerCase().includes('spice') || (i.categoryName || '').toLowerCase().includes('épice')
   ).length;
   const leftoversCount = items.filter((i) => i.isLeftover).length;
+
+  // Detect duplicate items (same normalized name + compartment)
+  const duplicateGroups = React.useMemo(() => {
+    const map = new Map<string, InventoryItem[]>();
+    for (const item of items) {
+      const key = `${(item.name || '').trim().toLowerCase()}__${item.locationType}`;
+      const list = map.get(key) || [];
+      list.push(item);
+      map.set(key, list);
+    }
+    return Array.from(map.values()).filter((g) => g.length > 1);
+  }, [items]);
+
+  const extraDuplicateCount = duplicateGroups.reduce((acc, g) => acc + (g.length - 1), 0);
+
+  // Detect spices currently sitting in PANTRY
+  const spicesInPantry = React.useMemo(() => {
+    const spiceKw = /\b(spice|épice|epice|powder|poudre|bay lea|laurier|paprika|cumin|oregano|origan|basil|basilic|thyme|thym|cinnamon|cannelle|turmeric|curcuma|curry|nutmeg|muscade|rosemary|romarin|coriander|coriandre|chili|cayenne)\b/i;
+    return items.filter(
+      (i) =>
+        i.locationType === 'PANTRY' &&
+        ((i.categoryName || '').toLowerCase().includes('spice') ||
+          (i.categoryName || '').toLowerCase().includes('épice') ||
+          spiceKw.test(i.name || ''))
+    );
+  }, [items]);
+
+  const handleMergeDuplicates = async () => {
+    if (duplicateGroups.length === 0 || isOrganizing) return;
+    setIsOrganizing(true);
+    try {
+      const idsToDelete: string[] = [];
+      const updatedMap = new Map<string, number>();
+
+      for (const group of duplicateGroups) {
+        const primary = group[0];
+        const totalQty = Number(
+          group.reduce((sum, g) => sum + (Number(g.quantity) || 1), 0).toFixed(3)
+        );
+        await fetch(`/api/v1/inventory/item/${encodeURIComponent(primary.id)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ quantity: totalQty, userId: currentUser?.id }),
+        });
+        updatedMap.set(primary.id, totalQty);
+        for (let i = 1; i < group.length; i++) {
+          idsToDelete.push(group[i].id);
+        }
+      }
+
+      if (idsToDelete.length > 0) {
+        await fetch('/api/v1/inventory/bulk-delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ itemIds: idsToDelete }),
+        });
+      }
+
+      const deleteSet = new Set(idsToDelete);
+      setItems((prev) =>
+        prev
+          .filter((item) => !deleteSet.has(item.id))
+          .map((item) =>
+            updatedMap.has(item.id) ? { ...item, quantity: updatedMap.get(item.id)! } : item
+          )
+      );
+
+      showToast(
+        lang === 'FR'
+          ? `${idsToDelete.length} doublon(s) fusionné(s) avec succès !`
+          : `Merged ${idsToDelete.length} duplicate item(s)!`,
+        'success'
+      );
+    } catch (err) {
+      console.error('Failed to merge duplicates:', err);
+      showToast(lang === 'FR' ? 'Erreur lors de la fusion.' : 'Failed to merge duplicates.', 'error');
+    } finally {
+      setIsOrganizing(false);
+    }
+  };
+
+  const handleMoveSpicesToSpiceRack = async () => {
+    if (spicesInPantry.length === 0 || isOrganizing) return;
+    setIsOrganizing(true);
+    try {
+      const movedIds = new Set<string>();
+      for (const spice of spicesInPantry) {
+        const res = await fetch(`/api/v1/inventory/item/${encodeURIComponent(spice.id)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            locationName: 'Spice Rack',
+            categoryName: 'Spices & Seasonings',
+            userId: currentUser?.id,
+          }),
+        });
+        if (res.ok) movedIds.add(spice.id);
+      }
+
+      setItems((prev) =>
+        prev.map((item) =>
+          movedIds.has(item.id)
+            ? {
+                ...item,
+                locationType: 'SPICE_RACK',
+                locationName: 'Spice Rack',
+                categoryName: 'Spices & Seasonings',
+              }
+            : item
+        )
+      );
+
+      showToast(
+        lang === 'FR'
+          ? `${movedIds.size} épice(s) déplacée(s) vers l’armoire à épices !`
+          : `Moved ${movedIds.size} spice(s) to Spice Rack!`,
+        'success'
+      );
+    } catch (err) {
+      console.error('Failed to move spices:', err);
+      showToast(lang === 'FR' ? 'Erreur lors du déplacement.' : 'Failed to move spices.', 'error');
+    } finally {
+      setIsOrganizing(false);
+    }
+  };
 
   if (isSessionValidating) {
     return (
@@ -1501,8 +1649,8 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         {/* VIEW: HOME INVENTORY */}
         {activeNav === 'home' && (
           <>
-            {/* 4 EQUAL METRIC BOXES AT THE TOP - M3 Surface Containers */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            {/* 5 EQUAL METRIC BOXES AT THE TOP - M3 Surface Containers */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
               {/* Box 1: Fridge */}
               <button
                 type="button"
@@ -1569,7 +1717,29 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 </div>
               </button>
 
-              {/* Box 4: Urgent / Bientôt expiré */}
+              {/* Box 4: Spice Rack */}
+              <button
+                type="button"
+                onClick={() => setFilterLocation(filterLocation === 'SPICE_RACK' ? 'ALL' : 'SPICE_RACK')}
+                className={`p-3 rounded-[16px] border text-left transition-all cursor-pointer ${
+                  filterLocation === 'SPICE_RACK'
+                    ? 'bg-orange-100 text-orange-950 border-orange-300 shadow-xs'
+                    : 'bg-[var(--md-sys-color-surface-container-low)] border-[var(--md-sys-color-outline-variant)] hover:bg-[var(--md-sys-color-surface-container)] text-[var(--md-sys-color-on-surface)]'
+                }`}
+              >
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span>{lang === 'FR' ? 'Épices' : 'Spice Rack'}</span>
+                  <Flame className={`w-4 h-4 shrink-0 ${filterLocation === 'SPICE_RACK' ? 'text-orange-700' : 'text-orange-500'}`} />
+                </div>
+                <div className="mt-1 flex items-baseline justify-between">
+                  <span className="text-2xl font-bold">{spiceCount}</span>
+                  <span className={`text-[10px] font-medium ${filterLocation === 'SPICE_RACK' ? 'text-orange-900' : 'text-[var(--md-sys-color-on-surface-variant)]'}`}>
+                    {lang === 'FR' ? 'articles' : 'items'}
+                  </span>
+                </div>
+              </button>
+
+              {/* Box 5: Urgent / Bientôt expiré */}
               <button
                 type="button"
                 onClick={() => setFilterLocation(filterLocation === 'EXPIRING' ? 'ALL' : 'EXPIRING')}
@@ -1690,6 +1860,20 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                   )}
                 </button>
 
+                {/* Group by Category Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setGroupByCategory((prev) => !prev)}
+                  title={lang === 'FR' ? 'Grouper par catégorie' : 'Group by category'}
+                  className={`p-2 rounded-full border transition-all cursor-pointer shrink-0 flex items-center gap-1 ${
+                    groupByCategory
+                      ? 'bg-teal-700 border-teal-700 text-white shadow-2xs'
+                      : 'bg-white hover:bg-[#F5F2E8] border-[#E5DFD0] text-[#527470]'
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                </button>
+
                 {/* Bento List / Grid View Switcher */}
                 <div className="flex items-center p-0.5 bg-white border border-[#E5DFD0] rounded-full shadow-2xs shrink-0">
                   <button
@@ -1791,6 +1975,52 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 </div>
               )}
             </div>
+
+            {/* SMART INVENTORY CLEANUP STRIP (Shown only when duplicates or misfiled spices exist) */}
+            {(extraDuplicateCount > 0 || spicesInPantry.length > 0) && (
+              <div className="p-3 rounded-[18px] bg-[#F5F2E8] border border-[#E5DFD0] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-2xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-7 h-7 rounded-full bg-teal-700/10 text-teal-800 flex items-center justify-center shrink-0">
+                    <Sparkles className="w-3.5 h-3.5" />
+                  </div>
+                  <p className="text-xs font-bold text-[#0D3B37] truncate">
+                    {lang === 'FR' ? 'Rangement intelligent' : 'Smart Inventory Cleanup'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {extraDuplicateCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleMergeDuplicates}
+                      disabled={isOrganizing}
+                      className="py-1.5 px-3 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-[11px] font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:opacity-50 shadow-2xs"
+                    >
+                      <Layers className="w-3 h-3" />
+                      <span>
+                        {lang === 'FR'
+                          ? `Fusionner ${extraDuplicateCount} doublon${extraDuplicateCount > 1 ? 's' : ''}`
+                          : `Merge ${extraDuplicateCount} Duplicate${extraDuplicateCount > 1 ? 's' : ''}`}
+                      </span>
+                    </button>
+                  )}
+                  {spicesInPantry.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleMoveSpicesToSpiceRack}
+                      disabled={isOrganizing}
+                      className="py-1.5 px-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-[11px] font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:opacity-50 shadow-2xs"
+                    >
+                      <Flame className="w-3 h-3" />
+                      <span>
+                        {lang === 'FR'
+                          ? `Déplacer ${spicesInPantry.length} épice${spicesInPantry.length > 1 ? 's' : ''} → Épices`
+                          : `Move ${spicesInPantry.length} Spice${spicesInPantry.length > 1 ? 's' : ''} → Spice Rack`}
+                      </span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* DEDICATED SPICES & SEASONINGS SECTION BANNER & CONTROLS */}
             {filterLocation === 'SPICE_RACK' && (
@@ -1957,8 +2187,33 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               </div>
             ) : bentoViewMode === 'grid' ? (
               /* BENTO BOX GRID MODE (Responsive tactile compartments) */
-              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                {filteredItems.map((item) => {
+              <div className="space-y-3.5">
+                {(groupByCategory ? groupedFilteredItems : ([['__ALL__', filteredItems]] as Array<[string, InventoryItem[]]>)).map(([catName, catItems]) => {
+                  const isCollapsed = groupByCategory && collapsedCategories.has(catName);
+                  return (
+                    <div key={catName} className="space-y-2.5">
+                      {groupByCategory && (
+                        <button
+                          type="button"
+                          onClick={() => toggleCategoryCollapse(catName)}
+                          className="w-full flex items-center justify-between px-3 py-2 rounded-2xl bg-[#F5F2E8] hover:bg-[#EDE8D8] border border-[#E5DFD0] text-left transition-colors cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            {isCollapsed ? (
+                              <ChevronRight className="w-4 h-4 text-[#527470] shrink-0" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4 text-[#0D3B37] shrink-0" />
+                            )}
+                            <span className="text-xs font-extrabold text-[#0D3B37] truncate">{catName}</span>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-full bg-white border border-[#E5DFD0] text-[10px] font-bold text-[#527470] shrink-0">
+                            {catItems.length}
+                          </span>
+                        </button>
+                      )}
+                      {!isCollapsed && (
+                        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                          {catItems.map((item) => {
                   const isFreezer = item.locationType === 'FREEZER';
                   const daysLeft = item.daysUntilExpiration;
                   const isSoon = item.isExpiringSoon || (daysLeft !== null && daysLeft <= 3);
@@ -2187,27 +2442,62 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                     </div>
                   );
                 })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               /* BENTO BOX LIST / SLAB MODE (Compact rows expandable on click) */
-              <div className="space-y-2">
-                {filteredItems.map((item) => (
-                  <InventoryListItem
-                    key={item.id}
-                    item={item}
-                    isExpanded={expandedItemIds.has(item.id)}
-                    onToggleExpand={() => toggleExpandItem(item.id)}
-                    isSelected={selectedItemIds.has(item.id)}
-                    onToggleSelect={() => toggleSelectItem(item.id)}
-                    onConsume={handleConsumeItem}
-                    onDelete={handleDeleteItem}
-                    onEdit={handleOpenEditModal}
-                    onAddToCart={handleAddItemToGroceryCart}
-                    onDefrost={handleDefrost}
-                    isDefrosting={defrostingId === item.id}
-                    lang={lang}
-                  />
-                ))}
+              <div className="space-y-3">
+                {(groupByCategory ? groupedFilteredItems : ([['__ALL__', filteredItems]] as Array<[string, InventoryItem[]]>)).map(([catName, catItems]) => {
+                  const isCollapsed = groupByCategory && collapsedCategories.has(catName);
+                  return (
+                    <div key={catName} className="space-y-2">
+                      {groupByCategory && (
+                        <button
+                          type="button"
+                          onClick={() => toggleCategoryCollapse(catName)}
+                          className="w-full flex items-center justify-between px-3 py-2 rounded-2xl bg-[#F5F2E8] hover:bg-[#EDE8D8] border border-[#E5DFD0] text-left transition-colors cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            {isCollapsed ? (
+                              <ChevronRight className="w-4 h-4 text-[#527470] shrink-0" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4 text-[#0D3B37] shrink-0" />
+                            )}
+                            <span className="text-xs font-extrabold text-[#0D3B37] truncate">{catName}</span>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-full bg-white border border-[#E5DFD0] text-[10px] font-bold text-[#527470] shrink-0">
+                            {catItems.length}
+                          </span>
+                        </button>
+                      )}
+                      {!isCollapsed && (
+                        <div className="space-y-2">
+                          {catItems.map((item) => (
+                            <InventoryListItem
+                              key={item.id}
+                              item={item}
+                              isExpanded={expandedItemIds.has(item.id)}
+                              onToggleExpand={() => toggleExpandItem(item.id)}
+                              isSelected={selectedItemIds.has(item.id)}
+                              onToggleSelect={() => toggleSelectItem(item.id)}
+                              onConsume={handleConsumeItem}
+                              onDelete={handleDeleteItem}
+                              onEdit={handleOpenEditModal}
+                              onAddToCart={handleAddItemToGroceryCart}
+                              onDefrost={handleDefrost}
+                              isDefrosting={defrostingId === item.id}
+                              lang={lang}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
 
