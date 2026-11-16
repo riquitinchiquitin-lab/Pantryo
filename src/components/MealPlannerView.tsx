@@ -49,6 +49,7 @@ import { getCuratedMealPhoto, getFoodSvgFallback, CURATED_FOOD_PHOTOS, isDocumen
 import { GuidedCookingModal } from './GuidedCookingModal';
 import { AddRecipeModal } from './AddRecipeModal';
 import { RicardoRecipe } from '../data/ricardoRecipes';
+import { isIngredientInInventory } from '../utils/inventoryMatcher';
 
 function parseLocalDate(dateStr: string): Date {
   const parts = dateStr.split('-');
@@ -436,9 +437,7 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
         .filter(Boolean)
         .map((line) => {
           const cleanName = line.replace(/\(.*\)/, '').trim();
-          const found = items.some(
-            (it) => it.name.toLowerCase().includes(cleanName.toLowerCase()) || cleanName.toLowerCase().includes(it.name.toLowerCase())
-          );
+          const found = isIngredientInInventory(cleanName, items);
           const nut = estimateIngredientNutrition(cleanName, 1, 'unit');
           return {
             name: line,
@@ -589,7 +588,7 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
 
   const handlePushMissingToGrocery = (meal: PlannedMeal) => {
     if (!onAddIngredientsToGrocery) return;
-    const missing = meal.ingredients.filter((ing) => !ing.inStock);
+    const missing = meal.ingredients.filter((ing) => !isIngredientInInventory(ing.name, items));
     if (missing.length === 0) {
       setSuccessToast(
         lang === 'FR'
@@ -1332,7 +1331,10 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
               ) : (
                 <div className="space-y-2.5">
                   {meals.map((meal) => {
-                    const hasMissingIngredients = meal.ingredients.some((ing) => !ing.inStock);
+                    const liveInStockCount = meal.ingredients.filter((ing) =>
+                      isIngredientInInventory(ing.name, items)
+                    ).length;
+                    const hasMissingIngredients = liveInStockCount < meal.ingredients.length;
 
                     return (
                       <div
@@ -1408,7 +1410,7 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                             </div>
 
                             {/* Servings & Prep Time */}
-                            <div className="flex items-center gap-2.5 text-[11px] text-[#527470]">
+                            <div className="flex items-center gap-2.5 text-[11px] text-[#527470] flex-wrap">
                               <span className="flex items-center gap-1">
                                 <Clock className="w-3 h-3 text-slate-400" />
                                 {meal.prepTimeMinutes || 30} {lang === 'FR' ? 'min' : 'mins'}
@@ -1417,6 +1419,23 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                               <span>
                                 {meal.servings || 2} {lang === 'FR' ? 'portions' : 'servings'}
                               </span>
+                              {meal.ingredients.length > 0 && (
+                                <>
+                                  <span>•</span>
+                                  <span
+                                    className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold border ${
+                                      !hasMissingIngredients
+                                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                                        : liveInStockCount > 0
+                                        ? 'bg-amber-50 border-amber-200 text-amber-900'
+                                        : 'bg-rose-50 border-rose-200 text-rose-800'
+                                    }`}
+                                  >
+                                    {liveInStockCount}/{meal.ingredients.length}{' '}
+                                    {lang === 'FR' ? 'en stock' : 'in stock'}
+                                  </span>
+                                </>
+                              )}
                             </div>
 
                             {/* Nutritional Badges */}
@@ -1500,23 +1519,26 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                             {/* Ingredients Badge Checklist */}
                             {meal.ingredients.length > 0 && (
                               <div className="pt-1.5 flex flex-wrap items-center gap-1">
-                                {meal.ingredients.map((ing, idx) => (
-                                  <span
-                                    key={idx}
-                                    className={`text-[10px] px-2 py-0.5 rounded-md font-semibold border flex items-center gap-1 ${
-                                      ing.inStock
-                                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                                        : 'bg-amber-50 border-amber-200 text-amber-900'
-                                    }`}
-                                  >
-                                    {ing.inStock ? (
-                                      <Check className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
-                                    ) : (
-                                      <AlertCircle className="w-2.5 h-2.5 text-amber-600 shrink-0" />
-                                    )}
-                                    <span className="truncate max-w-[120px]">{getItemDisplayName(ing, lang)}</span>
-                                  </span>
-                                ))}
+                                {meal.ingredients.map((ing, idx) => {
+                                  const liveInStock = isIngredientInInventory(ing.name, items);
+                                  return (
+                                    <span
+                                      key={idx}
+                                      className={`text-[10px] px-2 py-0.5 rounded-md font-semibold border flex items-center gap-1 ${
+                                        liveInStock
+                                          ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                                          : 'bg-amber-50 border-amber-200 text-amber-900'
+                                      }`}
+                                    >
+                                      {liveInStock ? (
+                                        <Check className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
+                                      ) : (
+                                        <AlertCircle className="w-2.5 h-2.5 text-amber-600 shrink-0" />
+                                      )}
+                                      <span className="truncate max-w-[120px]">{getItemDisplayName(ing, lang)}</span>
+                                    </span>
+                                  );
+                                })}
                               </div>
                             )}
 

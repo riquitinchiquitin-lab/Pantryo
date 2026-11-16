@@ -24,6 +24,7 @@ import { PlannedMeal, InventoryItem, StorageType, SavedGroceryList } from '../ty
 import { getFoodVisual } from '../utils/foodVisuals';
 import { useLanguage, getLocationLocalizedName } from '../utils/i18n';
 import { getItemDisplayName, formatLocalizedQuantityUnit } from '../utils/foodTranslator';
+import { findMatchingInventoryItem } from '../utils/inventoryMatcher';
 
 const SAVED_LISTS_STORAGE_KEY = 'kitchen_komrade_saved_grocery_lists_v1';
 
@@ -264,24 +265,11 @@ export const MealPlanShoppingListModal: React.FC<MealPlanShoppingListModalProps>
     const itemsList: MealPlanShoppingItem[] = [];
 
     aggregated.forEach((val, key) => {
-      // Find matching item in inventory
-      let matchedStockItem: InventoryItem | undefined;
-
-      if (val.explicitInStock === true) {
-        // Explicitly marked in stock on the meal
-        matchedStockItem = inventoryItems.find((inv) => {
-          const normInv = normalizeName(inv.name);
-          return normInv.includes(key) || key.includes(normInv);
-        });
-      } else {
-        matchedStockItem = inventoryItems.find((inv) => {
-          const normInv = normalizeName(inv.name);
-          return normInv === key || normInv.includes(key) || key.includes(normInv);
-        });
-      }
+      // Find matching item in current live inventory
+      const matchedStockItem = findMatchingInventoryItem(val.cleanName, inventoryItems);
 
       const visual = getFoodVisual(val.cleanName);
-      const inStock = Boolean(matchedStockItem) || val.explicitInStock === true;
+      const inStock = Boolean(matchedStockItem);
 
       itemsList.push({
         id: `mp_item_${key}_${Math.random().toString(36).substring(2, 6)}`,

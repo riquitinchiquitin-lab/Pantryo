@@ -58,8 +58,10 @@ import {
 import { ScrollableRow } from './ScrollableRow';
 import { detectSafeCookingRule, SAFE_COOKING_GUIDELINES, SafeCookingRule } from '../utils/safeCookingInstructions';
 import { getCuratedMealPhoto, getFoodSvgFallback, isDocumentScan } from '../utils/curatedFoodImages';
+import { isIngredientInInventory } from '../utils/inventoryMatcher';
 
 const LOCAL_STORAGE_CUSTOM_RECIPES = 'kitchen_komrade_custom_recipes';
+const LOCAL_STORAGE_HIDDEN_RECIPES = 'pantryo_hidden_recipes';
 
 interface CookingIdeasViewProps {
   items: InventoryItem[];
@@ -317,6 +319,20 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
     return [];
   });
 
+  // Hidden built-in recipe IDs (when user deletes a built-in recipe)
+  const [hiddenRecipeIds, setHiddenRecipeIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_HIDDEN_RECIPES);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.warn('Failed to parse hidden recipes from localStorage', e);
+    }
+    return [];
+  });
+
   // Fetch initial custom recipes from backend API
   useEffect(() => {
     let isMounted = true;
@@ -380,7 +396,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
     setActiveFilter('CUSTOM');
   };
 
-  const handleDeleteCustomRecipe = async (recipeId: string, title: string) => {
+  const handleDeleteCustomRecipe = async (recipeId: string, title: string, isCustom?: boolean) => {
     const confirmed = await confirmAction({
       title: lang === 'FR' ? 'Supprimer la recette ?' : 'Delete recipe?',
       message:
@@ -395,51 +411,72 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
       return;
     }
 
-    setCustomRecipes((prev) => {
-      const updated = prev.filter((r) => r.id !== recipeId);
-      try {
-        localStorage.setItem(
-          LOCAL_STORAGE_CUSTOM_RECIPES,
-          JSON.stringify(updated)
-        );
-      } catch (err) {
-        console.warn('LocalStorage save failed', err);
-      }
-      return updated;
-    });
-
-    try {
-      await fetch(`/api/v1/recipes/custom/${recipeId}`, { method: 'DELETE' });
-      showToast(
-        lang === 'FR'
-          ? `Recette « ${title} » supprimée.`
-          : `Recipe "${title}" deleted.`,
-        'success'
-      );
-    } catch (e) {
-      console.warn('Backend delete recipe failed', e);
+    if (expandedRecipeId === recipeId) {
+      setExpandedRecipeId(null);
     }
+
+    if (isCustom || customRecipes.some((r) => r.id === recipeId)) {
+      setCustomRecipes((prev) => {
+        const updated = prev.filter((r) => r.id !== recipeId);
+        try {
+          localStorage.setItem(
+            LOCAL_STORAGE_CUSTOM_RECIPES,
+            JSON.stringify(updated)
+          );
+        } catch (err) {
+          console.warn('LocalStorage save failed', err);
+        }
+        return updated;
+      });
+
+      try {
+        await fetch(`/api/v1/recipes/custom/${encodeURIComponent(recipeId)}`, { method: 'DELETE' });
+      } catch (e) {
+        console.warn('Backend delete recipe failed', e);
+      }
+    }
+
+    if (RICARDO_RECIPES.some((r) => r.id === recipeId)) {
+      setHiddenRecipeIds((prev) => {
+        if (prev.includes(recipeId)) return prev;
+        const updated = [...prev, recipeId];
+        try {
+          localStorage.setItem(LOCAL_STORAGE_HIDDEN_RECIPES, JSON.stringify(updated));
+        } catch (err) {
+          console.warn('LocalStorage hidden recipes save failed', err);
+        }
+        return updated;
+      });
+    }
+
+    showToast(
+      lang === 'FR'
+        ? `Recette « ${title} » supprimée.`
+        : `Recipe "${title}" deleted.`,
+      'success'
+    );
   };
 
   // Combine static Ricardo recipes + custom user-added recipes with strict ID deduplication
   const allRecipes = useMemo(() => {
+    const hiddenSet = new Set(hiddenRecipeIds);
     const seenIds = new Set<string>();
     const combined: RicardoRecipe[] = [];
     // Custom user recipes take precedence
     for (const r of customRecipes) {
-      if (r && r.id && !seenIds.has(r.id)) {
+      if (r && r.id && !hiddenSet.has(r.id) && !seenIds.has(r.id)) {
         seenIds.add(r.id);
         combined.push(r);
       }
     }
     for (const r of RICARDO_RECIPES) {
-      if (r && r.id && !seenIds.has(r.id)) {
+      if (r && r.id && !hiddenSet.has(r.id) && !seenIds.has(r.id)) {
         seenIds.add(r.id);
         combined.push(r);
       }
     }
     return combined;
-  }, [customRecipes]);
+  }, [customRecipes, hiddenRecipeIds]);
 
   // Items expiring in 3 days or less
   const expiringItems = useMemo(
@@ -452,34 +489,9 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
     [items]
   );
 
-  // Check which ingredients in recipes match the household inventory
-  const itemNamesNormalized = useMemo(
-    () => items.map((i) => i.name.toLowerCase().trim()),
-    [items]
-  );
-
+  // Check which ingredients in recipes match the live household inventory
   const isIngredientInKitchen = (ingredientName: string, mappedName?: string): boolean => {
-    const target = (mappedName || ingredientName).toLowerCase().trim();
-    return itemNamesNormalized.some(
-      (invName) =>
-        invName.includes(target) ||
-        target.includes(invName) ||
-        (target.includes('salmon') && invName.includes('salmon')) ||
-        (target.includes('beef') && invName.includes('beef')) ||
-        (target.includes('chicken') && invName.includes('chicken')) ||
-        (target.includes('potato') && invName.includes('potato')) ||
-        (target.includes('butter') && invName.includes('butter')) ||
-        (target.includes('garlic') && invName.includes('garlic')) ||
-        (target.includes('spinach') && invName.includes('spinach')) ||
-        (target.includes('strawberry') && invName.includes('strawberries')) ||
-        (target.includes('strawberries') && invName.includes('strawberries')) ||
-        (target.includes('bread') && invName.includes('sourdough')) ||
-        (target.includes('avocado') && invName.includes('avocado')) ||
-        (target.includes('yogurt') && invName.includes('yogurt')) ||
-        (target.includes('egg') && invName.includes('egg')) ||
-        (target.includes('milk') && invName.includes('milk')) ||
-        (target.includes('tomato') && invName.includes('tomato'))
-    );
+    return isIngredientInInventory(ingredientName, items, mappedName);
   };
 
   // Filtered recipes
@@ -1460,16 +1472,27 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                       )}
                     </div>
 
-                    {/* Right Action: Details Disclosure Toggle */}
-                    <button
-                      type="button"
-                      onClick={() => setExpandedRecipeId(recipe.id)}
-                      className="h-9 px-3 rounded-xl bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-950 border border-[#E5DFD0] text-xs font-semibold flex items-center gap-1 transition-all active:scale-95 cursor-pointer shrink-0 shadow-2xs"
-                      title={lang === 'FR' ? 'Afficher les détails de la recette' : 'Show recipe details'}
-                    >
-                      <span>{lang === 'FR' ? 'Détails' : 'Details'}</span>
-                      <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
-                    </button>
+                    {/* Right Actions: Delete & Details Disclosure Toggle */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCustomRecipe(recipe.id, title, isUserCustom)}
+                        className="h-9 w-9 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 border border-rose-200/80 flex items-center justify-center transition-all active:scale-95 cursor-pointer shadow-2xs"
+                        title={lang === 'FR' ? 'Supprimer cette recette' : 'Delete recipe'}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setExpandedRecipeId(recipe.id)}
+                        className="h-9 px-3 rounded-xl bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-950 border border-[#E5DFD0] text-xs font-semibold flex items-center gap-1 transition-all active:scale-95 cursor-pointer shrink-0 shadow-2xs"
+                        title={lang === 'FR' ? 'Afficher les détails de la recette' : 'Show recipe details'}
+                      >
+                        <span>{lang === 'FR' ? 'Détails' : 'Details'}</span>
+                        <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -1585,15 +1608,14 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                           <Pencil className="w-2.5 h-2.5" />
                         </button>
 
-                        {isUserCustom && (
-                          <button
-                            onClick={() => handleDeleteCustomRecipe(recipe.id, title)}
-                            className="p-1 rounded-lg bg-rose-600/90 text-white hover:bg-rose-700 transition-colors cursor-pointer shadow-2xs"
-                            title={lang === 'FR' ? 'Supprimer la recette personnalisée' : 'Delete custom recipe'}
-                          >
-                            <Trash2 className="w-2.5 h-2.5" />
-                          </button>
-                        )}
+                        {/* Delete Recipe Button */}
+                        <button
+                          onClick={() => handleDeleteCustomRecipe(recipe.id, title, isUserCustom)}
+                          className="p-1 rounded-lg bg-rose-600/90 text-white hover:bg-rose-700 transition-colors cursor-pointer shadow-2xs"
+                          title={lang === 'FR' ? 'Supprimer cette recette' : 'Delete recipe'}
+                        >
+                          <Trash2 className="w-2.5 h-2.5" />
+                        </button>
                       </div>
 
                       <div className="flex items-center gap-1.5">
