@@ -57,8 +57,13 @@ npm install --no-audit
 echo -e "\n${CYAN}3/4: Building production bundle (npm run build)...${NC}"
 npm run build
 
-# 4. Enforce strict permissions for the unprivileged pantryo user & data security
-echo -e "\n${CYAN}4/4: Hardening permissions & restarting service...${NC}"
+# 4. Enforce strict permissions, OS/OpenSSH CVE hardening & restart service
+echo -e "\n${CYAN}4/4: Hardening permissions, applying OS/OpenSSH CVE patches & restarting service...${NC}"
+if [[ $EUID -eq 0 ]] && [[ -f "$INSTALL_DIR/scripts/fix-openssh-cves.sh" ]]; then
+  chmod +x "$INSTALL_DIR/scripts/fix-openssh-cves.sh" 2>/dev/null || true
+  bash "$INSTALL_DIR/scripts/fix-openssh-cves.sh" || true
+fi
+
 if id -u pantryo >/dev/null 2>&1; then
   chown -R pantryo:pantryo "$INSTALL_DIR"
   [ -d "$INSTALL_DIR/server/data" ] && chmod 700 "$INSTALL_DIR/server/data"

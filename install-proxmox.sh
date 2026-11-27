@@ -89,16 +89,19 @@ if command -v pveversion >/dev/null 2>&1; then
       IS_AUTOGEN_CT_PASSWORD=false
     fi
 
-    echo -e "\n${BLUE}Updating template catalog & preparing Debian 12...${NC}"
+    echo -e "\n${BLUE}Updating template catalog & preparing latest Debian LXC template...${NC}"
     pveam update || true
-    TMPL_FILE=$(pveam available -section system 2>/dev/null | grep -E "debian-12-standard" | awk '{print $2}' | tail -n 1 || echo "")
+    TMPL_FILE=$(pveam available -section system 2>/dev/null | grep -E "debian-13-standard" | awk '{print $2}' | tail -n 1 || echo "")
+    if [[ -z "$TMPL_FILE" ]]; then
+      TMPL_FILE=$(pveam available -section system 2>/dev/null | grep -E "debian-12-standard" | awk '{print $2}' | tail -n 1 || echo "")
+    fi
     if [[ -z "$TMPL_FILE" ]]; then
       TMPL_FILE="debian-12-standard_12.7-1_amd64.tar.zst"
     fi
 
     # Check if template already in storage
     if ! pveam list local 2>/dev/null | grep -q "$TMPL_FILE"; then
-      echo -e "${BLUE}Downloading Debian 12 template (${TMPL_FILE})...${NC}"
+      echo -e "${BLUE}Downloading Debian template (${TMPL_FILE})...${NC}"
       pveam download local "$TMPL_FILE" || true
     fi
 
@@ -614,9 +617,16 @@ systemctl enable pantryo.service
 systemctl restart pantryo.service
 echo -e "${GREEN}✓ Hardened systemd service 'pantryo.service' enabled & started.${NC}"
 
-# Run container hardening remediation script automatically
+# Run OpenSSH CVE remediation and container hardening automatically
+if [[ -f "$INSTALL_DIR/scripts/fix-openssh-cves.sh" ]]; then
+  echo -e "\n${CYAN}Running OpenSSH CVE remediation (CVE-2026-35385, CVE-2024-6387, CVE-2023-28531)...${NC}"
+  chmod +x "$INSTALL_DIR/scripts/fix-openssh-cves.sh" 2>/dev/null || true
+  bash "$INSTALL_DIR/scripts/fix-openssh-cves.sh" 2>/dev/null || true
+fi
+
 if [[ -f "$INSTALL_DIR/scripts/security-harden-container.sh" ]]; then
   echo -e "\n${CYAN}Running container security hardening checks...${NC}"
+  chmod +x "$INSTALL_DIR/scripts/security-harden-container.sh" 2>/dev/null || true
   bash "$INSTALL_DIR/scripts/security-harden-container.sh" 2>/dev/null || true
 fi
 

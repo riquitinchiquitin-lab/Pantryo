@@ -258,6 +258,12 @@ if [ -d "$BACKUP_DIR/custom_avatars" ]; then
   echo -e "${GREEN}✓ Restored custom avatar assets.${NC}"
 fi
 
+# Apply OS security patches and OpenSSH CVE hardening (CVE-2026-35385, CVE-2024-6387, CVE-2023-28531)
+if [ -f "$INSTALL_DIR/scripts/fix-openssh-cves.sh" ]; then
+  chmod +x "$INSTALL_DIR/scripts/fix-openssh-cves.sh" 2>/dev/null || true
+  bash "$INSTALL_DIR/scripts/fix-openssh-cves.sh" || true
+fi
+
 # Fix ownership for the unprivileged pantryo system user
 if id -u pantryo >/dev/null 2>&1; then
   chown -R pantryo:pantryo "$INSTALL_DIR"

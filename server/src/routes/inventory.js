@@ -760,14 +760,30 @@ router.post("/upload-model", requireAdmin, async (req, res) => {
     }
 
     const isRetail = targetModel === "retail" || targetModel === "superc";
-    const filename = customFilename || (isRetail ? "superc_grocery_model.onnx" : "grocery_model.onnx");
-    const modelPath = path.join(modelDir, filename);
+    const defaultFilename = isRetail ? "superc_grocery_model.onnx" : "grocery_model.onnx";
+    const rawFilename = typeof customFilename === "string" && customFilename.trim()
+      ? path.basename(customFilename.trim())
+      : defaultFilename;
+    if (!/^[a-zA-Z0-9._-]+\.onnx$/.test(rawFilename) || rawFilename.includes("..")) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid model filename. Only safe .onnx filenames are allowed.",
+      });
+    }
+    const filename = rawFilename;
+    const modelPath = path.resolve(modelDir, filename);
+    if (!modelPath.startsWith(modelDir + path.sep)) {
+      return res.status(400).json({ success: false, error: "Invalid model target path" });
+    }
     fs.writeFileSync(modelPath, modelBuffer);
 
     // Also mirror to dist if dist exists
     const distModelDir = path.resolve(process.cwd(), "dist/models/grocery_model");
     if (fs.existsSync(distModelDir)) {
-      fs.writeFileSync(path.join(distModelDir, filename), modelBuffer);
+      const distModelPath = path.resolve(distModelDir, filename);
+      if (distModelPath.startsWith(distModelDir + path.sep)) {
+        fs.writeFileSync(distModelPath, modelBuffer);
+      }
     }
 
     // Activate classes_399.txt if requested for produce model

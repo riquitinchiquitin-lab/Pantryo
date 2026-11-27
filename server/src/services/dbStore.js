@@ -1826,7 +1826,7 @@ class EncryptedDatabaseStore {
   }
 
   completeAdminSetup(userId, newUsername, newName, newPassword, avatarUrl = null) {
-    const user = this.users.find((u) => u.id === userId || (u.role === "ADMIN"));
+    const user = this.users.find((u) => u.id === userId);
     if (!user) throw new Error("User not found");
     if (newUsername) user.email = newUsername.trim().toLowerCase();
     if (newName) user.name = newName.trim();

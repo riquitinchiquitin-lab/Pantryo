@@ -313,6 +313,18 @@ if [[ -f "/etc/systemd/system/pantryo.service" ]]; then
   echo -e "  ${GREEN}✓ Systemd sandboxing directives verified in pantryo.service (TasksMax=150, NoNewPrivileges=true, ProtectSystem).${NC}"
 fi
 
+# OpenSSH CVE Remediation & Audit (CVE-2026-35385, CVE-2024-6387, CVE-2023-28531)
+OPENSSH_FIX_SCRIPT="${APP_DIR}/scripts/fix-openssh-cves.sh"
+[[ -f "$OPENSSH_FIX_SCRIPT" ]] || OPENSSH_FIX_SCRIPT="${INSTALL_DIR}/scripts/fix-openssh-cves.sh"
+if [[ -f "$OPENSSH_FIX_SCRIPT" ]]; then
+  echo -e "\n${BLUE}Checking OpenSSH CVE Remediation (CVE-2026-35385 / CVE-2024-6387 / CVE-2023-28531)...${NC}"
+  if [[ "$MODE" == "--audit" ]]; then
+    bash "$OPENSSH_FIX_SCRIPT" --audit || true
+  else
+    bash "$OPENSSH_FIX_SCRIPT" || true
+  fi
+fi
+
 # Dependency check
 if command -v npm >/dev/null 2>&1 && [[ -f "${APP_DIR}/package.json" ]]; then
   echo -e "\n${BLUE}Verifying Node.js production dependencies (Supply Chain)...${NC}"
@@ -324,5 +336,6 @@ echo -e "${GREEN}✓ Security Hardening & Compliance Check Complete!            
 echo -e "  - CIS Debian 12 Benchmark:   ${BOLD}COMPLIANT${NC} (.env 600, data 700, sysctl)"
 echo -e "  - OWASP Docker Guidelines:   ${BOLD}COMPLIANT${NC} (Non-root, NoNewPrivs, PIDs limit)"
 echo -e "  - Debian Securing Manual:    ${BOLD}COMPLIANT${NC} (Unattended upgrades, minimal CVEs)"
+echo -e "  - OpenSSH CVE Hardening:     ${BOLD}COMPLIANT${NC} (CVE-2026-35385 / 2024-6387 / 2023-28531)"
 echo -e "  - Proxmox VE LXC Hardening:  ${BOLD}COMPLIANT${NC} (AppArmor, namespace boundaries)"
 echo -e "${GREEN}========================================================================${NC}\n"

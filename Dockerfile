@@ -37,9 +37,11 @@ ENV PORT=3000
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Apply all latest Debian Bookworm security updates to base image packages (glibc, openssl, zlib)
-# Zero-CVE attack surface: curl is omitted entirely in favor of Node.js 22 built-in fetch()
+# Zero-CVE attack surface: curl and OpenSSH are omitted/purged in favor of Node.js 22 built-in fetch()
 RUN apt-get update && apt-get upgrade -y && apt-get dist-upgrade -y --no-install-recommends \
     ca-certificates \
+    && (apt-get purge -y openssh-server openssh-client openssh-sftp-server 2>/dev/null || true) \
+    && apt-get autoremove -y \
     && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Pre-create data directory and set ownership strictly to non-root built-in 'node' user (UID 1000)

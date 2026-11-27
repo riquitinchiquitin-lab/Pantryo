@@ -15,8 +15,11 @@ if (process.env.DISABLE_HMR === undefined) {
 }
 
 // Global crash and rejection handlers for robust container diagnostics
-process.on("uncaughtException", (err) => {
+process.on("uncaughtException", (err: any) => {
   console.error("[Pantryo Server] Uncaught exception:", err);
+  if (err?.code === "EADDRINUSE") {
+    process.exit(1);
+  }
 });
 process.on("unhandledRejection", (reason, promise) => {
   console.error("[Pantryo Server] Unhandled rejection at:", promise, "reason:", reason);
@@ -390,7 +393,8 @@ async function startServer() {
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
-        hmr: isHmrDisabled ? false : { server },
+        hmr: false,
+        watch: isHmrDisabled ? null : undefined,
       },
       appType: "spa",
     });

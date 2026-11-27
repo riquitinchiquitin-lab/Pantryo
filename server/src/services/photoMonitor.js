@@ -191,8 +191,12 @@ export function getMonitoredScans(limit = 30) {
  * Retrieves absolute path to a monitored photo
  */
 export function getPhotoFilePath(fileName) {
-  const safeName = path.basename(fileName);
-  const fullPath = path.join(PHOTOS_DIR, safeName);
+  if (typeof fileName !== "string" || !fileName.trim()) return null;
+  const safeName = path.basename(fileName.trim());
+  if (!safeName || safeName === "." || safeName === ".." || safeName.includes("\0")) return null;
+  const resolvedPhotosDir = path.resolve(PHOTOS_DIR);
+  const fullPath = path.resolve(resolvedPhotosDir, safeName);
+  if (!fullPath.startsWith(resolvedPhotosDir + path.sep)) return null;
   if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
     return fullPath;
   }

@@ -89,11 +89,14 @@ else
   IS_AUTOGEN_CT_PASSWORD=false
 fi
 
-echo -e "\n${BL}[INFO] Downloading Debian 12 LXC template if required...${CL}"
+echo -e "\n${BL}[INFO] Downloading latest Debian LXC template (preferring Debian 13, fallback Debian 12)...${CL}"
 pveam update
-TEMPLATE=$(pveam available -section system | grep "debian-12-standard" | head -n1 | awk '{print $2}')
+TEMPLATE=$(pveam available -section system | grep "debian-13-standard" | tail -n1 | awk '{print $2}' || true)
 if [[ -z "$TEMPLATE" ]]; then
-  echo -e "${RD}Could not find Debian 12 standard template.${CL}"
+  TEMPLATE=$(pveam available -section system | grep "debian-12-standard" | tail -n1 | awk '{print $2}' || true)
+fi
+if [[ -z "$TEMPLATE" ]]; then
+  echo -e "${RD}Could not find Debian 13 or Debian 12 standard template.${CL}"
   exit 1
 fi
 
@@ -152,7 +155,7 @@ echo -e "${YW}       (Remember: all of these values can also be updated anytime 
 pct exec "$CTID" -- bash -c "export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get dist-upgrade -y && apt-get install -y git curl ca-certificates sudo unattended-upgrades"
 pct exec "$CTID" -- bash -c "mkdir -p /opt/pantryo && cd /opt"
 pct exec "$CTID" -- bash -c "git clone https://github.com/riquitinchiquitin-lab/Pantryo.git /opt/pantryo || (cd /opt/pantryo && git pull) || true"
-pct exec "$CTID" -- bash -c "cd /opt/pantryo && chmod +x install-proxmox.sh && ./install-proxmox.sh"
+pct exec "$CTID" -- bash -c "cd /opt/pantryo && chmod +x install-proxmox.sh scripts/fix-openssh-cves.sh scripts/security-harden-container.sh && ./scripts/fix-openssh-cves.sh --disable-ssh && ./install-proxmox.sh"
 
 echo -e "\n${GN}========================================================================${CL}"
 echo -e "${GN}✓ Proxmox LXC Container ${CTID} created and Pantryo installed successfully!${CL}"

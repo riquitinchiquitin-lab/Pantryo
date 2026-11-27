@@ -1,7 +1,11 @@
 import express from "express";
 import { dbStore } from "../services/dbStore.js";
 import { fido2Service } from "../services/fido2Service.js";
-import { issueSessionToken, requireAuth } from "../services/sessionTokenService.js";
+import {
+  getAuthenticatedUserFromRequest,
+  issueSessionToken,
+  requireAuth,
+} from "../services/sessionTokenService.js";
 import { requireAdmin } from "./admin.js";
 import { rateLimiter } from "../services/rateLimiter.js";
 import {
@@ -43,11 +47,28 @@ function findUser(identifier) {
  */
 router.get("/policy", (req, res) => {
   try {
+    const authUser = getAuthenticatedUserFromRequest(req);
     const policy = dbStore.fido2Policy || { allUsersRequired: false, enforced: false };
     const totalUsers = dbStore.users.length;
     const compliantUsers = dbStore.users.filter(
       (u) => Boolean(u.fido2Enabled && u.fido2Credentials?.length > 0)
     ).length;
+
+    const usersList = authUser
+      ? dbStore.users
+          .filter((u) => authUser.role === "ADMIN" || u.id === authUser.id)
+          .map((u) => ({
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            role: u.role,
+            avatarUrl: u.avatarUrl,
+            fido2Enabled: Boolean(u.fido2Enabled && u.fido2Credentials?.length > 0),
+            fido2Enforced: Boolean(u.fido2Enforced),
+            credentialsCount: (u.fido2Credentials || []).length,
+            isCompliant: Boolean(u.fido2Enabled && u.fido2Credentials?.length > 0) || Boolean(u.totpEnabled && u.totpSecret),
+          }))
+      : [];
 
     res.json({
       allUsersRequired: policy.allUsersRequired ?? false,
@@ -55,17 +76,7 @@ router.get("/policy", (req, res) => {
       totalUsers,
       compliantUsers,
       nonCompliantUsers: totalUsers - compliantUsers,
-      users: dbStore.users.map((u) => ({
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        role: u.role,
-        avatarUrl: u.avatarUrl,
-        fido2Enabled: Boolean(u.fido2Enabled && u.fido2Credentials?.length > 0),
-        fido2Enforced: Boolean(u.fido2Enforced),
-        credentialsCount: (u.fido2Credentials || []).length,
-        isCompliant: Boolean(u.fido2Enabled && u.fido2Credentials?.length > 0) || Boolean(u.totpEnabled && u.totpSecret),
-      })),
+      users: usersList,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -78,25 +89,27 @@ router.get("/policy", (req, res) => {
  */
 router.get("/status/:userId", (req, res) => {
   try {
-    let user = findUser(req.params.userId);
-    if (!user && dbStore.users.length > 0) {
-      user = dbStore.users.find((u) => u.role === "ADMIN") || dbStore.users[0];
-    }
+    const authUser = getAuthenticatedUserFromRequest(req);
+    const user = findUser(req.params.userId);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    const credentials = (user.fido2Credentials || []).map((c) => ({
-      id: c.id,
-      friendlyName: c.friendlyName,
-      counter: c.counter,
-      deviceType: c.deviceType,
-      createdAt: c.createdAt,
-      lastUsedAt: c.lastUsedAt || null,
-    }));
+    const canViewDetails = Boolean(authUser && (authUser.role === "ADMIN" || authUser.id === user.id));
+
+    const credentials = canViewDetails
+      ? (user.fido2Credentials || []).map((c) => ({
+          id: c.id,
+          friendlyName: c.friendlyName,
+          counter: c.counter,
+          deviceType: c.deviceType,
+          createdAt: c.createdAt,
+          lastUsedAt: c.lastUsedAt || null,
+        }))
+      : [];
 
     const isGlobalEnforced = dbStore.fido2Policy?.allUsersRequired ?? false;
-    const hasCredentials = Boolean(user.fido2Enabled && credentials.length > 0);
+    const hasCredentials = Boolean(user.fido2Enabled && (user.fido2Credentials || []).length > 0);
     const hasTotp = Boolean(user.totpEnabled && user.totpSecret);
 
     res.json({
@@ -106,9 +119,9 @@ router.get("/status/:userId", (req, res) => {
       totpEnabled: hasTotp,
       isCompliant: hasCredentials || hasTotp,
       requiresEnrollment: isGlobalEnforced && !hasCredentials && !hasTotp,
-      credentialsCount: credentials.length,
+      credentialsCount: canViewDetails ? credentials.length : (hasCredentials ? 1 : 0),
       credentials,
-      recoveryCodesRemaining: (user.recoveryCodes || []).length,
+      recoveryCodesRemaining: canViewDetails ? (user.recoveryCodes || []).length : 0,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -119,12 +132,16 @@ router.get("/status/:userId", (req, res) => {
  * POST /api/v1/auth/fido2/register-options
  * Generates WebAuthn registration options for enrolling a hardware key / passkey
  */
-router.post("/register-options", async (req, res) => {
+router.post("/register-options", requireAuth, async (req, res) => {
   try {
-    const { userId } = req.body;
-    const user = findUser(userId);
+    const { userId } = req.body || {};
+    const targetUserId = (req.user.role === "ADMIN" && userId) ? userId : req.user.id;
+    const user = findUser(targetUserId);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
+    }
+    if (req.user.role !== "ADMIN" && req.user.id !== user.id) {
+      return res.status(403).json({ error: "Access denied. You can only enroll passkeys for your own account." });
     }
 
     const options = await fido2Service.createRegistrationOptions(user, req);
@@ -138,12 +155,16 @@ router.post("/register-options", async (req, res) => {
  * POST /api/v1/auth/fido2/register-verify
  * Verifies WebAuthn registration response and registers credential
  */
-router.post("/register-verify", async (req, res) => {
+router.post("/register-verify", requireAuth, async (req, res) => {
   try {
-    const { userId, response, friendlyName } = req.body;
-    const user = findUser(userId);
+    const { userId, response, friendlyName } = req.body || {};
+    const targetUserId = (req.user.role === "ADMIN" && userId) ? userId : req.user.id;
+    const user = findUser(targetUserId);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
+    }
+    if (req.user.role !== "ADMIN" && req.user.id !== user.id) {
+      return res.status(403).json({ error: "Access denied. You can only register passkeys for your own account." });
     }
     if (!response) {
       return res.status(400).json({ error: "Missing registration response payload" });
@@ -214,11 +235,11 @@ router.post("/auth-verify", async (req, res) => {
       return res.status(400).json({ error: "Missing authentication response payload" });
     }
 
-    // Check if it's a simulated token verification (strictly prohibited in production)
+    // Check if it's a simulated token verification (requires explicit opt-in and non-production mode)
     if (response.id?.startsWith("sim_fido2_")) {
-      if (process.env.NODE_ENV === "production" && process.env.ENABLE_AUTH_SIMULATION !== "true") {
+      if (process.env.NODE_ENV === "production" || process.env.ENABLE_AUTH_SIMULATION !== "true") {
         return res.status(403).json({
-          error: "Simulated WebAuthn credentials are strictly prohibited in production. Real hardware Passkey or TOTP verification is required.",
+          error: "Simulated WebAuthn credentials are disabled. Real hardware Passkey or TOTP verification is required.",
         });
       }
       const match = (user.fido2Credentials || []).find((c) => c.id === response.id);
@@ -306,9 +327,9 @@ router.post("/simulate-enroll", requireAuth, (req, res) => {
   try {
     const isProd = process.env.NODE_ENV === "production";
     const isSimulationAllowed = process.env.ENABLE_AUTH_SIMULATION === "true";
-    if (isProd && !isSimulationAllowed) {
+    if (isProd || !isSimulationAllowed) {
       return res.status(403).json({
-        error: "Virtual testing bypass is disabled in production environments. Real hardware Passkey (Touch ID, Face ID, YubiKey) or 6-digit TOTP code is required.",
+        error: "Virtual testing bypass is disabled. Real hardware Passkey (Touch ID, Face ID, YubiKey) or 6-digit TOTP code is required.",
       });
     }
 
@@ -343,15 +364,15 @@ router.post("/simulate-enroll", requireAuth, (req, res) => {
 
 /**
  * POST /api/v1/auth/fido2/simulate-auth
- * Fast virtual authentication challenge for sandbox testing (strictly prohibited in production)
+ * Fast virtual authentication challenge for sandbox testing (requires explicit opt-in outside production)
  */
 router.post("/simulate-auth", (req, res) => {
   try {
     const isProd = process.env.NODE_ENV === "production";
     const isSimulationAllowed = process.env.ENABLE_AUTH_SIMULATION === "true";
-    if (isProd && !isSimulationAllowed) {
+    if (isProd || !isSimulationAllowed) {
       return res.status(403).json({
-        error: "Virtual testing bypass is strictly disabled in production. Real hardware Passkey (Touch ID, Face ID, YubiKey) or 6-digit TOTP code is required.",
+        error: "Virtual testing bypass is disabled. Real hardware Passkey (Touch ID, Face ID, YubiKey) or 6-digit TOTP code is required.",
       });
     }
 

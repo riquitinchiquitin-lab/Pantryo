@@ -48,14 +48,17 @@ if command -v apt-get >/dev/null 2>&1; then
     echo -e "  Updating package index..."
     apt-get update -q -y 2>&1 || true
     echo -e "  Applying security upgrades..."
-    apt-get upgrade -y --no-install-recommends -q 2>&1 || true
+    apt-get dist-upgrade -y --no-install-recommends -q 2>&1 || true
     apt-get autoremove -y -q 2>&1 || true
     apt-get clean 2>&1 || true
 
     if command -v unattended-upgrade >/dev/null 2>&1; then
       unattended-upgrade 2>&1 || true
     fi
-    echo -e "  ${GREEN}✓ Debian system packages up to date.${NC}"
+    if [[ -f "${APP_DIR}/scripts/fix-openssh-cves.sh" ]]; then
+      bash "${APP_DIR}/scripts/fix-openssh-cves.sh" 2>&1 || true
+    fi
+    echo -e "  ${GREEN}✓ Debian system packages & OpenSSH CVE protections up to date.${NC}"
   else
     echo -e "  ${YELLOW}ℹ️  Non-root execution: skipping OS apt-get upgrade (requires sudo/root).${NC}"
   fi

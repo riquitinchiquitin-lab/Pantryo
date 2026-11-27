@@ -14,9 +14,24 @@
  * 7. Persists status to server/data/dependency-status.json
  */
 
-import { execSync } from "child_process";
+import { execSync, execFileSync } from "child_process";
 import fs from "fs";
 import path from "path";
+
+const SAFE_NPM_PACKAGE_RE = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/;
+
+function getDeclaredPackages() {
+  try {
+    const raw = fs.readFileSync(packageJsonPath, "utf8");
+    const parsed = JSON.parse(raw);
+    return new Set([
+      ...Object.keys(parsed.dependencies || {}),
+      ...Object.keys(parsed.devDependencies || {}),
+    ]);
+  } catch (_) {
+    return new Set();
+  }
+}
 
 const rootDir = process.cwd();
 const logFile = path.resolve(rootDir, "update-dependencies.log");
@@ -174,16 +189,31 @@ export async function runAutoUpdate(options = {}) {
 
   // 3. Targeted or Major Version Upgrades (e.g. better-sqlite3-multiple-ciphers, motion, vite plugins)
   if (targetedPackages.length > 0 || isUpgradeMajor) {
-    const packagesToUpgrade =
+    const declaredPackages = getDeclaredPackages();
+    const rawPackagesToUpgrade =
       targetedPackages.length > 0
         ? targetedPackages
         : result.majorAlerts.map((a) => a.package);
 
-    log(`Upgrading requested package(s): ${packagesToUpgrade.join(", ")}...`);
+    const packagesToUpgrade = rawPackagesToUpgrade.filter((pkg) => {
+      if (typeof pkg !== "string" || !SAFE_NPM_PACKAGE_RE.test(pkg)) {
+        log(`Rejected invalid package name: ${String(pkg)}`);
+        return false;
+      }
+      if (declaredPackages.size > 0 && !declaredPackages.has(pkg)) {
+        log(`Rejected undeclared package name: ${pkg}`);
+        return false;
+      }
+      return true;
+    });
+
+    if (packagesToUpgrade.length > 0) {
+      log(`Upgrading requested package(s): ${packagesToUpgrade.join(", ")}...`);
+    }
     for (const pkg of packagesToUpgrade) {
       try {
         log(`Installing latest version for: ${pkg}...`);
-        execSync(`npm install --include=dev ${pkg}@latest`, { stdio: "inherit" });
+        execFileSync("npm", ["install", "--include=dev", `${pkg}@latest`], { stdio: "inherit" });
         result.majorUpgradesApplied.push(pkg);
         result.updatesApplied = true;
       } catch (err) {
