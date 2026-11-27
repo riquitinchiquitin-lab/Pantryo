@@ -8,5 +8,5 @@ onnx>=1.14.0
 onnxruntime>=1.15.0
 pillow>=9.5.0
 tqdm>=4.65.0
-numpy>=1.24.0
+numpy>=2.5.5
 onnxscript>=0.1.0
