@@ -557,17 +557,36 @@ if command -v apt-get >/dev/null 2>&1; then
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -y -q >/dev/null 2>&1 || true
   apt-get install -y --no-install-recommends unattended-upgrades ca-certificates >/dev/null 2>&1 || true
+  if [[ -d "/etc/apt/apt.conf.d" ]]; then
+    cat <<'EOF_AUTOAPT' > /etc/apt/apt.conf.d/20auto-upgrades
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Download-Upgradeable-Packages "1";
+APT::Periodic::AutocleanInterval "7";
+APT::Periodic::Unattended-Upgrade "1";
+EOF_AUTOAPT
+  fi
 fi
 
-cat <<'EOF_CRON' > /etc/cron.daily/pantryo-security-updates
+cat <<EOF_CRON > /etc/cron.daily/pantryo-security-updates
 #!/usr/bin/env bash
 export DEBIAN_FRONTEND=noninteractive
+export NPM_CONFIG_UPDATE_NOTIFIER=false
+export NPM_CONFIG_FUND=false
 if command -v apt-get >/dev/null 2>&1; then
-  apt-get update -q -y >> /var/log/pantryo-security.log 2>&1
-  unattended-upgrade >> /var/log/pantryo-security.log 2>&1 || true
+  apt-get update -q -y >> /var/log/pantryo-security.log 2>&1 || true
+  apt-get dist-upgrade -y --no-install-recommends -q >> /var/log/pantryo-security.log 2>&1 || true
+  command -v unattended-upgrade >/dev/null 2>&1 && unattended-upgrade >> /var/log/pantryo-security.log 2>&1 || true
+  apt-get autoremove -y -q >> /var/log/pantryo-security.log 2>&1 || true
 fi
-if [[ -f "/opt/pantryo/scripts/auto-update-dependencies.js" ]]; then
-  cd /opt/pantryo && node scripts/auto-update-dependencies.js >> /var/log/pantryo-security.log 2>&1 || true
+if [[ -f "${INSTALL_DIR}/scripts/fix-openssh-cves.sh" ]]; then
+  bash "${INSTALL_DIR}/scripts/fix-openssh-cves.sh" >> /var/log/pantryo-security.log 2>&1 || true
+fi
+if [[ -f "${INSTALL_DIR}/scripts/auto-update-dependencies.js" ]]; then
+  cd "${INSTALL_DIR}" && node scripts/auto-update-dependencies.js >> /var/log/pantryo-security.log 2>&1 || true
+  if id -u pantryo >/dev/null 2>&1; then
+    chown -R pantryo:pantryo "${INSTALL_DIR}" 2>/dev/null || true
+  fi
+  command -v systemctl >/dev/null 2>&1 && systemctl restart pantryo.service 2>/dev/null || true
 fi
 EOF_CRON
 chmod 755 /etc/cron.daily/pantryo-security-updates
@@ -575,7 +594,11 @@ echo -e "${GREEN}✓ Configured daily automated security patches (/etc/cron.dail
 
 echo -e "\n${BLUE}[4/5] Building Production Application...${NC}"
 cd "$INSTALL_DIR"
-npm install
+export NPM_CONFIG_UPDATE_NOTIFIER=false
+export NPM_CONFIG_FUND=false
+npm install --no-fund
+npm audit fix --include=dev --no-fund 2>/dev/null || true
+npm audit --audit-level=high || echo -e "${YELLOW}[WARN] Review remaining npm audit advisories above.${NC}"
 npm run build
 chown -R pantryo:pantryo "$INSTALL_DIR"
 echo -e "${GREEN}✓ Pantryo frontend and backend compiled successfully.${NC}"

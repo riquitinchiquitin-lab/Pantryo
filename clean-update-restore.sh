@@ -215,11 +215,23 @@ else
 fi
 
 # ------------------------------------------------------------------------------
-# 7. Install Dependencies & Build Production Bundle
+# 7. Patch OS Security Packages, Install Dependencies & Build Production Bundle
 # ------------------------------------------------------------------------------
-echo -e "\n${CYAN}[6/8] Installing fresh NPM dependencies...${NC}"
+echo -e "\n${CYAN}[6/8] Patching OS packages & installing fresh NPM dependencies...${NC}"
+if command -v apt-get >/dev/null 2>&1; then
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -q -y || true
+  apt-get dist-upgrade -y --no-install-recommends -q || true
+  apt-get autoremove -y -q || true
+  apt-get clean || true
+fi
+
+export NPM_CONFIG_UPDATE_NOTIFIER=false
+export NPM_CONFIG_FUND=false
 # Rebuild native modules including better-sqlite3-multiple-ciphers
-npm install --include=dev --no-audit
+npm install --include=dev --no-fund
+npm audit fix --include=dev --no-fund 2>/dev/null || true
+npm audit --audit-level=high || echo -e "${YELLOW}⚠ Review remaining npm audit advisories above.${NC}"
 
 echo -e "\n${CYAN}[7/8] Compiling production bundle (Vite + esbuild server)...${NC}"
 # Use 2048MB heap limit to prevent out-of-memory errors on Proxmox 512MB/1GB LXCs

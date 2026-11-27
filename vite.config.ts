@@ -98,6 +98,90 @@ export default defineConfig(() => {
     optimizeDeps: {
       include: ['react', 'react-dom', 'react-dom/client', 'lucide-react'],
     },
+    build: {
+      chunkSizeWarningLimit: 650,
+      rolldownOptions: {
+        checks: {
+          pluginTimings: false,
+        },
+        output: {
+          codeSplitting: {
+            groups: [
+              {
+                name: 'vendor-react',
+                test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/,
+                priority: 40,
+              },
+              {
+                name: 'vendor-icons',
+                test: /node_modules[\\/]lucide-react[\\/]/,
+                priority: 35,
+              },
+              {
+                name: 'vendor-motion',
+                test: /node_modules[\\/](motion|framer-motion)[\\/]/,
+                priority: 35,
+              },
+              {
+                name: 'vendor-tfjs-webgl',
+                test: /node_modules[\\/]@tensorflow[\\/]tfjs-backend-webgl[\\/]/,
+                priority: 35,
+              },
+              {
+                name: 'vendor-tfjs-core',
+                test: /node_modules[\\/]@tensorflow[\\/]tfjs-core[\\/]/,
+                priority: 34,
+              },
+              {
+                name: 'vendor-tfjs-layers',
+                test: /node_modules[\\/]@tensorflow[\\/]tfjs-layers[\\/]/,
+                priority: 33,
+              },
+              {
+                name: 'vendor-tfjs-converter',
+                test: /node_modules[\\/]@tensorflow[\\/]tfjs-converter[\\/]/,
+                priority: 32,
+              },
+              {
+                name: 'vendor-tfjs-misc',
+                test: /node_modules[\\/]@tensorflow[\\/]/,
+                priority: 30,
+              },
+              {
+                name: 'vendor-onnx',
+                test: /node_modules[\\/]onnxruntime-web[\\/]/,
+                priority: 35,
+              },
+              {
+                name: 'vendor-ocr',
+                test: /node_modules[\\/]tesseract\.js/,
+                priority: 35,
+              },
+              {
+                name: 'vendor-webauthn',
+                test: /node_modules[\\/]@simplewebauthn[\\/]/,
+                priority: 30,
+              },
+              {
+                name: 'vendor-genai',
+                test: /node_modules[\\/]@google[\\/]genai[\\/]/,
+                priority: 30,
+              },
+              {
+                name: 'vendor-misc',
+                test: /node_modules[\\/]/,
+                priority: 10,
+              },
+              {
+                name: 'app-i18n-data',
+                test: /src[\\/]utils[\\/](foodTranslatorCore|foodTranslator|i18n)\./,
+                priority: 20,
+              },
+            ],
+          },
+        },
+      },
+    },
     assetsInclude: ['**/*.onnx', '**/*.wasm', '**/assets/aistudio/**', '**/public/assets/**'],
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.

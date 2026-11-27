@@ -1,0 +1,46 @@
+name: Security Audit & Dependency Verification
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    # Run daily at 04:00 UTC to verify zero unpatched advisories
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit-and-build:
+    name: Audit, Typecheck & Build (Node 22 LTS)
+    runs-on: ubuntu-latest
+    env:
+      NPM_CONFIG_UPDATE_NOTIFIER: "false"
+      NPM_CONFIG_FUND: "false"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies cleanly
+        run: npm ci --no-fund
+
+      - name: Enforce zero moderate/high/critical npm advisories
+        run: npm audit --audit-level=moderate
+
+      - name: Check for outdated dependencies (informational)
+        run: npm outdated || true
+
+      - name: TypeScript typecheck
+        run: npm run lint
+
+      - name: Production build verification
+        run: npm run build

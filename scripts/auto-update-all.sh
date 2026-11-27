@@ -45,9 +45,23 @@ echo -e "\n${BLUE}[1/2] Updating Debian OS System Packages & Security Patches...
 if command -v apt-get >/dev/null 2>&1; then
   if [[ $EUID -eq 0 ]]; then
     export DEBIAN_FRONTEND=noninteractive
+    if [[ -f "/etc/os-release" ]] && grep -qi '^ID=debian' /etc/os-release; then
+      CODENAME=$(. /etc/os-release && echo "${VERSION_CODENAME:-bookworm}")
+      if ! grep -rq "debian-security" /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null; then
+        echo "deb https://security.debian.org/debian-security ${CODENAME}-security main contrib non-free-firmware" > /etc/apt/sources.list.d/pantryo-debian-security.list
+      fi
+    fi
+    if [[ -d "/etc/apt/apt.conf.d" ]]; then
+      cat <<'EOF_AUTOAPT' > /etc/apt/apt.conf.d/20auto-upgrades
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Download-Upgradeable-Packages "1";
+APT::Periodic::AutocleanInterval "7";
+APT::Periodic::Unattended-Upgrade "1";
+EOF_AUTOAPT
+    fi
     echo -e "  Updating package index..."
     apt-get update -q -y 2>&1 || true
-    echo -e "  Applying security upgrades..."
+    echo -e "  Applying security upgrades (including OpenSSL, glibc, Node.js)..."
     apt-get dist-upgrade -y --no-install-recommends -q 2>&1 || true
     apt-get autoremove -y -q 2>&1 || true
     apt-get clean 2>&1 || true
@@ -70,13 +84,16 @@ fi
 # 2. Node.js & npm Application Dependencies Update (All Scopes & Native Addons)
 # ------------------------------------------------------------------------------
 echo -e "\n${BLUE}[2/2] Updating npm Application Dependencies (All Scopes + Native Addons)...${NC}"
+export NPM_CONFIG_UPDATE_NOTIFIER=false
+export NPM_CONFIG_FUND=false
 if [[ -f "${APP_DIR}/scripts/auto-update-dependencies.js" ]]; then
   node "${APP_DIR}/scripts/auto-update-dependencies.js" "$@"
 else
   echo -e "  Running standard npm update across all scopes..."
-  npm update --include=dev
-  npm audit fix --include=dev || true
+  npm update --include=dev --no-fund
+  npm audit fix --include=dev --no-fund || true
   npm rebuild better-sqlite3-multiple-ciphers || true
+  npm audit --audit-level=high || true
   npm run build
 fi
 

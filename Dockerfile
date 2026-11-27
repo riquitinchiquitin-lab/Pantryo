@@ -15,9 +15,12 @@ RUN apt-get update && apt-get upgrade -y && apt-get dist-upgrade -y && apt-get i
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Install all dependencies
-COPY package*.json ./
-RUN npm install
+ENV NPM_CONFIG_UPDATE_NOTIFIER=false
+ENV NPM_CONFIG_FUND=false
+
+# Install all dependencies and fail build if any high/critical advisory is present
+COPY package*.json .npmrc ./
+RUN npm ci --no-fund && npm audit --audit-level=high
 
 # Copy application source files
 COPY . .

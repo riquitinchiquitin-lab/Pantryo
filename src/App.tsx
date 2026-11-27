@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { MobileSimulator } from './components/MobileSimulator';
 import { PantryoLogo } from './components/PantryoLogo';
 import { Share, X, Download, Smartphone, Check, Laptop } from 'lucide-react';
@@ -6,7 +6,10 @@ import { LanguageProvider, useLanguage } from './utils/i18n';
 import { CookingSessionProvider } from './contexts/CookingSessionContext';
 import { AlertToastProvider } from './contexts/AlertToastContext';
 import { usePWAInstall } from './hooks/usePWAInstall';
-import { DocumentationModal } from './components/DocumentationModal';
+
+const DocumentationModal = lazy(() =>
+  import('./components/DocumentationModal').then((m) => ({ default: m.DocumentationModal }))
+);
 
 function AppContent() {
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
@@ -45,11 +48,15 @@ function AppContent() {
       </main>
 
       {/* Interactive Documentation & Self-Hosting Hub Modal */}
-      <DocumentationModal
-        isOpen={showDocModal}
-        onClose={() => setShowDocModal(false)}
-        initialTab={docModalTab}
-      />
+      {showDocModal && (
+        <Suspense fallback={null}>
+          <DocumentationModal
+            isOpen={showDocModal}
+            onClose={() => setShowDocModal(false)}
+            initialTab={docModalTab}
+          />
+        </Suspense>
+      )}
 
       {/* PWA Install Guidance Modal (Phone & Desktop Instructions) */}
       {!isInstalled && showInstallModal && (

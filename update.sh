@@ -49,19 +49,66 @@ else
   fi
 fi
 
-# 2. Install dependencies & rebuild better-sqlite3-multiple-ciphers
-echo -e "\n${CYAN}2/4: Installing NPM dependencies...${NC}"
-npm install --no-audit
+# 2. Patch OS/Node.js security updates & install latest verified NPM dependencies
+echo -e "\n${CYAN}2/4: Applying OS security patches & installing NPM dependencies...${NC}"
+if [[ $EUID -eq 0 ]] && command -v apt-get >/dev/null 2>&1; then
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -q -y || true
+  apt-get dist-upgrade -y --no-install-recommends -q || true
+  apt-get autoremove -y -q || true
+  apt-get clean || true
+fi
+
+export NPM_CONFIG_UPDATE_NOTIFIER=false
+export NPM_CONFIG_FUND=false
+npm install --no-fund
+npm audit fix --include=dev --no-fund 2>/dev/null || true
+npm audit --audit-level=high || echo -e "${YELLOW}[WARN] Review remaining npm audit advisories above.${NC}"
 
 # 3. Build production bundle (Vite + esbuild server.cjs)
 echo -e "\n${CYAN}3/4: Building production bundle (npm run build)...${NC}"
 npm run build
 
-# 4. Enforce strict permissions, OS/OpenSSH CVE hardening & restart service
-echo -e "\n${CYAN}4/4: Hardening permissions, applying OS/OpenSSH CVE patches & restarting service...${NC}"
-if [[ $EUID -eq 0 ]] && [[ -f "$INSTALL_DIR/scripts/fix-openssh-cves.sh" ]]; then
-  chmod +x "$INSTALL_DIR/scripts/fix-openssh-cves.sh" 2>/dev/null || true
-  bash "$INSTALL_DIR/scripts/fix-openssh-cves.sh" || true
+# 4. Enforce strict permissions, OS/OpenSSH CVE hardening, daily auto-patches & restart service
+echo -e "\n${CYAN}4/4: Hardening permissions, applying OpenSSH CVE patches & restarting service...${NC}"
+if [[ $EUID -eq 0 ]]; then
+  if [[ -f "$INSTALL_DIR/scripts/fix-openssh-cves.sh" ]]; then
+    chmod +x "$INSTALL_DIR/scripts/fix-openssh-cves.sh" 2>/dev/null || true
+    bash "$INSTALL_DIR/scripts/fix-openssh-cves.sh" || true
+  fi
+  if [[ -d "/etc/apt/apt.conf.d" ]]; then
+    cat <<'EOF_AUTOAPT' > /etc/apt/apt.conf.d/20auto-upgrades
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Download-Upgradeable-Packages "1";
+APT::Periodic::AutocleanInterval "7";
+APT::Periodic::Unattended-Upgrade "1";
+EOF_AUTOAPT
+  fi
+  if [[ -d "/etc/cron.daily" ]]; then
+    cat <<EOF_CRON > /etc/cron.daily/pantryo-security-updates
+#!/usr/bin/env bash
+export DEBIAN_FRONTEND=noninteractive
+export NPM_CONFIG_UPDATE_NOTIFIER=false
+export NPM_CONFIG_FUND=false
+if command -v apt-get >/dev/null 2>&1; then
+  apt-get update -q -y >> /var/log/pantryo-security.log 2>&1 || true
+  apt-get dist-upgrade -y --no-install-recommends -q >> /var/log/pantryo-security.log 2>&1 || true
+  command -v unattended-upgrade >/dev/null 2>&1 && unattended-upgrade >> /var/log/pantryo-security.log 2>&1 || true
+  apt-get autoremove -y -q >> /var/log/pantryo-security.log 2>&1 || true
+fi
+if [[ -f "${INSTALL_DIR}/scripts/fix-openssh-cves.sh" ]]; then
+  bash "${INSTALL_DIR}/scripts/fix-openssh-cves.sh" >> /var/log/pantryo-security.log 2>&1 || true
+fi
+if [[ -f "${INSTALL_DIR}/scripts/auto-update-dependencies.js" ]]; then
+  cd "${INSTALL_DIR}" && node scripts/auto-update-dependencies.js >> /var/log/pantryo-security.log 2>&1 || true
+  if id -u pantryo >/dev/null 2>&1; then
+    chown -R pantryo:pantryo "${INSTALL_DIR}" 2>/dev/null || true
+  fi
+  command -v systemctl >/dev/null 2>&1 && systemctl restart pantryo.service 2>/dev/null || true
+fi
+EOF_CRON
+    chmod 755 /etc/cron.daily/pantryo-security-updates
+  fi
 fi
 
 if id -u pantryo >/dev/null 2>&1; then

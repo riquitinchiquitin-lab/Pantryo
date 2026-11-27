@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   Home,
   ShoppingCart,
@@ -54,25 +54,49 @@ import { FoodVisualBadge } from './FoodVisualBadge';
 import { InventoryListItem } from './InventoryListItem';
 import { getFoodVisual, ALL_FOOD_CATEGORIES, ALL_SUB_CATEGORIES, ALL_MEAT_SEAFOOD_SUBCATEGORIES } from '../utils/foodVisuals';
 import { deductRecipeFromInventory } from '../utils/recipeCooker';
-import { CameraScannerModal } from './CameraScannerModal';
-import { AddEditItemModal } from './AddEditItemModal';
-import { ImportLeftoverModal } from './ImportLeftoverModal';
-import { PasteReceiptModal } from './PasteReceiptModal';
+import type { GroceryCartItem } from './GroceryListView';
 import { FoodItemImage } from '../utils/foodIllustrations';
-import { GroceryListView, GroceryCartItem } from './GroceryListView';
-import { CookingIdeasView } from './CookingIdeasView';
-import { FamilySyncView } from './FamilySyncView';
-import { MealPlannerView } from './MealPlannerView';
 import { PantryoLogo } from './PantryoLogo';
 import { ScrollableRow } from './ScrollableRow';
-import { AdminManagementModal } from './AdminManagementModal';
 import { AdminRestrictedModal } from './AdminRestrictedModal';
 import { LoginSplash } from './LoginSplash';
-import { ChangeAvatarModal } from './ChangeAvatarModal';
-import { AddRecipeModal } from './AddRecipeModal';
 import { ActiveCookingBar } from './ActiveCookingBar';
-import { GuidedCookingModal } from './GuidedCookingModal';
+import { ChangeAvatarModal } from './ChangeAvatarModal';
 import { useCookingSession } from '../contexts/CookingSessionContext';
+
+const CameraScannerModal = lazy(() =>
+  import('./CameraScannerModal').then((m) => ({ default: m.CameraScannerModal }))
+);
+const AddEditItemModal = lazy(() =>
+  import('./AddEditItemModal').then((m) => ({ default: m.AddEditItemModal }))
+);
+const ImportLeftoverModal = lazy(() =>
+  import('./ImportLeftoverModal').then((m) => ({ default: m.ImportLeftoverModal }))
+);
+const PasteReceiptModal = lazy(() =>
+  import('./PasteReceiptModal').then((m) => ({ default: m.PasteReceiptModal }))
+);
+const GroceryListView = lazy(() =>
+  import('./GroceryListView').then((m) => ({ default: m.GroceryListView }))
+);
+const CookingIdeasView = lazy(() =>
+  import('./CookingIdeasView').then((m) => ({ default: m.CookingIdeasView }))
+);
+const FamilySyncView = lazy(() =>
+  import('./FamilySyncView').then((m) => ({ default: m.FamilySyncView }))
+);
+const MealPlannerView = lazy(() =>
+  import('./MealPlannerView').then((m) => ({ default: m.MealPlannerView }))
+);
+const AdminManagementModal = lazy(() =>
+  import('./AdminManagementModal').then((m) => ({ default: m.AdminManagementModal }))
+);
+const AddRecipeModal = lazy(() =>
+  import('./AddRecipeModal').then((m) => ({ default: m.AddRecipeModal }))
+);
+const GuidedCookingModal = lazy(() =>
+  import('./GuidedCookingModal').then((m) => ({ default: m.GuidedCookingModal }))
+);
 import { isAppInstalledOrStandalone } from '../utils/installStatus';
 import {
   useLanguage,
@@ -2580,120 +2604,128 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
 
         {/* VIEW: GROCERY LIST */}
         {activeNav === 'grocery' && (
-          <GroceryListView
-            expiringItems={expiringItems}
-            currentUser={currentUser}
-            onStockItemsToKitchen={handleStockItemsToKitchen}
-            groceryItems={groceryItems}
-            onUpdateGroceryItems={setGroceryItems}
-            onSwitchToInventory={() => setActiveNav('home')}
-            onOpenReceiptScanner={() => {
-              setScannerInitialMode('receipt');
-              setIsScannerOpen(true);
-            }}
-          />
+          <Suspense fallback={<div className="py-16 flex justify-center"><RefreshCw className="w-6 h-6 text-teal-700 animate-spin" /></div>}>
+            <GroceryListView
+              expiringItems={expiringItems}
+              currentUser={currentUser}
+              onStockItemsToKitchen={handleStockItemsToKitchen}
+              groceryItems={groceryItems}
+              onUpdateGroceryItems={setGroceryItems}
+              onSwitchToInventory={() => setActiveNav('home')}
+              onOpenReceiptScanner={() => {
+                setScannerInitialMode('receipt');
+                setIsScannerOpen(true);
+              }}
+            />
+          </Suspense>
         )}
 
         {/* VIEW: MEAL PLANNER & CALENDAR */}
         {activeNav === 'meals' && (
-          <MealPlannerView
-            householdId="hh_pantryo_main"
-            items={items}
-            plannedMeals={plannedMeals}
-            onAddMeal={handleAddMeal}
-            onUpdateMeal={handleUpdateMeal}
-            onDeleteMeal={handleDeleteMeal}
-            onCookMeal={handleCookMealAndDeduct}
-            onAddIngredientsToGrocery={(ingredients) => {
-              ingredients.forEach((ing) => {
-                setGroceryItems((prev) => [
-                  {
-                    id: `g_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-                    name: ing.name,
-                    category: ing.category || 'Pantry Staples',
-                    quantity: ing.quantity || 1,
-                    unit: ing.unit || 'pcs',
-                    locationType: 'FRIDGE',
-                    inCart: false,
-                    notes: lang === 'FR' ? 'Du plan de repas' : 'From Meal Plan',
-                  },
-                  ...prev,
-                ]);
-              });
-              setBannerNotice(
-                lang === 'FR'
-                  ? `🛒 ${ingredients.length} ingrédients ajoutés à votre liste d'épicerie !`
-                  : `🛒 Added ${ingredients.length} ingredients to your grocery list!`
-              );
-              setTimeout(() => setBannerNotice(null), 3500);
-            }}
-            onNavigateToGrocery={() => setActiveNav('grocery')}
-            onOpenRecipes={() => setActiveNav('cooking')}
-          />
+          <Suspense fallback={<div className="py-16 flex justify-center"><RefreshCw className="w-6 h-6 text-teal-700 animate-spin" /></div>}>
+            <MealPlannerView
+              householdId="hh_pantryo_main"
+              items={items}
+              plannedMeals={plannedMeals}
+              onAddMeal={handleAddMeal}
+              onUpdateMeal={handleUpdateMeal}
+              onDeleteMeal={handleDeleteMeal}
+              onCookMeal={handleCookMealAndDeduct}
+              onAddIngredientsToGrocery={(ingredients) => {
+                ingredients.forEach((ing) => {
+                  setGroceryItems((prev) => [
+                    {
+                      id: `g_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+                      name: ing.name,
+                      category: ing.category || 'Pantry Staples',
+                      quantity: ing.quantity || 1,
+                      unit: ing.unit || 'pcs',
+                      locationType: 'FRIDGE',
+                      inCart: false,
+                      notes: lang === 'FR' ? 'Du plan de repas' : 'From Meal Plan',
+                    },
+                    ...prev,
+                  ]);
+                });
+                setBannerNotice(
+                  lang === 'FR'
+                    ? `🛒 ${ingredients.length} ingrédients ajoutés à votre liste d'épicerie !`
+                    : `🛒 Added ${ingredients.length} ingredients to your grocery list!`
+                );
+                setTimeout(() => setBannerNotice(null), 3500);
+              }}
+              onNavigateToGrocery={() => setActiveNav('grocery')}
+              onOpenRecipes={() => setActiveNav('cooking')}
+            />
+          </Suspense>
         )}
 
         {/* VIEW: COOKING IDEAS */}
         {activeNav === 'cooking' && (
-          <CookingIdeasView
-            items={items}
-            onPlanMeal={handleAddMeal}
-            onNavigateToMealPlanner={() => setActiveNav('meals')}
-            onCookRecipe={handleCookRecipeDirectly}
-            onAddMissingToGrocery={(missing) => {
-              setGroceryItems((prev) => [
-                {
-                  id: `g_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-                  name: missing.name,
-                  category: missing.category || 'Produce',
-                  quantity: missing.quantity || 1,
-                  unit: missing.unit || 'item',
-                  locationType: missing.locationType || 'FRIDGE',
-                  inCart: false,
-                  notes: missing.recipeTitle
-                    ? lang === 'FR'
-                      ? `Pour : ${missing.recipeTitle}`
-                      : `For: ${missing.recipeTitle}`
-                    : undefined,
-                },
-                ...prev,
-              ]);
-              setBannerNotice(
-                lang === 'FR'
-                  ? `🛒 "${missing.name}" ajouté à votre liste de courses !`
-                  : `🛒 Added "${missing.name}" to your grocery list!`
-              );
-              setTimeout(() => setBannerNotice(null), 3000);
-            }}
-          />
+          <Suspense fallback={<div className="py-16 flex justify-center"><RefreshCw className="w-6 h-6 text-teal-700 animate-spin" /></div>}>
+            <CookingIdeasView
+              items={items}
+              onPlanMeal={handleAddMeal}
+              onNavigateToMealPlanner={() => setActiveNav('meals')}
+              onCookRecipe={handleCookRecipeDirectly}
+              onAddMissingToGrocery={(missing) => {
+                setGroceryItems((prev) => [
+                  {
+                    id: `g_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                    name: missing.name,
+                    category: missing.category || 'Produce',
+                    quantity: missing.quantity || 1,
+                    unit: missing.unit || 'item',
+                    locationType: missing.locationType || 'FRIDGE',
+                    inCart: false,
+                    notes: missing.recipeTitle
+                      ? lang === 'FR'
+                        ? `Pour : ${missing.recipeTitle}`
+                        : `For: ${missing.recipeTitle}`
+                      : undefined,
+                  },
+                  ...prev,
+                ]);
+                setBannerNotice(
+                  lang === 'FR'
+                    ? `🛒 "${missing.name}" ajouté à votre liste de courses !`
+                    : `🛒 Added "${missing.name}" to your grocery list!`
+                );
+                setTimeout(() => setBannerNotice(null), 3000);
+              }}
+            />
+          </Suspense>
         )}
 
         {/* VIEW: FAMILY SYNC */}
         {activeNav === 'sync' && (
-          <FamilySyncView
-            currentUser={currentUser}
-            onSwitchUser={(switchedUser) => {
-              setCurrentUser(switchedUser);
-              try {
-                localStorage.setItem(LOCAL_STORAGE_ACTIVE_USER_ID, switchedUser.id);
-              } catch (_) {}
-            }}
-            members={householdMembers}
-            onUpdateMember={handleUpdateMember}
-            onLogout={handleLogout}
-            onInstall={onInstall}
-            isInstalled={isInstalledEffective}
-            kitchenName={kitchenName}
-            onDeleteMember={handleDeleteUser}
-            onOpenDocs={onOpenDocs}
-            onOpenAdmin={(tab = 'backup') => {
-              setAdminModalInitialTab(tab);
-              if (currentUser.role === 'ADMIN') {
-                setIsAdminModalOpen(true);
-              } else {
-                setIsAdminRestrictedOpen(true);
-              }
-            }}
-          />
+          <Suspense fallback={<div className="py-16 flex justify-center"><RefreshCw className="w-6 h-6 text-teal-700 animate-spin" /></div>}>
+            <FamilySyncView
+              currentUser={currentUser}
+              onSwitchUser={(switchedUser) => {
+                setCurrentUser(switchedUser);
+                try {
+                  localStorage.setItem(LOCAL_STORAGE_ACTIVE_USER_ID, switchedUser.id);
+                } catch (_) {}
+              }}
+              members={householdMembers}
+              onUpdateMember={handleUpdateMember}
+              onLogout={handleLogout}
+              onInstall={onInstall}
+              isInstalled={isInstalledEffective}
+              kitchenName={kitchenName}
+              onDeleteMember={handleDeleteUser}
+              onOpenDocs={onOpenDocs}
+              onOpenAdmin={(tab = 'backup') => {
+                setAdminModalInitialTab(tab);
+                if (currentUser.role === 'ADMIN') {
+                  setIsAdminModalOpen(true);
+                } else {
+                  setIsAdminRestrictedOpen(true);
+                }
+              }}
+            />
+          </Suspense>
         )}
       </div>
 
@@ -3294,57 +3326,69 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
       )}
 
       {/* Vision Scanner Modal */}
-      <CameraScannerModal
-        isOpen={isScannerOpen}
-        onClose={() => setIsScannerOpen(false)}
-        onItemAdded={handleItemAdded}
-        currentUser={currentUser}
-        onOpenManualAdd={handleOpenAddModal}
-        initialMode={scannerInitialMode}
-      />
+      {isScannerOpen && (
+        <Suspense fallback={null}>
+          <CameraScannerModal
+            isOpen={isScannerOpen}
+            onClose={() => setIsScannerOpen(false)}
+            onItemAdded={handleItemAdded}
+            currentUser={currentUser}
+            onOpenManualAdd={handleOpenAddModal}
+            initialMode={scannerInitialMode}
+          />
+        </Suspense>
+      )}
 
       {/* Paste Store / Email Receipt Modal */}
-      <PasteReceiptModal
-        isOpen={isPasteReceiptOpen}
-        onClose={() => setIsPasteReceiptOpen(false)}
-        currentUser={currentUser}
-        onItemsAdded={(newItems) => {
-          setItems((prev) => {
-            const newIds = new Set(newItems.map((i) => i.id));
-            return [...newItems, ...prev.filter((i) => !newIds.has(i.id))];
-          });
-          const count = newItems.length;
-          setBannerNotice(
-            lang === 'FR'
-              ? `✓ ${count} article(s) du reçu importé(s) dans la cuisine !`
-              : `✓ ${count} receipt item(s) imported into kitchen!`
-          );
-          setTimeout(() => setBannerNotice(null), 4500);
-        }}
-      />
+      {isPasteReceiptOpen && (
+        <Suspense fallback={null}>
+          <PasteReceiptModal
+            isOpen={isPasteReceiptOpen}
+            onClose={() => setIsPasteReceiptOpen(false)}
+            currentUser={currentUser}
+            onItemsAdded={(newItems) => {
+              setItems((prev) => {
+                const newIds = new Set(newItems.map((i) => i.id));
+                return [...newItems, ...prev.filter((i) => !newIds.has(i.id))];
+              });
+              const count = newItems.length;
+              setBannerNotice(
+                lang === 'FR'
+                  ? `✓ ${count} article(s) du reçu importé(s) dans la cuisine !`
+                  : `✓ ${count} receipt item(s) imported into kitchen!`
+              );
+              setTimeout(() => setBannerNotice(null), 4500);
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* Manual Add & Edit Item Modal */}
-      <AddEditItemModal
-        isOpen={isAddEditModalOpen}
-        onClose={() => {
-          setIsAddEditModalOpen(false);
-          setItemToEdit(null);
-          setModalDefaultLocation(undefined);
-        }}
-        itemToEdit={itemToEdit}
-        currentUser={currentUser}
-        defaultLocationType={modalDefaultLocation}
-        onSaved={handleItemSaved}
-        onOpenPasteReceipt={() => {
-          setIsAddEditModalOpen(false);
-          setIsPasteReceiptOpen(true);
-        }}
-        onDeleted={(itemId) => {
-          setItems((prev) => prev.filter((i) => i.id !== itemId));
-          setBannerNotice(lang === 'FR' ? "Article supprimé de l'inventaire." : 'Item deleted from inventory.');
-          setTimeout(() => setBannerNotice(null), 3000);
-        }}
-      />
+      {isAddEditModalOpen && (
+        <Suspense fallback={null}>
+          <AddEditItemModal
+            isOpen={isAddEditModalOpen}
+            onClose={() => {
+              setIsAddEditModalOpen(false);
+              setItemToEdit(null);
+              setModalDefaultLocation(undefined);
+            }}
+            itemToEdit={itemToEdit}
+            currentUser={currentUser}
+            defaultLocationType={modalDefaultLocation}
+            onSaved={handleItemSaved}
+            onOpenPasteReceipt={() => {
+              setIsAddEditModalOpen(false);
+              setIsPasteReceiptOpen(true);
+            }}
+            onDeleted={(itemId) => {
+              setItems((prev) => prev.filter((i) => i.id !== itemId));
+              setBannerNotice(lang === 'FR' ? "Article supprimé de l'inventaire." : 'Item deleted from inventory.');
+              setTimeout(() => setBannerNotice(null), 3000);
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* Compact Filter Drawer Modal */}
       {isFilterDrawerOpen && (
@@ -3583,77 +3627,85 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
       )}
 
       {/* Import Leftovers Modal with Smart Expiration */}
-      <ImportLeftoverModal
-        isOpen={isImportLeftoverOpen}
-        onClose={() => {
-          setIsImportLeftoverOpen(false);
-          setSelectedMealForLeftover(null);
-        }}
-        currentUser={currentUser}
-        plannedMeals={plannedMeals}
-        initialMeal={selectedMealForLeftover}
-        lang={lang}
-        onLeftoversImported={(newItems) => {
-          setItems((prev) => {
-            const newIds = new Set(newItems.map((i) => i.id));
-            return [...newItems, ...prev.filter((i) => !newIds.has(i.id))];
-          });
-          const count = newItems.length;
-          const names = newItems.map((i) => getItemDisplayName(i, lang)).slice(0, 2).join(', ');
-          const more = count > 2 ? ` (+${count - 2})` : '';
-          setBannerNotice(
-            lang === 'FR'
-              ? `🍲 ${count} plat(s) de restes (${names}${more}) ajouté(s) à la cuisine ! Normes Santé Canada & UE appliquées.`
-              : `🍲 ${count} leftover dish(es) (${names}${more}) added to Kitchen! Canadian & EU safety standards applied.`
-          );
-          setTimeout(() => setBannerNotice(null), 5500);
-        }}
-      />
+      {isImportLeftoverOpen && (
+        <Suspense fallback={null}>
+          <ImportLeftoverModal
+            isOpen={isImportLeftoverOpen}
+            onClose={() => {
+              setIsImportLeftoverOpen(false);
+              setSelectedMealForLeftover(null);
+            }}
+            currentUser={currentUser}
+            plannedMeals={plannedMeals}
+            initialMeal={selectedMealForLeftover}
+            lang={lang}
+            onLeftoversImported={(newItems) => {
+              setItems((prev) => {
+                const newIds = new Set(newItems.map((i) => i.id));
+                return [...newItems, ...prev.filter((i) => !newIds.has(i.id))];
+              });
+              const count = newItems.length;
+              const names = newItems.map((i) => getItemDisplayName(i, lang)).slice(0, 2).join(', ');
+              const more = count > 2 ? ` (+${count - 2})` : '';
+              setBannerNotice(
+                lang === 'FR'
+                  ? `🍲 ${count} plat(s) de restes (${names}${more}) ajouté(s) à la cuisine ! Normes Santé Canada & UE appliquées.`
+                  : `🍲 ${count} leftover dish(es) (${names}${more}) added to Kitchen! Canadian & EU safety standards applied.`
+              );
+              setTimeout(() => setBannerNotice(null), 5500);
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* Admin App & Database Management Modal */}
-      <AdminManagementModal
-        isOpen={isAdminModalOpen}
-        initialTab={adminModalInitialTab}
-        onClose={() => {
-          setIsAdminModalOpen(false);
-          setAdminModalInitialTab('backup');
-          fetchInventory();
-        }}
-        onNavigateToAppTab={(tab) => {
-          setIsAdminModalOpen(false);
-          setAdminModalInitialTab('backup');
-          setActiveNav(tab);
-          fetchInventory();
-        }}
-        currentUser={currentUser}
-        onOpenDocs={onOpenDocs}
-        onUserChange={(newUser) => {
-          setCurrentUser(newUser);
-          setBannerNotice(
-            lang === 'FR'
-              ? `Session basculée sur ${newUser.name} (${newUser.role})`
-              : `Switched active session to ${newUser.name} (${newUser.role})`
-          );
-          setTimeout(() => setBannerNotice(null), 3500);
-        }}
-        onDatabaseRestored={async () => {
-          await fetchInventory();
-          try {
-            const pubRes = await fetch('/api/v1/auth/public-members');
-            if (pubRes.ok) {
-              const members = await pubRes.json();
-              setHouseholdMembers(members);
-              localStorage.setItem('kitchen_komrade_household_members', JSON.stringify(members));
-            }
-          } catch (_) {}
-          setBannerNotice(
-            lang === 'FR'
-              ? 'Base de données restaurée et synchronisée avec succès !'
-              : 'Database restored and synchronized successfully!'
-          );
-          setTimeout(() => setBannerNotice(null), 4000);
-        }}
-      />
+      {isAdminModalOpen && (
+        <Suspense fallback={null}>
+          <AdminManagementModal
+            isOpen={isAdminModalOpen}
+            initialTab={adminModalInitialTab}
+            onClose={() => {
+              setIsAdminModalOpen(false);
+              setAdminModalInitialTab('backup');
+              fetchInventory();
+            }}
+            onNavigateToAppTab={(tab) => {
+              setIsAdminModalOpen(false);
+              setAdminModalInitialTab('backup');
+              setActiveNav(tab);
+              fetchInventory();
+            }}
+            currentUser={currentUser}
+            onOpenDocs={onOpenDocs}
+            onUserChange={(newUser) => {
+              setCurrentUser(newUser);
+              setBannerNotice(
+                lang === 'FR'
+                  ? `Session basculée sur ${newUser.name} (${newUser.role})`
+                  : `Switched active session to ${newUser.name} (${newUser.role})`
+              );
+              setTimeout(() => setBannerNotice(null), 3500);
+            }}
+            onDatabaseRestored={async () => {
+              await fetchInventory();
+              try {
+                const pubRes = await fetch('/api/v1/auth/public-members');
+                if (pubRes.ok) {
+                  const members = await pubRes.json();
+                  setHouseholdMembers(members);
+                  localStorage.setItem('kitchen_komrade_household_members', JSON.stringify(members));
+                }
+              } catch (_) {}
+              setBannerNotice(
+                lang === 'FR'
+                  ? 'Base de données restaurée et synchronisée avec succès !'
+                  : 'Database restored and synchronized successfully!'
+              );
+              setTimeout(() => setBannerNotice(null), 4000);
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* Admin Restricted Notice Modal */}
       <AdminRestrictedModal
@@ -3678,25 +3730,27 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
 
       {/* Direct User Avatar Change Modal */}
       {isAvatarModalOpen && currentUser && (
-        <ChangeAvatarModal
-          isOpen={isAvatarModalOpen}
-          user={currentUser}
-          onClose={() => setIsAvatarModalOpen(false)}
-          onSaveAvatar={(newAvatarUrl) => {
-            const updatedUser: User = {
-              ...currentUser,
-              avatarUrl: newAvatarUrl,
-            };
-            handleUpdateMember(updatedUser);
-            setIsAvatarModalOpen(false);
-            setBannerNotice(
-              lang === 'FR'
-                ? 'Photo de profil mise à jour avec succès !'
-                : 'Profile picture updated successfully!'
-            );
-            setTimeout(() => setBannerNotice(null), 3500);
-          }}
-        />
+        <Suspense fallback={null}>
+          <ChangeAvatarModal
+            isOpen={isAvatarModalOpen}
+            user={currentUser}
+            onClose={() => setIsAvatarModalOpen(false)}
+            onSaveAvatar={(newAvatarUrl) => {
+              const updatedUser: User = {
+                ...currentUser,
+                avatarUrl: newAvatarUrl,
+              };
+              handleUpdateMember(updatedUser);
+              setIsAvatarModalOpen(false);
+              setBannerNotice(
+                lang === 'FR'
+                  ? 'Photo de profil mise à jour avec succès !'
+                  : 'Profile picture updated successfully!'
+              );
+              setTimeout(() => setBannerNotice(null), 3500);
+            }}
+          />
+        </Suspense>
       )}
 
       {/* Dedicated native camera input for recipe scanning */}
@@ -3710,27 +3764,31 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
       />
 
       {/* Full-screen Recipe Review & Save Modal from Camera Scanner */}
-      <AddRecipeModal
-        isOpen={isRecipeAddModalOpen}
-        onClose={() => {
-          setIsRecipeAddModalOpen(false);
-          setRecipeScanPhoto(null);
-        }}
-        onRecipeSaved={(newRecipe) => {
-          setIsRecipeAddModalOpen(false);
-          setRecipeScanPhoto(null);
-          setActiveNav('cooking');
-          setBannerNotice(
-            lang === 'FR'
-              ? `✓ Recette enregistrée : ${newRecipe.titleFr || newRecipe.title}`
-              : `✓ Recipe saved: ${newRecipe.title}`
-          );
-          setTimeout(() => setBannerNotice(null), 4000);
-        }}
-        lang={lang}
-        initialTab="photo"
-        initialPhotoBase64={recipeScanPhoto}
-      />
+      {isRecipeAddModalOpen && (
+        <Suspense fallback={null}>
+          <AddRecipeModal
+            isOpen={isRecipeAddModalOpen}
+            onClose={() => {
+              setIsRecipeAddModalOpen(false);
+              setRecipeScanPhoto(null);
+            }}
+            onRecipeSaved={(newRecipe) => {
+              setIsRecipeAddModalOpen(false);
+              setRecipeScanPhoto(null);
+              setActiveNav('cooking');
+              setBannerNotice(
+                lang === 'FR'
+                  ? `✓ Recette enregistrée : ${newRecipe.titleFr || newRecipe.title}`
+                  : `✓ Recipe saved: ${newRecipe.title}`
+              );
+              setTimeout(() => setBannerNotice(null), 4000);
+            }}
+            lang={lang}
+            initialTab="photo"
+            initialPhotoBase64={recipeScanPhoto}
+          />
+        </Suspense>
+      )}
 
       {/* Bulk Delete Confirmation Modal */}
       {showBulkDeleteConfirm && (
@@ -3794,6 +3852,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
 
       {/* Full Screen Guided Cooking Modal (driven by global session) */}
       {sessionActiveRecipe && (
+        <Suspense fallback={null}>
         <GuidedCookingModal
           isOpen={isSessionCookingOpen}
           onClose={exitCooking}
@@ -3831,6 +3890,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
           }
           onRecipeCookedSuccessfully={sessionHandlers.onRecipeCookedSuccessfully}
         />
+        </Suspense>
       )}
     </div>
   );

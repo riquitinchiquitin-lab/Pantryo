@@ -118,6 +118,12 @@ export function getOutdatedAnalysis() {
   }
 }
 
+const SAFE_ENV = {
+  ...process.env,
+  NPM_CONFIG_UPDATE_NOTIFIER: "false",
+  NPM_CONFIG_FUND: "false",
+};
+
 export async function runAutoUpdate(options = {}) {
   const isUpgradeMajor = Boolean(
     options.upgradeMajor ||
@@ -134,11 +140,20 @@ export async function runAutoUpdate(options = {}) {
             .filter((arg) => !arg.startsWith("-") && !/^\d+$/.test(arg) && !/^\d+\.\d+\.\d+\.\d+$/.test(arg) && arg.trim().length > 0)
         : [];
 
+  let npmVersion = "unknown";
+  try {
+    npmVersion = execFileSync("npm", ["-v"], { encoding: "utf8", env: SAFE_ENV }).trim();
+  } catch (_) {}
+
   const result = {
     timestamp: new Date().toISOString(),
+    nodeVersion: process.version,
+    npmVersion,
     success: false,
     auditBefore: null,
     auditAfter: null,
+    zeroVulnerabilities: false,
+    outdatedCount: 0,
     updatesApplied: false,
     majorUpgradesApplied: [],
     nativeRebuildDone: false,
@@ -151,10 +166,17 @@ export async function runAutoUpdate(options = {}) {
 
   log("Starting automated package update & vulnerability remediation across all dependency scopes...");
 
-  // Snapshot package.json for rollback if major build fails
+  // Snapshot package.json and package-lock.json for rollback if major build fails
+  const lockfilePath = path.resolve(rootDir, "package-lock.json");
   let originalPkgJson = null;
+  let originalLockfile = null;
   try {
     originalPkgJson = fs.readFileSync(packageJsonPath, "utf8");
+  } catch (_) {}
+  try {
+    if (fs.existsSync(lockfilePath)) {
+      originalLockfile = fs.readFileSync(lockfilePath, "utf8");
+    }
   } catch (_) {}
 
   // Normalize .env: Remove legacy NODE_ENV to comply with Vite specifications
@@ -172,7 +194,7 @@ export async function runAutoUpdate(options = {}) {
 
   // 1. Initial audit
   try {
-    const rawAudit = execSync("npm audit --json", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+    const rawAudit = execSync("npm audit --json", { encoding: "utf8", env: SAFE_ENV, stdio: ["ignore", "pipe", "ignore"] });
     result.auditBefore = JSON.parse(rawAudit).metadata;
   } catch (err) {
     if (err.stdout) {
@@ -213,7 +235,7 @@ export async function runAutoUpdate(options = {}) {
     for (const pkg of packagesToUpgrade) {
       try {
         log(`Installing latest version for: ${pkg}...`);
-        execFileSync("npm", ["install", "--include=dev", `${pkg}@latest`], { stdio: "inherit" });
+        execFileSync("npm", ["install", "--include=dev", "--no-fund", `${pkg}@latest`], { stdio: "inherit", env: SAFE_ENV });
         result.majorUpgradesApplied.push(pkg);
         result.updatesApplied = true;
       } catch (err) {
@@ -225,7 +247,7 @@ export async function runAutoUpdate(options = {}) {
   // 4. Safe semver dependency update across ALL scopes (dependencies + devDependencies)
   try {
     log("Running npm update --include=dev (safe semver patch and minor updates across all scopes)...");
-    execSync("npm update --include=dev", { stdio: "inherit" });
+    execFileSync("npm", ["update", "--include=dev", "--no-fund"], { stdio: "inherit", env: SAFE_ENV });
     result.updatesApplied = true;
   } catch (err) {
     log(`Notice during npm update: ${err.message}`);
@@ -244,7 +266,7 @@ export async function runAutoUpdate(options = {}) {
 
     if (hasBuildTools) {
       log("Rebuilding native binary C/C++ addons (better-sqlite3-multiple-ciphers)...");
-      execSync("npm rebuild better-sqlite3-multiple-ciphers", { stdio: "inherit" });
+      execFileSync("npm", ["rebuild", "better-sqlite3-multiple-ciphers"], { stdio: "inherit", env: SAFE_ENV });
       result.nativeRebuildDone = true;
     } else {
       log("Build tools (make) not present in runner environment; utilizing verified prebuilt native binary for better-sqlite3-multiple-ciphers.");
@@ -258,20 +280,35 @@ export async function runAutoUpdate(options = {}) {
   // 6. Security patch auto-fix
   try {
     log("Running npm audit fix --include=dev for automated security patches...");
-    execSync("npm audit fix --include=dev", { stdio: "inherit" });
+    execFileSync("npm", ["audit", "fix", "--include=dev", "--no-fund"], { stdio: "inherit", env: SAFE_ENV });
   } catch (err) {
     log(`Notice during npm audit fix: ${err.message}`);
   }
 
-  // 7. Audit after fix
-  try {
-    const rawAuditAfter = execSync("npm audit --json", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
-    result.auditAfter = JSON.parse(rawAuditAfter).metadata;
-  } catch (err) {
-    if (err.stdout) {
-      try {
-        result.auditAfter = JSON.parse(err.stdout).metadata;
-      } catch (_) {}
+  // 7. Audit after fix (and refresh lockfile once if transitive advisories remain)
+  const readAuditMetadata = () => {
+    try {
+      const raw = execSync("npm audit --json", { encoding: "utf8", env: SAFE_ENV, stdio: ["ignore", "pipe", "ignore"] });
+      return JSON.parse(raw).metadata;
+    } catch (err) {
+      if (err.stdout) {
+        try {
+          return JSON.parse(err.stdout).metadata;
+        } catch (_) {}
+      }
+      return null;
+    }
+  };
+
+  result.auditAfter = readAuditMetadata();
+  if ((result.auditAfter?.vulnerabilities?.total ?? 0) > 0) {
+    try {
+      log("Refreshing package-lock.json to resolve remaining transitive advisories...");
+      execFileSync("npm", ["install", "--package-lock-only", "--no-fund"], { stdio: "inherit", env: SAFE_ENV });
+      execFileSync("npm", ["audit", "fix", "--include=dev", "--no-fund"], { stdio: "inherit", env: SAFE_ENV });
+      result.auditAfter = readAuditMetadata();
+    } catch (err) {
+      log(`Notice during lockfile security refresh: ${err.message}`);
     }
   }
 
@@ -279,12 +316,13 @@ export async function runAutoUpdate(options = {}) {
   const refreshedOutdated = getOutdatedAnalysis();
   result.minorPatchUpdates = refreshedOutdated.minorPatchUpdates;
   result.majorAlerts = refreshedOutdated.majorAlerts;
+  result.outdatedCount = Object.keys(refreshedOutdated.allOutdated || {}).length;
 
   // 9. Verification: Build integrity
   if (!options.skipBuild) {
     try {
       log("Verifying project build integrity with npm run build...");
-      execSync("npm run build", { stdio: "inherit" });
+      execFileSync("npm", ["run", "build"], { stdio: "inherit", env: SAFE_ENV });
       result.buildVerified = true;
       result.success = true;
       log("Project build passed successfully!");
@@ -294,10 +332,13 @@ export async function runAutoUpdate(options = {}) {
 
       // Safe rollback if major upgrade broke the build
       if (originalPkgJson && result.majorUpgradesApplied.length > 0) {
-        log("Rolling back package.json to preserve runtime stability...");
+        log("Rolling back package.json and lockfile to preserve runtime stability...");
         try {
           fs.writeFileSync(packageJsonPath, originalPkgJson, "utf8");
-          execSync("npm install --include=dev", { stdio: "inherit" });
+          if (originalLockfile) {
+            fs.writeFileSync(lockfilePath, originalLockfile, "utf8");
+          }
+          execFileSync("npm", ["install", "--include=dev", "--no-fund"], { stdio: "inherit", env: SAFE_ENV });
           log("Rollback completed successfully.");
         } catch (rbErr) {
           log(`Notice during rollback: ${rbErr.message}`);
@@ -311,7 +352,8 @@ export async function runAutoUpdate(options = {}) {
 
   const vulnsBefore = result.auditBefore?.vulnerabilities?.total ?? 0;
   const vulnsAfter = result.auditAfter?.vulnerabilities?.total ?? 0;
-  result.summary = `Automated package check complete. Vulnerabilities: ${vulnsAfter} (was ${vulnsBefore}). Major alerts: ${result.majorAlerts.length}. Native binary compiled: ${result.nativeRebuildDone}. Build verified: ${result.buildVerified}.`;
+  result.zeroVulnerabilities = vulnsAfter === 0;
+  result.summary = `Automated package check complete. Vulnerabilities: ${vulnsAfter} (was ${vulnsBefore}). Outdated: ${result.outdatedCount}. Major alerts: ${result.majorAlerts.length}. Native binary compiled: ${result.nativeRebuildDone}. Build verified: ${result.buildVerified}.`;
   log(result.summary);
 
   // Persist status to server/data/dependency-status.json

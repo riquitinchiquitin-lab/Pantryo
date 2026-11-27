@@ -104,12 +104,25 @@ export const OnboardingFlowModal: React.FC<OnboardingFlowModalProps> = ({
 
     try {
       setLoading(true);
+      const getAuthHeaders = (overrideToken?: string) => {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        let token = overrideToken || '';
+        if (!token) {
+          try {
+            token = localStorage.getItem('pantryo_auth_token') || '';
+          } catch (_) {}
+        }
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        return headers;
+      };
 
       if (isAdminInit) {
         // Complete default admin initialization
         const res = await fetch(`/api/v1/admin/users/${encodeURIComponent(user.id)}/complete-setup`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify({
             newUsername: username.trim(),
             newName: name.trim(),
@@ -135,7 +148,7 @@ export const OnboardingFlowModal: React.FC<OnboardingFlowModalProps> = ({
         // Member must change password
         const res = await fetch(`/api/v1/admin/users/${encodeURIComponent(user.id)}/change-password`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify({
             newPassword: newPassword.trim(),
           }),
@@ -157,7 +170,7 @@ export const OnboardingFlowModal: React.FC<OnboardingFlowModalProps> = ({
         if (avatarUrl && avatarUrl !== user.avatarUrl) {
           await fetch(`/api/v1/admin/users/${encodeURIComponent(user.id)}/avatar`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(data.token),
             body: JSON.stringify({ avatarUrl }),
           }).catch(() => {});
           data.user.avatarUrl = avatarUrl;

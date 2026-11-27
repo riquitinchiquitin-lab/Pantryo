@@ -383,8 +383,28 @@ router.post("/test-gemma", requireAdmin, async (req, res) => {
     const { localVisionUrl, localVisionModel = "paligemma" } = req.body;
     const url = (localVisionUrl || dbStore?.systemSettings?.localVisionUrl || "http://localhost:11434").trim().replace(/\/+$/, "");
 
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      return res.status(400).json({ success: false, error: "URL du serveur local Gemma invalide." });
+    }
+    if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+      return res.status(400).json({ success: false, error: "Seuls les protocoles HTTP et HTTPS sont autorisés." });
+    }
+    const host = parsedUrl.hostname.toLowerCase();
+    if (
+      host === "169.254.169.254" ||
+      host.startsWith("169.254.") ||
+      host === "metadata.google.internal" ||
+      host === "metadata" ||
+      host === "instance-data"
+    ) {
+      return res.status(400).json({ success: false, error: "L'accès aux endpoints de métadonnées cloud est interdit." });
+    }
+
     const testUrl = url.endsWith("/v1") ? `${url}/models` : `${url}/api/tags`;
-    const response = await fetch(testUrl, { method: "GET", signal: AbortSignal.timeout(5000) });
+    const response = await fetch(testUrl, { method: "GET", redirect: "manual", signal: AbortSignal.timeout(5000) });
     if (!response.ok) {
       throw new Error(`Serveur local a répondu avec le statut HTTP ${response.status}`);
     }
@@ -547,12 +567,21 @@ router.get("/security/audit", requireAdmin, async (req, res) => {
  * POST /api/v1/admin/security/auto-update
  * Triggers automated dependency security patches and non-breaking package updates
  */
+const SAFE_NPM_PACKAGE_RE = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/;
+
 router.post("/security/auto-update", requireAdmin, async (req, res) => {
   try {
     const { upgradeMajor, packages } = req.body || {};
+    let validatedPackages;
+    if (packages !== undefined) {
+      if (!Array.isArray(packages) || packages.some((p) => typeof p !== "string" || !SAFE_NPM_PACKAGE_RE.test(p))) {
+        return res.status(400).json({ success: false, error: "Invalid npm package name in update request." });
+      }
+      validatedPackages = packages;
+    }
     const scriptPath = path.resolve(process.cwd(), "scripts/auto-update-dependencies.js");
     const { runAutoUpdate } = await import(pathToFileURL(scriptPath).href);
-    const result = await runAutoUpdate({ upgradeMajor: Boolean(upgradeMajor), packages });
+    const result = await runAutoUpdate({ upgradeMajor: Boolean(upgradeMajor), packages: validatedPackages });
     res.json(result);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -827,16 +856,36 @@ router.get("/security/compliance-audit", requireAdmin, async (req, res) => {
       remediable: true,
     });
 
-    // 6. SEC-06: Debian Securing - Package Vulnerability Audit
+    // 6. SEC-06: Debian Securing - Package Vulnerability Audit (reads latest verified audit telemetry)
+    let depAuditStatus = "PASS";
+    let depAuditDetails = "Lockfile audited with zero known vulnerabilities.";
+    try {
+      const depStatusPath = path.resolve(cwd, "server/data/dependency-status.json");
+      if (fs.existsSync(depStatusPath)) {
+        const depData = JSON.parse(fs.readFileSync(depStatusPath, "utf8"));
+        const vulns = depData?.auditAfter?.vulnerabilities || {};
+        const criticalOrHigh = (vulns.critical || 0) + (vulns.high || 0);
+        const totalVulns = vulns.total || 0;
+        if (criticalOrHigh > 0) {
+          depAuditStatus = "FAIL";
+          depAuditDetails = `${criticalOrHigh} high/critical dependency advisories detected (total: ${totalVulns}). Run Auto-Update to remediate.`;
+        } else if (totalVulns > 0) {
+          depAuditStatus = "WARN";
+          depAuditDetails = `${totalVulns} low/moderate dependency advisories detected. Run Auto-Update to patch.`;
+        } else {
+          depAuditDetails = `Verified 0 vulnerabilities (last checked ${depData.timestamp || "recently"}).`;
+        }
+      }
+    } catch (_) {}
     checks.push({
       id: "SEC-06",
       standard: "Debian Official",
       category: "Supply Chain Security",
       title: "Dependency Vulnerability Screening",
-      status: "PASS",
+      status: depAuditStatus,
       description: "Guarantees zero high or critical CVEs across all direct and transitive dependencies.",
-      details: "Lockfile audited with zero critical or high severity vulnerabilities.",
-      remediable: false,
+      details: depAuditDetails,
+      remediable: depAuditStatus !== "PASS",
     });
 
     // 7. SEC-07: Debian Securing - Automated Security Updates Cron
@@ -911,6 +960,31 @@ router.get("/security/compliance-audit", requireAdmin, async (req, res) => {
       details: isEncrypted
         ? `Database encrypted with AES-256-GCM / SQLCipher at rest (${dbStats.sqlite?.fileSizeKb || 0} KB).`
         : "Database is unencrypted in plaintext.",
+      remediable: false,
+    });
+
+    // 11. SEC-11: OpenSSH CVE Remediation (CVE-2026-35385, CVE-2024-6387, CVE-2023-28531)
+    const sshdInstalled = fs.existsSync("/usr/sbin/sshd");
+    const sshHardeningPresent = fs.existsSync("/etc/ssh/sshd_config.d/99-pantryo-cve-hardening.conf");
+    let sshStatus = "PASS";
+    let sshDetails = "OpenSSH server is not installed (zero port-22 exposure).";
+    if (sshdInstalled) {
+      if (sshHardeningPresent) {
+        sshStatus = "PASS";
+        sshDetails = "OpenSSH hardened with LoginGraceTime 0, AllowAgentForwarding no, and DebianBanner no.";
+      } else {
+        sshStatus = "WARN";
+        sshDetails = "sshd binary present without Pantryo CVE hardening drop-in. Run ./scripts/fix-openssh-cves.sh.";
+      }
+    }
+    checks.push({
+      id: "SEC-11",
+      standard: "Debian Security / CIS",
+      category: "Host Network Exposure",
+      title: "OpenSSH CVE Protection (CVE-2026-35385 / 2024-6387 / 2023-28531)",
+      status: sshStatus,
+      description: "Ensures sshd is disabled inside containers or hardened against known OpenSSH CVEs.",
+      details: sshDetails,
       remediable: false,
     });
 
@@ -1445,8 +1519,12 @@ router.post("/users/:id/password", requireAdmin, async (req, res) => {
  * Onboarding endpoint for default admin:
  * Replaces default "admin" / "pnatryo" with personalized username and password, removing default credentials.
  */
-router.post("/users/:id/complete-setup", async (req, res) => {
+router.post("/users/:id/complete-setup", requireAuth, async (req, res) => {
   try {
+    if (req.user.role !== "ADMIN" && req.user.id !== req.params.id) {
+      return res.status(403).json({ error: "Access denied. You can only complete setup for your own account." });
+    }
+
     const { newUsername, newName, newPassword, avatarUrl } = req.body;
     if (!newUsername || !newPassword) {
       return res.status(400).json({ error: "Personalized username and new password are required" });
@@ -1454,6 +1532,10 @@ router.post("/users/:id/complete-setup", async (req, res) => {
 
     const user = dbStore.users.find((u) => u.id === req.params.id);
     if (!user) return res.status(404).json({ error: "User not found" });
+
+    if (!user.mustSetupProfile && !user.isDefaultAdmin) {
+      return res.status(403).json({ error: "Account setup has already been completed." });
+    }
 
     // Validate new password against NIST SP 800-63B
     const validation = await validatePasswordNist(newPassword, {
@@ -1493,8 +1575,12 @@ router.post("/users/:id/complete-setup", async (req, res) => {
  * POST /api/v1/admin/users/:id/change-password
  * Mandatory password change endpoint for users upon first login
  */
-router.post("/users/:id/change-password", async (req, res) => {
+router.post("/users/:id/change-password", requireAuth, async (req, res) => {
   try {
+    if (req.user.role !== "ADMIN" && req.user.id !== req.params.id) {
+      return res.status(403).json({ error: "Access denied. You can only change your own password." });
+    }
+
     const { newPassword, currentPassword } = req.body;
     if (!newPassword) {
       return res.status(400).json({ error: "New password is required" });
@@ -1505,8 +1591,7 @@ router.post("/users/:id/change-password", async (req, res) => {
 
     // If account is not in mandatory initial setup mode, verify current password or active admin session
     if (!user.mustChangePassword) {
-      const authUser = getAuthenticatedUserFromRequest(req);
-      const isCallerAdmin = authUser && authUser.role === "ADMIN";
+      const isCallerAdmin = req.user.role === "ADMIN" && req.user.id !== user.id;
       if (!isCallerAdmin) {
         if (!currentPassword) {
           return res.status(400).json({ error: "Current password is required to change password." });

@@ -1,8 +1,8 @@
 # GitHub Dependabot configuration
-# Automatically checks for security vulnerabilities and updates packages daily
+# Enforces daily security & dependency updates across npm, Docker, Python, and GitHub Actions
 version: 2
 updates:
-  # Automated package updates for npm dependencies
+  # 1. Node.js / npm production & development dependencies
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
@@ -17,16 +17,73 @@ updates:
       - "dependencies"
       - "security"
       - "auto-update"
-    versioning-strategy: "increase-if-necessary"
+    versioning-strategy: "increase"
     groups:
       production-dependencies:
-        patterns:
-          - "*"
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+      development-dependencies:
+        dependency-type: "development"
         update-types:
           - "minor"
           - "patch"
 
-  # Automated updates for GitHub Actions
+  # 2. Main Docker base image (Node.js / Debian security patches)
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "daily"
+      time: "04:00"
+      timezone: "America/Montreal"
+    commit-message:
+      prefix: "chore(docker)"
+    labels:
+      - "docker"
+      - "security"
+      - "auto-update"
+
+  # 3. Vision microservice Docker image
+  - package-ecosystem: "docker"
+    directory: "/vision_service"
+    schedule:
+      interval: "daily"
+      time: "04:00"
+      timezone: "America/Montreal"
+    commit-message:
+      prefix: "chore(docker-vision)"
+    labels:
+      - "docker"
+      - "security"
+      - "auto-update"
+
+  # 4. Vision microservice Python packages
+  - package-ecosystem: "pip"
+    directory: "/vision_service"
+    schedule:
+      interval: "daily"
+      time: "04:00"
+      timezone: "America/Montreal"
+    commit-message:
+      prefix: "chore(pip-vision)"
+    labels:
+      - "python"
+      - "security"
+      - "auto-update"
+
+  # 5. Model training Python packages
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(pip)"
+    labels:
+      - "python"
+      - "dependencies"
+
+  # 6. GitHub Actions workflows
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -35,4 +92,5 @@ updates:
       prefix: "ci(actions)"
     labels:
       - "ci"
+      - "security"
       - "auto-update"

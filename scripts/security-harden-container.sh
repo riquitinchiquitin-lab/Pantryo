@@ -164,6 +164,14 @@ if command -v apt-get >/dev/null 2>&1; then
     apt-get autoremove -y -q 2>/dev/null || true
     apt-get clean 2>/dev/null || true
     apt-get install -y --no-install-recommends unattended-upgrades ca-certificates -q 2>/dev/null || true
+    if [[ -d "/etc/apt/apt.conf.d" ]]; then
+      cat <<'EOF_AUTOAPT' > /etc/apt/apt.conf.d/20auto-upgrades
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Download-Upgradeable-Packages "1";
+APT::Periodic::AutocleanInterval "7";
+APT::Periodic::Unattended-Upgrade "1";
+EOF_AUTOAPT
+    fi
     echo -e "  ${GREEN}✓ Base OS packages patched to eliminate known CVEs.${NC}"
   else
     echo -e "  ${CYAN}ℹ️  Debian apt package management available.${NC}"
@@ -171,12 +179,26 @@ if command -v apt-get >/dev/null 2>&1; then
 fi
 
 if [[ -d "/etc/cron.daily" ]] && [[ "$MODE" == "--enforce" ]] && [[ $EUID -eq 0 ]]; then
-  cat <<'EOF_CRON' > /etc/cron.daily/pantryo-security-updates
+  cat <<EOF_CRON > /etc/cron.daily/pantryo-security-updates
 #!/usr/bin/env bash
 export DEBIAN_FRONTEND=noninteractive
+export NPM_CONFIG_UPDATE_NOTIFIER=false
+export NPM_CONFIG_FUND=false
 if command -v apt-get >/dev/null 2>&1; then
-  apt-get update -q -y >> /var/log/pantryo-security.log 2>&1
-  unattended-upgrade >> /var/log/pantryo-security.log 2>&1 || true
+  apt-get update -q -y >> /var/log/pantryo-security.log 2>&1 || true
+  apt-get dist-upgrade -y --no-install-recommends -q >> /var/log/pantryo-security.log 2>&1 || true
+  command -v unattended-upgrade >/dev/null 2>&1 && unattended-upgrade >> /var/log/pantryo-security.log 2>&1 || true
+  apt-get autoremove -y -q >> /var/log/pantryo-security.log 2>&1 || true
+fi
+if [[ -f "${INSTALL_DIR}/scripts/fix-openssh-cves.sh" ]]; then
+  bash "${INSTALL_DIR}/scripts/fix-openssh-cves.sh" >> /var/log/pantryo-security.log 2>&1 || true
+fi
+if [[ -f "${INSTALL_DIR}/scripts/auto-update-dependencies.js" ]]; then
+  cd "${INSTALL_DIR}" && node scripts/auto-update-dependencies.js >> /var/log/pantryo-security.log 2>&1 || true
+  if id -u pantryo >/dev/null 2>&1; then
+    chown -R pantryo:pantryo "${INSTALL_DIR}" 2>/dev/null || true
+  fi
+  command -v systemctl >/dev/null 2>&1 && systemctl restart pantryo.service 2>/dev/null || true
 fi
 EOF_CRON
   chmod 755 /etc/cron.daily/pantryo-security-updates

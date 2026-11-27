@@ -359,20 +359,20 @@ case "$OS_FAMILY" in
 esac
 
 # ------------------------------------------------------------------------------
-# 6. Node.js 20+ / 22 LTS Verification & Installation
+# 6. Node.js 22 LTS Verification & Installation
 # ------------------------------------------------------------------------------
 NEED_NODE=false
 if ! command -v node >/dev/null 2>&1; then
   NEED_NODE=true
 else
   NODE_VER=$(node -v | tr -d 'v' | cut -d. -f1)
-  if [[ "$NODE_VER" -lt 20 ]]; then
+  if [[ "$NODE_VER" -lt 22 ]]; then
     NEED_NODE=true
   fi
 fi
 
 if [[ "$NEED_NODE" == "true" ]]; then
-  echo -e "${CYAN}Installing Node.js 22 LTS for ${ARCH}...${NC}"
+  echo -e "${CYAN}Installing latest Node.js 22 LTS for ${ARCH}...${NC}"
   if [[ "$OS_FAMILY" == "debian" ]]; then
     mkdir -p /etc/apt/keyrings
     curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg --yes 2>/dev/null || true
@@ -389,11 +389,11 @@ if [[ "$NEED_NODE" == "true" ]]; then
   elif [[ "$OS_FAMILY" == "arch" ]]; then
     pacman -Sy --noconfirm nodejs npm
   else
-    # Universal standalone Node.js tarball fallback for any Linux architecture
-    echo -e "${CYAN}Downloading precompiled Node.js 22 LTS standalone binary for ${NODE_ARCH}...${NC}"
-    NODE_VERSION_TAG="v22.14.0"
-    NODE_TARBALL="node-${NODE_VERSION_TAG}-linux-${NODE_ARCH}.tar.xz"
-    curl -fsSL "https://nodejs.org/dist/${NODE_VERSION_TAG}/${NODE_TARBALL}" -o "/tmp/${NODE_TARBALL}"
+    # Universal standalone Node.js 22 LTS tarball fallback (resolves latest security release)
+    echo -e "${CYAN}Downloading latest precompiled Node.js 22 LTS standalone binary for ${NODE_ARCH}...${NC}"
+    NODE_TARBALL=$(curl -fsSL "https://nodejs.org/dist/latest-v22.x/SHASUMS256.txt" | awk -v arch="linux-${NODE_ARCH}.tar.xz" '$2 ~ arch {print $2; exit}')
+    NODE_TARBALL="${NODE_TARBALL:-node-v22.23.5-linux-${NODE_ARCH}.tar.xz}"
+    curl -fsSL "https://nodejs.org/dist/latest-v22.x/${NODE_TARBALL}" -o "/tmp/${NODE_TARBALL}"
     tar -xJf "/tmp/${NODE_TARBALL}" -C /usr/local --strip-components=1
     rm -f "/tmp/${NODE_TARBALL}"
   fi
@@ -575,7 +575,11 @@ chmod 700 "$INSTALL_DIR/server/data"
 chown -R pantryo:pantryo "$INSTALL_DIR"
 
 cd "$INSTALL_DIR"
-npm install --no-audit --prefer-offline 2>/dev/null || npm install
+export NPM_CONFIG_UPDATE_NOTIFIER=false
+export NPM_CONFIG_FUND=false
+npm install --no-fund
+npm audit fix --include=dev --no-fund 2>/dev/null || true
+npm audit --audit-level=high || echo -e "${YELLOW}[WARN] Review remaining npm audit advisories above.${NC}"
 
 # Build with memory limit set to protect Raspberry Pi and low-RAM devices from OOM killer
 export NODE_OPTIONS="--max-old-space-size=1536"
@@ -612,6 +616,7 @@ ProtectKernelTunables=true
 ProtectControlGroups=true
 RestrictRealtime=true
 LockPersonality=true
+TasksMax=150
 
 [Install]
 WantedBy=multi-user.target
@@ -623,25 +628,49 @@ EOF
   echo -e "${GREEN}✓ Hardened systemd service 'pantryo.service' enabled and started.${NC}"
 fi
 
-# Automated daily dependency & OS security updates cron
+# Configure automatic OS security patches & daily dependency remediation
+if [ -d /etc/apt/apt.conf.d ]; then
+  cat <<'EOF_AUTOAPT' > /etc/apt/apt.conf.d/20auto-upgrades
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Download-Upgradeable-Packages "1";
+APT::Periodic::AutocleanInterval "7";
+APT::Periodic::Unattended-Upgrade "1";
+EOF_AUTOAPT
+fi
+
 if [ -d /etc/cron.daily ]; then
-  cat <<EOF_CRON > /etc/cron.daily/pantryo-autoupdate
+  cat <<EOF_CRON > /etc/cron.daily/pantryo-security-updates
 #!/usr/bin/env bash
 # Pantryo automated daily vulnerability remediation and package updater
 export DEBIAN_FRONTEND=noninteractive
+export NPM_CONFIG_UPDATE_NOTIFIER=false
+export NPM_CONFIG_FUND=false
 if command -v apt-get >/dev/null 2>&1; then
-  apt-get update -q -y >> /var/log/pantryo-autoupdate.log 2>&1
-  apt-get --only-upgrade install -y unattended-upgrades >> /var/log/pantryo-autoupdate.log 2>&1
-  unattended-upgrade >> /var/log/pantryo-autoupdate.log 2>&1 || true
+  apt-get update -q -y >> /var/log/pantryo-autoupdate.log 2>&1 || true
+  apt-get dist-upgrade -y --no-install-recommends -q >> /var/log/pantryo-autoupdate.log 2>&1 || true
+  command -v unattended-upgrade >/dev/null 2>&1 && unattended-upgrade >> /var/log/pantryo-autoupdate.log 2>&1 || true
+  apt-get autoremove -y -q >> /var/log/pantryo-autoupdate.log 2>&1 || true
+fi
+
+if [ -f "${INSTALL_DIR}/scripts/fix-openssh-cves.sh" ]; then
+  bash "${INSTALL_DIR}/scripts/fix-openssh-cves.sh" >> /var/log/pantryo-autoupdate.log 2>&1 || true
 fi
 
 cd "${INSTALL_DIR}" || exit 0
 if [ -f "scripts/auto-update-dependencies.js" ]; then
-  node scripts/auto-update-dependencies.js >> /var/log/pantryo-autoupdate.log 2>&1
+  node scripts/auto-update-dependencies.js >> /var/log/pantryo-autoupdate.log 2>&1 || true
+  if id -u pantryo >/dev/null 2>&1; then
+    chown -R pantryo:pantryo "${INSTALL_DIR}" 2>/dev/null || true
+  fi
   systemctl restart pantryo.service 2>/dev/null || true
 fi
 EOF_CRON
-  chmod 755 /etc/cron.daily/pantryo-autoupdate
+  chmod 755 /etc/cron.daily/pantryo-security-updates
+fi
+
+if [ -f "${INSTALL_DIR}/scripts/fix-openssh-cves.sh" ]; then
+  chmod +x "${INSTALL_DIR}/scripts/fix-openssh-cves.sh" 2>/dev/null || true
+  bash "${INSTALL_DIR}/scripts/fix-openssh-cves.sh" 2>/dev/null || true
 fi
 
 # ------------------------------------------------------------------------------

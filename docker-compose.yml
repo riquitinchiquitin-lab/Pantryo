@@ -83,7 +83,7 @@ services:
       - pantryo_net
 
   db:
-    image: postgres:16-alpine3.21
+    image: postgres:16-alpine
     container_name: pantryo_db
     restart: unless-stopped
     security_opt:
