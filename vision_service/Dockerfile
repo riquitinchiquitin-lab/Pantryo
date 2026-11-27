@@ -1,4 +1,4 @@
-FROM python:3.13-slim
+FROM python:3.15-slim
 
 # Prevent python from writing pyc files to disk and enable line-buffered output
 ENV PYTHONDONTWRITEBYTECODE=1
