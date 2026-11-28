@@ -986,7 +986,7 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
             className="px-3 py-1.5 rounded-xl bg-[#004D36] hover:bg-[#003827] text-white text-xs font-bold flex items-center gap-1 shadow-2xs transition-all active:scale-95 cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>{lang === 'FR' ? '+ Planifier un repas' : '+ Plan Meal'}</span>
+            <span>{lang === 'FR' ? 'Planifier un repas' : 'Plan Meal'}</span>
           </button>
         </div>
       </div>
@@ -1325,7 +1325,7 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                     className="py-2.5 px-3 rounded-2xl bg-[#FAF7F2] hover:bg-[#EFE9DF] border border-[var(--md-sys-color-outline-variant)] text-center text-xs font-bold text-[#111A15] transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
                   >
                     <Plus className="w-3.5 h-3.5 text-[#004D36]" />
-                    <span>{lang === 'FR' ? '+ Planifier un repas' : '+ Plan Meal'}</span>
+                    <span>{lang === 'FR' ? 'Planifier un repas' : 'Plan Meal'}</span>
                   </button>
                 </div>
               ) : (

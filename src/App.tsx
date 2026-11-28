@@ -38,7 +38,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-[#FAF7F2] text-[#111A15] flex flex-col font-sans selection:bg-[#9DF4C7] selection:text-[#002115]">
-      <main className="flex-1 w-full flex justify-center sm:py-4">
+      <main className="flex-1 w-full flex">
         <MobileSimulator
           mode="webapp"
           onInstall={isInstalled ? undefined : handleInstallClick}

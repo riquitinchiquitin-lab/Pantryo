@@ -1529,341 +1529,485 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
   }
 
   return (
-    <div className="relative w-full max-w-7xl mx-auto text-[var(--md-sys-color-on-surface)] flex flex-col min-h-screen sm:min-h-[850px] sm:rounded-[28px] border-0 sm:border border-[var(--md-sys-color-outline-variant)] shadow-none bg-[var(--md-sys-color-surface)] overflow-hidden">
-      {/* M3 Top App Bar */}
-      <header className="sticky top-0 z-30 px-3 sm:px-5 py-2.5 pt-[max(0.6rem,env(safe-area-inset-top,0px))] bg-[var(--md-sys-color-surface-container-high)]/95 backdrop-blur-md border-b border-[var(--md-sys-color-outline-variant)]/60 shadow-none shrink-0">
-        <div className="flex items-center justify-between gap-2 lg:gap-4 max-w-7xl mx-auto w-full">
-          {/* 1. Left: Bold Wordmark & Admin Console Trigger */}
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              id="btn-pantryo-admin-management"
-              onClick={() => {
-                if (currentUser.role === 'ADMIN') {
-                  setIsAdminModalOpen(true);
-                } else {
-                  setIsAdminRestrictedOpen(true);
-                }
-              }}
-              className="flex items-center gap-2.5 shrink-0 hover:bg-[var(--md-sys-color-surface-container-highest)] p-1.5 -m-1 rounded-2xl transition-all cursor-pointer group text-left"
-              title={
-                currentUser.role === 'ADMIN'
-                  ? lang === 'FR'
-                    ? 'Ouvrir la Console d’Administration (Admin)'
-                    : 'Open App Administration (Admin)'
-                  : lang === 'FR'
-                  ? 'Console Pantryo (Accès Administrateur)'
-                  : 'Pantryo Console (Admin Access)'
+    <div className="relative w-full text-[var(--md-sys-color-on-surface)] flex flex-col xl:flex-row min-h-screen bg-[var(--md-sys-color-surface)]">
+      {/* Desktop Material Design 3 Verdant Navigation Drawer (Deep Forest Emerald #004D36) */}
+      <aside
+        aria-label="Desktop Navigation Drawer"
+        className="hidden xl:flex xl:flex-col w-64 shrink-0 bg-[#004D36] text-white sticky top-0 h-screen p-4 justify-between shadow-[var(--md-sys-elevation-2)] z-30 select-none"
+      >
+        <div className="space-y-6">
+          {/* Brand Header — Original PantryoLogo Preserved */}
+          <button
+            type="button"
+            onClick={() => {
+              if (currentUser.role === 'ADMIN') {
+                setIsAdminModalOpen(true);
+              } else {
+                setIsAdminRestrictedOpen(true);
               }
-            >
-              <div className="shrink-0 flex items-center justify-center">
-                <PantryoLogo size={28} />
+            }}
+            className="w-full flex items-center gap-3 p-2.5 rounded-[20px] hover:bg-white/10 transition-all cursor-pointer text-left group"
+            title={
+              currentUser.role === 'ADMIN'
+                ? lang === 'FR'
+                  ? 'Ouvrir la Console d’Administration (Admin)'
+                  : 'Open App Administration (Admin)'
+                : lang === 'FR'
+                ? 'Console Pantryo (Accès Administrateur)'
+                : 'Pantryo Console (Admin Access)'
+            }
+          >
+            <div className="w-11 h-11 rounded-2xl bg-[#FAF7F2] flex items-center justify-center shrink-0 shadow-xs">
+              <PantryoLogo size={32} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-lg font-black tracking-tight text-white leading-tight truncate">
+                Pantryo
               </div>
-              <div className="shrink-0 flex flex-col items-start justify-center">
-                <h1 className="text-base sm:text-lg font-bold tracking-tight text-[var(--md-sys-color-on-surface)] leading-tight whitespace-nowrap">
-                  Pantryo
-                </h1>
-                {currentUser.role === 'ADMIN' ? (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[var(--md-sys-color-secondary-container)] text-[var(--md-sys-color-on-secondary-container)] mt-0.5 leading-tight">
-                    <ShieldCheck className="w-2.5 h-2.5" />
-                    <span>Admin</span>
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold text-[var(--md-sys-color-on-surface-variant)] bg-[var(--md-sys-color-surface-container-lowest)] border border-[var(--md-sys-color-outline-variant)] mt-0.5 leading-tight">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--md-sys-color-primary)] shrink-0" />
-                    <span>{currentUser.role === 'GUEST' ? (lang === 'FR' ? 'Invité' : 'Guest') : (lang === 'FR' ? 'Membre' : 'Member')}</span>
-                  </span>
-                )}
-              </div>
-            </button>
-          </div>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#9DF4C7]/20 text-[#9DF4C7] mt-0.5">
+                <ShieldCheck className="w-2.5 h-2.5" />
+                <span>
+                  {currentUser.role === 'ADMIN'
+                    ? 'Admin'
+                    : currentUser.role === 'GUEST'
+                    ? lang === 'FR'
+                      ? 'Invité'
+                      : 'Guest'
+                    : lang === 'FR'
+                    ? 'Membre'
+                    : 'Member'}
+                </span>
+              </span>
+            </div>
+          </button>
 
-          {/* 2. Center: M3 Main Navigation Bar with Pill Indicators (Visible on Desktop) */}
-          <nav aria-label="Main Navigation" className="hidden xl:flex items-center p-1 bg-[var(--md-sys-color-surface-container)] rounded-full border border-[var(--md-sys-color-outline-variant)]/60 shrink min-w-0 gap-1 shadow-none">
-            {/* Inventory */}
+          {/* Primary M3 Navigation Destinations with Mint Active Pill */}
+          <nav aria-label="Main Navigation" className="space-y-1.5">
             <button
+              type="button"
               onClick={() => setActiveNav('home')}
-              title={t('nav_inventory')}
-              className={`px-3.5 py-1.5 rounded-full text-xs transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
+              className={`w-full px-4 py-3 rounded-full text-sm transition-all flex items-center justify-between gap-3 cursor-pointer ${
                 activeNav === 'home'
-                  ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] font-bold shadow-xs'
-                  : 'text-[var(--md-sys-color-on-surface-variant)] hover:text-[var(--md-sys-color-on-surface)] hover:bg-[var(--md-sys-color-surface-container-high)] font-medium'
+                  ? 'bg-[#9DF4C7] text-[#002115] font-bold shadow-xs'
+                  : 'text-emerald-50/90 hover:bg-white/10 hover:text-white font-medium'
               }`}
             >
-              <Home className="w-4 h-4 shrink-0" />
-              <span>{t('nav_inventory')}</span>
+              <span className="flex items-center gap-3 min-w-0">
+                <Home className="w-5 h-5 shrink-0" />
+                <span className="truncate">{t('nav_inventory')}</span>
+              </span>
+              <span
+                className={`text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                  activeNav === 'home'
+                    ? 'bg-[#004D36] text-white'
+                    : 'bg-white/15 text-emerald-100'
+                }`}
+              >
+                {items.length}
+              </span>
             </button>
 
-            {/* Meals */}
             <button
+              type="button"
               onClick={() => setActiveNav('meals')}
-              title={t('nav_meals')}
-              className={`px-3.5 py-1.5 rounded-full text-xs transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
+              className={`w-full px-4 py-3 rounded-full text-sm transition-all flex items-center justify-between gap-3 cursor-pointer ${
                 activeNav === 'meals'
-                  ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] font-bold shadow-xs'
-                  : 'text-[var(--md-sys-color-on-surface-variant)] hover:text-[var(--md-sys-color-on-surface)] hover:bg-[var(--md-sys-color-surface-container-high)] font-medium'
+                  ? 'bg-[#9DF4C7] text-[#002115] font-bold shadow-xs'
+                  : 'text-emerald-50/90 hover:bg-white/10 hover:text-white font-medium'
               }`}
             >
-              <CalendarDays className="w-4 h-4 shrink-0" />
-              <span>{lang === 'FR' ? 'Repas' : 'Meals'}</span>
+              <span className="flex items-center gap-3 min-w-0">
+                <CalendarDays className="w-5 h-5 shrink-0" />
+                <span className="truncate">{lang === 'FR' ? 'Planificateur' : 'Meal Planner'}</span>
+              </span>
               {plannedMeals.length > 0 && (
-                <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full shrink-0 ${
-                  activeNav === 'meals' ? 'bg-[var(--md-sys-color-primary)] text-white' : 'bg-[var(--md-sys-color-surface-container-high)] text-[var(--md-sys-color-on-surface)]'
-                }`}>
+                <span
+                  className={`text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                    activeNav === 'meals'
+                      ? 'bg-[#004D36] text-white'
+                      : 'bg-white/15 text-emerald-100'
+                  }`}
+                >
                   {plannedMeals.length}
                 </span>
               )}
             </button>
 
-
-            {/* Grocery */}
             <button
+              type="button"
               onClick={() => setActiveNav('grocery')}
-              title={t('nav_grocery')}
-              className={`px-3.5 py-1.5 rounded-full text-xs transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
+              className={`w-full px-4 py-3 rounded-full text-sm transition-all flex items-center justify-between gap-3 cursor-pointer ${
                 activeNav === 'grocery'
-                  ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] font-bold shadow-xs'
-                  : 'text-[var(--md-sys-color-on-surface-variant)] hover:text-[var(--md-sys-color-on-surface)] hover:bg-[var(--md-sys-color-surface-container-high)] font-medium'
+                  ? 'bg-[#9DF4C7] text-[#002115] font-bold shadow-xs'
+                  : 'text-emerald-50/90 hover:bg-white/10 hover:text-white font-medium'
               }`}
             >
-              <ShoppingCart className="w-4 h-4 shrink-0" />
-              <span>{lang === 'FR' ? 'Épicerie' : 'Grocery'}</span>
-              {groceryItems.filter((i) => i.inCart).length > 0 && (
-                <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full shrink-0 ${
-                  activeNav === 'grocery' ? 'bg-[var(--md-sys-color-primary)] text-white' : 'bg-[var(--md-sys-color-surface-container-high)] text-[var(--md-sys-color-on-surface)]'
-                }`}>
-                  {groceryItems.filter((i) => i.inCart).length}
+              <span className="flex items-center gap-3 min-w-0">
+                <ShoppingCart className="w-5 h-5 shrink-0" />
+                <span className="truncate">{lang === 'FR' ? 'Épicerie' : 'Grocery List'}</span>
+              </span>
+              {groceryItems.length > 0 && (
+                <span
+                  className={`text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                    activeNav === 'grocery'
+                      ? 'bg-[#004D36] text-white'
+                      : 'bg-white/15 text-emerald-100'
+                  }`}
+                >
+                  {groceryItems.length}
                 </span>
               )}
             </button>
 
-            {/* Cooking */}
             <button
+              type="button"
               onClick={() => setActiveNav('cooking')}
-              title={t('nav_cooking')}
-              className={`px-3.5 py-1.5 rounded-full text-xs transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
+              className={`w-full px-4 py-3 rounded-full text-sm transition-all flex items-center justify-between gap-3 cursor-pointer ${
                 activeNav === 'cooking'
-                  ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] font-bold shadow-xs'
-                  : 'text-[var(--md-sys-color-on-surface-variant)] hover:text-[var(--md-sys-color-on-surface)] hover:bg-[var(--md-sys-color-surface-container-high)] font-medium'
+                  ? 'bg-[#9DF4C7] text-[#002115] font-bold shadow-xs'
+                  : 'text-emerald-50/90 hover:bg-white/10 hover:text-white font-medium'
               }`}
             >
-              <ChefHat className="w-4 h-4 shrink-0" />
-              <span>{t('nav_cooking')}</span>
+              <span className="flex items-center gap-3 min-w-0">
+                <ChefHat className="w-5 h-5 shrink-0" />
+                <span className="truncate">{t('nav_cooking')}</span>
+              </span>
             </button>
 
-            {/* Family */}
             <button
+              type="button"
               onClick={() => setActiveNav('sync')}
-              title={t('nav_family')}
-              className={`px-3.5 py-1.5 rounded-full text-xs transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
+              className={`w-full px-4 py-3 rounded-full text-sm transition-all flex items-center justify-between gap-3 cursor-pointer ${
                 activeNav === 'sync'
-                  ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] font-bold shadow-xs'
-                  : 'text-[var(--md-sys-color-on-surface-variant)] hover:text-[var(--md-sys-color-on-surface)] hover:bg-[var(--md-sys-color-surface-container-high)] font-medium'
+                  ? 'bg-[#9DF4C7] text-[#002115] font-bold shadow-xs'
+                  : 'text-emerald-50/90 hover:bg-white/10 hover:text-white font-medium'
               }`}
             >
-              <Users className="w-4 h-4 shrink-0" />
-              <span>{t('nav_family')}</span>
+              <span className="flex items-center gap-3 min-w-0">
+                <Users className="w-5 h-5 shrink-0" />
+                <span className="truncate">{t('nav_family')}</span>
+              </span>
             </button>
           </nav>
-
-          {/* 3. Right: Action Bar, Language Switcher & User Profile */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto">
-            {/* Global Omnipresent Language Switcher (EN / FR) */}
-            <LanguageSwitcher compact />
-
-            {/* Camera Scanner Button (1-Tap from any tab) */}
-            <button
-              type="button"
-              onClick={() => {
-                setScannerInitialMode('snap');
-                setIsScannerOpen(true);
-              }}
-              className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-full bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 shrink-0 cursor-pointer shadow-2xs"
-              title={lang === 'FR' ? 'Scanner (Code-barres / Photo)' : 'Scan (Barcode / Photo)'}
-              aria-label={lang === 'FR' ? 'Scanner' : 'Scan'}
-            >
-              <Camera className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-teal-100" />
-              <span className="hidden sm:inline">{lang === 'FR' ? 'Scanner' : 'Scan'}</span>
-            </button>
-
-            {/* Quick Add Item Button */}
-            <button
-              type="button"
-              id="header-quick-add-btn"
-              onClick={handleOpenAddModal}
-              className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-full bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-all active:scale-95 flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs"
-              title={t('quick_add_tooltip')}
-              aria-label={lang === 'FR' ? 'Ajouter' : 'Add'}
-            >
-              <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
-              <span className="hidden sm:inline">{lang === 'FR' ? 'Ajouter' : 'Add'}</span>
-            </button>
-
-            {/* Log Off Button */}
-            <button
-              type="button"
-              id="header-logout-btn"
-              onClick={handleLogout}
-              className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-full border border-red-200/90 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 shrink-0 cursor-pointer shadow-2xs"
-              title={lang === 'FR' ? 'Déconnexion du compte' : 'Log out of account'}
-              aria-label={lang === 'FR' ? 'Déconnexion' : 'Log out'}
-            >
-              <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-600" />
-              <span className="hidden sm:inline">{lang === 'FR' ? 'Déconnexion' : 'Log out'}</span>
-            </button>
-          </div>
         </div>
-      </header>
 
-      {/* Auto-Update Notification Banner (When a server update is detected) */}
-      {updateAvailable && !isReloading && (
-        <div className="bg-emerald-800 text-white px-3 sm:px-5 py-2 flex items-center justify-between gap-3 text-xs shadow-md shrink-0 border-b border-emerald-900 transition-all">
-          <div className="flex items-center gap-2 font-medium">
-            <Sparkles className="w-4 h-4 text-emerald-300 animate-pulse shrink-0" />
-            <span>
-              {lang === 'FR'
-                ? 'Une nouvelle version de l’application est disponible.'
-                : 'A new version of Pantryo is available.'}
-            </span>
-          </div>
+        {/* Bottom Drawer Utilities */}
+        <div className="space-y-2 pt-4 border-t border-white/15">
           <button
             type="button"
-            onClick={applyUpdateNow}
-            className="px-3 py-1 bg-white hover:bg-emerald-50 text-emerald-900 rounded-full font-bold text-xs transition-all active:scale-95 cursor-pointer shadow-xs whitespace-nowrap"
+            onClick={() => {
+              setScannerInitialMode('snap');
+              setIsScannerOpen(true);
+            }}
+            className="w-full py-2.5 px-4 rounded-full bg-[#9DF4C7] hover:brightness-95 text-[#002115] font-bold text-xs flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer shadow-xs"
           >
-            {lang === 'FR' ? 'Mettre à jour' : 'Update Now'}
+            <Camera className="w-4 h-4" />
+            <span>{lang === 'FR' ? 'Scanner (Photo / Code)' : 'Scan Barcode / Photo'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="w-full py-2.5 px-4 rounded-full bg-white/10 hover:bg-white/20 text-emerald-50 font-semibold text-xs flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>{lang === 'FR' ? 'Déconnexion' : 'Log out'}</span>
           </button>
         </div>
-      )}
+      </aside>
 
-      {/* Reloading Overlay when applying fresh server version */}
-      {isReloading && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 bg-emerald-900/95 backdrop-blur-md text-white text-xs font-bold rounded-full shadow-2xl flex items-center gap-2.5 border border-emerald-700 pointer-events-none animate-pulse">
-          <RefreshCw className="w-4 h-4 animate-spin text-emerald-300" />
-          <span>{lang === 'FR' ? 'Mise à jour en cours...' : 'Updating to latest version...'}</span>
-        </div>
-      )}
-
-      {/* Main Scrollable View */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 sm:px-5 pt-1.5 pb-28 xl:pb-16 space-y-2.5 sm:space-y-3.5">
-        {/* VIEW: HOME INVENTORY */}
-        {activeNav === 'home' && (
-          <>
-            {/* 5 EQUAL METRIC BOXES AT THE TOP - M3 Surface Containers */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
-              {/* Box 1: Fridge */}
+      {/* Main Workspace Column */}
+      <div className="flex-1 min-w-0 flex flex-col min-h-screen bg-[var(--md-sys-color-surface)]">
+        {/* M3 Top App Bar */}
+        <header className="sticky top-0 z-30 px-4 sm:px-6 xl:px-8 py-3 pt-[max(0.75rem,env(safe-area-inset-top,0px))] bg-[var(--md-sys-color-surface)]/92 backdrop-blur-md border-b border-[var(--md-sys-color-outline-variant)]/55 shrink-0">
+          <div className="flex items-center justify-between gap-3 max-w-6xl mx-auto w-full">
+            {/* Mobile / Tablet Brand Trigger (Original PantryoLogo) */}
+            <div className="flex items-center gap-2 shrink-0 xl:hidden">
               <button
-                type="button"
-                onClick={() => setFilterLocation(filterLocation === 'FRIDGE' ? 'ALL' : 'FRIDGE')}
-                className={`p-3 rounded-[16px] border text-left transition-all cursor-pointer ${
-                  filterLocation === 'FRIDGE'
-                    ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] border-[var(--md-sys-color-primary)] shadow-xs'
-                    : 'bg-[var(--md-sys-color-surface-container-low)] border-[var(--md-sys-color-outline-variant)] hover:bg-[var(--md-sys-color-surface-container)] text-[var(--md-sys-color-on-surface)]'
-                }`}
+                id="btn-pantryo-admin-management"
+                onClick={() => {
+                  if (currentUser.role === 'ADMIN') {
+                    setIsAdminModalOpen(true);
+                  } else {
+                    setIsAdminRestrictedOpen(true);
+                  }
+                }}
+                className="flex items-center gap-2.5 shrink-0 hover:bg-[var(--md-sys-color-surface-container)] p-1.5 -m-1 rounded-2xl transition-all cursor-pointer group text-left"
+                title={
+                  currentUser.role === 'ADMIN'
+                    ? lang === 'FR'
+                      ? 'Ouvrir la Console d’Administration (Admin)'
+                      : 'Open App Administration (Admin)'
+                    : lang === 'FR'
+                    ? 'Console Pantryo (Accès Administrateur)'
+                    : 'Pantryo Console (Admin Access)'
+                }
               >
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span>{lang === 'FR' ? 'Frigo' : 'Fridge'}</span>
-                  <Refrigerator className={`w-4 h-4 shrink-0 ${filterLocation === 'FRIDGE' ? 'text-[var(--md-sys-color-primary)]' : 'text-[var(--md-sys-color-secondary)]'}`} />
+                <div className="shrink-0 flex items-center justify-center">
+                  <PantryoLogo size={28} />
                 </div>
-                <div className="mt-1 flex items-baseline justify-between">
-                  <span className="text-2xl font-bold">{fridgeCount}</span>
-                  <span className={`text-[10px] font-medium ${filterLocation === 'FRIDGE' ? 'text-[var(--md-sys-color-on-primary-container)]' : 'text-[var(--md-sys-color-on-surface-variant)]'}`}>
-                    {lang === 'FR' ? 'articles' : 'items'}
-                  </span>
-                </div>
-              </button>
-
-              {/* Box 2: Freezer */}
-              <button
-                type="button"
-                onClick={() => setFilterLocation(filterLocation === 'FREEZER' ? 'ALL' : 'FREEZER')}
-                className={`p-3 rounded-[16px] border text-left transition-all cursor-pointer ${
-                  filterLocation === 'FREEZER'
-                    ? 'bg-[var(--md-sys-color-tertiary-container)] text-[var(--md-sys-color-on-tertiary-container)] border-[var(--md-sys-color-tertiary)] shadow-xs'
-                    : 'bg-[var(--md-sys-color-surface-container-low)] border-[var(--md-sys-color-outline-variant)] hover:bg-[var(--md-sys-color-surface-container)] text-[var(--md-sys-color-on-surface)]'
-                }`}
-              >
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span>{lang === 'FR' ? 'Congélateur' : 'Freezer'}</span>
-                  <Snowflake className={`w-4 h-4 shrink-0 ${filterLocation === 'FREEZER' ? 'text-[var(--md-sys-color-tertiary)]' : 'text-[var(--md-sys-color-secondary)]'}`} />
-                </div>
-                <div className="mt-1 flex items-baseline justify-between">
-                  <span className="text-2xl font-bold">{freezerCount}</span>
-                  <span className={`text-[10px] font-medium ${filterLocation === 'FREEZER' ? 'text-[var(--md-sys-color-on-tertiary-container)]' : 'text-[var(--md-sys-color-on-surface-variant)]'}`}>
-                    {lang === 'FR' ? 'articles' : 'items'}
-                  </span>
-                </div>
-              </button>
-
-              {/* Box 3: Pantry */}
-              <button
-                type="button"
-                onClick={() => setFilterLocation(filterLocation === 'PANTRY' ? 'ALL' : 'PANTRY')}
-                className={`p-3 rounded-[16px] border text-left transition-all cursor-pointer ${
-                  filterLocation === 'PANTRY'
-                    ? 'bg-amber-100 text-amber-950 border-amber-300 shadow-xs'
-                    : 'bg-[var(--md-sys-color-surface-container-low)] border-[var(--md-sys-color-outline-variant)] hover:bg-[var(--md-sys-color-surface-container)] text-[var(--md-sys-color-on-surface)]'
-                }`}
-              >
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span>{lang === 'FR' ? 'Garde-manger' : 'Pantry'}</span>
-                  <Boxes className={`w-4 h-4 shrink-0 ${filterLocation === 'PANTRY' ? 'text-amber-800' : 'text-amber-600'}`} />
-                </div>
-                <div className="mt-1 flex items-baseline justify-between">
-                  <span className="text-2xl font-bold">{pantryCount}</span>
-                  <span className={`text-[10px] font-medium ${filterLocation === 'PANTRY' ? 'text-amber-900' : 'text-[var(--md-sys-color-on-surface-variant)]'}`}>
-                    {lang === 'FR' ? 'articles' : 'items'}
-                  </span>
-                </div>
-              </button>
-
-              {/* Box 4: Spice Rack */}
-              <button
-                type="button"
-                onClick={() => setFilterLocation(filterLocation === 'SPICE_RACK' ? 'ALL' : 'SPICE_RACK')}
-                className={`p-3 rounded-[16px] border text-left transition-all cursor-pointer ${
-                  filterLocation === 'SPICE_RACK'
-                    ? 'bg-orange-100 text-orange-950 border-orange-300 shadow-xs'
-                    : 'bg-[var(--md-sys-color-surface-container-low)] border-[var(--md-sys-color-outline-variant)] hover:bg-[var(--md-sys-color-surface-container)] text-[var(--md-sys-color-on-surface)]'
-                }`}
-              >
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span>{lang === 'FR' ? 'Épices' : 'Spice Rack'}</span>
-                  <Flame className={`w-4 h-4 shrink-0 ${filterLocation === 'SPICE_RACK' ? 'text-orange-700' : 'text-orange-500'}`} />
-                </div>
-                <div className="mt-1 flex items-baseline justify-between">
-                  <span className="text-2xl font-bold">{spiceCount}</span>
-                  <span className={`text-[10px] font-medium ${filterLocation === 'SPICE_RACK' ? 'text-orange-900' : 'text-[var(--md-sys-color-on-surface-variant)]'}`}>
-                    {lang === 'FR' ? 'articles' : 'items'}
-                  </span>
-                </div>
-              </button>
-
-              {/* Box 5: Urgent / Bientôt expiré */}
-              <button
-                type="button"
-                onClick={() => setFilterLocation(filterLocation === 'EXPIRING' ? 'ALL' : 'EXPIRING')}
-                className={`p-3 rounded-[16px] border text-left transition-all cursor-pointer ${
-                  filterLocation === 'EXPIRING'
-                    ? 'bg-[var(--md-sys-color-error-container)] text-[var(--md-sys-color-on-error-container)] border-[var(--md-sys-color-error)] shadow-xs'
-                    : expiringItems.length > 0
-                    ? 'bg-[var(--md-sys-color-error-container)]/50 border-[var(--md-sys-color-outline-variant)] hover:border-[var(--md-sys-color-error)] text-[var(--md-sys-color-on-error-container)]'
-                    : 'bg-[var(--md-sys-color-surface-container-low)] border-[var(--md-sys-color-outline-variant)] hover:border-slate-300 text-[var(--md-sys-color-on-surface)]'
-                }`}
-              >
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span>{lang === 'FR' ? 'Bientôt expiré' : 'Expiring Soon'}</span>
-                  <AlertTriangle className={`w-4 h-4 shrink-0 ${filterLocation === 'EXPIRING' ? 'text-[var(--md-sys-color-error)]' : 'text-rose-600'}`} />
-                </div>
-                <div className="mt-1 flex items-baseline justify-between">
-                  <span className="text-2xl font-bold">{expiringItems.length}</span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    expiringItems.length > 0 ? 'bg-[var(--md-sys-color-error-container)] text-[var(--md-sys-color-on-error-container)]' : 'bg-[var(--md-sys-color-surface-container-high)] text-[var(--md-sys-color-on-surface-variant)]'
-                  }`}>
-                    {expiringItems.length > 0 ? (lang === 'FR' ? 'Alerte' : 'Alert') : (lang === 'FR' ? 'Sûr' : 'Safe')}
-                  </span>
+                <div className="shrink-0 flex flex-col items-start justify-center">
+                  <h1 className="text-base sm:text-lg font-bold tracking-tight text-[var(--md-sys-color-on-surface)] leading-tight whitespace-nowrap">
+                    Pantryo
+                  </h1>
+                  {currentUser.role === 'ADMIN' ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[var(--md-sys-color-secondary-container)] text-[var(--md-sys-color-on-secondary-container)] mt-0.5 leading-tight">
+                      <ShieldCheck className="w-2.5 h-2.5" />
+                      <span>Admin</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold text-[var(--md-sys-color-on-surface-variant)] bg-[var(--md-sys-color-surface-container-lowest)] border border-[var(--md-sys-color-outline-variant)] mt-0.5 leading-tight">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--md-sys-color-primary)] shrink-0" />
+                      <span>{currentUser.role === 'GUEST' ? (lang === 'FR' ? 'Invité' : 'Guest') : (lang === 'FR' ? 'Membre' : 'Member')}</span>
+                    </span>
+                  )}
                 </div>
               </button>
             </div>
+
+            {/* Desktop M3 Page Headline */}
+            <div className="hidden xl:flex flex-col min-w-0">
+              <h1 className="text-2xl font-black tracking-tight text-[var(--md-sys-color-on-surface)] leading-tight truncate">
+                {activeNav === 'home'
+                  ? lang === 'FR'
+                    ? 'Inventaire de Cuisine'
+                    : 'Pantry Inventory'
+                  : activeNav === 'meals'
+                  ? lang === 'FR'
+                    ? 'Planificateur de Repas'
+                    : 'Meal Planner'
+                  : activeNav === 'grocery'
+                  ? lang === 'FR'
+                    ? "Liste d'Épicerie"
+                    : 'Grocery List'
+                  : activeNav === 'cooking'
+                  ? lang === 'FR'
+                    ? 'Idées Recettes'
+                    : 'Cooking Ideas'
+                  : lang === 'FR'
+                  ? 'Famille & Synchronisation'
+                  : 'Family & Sync'}
+              </h1>
+            </div>
+
+            {/* Right: Language Switcher & Primary Quick Actions */}
+            <div className="flex items-center gap-2 shrink-0 ml-auto">
+              <LanguageSwitcher compact />
+
+              <button
+                type="button"
+                onClick={() => {
+                  setScannerInitialMode('snap');
+                  setIsScannerOpen(true);
+                }}
+                className="p-2 sm:px-3.5 sm:py-2 rounded-full bg-[var(--md-sys-color-secondary-container)] hover:brightness-95 text-[var(--md-sys-color-on-secondary-container)] text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 shrink-0 cursor-pointer"
+                title={lang === 'FR' ? 'Scanner (Code-barres / Photo)' : 'Scan (Barcode / Photo)'}
+                aria-label={lang === 'FR' ? 'Scanner' : 'Scan'}
+              >
+                <Camera className="w-4 h-4" />
+                <span className="hidden sm:inline">{lang === 'FR' ? 'Scanner' : 'Scan'}</span>
+              </button>
+
+              <button
+                type="button"
+                id="header-quick-add-btn"
+                onClick={handleOpenAddModal}
+                className="p-2 sm:px-4 sm:py-2 rounded-full bg-[var(--md-sys-color-primary)] hover:brightness-110 text-[var(--md-sys-color-on-primary)] text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 shrink-0 cursor-pointer shadow-[var(--md-sys-elevation-1)]"
+                title={t('quick_add_tooltip')}
+                aria-label={lang === 'FR' ? 'Ajouter' : 'Add'}
+              >
+                <Plus className="w-4 h-4 stroke-[2.5]" />
+                <span className="hidden sm:inline">{lang === 'FR' ? 'Ajouter' : 'Add'}</span>
+              </button>
+
+              <button
+                type="button"
+                id="header-logout-btn"
+                onClick={handleLogout}
+                className="xl:hidden p-2 sm:px-3 sm:py-2 rounded-full bg-[var(--md-sys-color-error-container)]/70 hover:bg-[var(--md-sys-color-error-container)] text-[var(--md-sys-color-on-error-container)] text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 shrink-0 cursor-pointer"
+                title={lang === 'FR' ? 'Déconnexion du compte' : 'Log out of account'}
+                aria-label={lang === 'FR' ? 'Déconnexion' : 'Log out'}
+              >
+                <LogOut className="w-4 h-4 text-[var(--md-sys-color-error)]" />
+                <span className="hidden sm:inline">{lang === 'FR' ? 'Déconnexion' : 'Log out'}</span>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* Auto-Update Notification Banner (When a server update is detected) */}
+        {updateAvailable && !isReloading && (
+          <div className="bg-[#004D36] text-white px-4 sm:px-6 xl:px-8 py-2.5 flex items-center justify-between gap-3 text-xs shrink-0 border-b border-white/10 transition-all">
+            <div className="flex items-center gap-2 font-medium max-w-6xl mx-auto w-full justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-[#9DF4C7] animate-pulse shrink-0" />
+                <span>
+                  {lang === 'FR'
+                    ? 'Une nouvelle version de l’application est disponible.'
+                    : 'A new version of Pantryo is available.'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={applyUpdateNow}
+                className="px-3.5 py-1 bg-[#9DF4C7] hover:brightness-95 text-[#002115] rounded-full font-bold text-xs transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+              >
+                {lang === 'FR' ? 'Mettre à jour' : 'Update Now'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Reloading Overlay when applying fresh server version */}
+        {isReloading && (
+          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 bg-[#004D36]/95 backdrop-blur-md text-white text-xs font-bold rounded-full shadow-2xl flex items-center gap-2.5 border border-[#9DF4C7]/40 pointer-events-none animate-pulse">
+            <RefreshCw className="w-4 h-4 animate-spin text-[#9DF4C7]" />
+            <span>{lang === 'FR' ? 'Mise à jour en cours...' : 'Updating to latest version...'}</span>
+          </div>
+        )}
+
+        {/* Main Scrollable Workspace */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 sm:px-6 xl:px-8 pt-4 sm:pt-5 pb-28 xl:pb-20">
+          <div className="max-w-6xl mx-auto space-y-4 sm:space-y-5">
+            {/* VIEW: HOME INVENTORY */}
+            {activeNav === 'home' && (
+              <>
+                {/* 5 EXPRESSIVE M3 STORAGE KPI CARDS */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  {/* Box 1: Fridge */}
+                  <button
+                    type="button"
+                    onClick={() => setFilterLocation(filterLocation === 'FRIDGE' ? 'ALL' : 'FRIDGE')}
+                    className={`p-4 rounded-[24px] text-left transition-all cursor-pointer flex flex-col justify-between gap-2.5 ${
+                      filterLocation === 'FRIDGE'
+                        ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] ring-2 ring-[var(--md-sys-color-primary)] shadow-[var(--md-sys-elevation-1)]'
+                        : 'bg-[var(--md-sys-color-surface-container-low)] hover:bg-[var(--md-sys-color-surface-container)] text-[var(--md-sys-color-on-surface)]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-bold tracking-tight">{lang === 'FR' ? 'Frigo' : 'Fridge'}</span>
+                      <div className={`w-8 h-8 rounded-2xl flex items-center justify-center shrink-0 ${
+                        filterLocation === 'FRIDGE' ? 'bg-[var(--md-sys-color-primary)] text-white' : 'bg-[var(--md-sys-color-secondary-container)] text-[var(--md-sys-color-on-secondary-container)]'
+                      }`}>
+                        <Refrigerator className="w-4 h-4" />
+                      </div>
+                    </div>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-3xl font-black tracking-tight">{fridgeCount}</span>
+                      <span className="text-[11px] font-semibold opacity-75">
+                        {lang === 'FR' ? 'articles' : 'items'}
+                      </span>
+                    </div>
+                  </button>
+
+                  {/* Box 2: Freezer */}
+                  <button
+                    type="button"
+                    onClick={() => setFilterLocation(filterLocation === 'FREEZER' ? 'ALL' : 'FREEZER')}
+                    className={`p-4 rounded-[24px] text-left transition-all cursor-pointer flex flex-col justify-between gap-2.5 ${
+                      filterLocation === 'FREEZER'
+                        ? 'bg-[var(--md-sys-color-tertiary-container)] text-[var(--md-sys-color-on-tertiary-container)] ring-2 ring-[var(--md-sys-color-tertiary)] shadow-[var(--md-sys-elevation-1)]'
+                        : 'bg-[var(--md-sys-color-surface-container-low)] hover:bg-[var(--md-sys-color-surface-container)] text-[var(--md-sys-color-on-surface)]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-bold tracking-tight">{lang === 'FR' ? 'Congélateur' : 'Freezer'}</span>
+                      <div className={`w-8 h-8 rounded-2xl flex items-center justify-center shrink-0 ${
+                        filterLocation === 'FREEZER' ? 'bg-[var(--md-sys-color-tertiary)] text-white' : 'bg-[var(--md-sys-color-tertiary-container)] text-[var(--md-sys-color-on-tertiary-container)]'
+                      }`}>
+                        <Snowflake className="w-4 h-4" />
+                      </div>
+                    </div>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-3xl font-black tracking-tight">{freezerCount}</span>
+                      <span className="text-[11px] font-semibold opacity-75">
+                        {lang === 'FR' ? 'articles' : 'items'}
+                      </span>
+                    </div>
+                  </button>
+
+                  {/* Box 3: Pantry */}
+                  <button
+                    type="button"
+                    onClick={() => setFilterLocation(filterLocation === 'PANTRY' ? 'ALL' : 'PANTRY')}
+                    className={`p-4 rounded-[24px] text-left transition-all cursor-pointer flex flex-col justify-between gap-2.5 ${
+                      filterLocation === 'PANTRY'
+                        ? 'bg-amber-100 text-amber-950 ring-2 ring-amber-500 shadow-[var(--md-sys-elevation-1)]'
+                        : 'bg-[var(--md-sys-color-surface-container-low)] hover:bg-[var(--md-sys-color-surface-container)] text-[var(--md-sys-color-on-surface)]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-bold tracking-tight">{lang === 'FR' ? 'Garde-manger' : 'Pantry'}</span>
+                      <div className={`w-8 h-8 rounded-2xl flex items-center justify-center shrink-0 ${
+                        filterLocation === 'PANTRY' ? 'bg-amber-700 text-white' : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        <Boxes className="w-4 h-4" />
+                      </div>
+                    </div>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-3xl font-black tracking-tight">{pantryCount}</span>
+                      <span className="text-[11px] font-semibold opacity-75">
+                        {lang === 'FR' ? 'articles' : 'items'}
+                      </span>
+                    </div>
+                  </button>
+
+                  {/* Box 4: Spice Rack */}
+                  <button
+                    type="button"
+                    onClick={() => setFilterLocation(filterLocation === 'SPICE_RACK' ? 'ALL' : 'SPICE_RACK')}
+                    className={`p-4 rounded-[24px] text-left transition-all cursor-pointer flex flex-col justify-between gap-2.5 ${
+                      filterLocation === 'SPICE_RACK'
+                        ? 'bg-orange-100 text-orange-950 ring-2 ring-orange-500 shadow-[var(--md-sys-elevation-1)]'
+                        : 'bg-[var(--md-sys-color-surface-container-low)] hover:bg-[var(--md-sys-color-surface-container)] text-[var(--md-sys-color-on-surface)]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-bold tracking-tight">{lang === 'FR' ? 'Épices' : 'Spice Rack'}</span>
+                      <div className={`w-8 h-8 rounded-2xl flex items-center justify-center shrink-0 ${
+                        filterLocation === 'SPICE_RACK' ? 'bg-orange-700 text-white' : 'bg-orange-100 text-orange-800'
+                      }`}>
+                        <Flame className="w-4 h-4" />
+                      </div>
+                    </div>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-3xl font-black tracking-tight">{spiceCount}</span>
+                      <span className="text-[11px] font-semibold opacity-75">
+                        {lang === 'FR' ? 'articles' : 'items'}
+                      </span>
+                    </div>
+                  </button>
+
+                  {/* Box 5: Urgent / Expiring Soon */}
+                  <button
+                    type="button"
+                    onClick={() => setFilterLocation(filterLocation === 'EXPIRING' ? 'ALL' : 'EXPIRING')}
+                    className={`p-4 rounded-[24px] text-left transition-all cursor-pointer flex flex-col justify-between gap-2.5 col-span-2 sm:col-span-1 ${
+                      filterLocation === 'EXPIRING'
+                        ? 'bg-[var(--md-sys-color-error-container)] text-[var(--md-sys-color-on-error-container)] ring-2 ring-[var(--md-sys-color-error)] shadow-[var(--md-sys-elevation-1)]'
+                        : expiringItems.length > 0
+                        ? 'bg-[var(--md-sys-color-error-container)]/55 hover:bg-[var(--md-sys-color-error-container)]/80 text-[var(--md-sys-color-on-error-container)]'
+                        : 'bg-[var(--md-sys-color-surface-container-low)] hover:bg-[var(--md-sys-color-surface-container)] text-[var(--md-sys-color-on-surface)]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-bold tracking-tight">{lang === 'FR' ? 'Bientôt expiré' : 'Expiring Soon'}</span>
+                      <div className={`w-8 h-8 rounded-2xl flex items-center justify-center shrink-0 ${
+                        expiringItems.length > 0 ? 'bg-[var(--md-sys-color-error)] text-white' : 'bg-[var(--md-sys-color-surface-container-high)] text-[var(--md-sys-color-outline)]'
+                      }`}>
+                        <AlertTriangle className="w-4 h-4" />
+                      </div>
+                    </div>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-3xl font-black tracking-tight">{expiringItems.length}</span>
+                      <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                        expiringItems.length > 0 ? 'bg-[var(--md-sys-color-error)] text-white' : 'bg-[var(--md-sys-color-surface-container-high)] text-[var(--md-sys-color-on-surface-variant)]'
+                      }`}>
+                        {expiringItems.length > 0 ? (lang === 'FR' ? 'Alerte' : 'Alert') : (lang === 'FR' ? 'Sûr' : 'Safe')}
+                      </span>
+                    </div>
+                  </button>
+                </div>
 
             {/* "COOK FIRST" EXPIRATION & LEFTOVERS PRIORITY STRIP */}
             {(expiringItems.length > 0 || leftoversCount > 0) && (
@@ -2727,6 +2871,8 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
             />
           </Suspense>
         )}
+          </div>
+        </div>
       </div>
 
       {/* Quick Add Action Menu (Functions like mobile phone on desktop, tablet & mobile) */}
