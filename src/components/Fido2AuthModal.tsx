@@ -202,10 +202,8 @@ export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
             ? 'Authentification FIDO2 réussie !'
             : 'FIDO2 Authentication successful!'
         );
-        setTimeout(() => {
-          onSuccess(result.user);
-          onClose();
-        }, 600);
+        onSuccess(result.user);
+        onClose();
       }
     } catch (err: any) {
       if (err?.name === 'NotAllowedError') {

@@ -266,7 +266,7 @@ router.post("/auth-verify", async (req, res) => {
         }
         match.counter += 1;
         match.lastUsedAt = new Date().toISOString();
-        dbStore.persistToEncryptedDisk();
+        dbStore.schedulePersistToEncryptedDisk(500);
       } else {
         await fido2Service.verifyAuthentication(user, response, req);
       }

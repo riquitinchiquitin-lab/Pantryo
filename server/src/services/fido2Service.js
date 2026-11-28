@@ -420,10 +420,11 @@ export const fido2Service = {
       throw new Error("FIDO2 cryptographic verification failed.");
     }
 
-    // Update credential counter to detect clone attacks
+    // Update credential counter to detect clone attacks and persist asynchronously
+    // so the login response and initial inventory fetch return immediately.
     credential.counter = verification.authenticationInfo.newCounter;
     credential.lastUsedAt = new Date().toISOString();
-    dbStore.persistToEncryptedDisk();
+    dbStore.schedulePersistToEncryptedDisk(500);
 
     return { verified: true };
   },
