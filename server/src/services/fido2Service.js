@@ -293,13 +293,16 @@ export const fido2Service = {
    * Generates FIDO2 authentication options for 2FA challenge
    */
   async createAuthenticationOptions(user, req) {
-    if (!user.fido2Credentials || user.fido2Credentials.length === 0) {
+    const realCreds = (user.fido2Credentials || []).filter(
+      (cred) => cred.id && !cred.id.startsWith("sim_fido2_")
+    );
+    if (realCreds.length === 0) {
       throw new Error("No FIDO2 security keys registered for this account.");
     }
 
     const { rpID } = getRpIdAndOrigin(req);
 
-    const allowCredentials = user.fido2Credentials.map((cred) => {
+    const allowCredentials = realCreds.map((cred) => {
       const item = { id: cred.id };
       if (Array.isArray(cred.transports) && cred.transports.length > 0) {
         item.transports = cred.transports;
@@ -322,28 +325,34 @@ export const fido2Service = {
   },
 
   /**
-   * Verifies the WebAuthn authentication response against enrolled credentials
+   * Generates discoverable (usernameless) Passkey authentication options
+   * so the browser immediately prompts for biometrics or passkey selection.
    */
-  async verifyAuthentication(user, clientResponse, req) {
-    const stored = activeChallenges.get(`auth_${user.id}`);
-    if (!stored || stored.expiresAt < Date.now()) {
-      throw new Error("Authentication challenge expired. Please retry.");
-    }
-    activeChallenges.delete(`auth_${user.id}`);
+  async createDiscoverableAuthenticationOptions(req) {
+    const { rpID } = getRpIdAndOrigin(req);
 
-    const normalizeId = (id) => (typeof id === "string" ? id.trim().replace(/=+$/, "") : "");
-    const creds = user.fido2Credentials || [];
-    const clientResponseId = clientResponse.id || clientResponse.rawId;
+    const options = await generateAuthenticationOptions({
+      rpID,
+      allowCredentials: [],
+      userVerification: "preferred",
+    });
 
-    // Look for matching credential by exact ID, stripped padding, or single registered key fallback
-    const credential =
-      creds.find((c) => c.id === clientResponseId || normalizeId(c.id) === normalizeId(clientResponseId)) ||
-      (creds.length === 1 ? creds[0] : null);
+    const challengeId = crypto.randomBytes(16).toString("hex");
+    activeChallenges.set(`discoverable_${challengeId}`, {
+      challenge: options.challenge,
+      expiresAt: Date.now() + 5 * 60 * 1000,
+    });
 
-    if (!credential) {
-      throw new Error("Unknown or unregistered FIDO2 security key presented.");
-    }
+    return {
+      ...options,
+      challengeId,
+    };
+  },
 
+  /**
+   * Shared cryptographic assertion verification helper for a matched credential
+   */
+  async _verifyCredentialAssertion(credential, expectedChallenge, clientResponse, req) {
     const { expectedOrigins, expectedRPIDs } = getRpIdAndOrigin(req);
 
     // If clientDataJSON contains an origin, also accept it if from the same hostname
@@ -367,7 +376,7 @@ export const fido2Service = {
     try {
       verification = await verifyAuthenticationResponse({
         response: clientResponse,
-        expectedChallenge: stored.challenge,
+        expectedChallenge,
         expectedOrigin: expectedOrigins,
         expectedRPID: expectedRPIDs,
         credential: {
@@ -391,7 +400,7 @@ export const fido2Service = {
         );
         verification = await verifyAuthenticationResponse({
           response: clientResponse,
-          expectedChallenge: stored.challenge,
+          expectedChallenge,
           expectedOrigin: expectedOrigins,
           expectedRPID: expectedRPIDs,
           credential: {
@@ -417,6 +426,73 @@ export const fido2Service = {
     dbStore.persistToEncryptedDisk();
 
     return { verified: true };
+  },
+
+  /**
+   * Verifies the WebAuthn authentication response against enrolled credentials
+   */
+  async verifyAuthentication(user, clientResponse, req) {
+    const stored = activeChallenges.get(`auth_${user.id}`);
+    if (!stored || stored.expiresAt < Date.now()) {
+      throw new Error("Authentication challenge expired. Please retry.");
+    }
+    activeChallenges.delete(`auth_${user.id}`);
+
+    const normalizeId = (id) => (typeof id === "string" ? id.trim().replace(/=+$/, "") : "");
+    const creds = user.fido2Credentials || [];
+    const clientResponseId = clientResponse.id || clientResponse.rawId;
+
+    // Look for matching credential by exact ID, stripped padding, or single registered key fallback
+    const credential =
+      creds.find((c) => c.id === clientResponseId || normalizeId(c.id) === normalizeId(clientResponseId)) ||
+      (creds.length === 1 ? creds[0] : null);
+
+    if (!credential) {
+      throw new Error("Unknown or unregistered FIDO2 security key presented.");
+    }
+
+    return this._verifyCredentialAssertion(credential, stored.challenge, clientResponse, req);
+  },
+
+  /**
+   * Verifies a discoverable Passkey authentication response by matching credential ID across users
+   */
+  async verifyDiscoverableAuthentication(challengeId, clientResponse, req) {
+    const stored = activeChallenges.get(`discoverable_${challengeId}`);
+    if (!stored || stored.expiresAt < Date.now()) {
+      throw new Error("Authentication challenge expired. Please retry.");
+    }
+    activeChallenges.delete(`discoverable_${challengeId}`);
+
+    const normalizeId = (id) => (typeof id === "string" ? id.trim().replace(/=+$/, "") : "");
+    const clientResponseId = clientResponse.id || clientResponse.rawId;
+    const normalizedClientId = normalizeId(clientResponseId);
+
+    let matchedUser = null;
+    let credential = null;
+
+    for (const u of dbStore.users) {
+      const creds = u.fido2Credentials || [];
+      const found = creds.find(
+        (c) =>
+          c.id === clientResponseId ||
+          (normalizedClientId && normalizeId(c.id) === normalizedClientId)
+      );
+      if (found) {
+        matchedUser = u;
+        credential = found;
+        break;
+      }
+    }
+
+    if (!matchedUser || !credential) {
+      throw new Error(
+        "No matching passkey found for this server. Please sign in with your password and register a passkey first."
+      );
+    }
+
+    await this._verifyCredentialAssertion(credential, stored.challenge, clientResponse, req);
+    return { verified: true, user: matchedUser };
   },
 
   /**

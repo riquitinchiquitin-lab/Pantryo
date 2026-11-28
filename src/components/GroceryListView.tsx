@@ -608,37 +608,37 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
         </div>
       )}
 
-      {/* Header & Checklist Progress (Clean & Simple) */}
-      <div className="p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl bg-white border border-[#E5DFD0] shadow-2xs space-y-2.5">
+      {/* Header & Checklist Progress (Material Design 3) */}
+      <div className="p-4 sm:p-5 m3-card-elevated space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] uppercase font-black tracking-wider text-[#527470]">
+              <span className="text-[10px] uppercase font-black tracking-wider text-[var(--md-sys-color-outline)]">
                 {lang === 'FR' ? 'Courses du Foyer' : 'Household Shopping'}
               </span>
-              <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--md-sys-color-primary)] animate-pulse" />
             </div>
-            <h2 className="text-base sm:text-lg font-black tracking-tight text-[#0D3B37] truncate">
+            <h2 className="text-base sm:text-lg font-black tracking-tight text-[var(--md-sys-color-on-surface)] truncate">
               {lang === 'FR' ? "Liste d'Épicerie" : 'Grocery Shopping List'}
             </h2>
-            <p className="text-xs text-[#527470] truncate">
+            <p className="text-xs text-[var(--md-sys-color-on-surface-variant)] truncate">
               {lang === 'FR' ? 'Synchronisée en direct entre les membres' : 'Synced in real time across household members'}
             </p>
           </div>
 
           <div className="text-right shrink-0">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-50 border border-teal-200/70 text-teal-800 text-xs font-bold whitespace-nowrap">
-              <Check className="w-3.5 h-3.5 text-teal-600 stroke-[3]" />
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] text-xs font-bold whitespace-nowrap">
+              <Check className="w-3.5 h-3.5 text-[var(--md-sys-color-primary)] stroke-[3]" />
               <span>
                 {inCartItems.length} / {groceryItems.length} {lang === 'FR' ? 'cochés' : 'checked'}
               </span>
             </div>
             {toBuyItems.length > 0 ? (
-              <p className="text-[11px] text-[#527470] mt-0.5 whitespace-nowrap">
+              <p className="text-[11px] text-[var(--md-sys-color-outline)] mt-0.5 whitespace-nowrap">
                 {toBuyItems.length} {lang === 'FR' ? 'restants' : 'remaining'}
               </p>
             ) : groceryItems.length > 0 ? (
-              <p className="text-[11px] text-emerald-700 font-bold mt-0.5 whitespace-nowrap">
+              <p className="text-[11px] text-[var(--md-sys-color-primary)] font-bold mt-0.5 whitespace-nowrap">
                 {lang === 'FR' ? '✓ Tout est coché !' : '✓ All checked!'}
               </p>
             ) : null}
@@ -647,13 +647,13 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
 
         {/* Shopping Checklist Progress Bar */}
         <div className="space-y-1">
-          <div className="flex items-center justify-between text-[11px] font-bold text-[#133E3B]">
+          <div className="flex items-center justify-between text-[11px] font-bold text-[var(--md-sys-color-on-surface)]">
             <span>{lang === 'FR' ? 'Progression des Courses' : 'Shopping Progress'}</span>
-            <span className="text-teal-700">{completionPct}% {lang === 'FR' ? 'cochés' : 'checked'}</span>
+            <span className="text-[var(--md-sys-color-primary)]">{completionPct}% {lang === 'FR' ? 'cochés' : 'checked'}</span>
           </div>
-          <div className="w-full h-2 bg-[#EAE5D8] rounded-full overflow-hidden">
+          <div className="w-full h-2 bg-[var(--md-sys-color-surface-container-high)] rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-teal-600 to-teal-500 transition-all duration-300"
+              className="h-full bg-[var(--md-sys-color-primary)] rounded-full transition-all duration-300"
               style={{ width: `${completionPct}%` }}
             />
           </div>
@@ -661,41 +661,39 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
       </div>
 
       {/* SAVED SHOPPING LISTS ACCESS */}
-      <div className="p-2 sm:p-2.5 rounded-2xl bg-white border border-[#E5DFD0] shadow-2xs">
+      <div className="p-2 sm:p-2.5 m3-surface-card">
         <button
           type="button"
           onClick={() => {
             setSavedListsInitialTab('saved');
             setIsSavedListsOpen(true);
           }}
-          className="w-full py-2 px-3 rounded-xl bg-[#F6FAF9] hover:bg-teal-50 border border-[#CDE3DF] text-[#0D3B37] text-xs font-black flex items-center justify-between gap-2 transition-all active:scale-[0.99] group text-left cursor-pointer"
+          className="w-full py-2.5 px-3.5 rounded-[16px] bg-[var(--md-sys-color-surface-container-lowest)] hover:bg-[var(--md-sys-color-secondary-container)]/40 border border-[var(--md-sys-color-outline-variant)]/60 text-[var(--md-sys-color-on-surface)] text-xs font-black flex items-center justify-between gap-2 transition-all active:scale-[0.99] group text-left cursor-pointer"
         >
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-7 h-7 rounded-lg bg-teal-700 text-white flex items-center justify-center shrink-0 shadow-2xs">
+            <div className="w-8 h-8 rounded-full bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] flex items-center justify-center shrink-0">
               <BookmarkCheck className="w-4 h-4" />
             </div>
             <div className="min-w-0">
               <span className="block text-xs font-black truncate">
                 {lang === 'FR' ? 'Listes de Courses Enregistrées' : 'Saved Shopping Lists'}
               </span>
-              <span className="block text-[10px] font-medium text-[#527470] truncate">
+              <span className="block text-[10px] font-medium text-[var(--md-sys-color-on-surface-variant)] truncate">
                 {lang === 'FR' ? 'Charger des essentiels, kits repas ou modèles' : 'Load weekly staples, meal kits, or templates'}
               </span>
             </div>
           </div>
-          <span className="px-3 py-1 rounded-full bg-white group-hover:bg-teal-100 text-teal-800 border border-teal-200/80 text-[10px] font-black shrink-0 shadow-2xs">
+          <span className="px-3.5 py-1 rounded-full bg-[var(--md-sys-color-secondary-container)] text-[var(--md-sys-color-on-secondary-container)] text-[10px] font-bold shrink-0">
             {lang === 'FR' ? 'Ouvrir' : 'Open'}
           </span>
         </button>
       </div>
 
-
-
       {/* Auto-Restock Suggestion from Expiring Kitchen Items */}
       {expiringItems.length > 0 && (
-        <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-900 text-xs flex items-center justify-between gap-2">
+        <div className="p-3.5 rounded-[20px] bg-[var(--md-sys-color-error-container)]/50 border border-[var(--md-sys-color-error)]/20 text-[var(--md-sys-color-on-error-container)] text-xs flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+            <Sparkles className="w-4 h-4 text-[var(--md-sys-color-error)] shrink-0" />
             <span className="truncate">
               <strong>{expiringItems[0].name}</strong>{' '}
               {lang === 'FR' ? 'expire bientôt.' : 'is expiring soon.'}
@@ -725,17 +723,17 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                 },
               ]);
             }}
-            className="px-2.5 py-1 bg-amber-200/70 hover:bg-amber-200 text-amber-900 font-bold rounded-xl text-[11px] transition-colors flex items-center gap-1 shrink-0 cursor-pointer"
+            className="px-3 py-1 rounded-full bg-[var(--md-sys-color-primary)] hover:brightness-110 text-[var(--md-sys-color-on-primary)] font-bold text-[11px] transition-all flex items-center gap-1 shrink-0 cursor-pointer"
           >
             <Plus className="w-3 h-3" /> {lang === 'FR' ? 'Ajouter' : 'Add'}
           </button>
         </div>
       )}
 
-      {/* Quick Add Form - Perfectly aligned and responsive */}
+      {/* Quick Add Form - Material Design 3 */}
       <form
         onSubmit={addItem}
-        className="p-2 sm:p-2.5 rounded-2xl bg-white border border-[#E5DFD0] shadow-2xs flex items-center gap-2"
+        className="p-2.5 m3-card-elevated flex items-center gap-2"
       >
         <input
           type="text"
@@ -746,7 +744,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
               ? 'Ajouter un article (ex. Pain, Pommes, Lait)...'
               : 'Add item (e.g. Sourdough, Apples, Milk)...'
           }
-          className="flex-1 min-w-0 px-3 py-2 text-xs bg-[#FAF7EE]/60 border border-[#E5DFD0] rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-600/30 focus:border-teal-600 text-[#0D3B37]"
+          className="m3-search-bar flex-1 min-w-0 px-4 py-2 text-xs font-medium placeholder-[var(--md-sys-color-outline)]"
         />
         <div className="flex items-center gap-1.5 shrink-0">
           <input
@@ -763,7 +761,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                 setInputQty(Number(num.toFixed(3)));
               }
             }}
-            className="w-11 sm:w-13 px-1 py-2 text-xs text-center font-bold bg-[#FAF7EE]/60 border border-[#E5DFD0] rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-600/30 text-[#0D3B37]"
+            className="w-11 sm:w-13 px-1 py-2 text-xs text-center font-bold bg-[var(--md-sys-color-surface-container-low)] border border-[var(--md-sys-color-outline-variant)]/85 rounded-full focus:outline-none focus:ring-2 focus:ring-[var(--md-sys-color-primary)]/30 text-[var(--md-sys-color-on-surface)]"
             title={lang === 'FR' ? 'Quantité' : 'Quantity'}
           />
           <input
@@ -771,12 +769,12 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
             value={inputUnit}
             onChange={(e) => setInputUnit(e.target.value)}
             placeholder={lang === 'FR' ? 'unités' : 'unit'}
-            className="w-12 sm:w-14 px-1 py-2 text-xs text-center bg-[#FAF7EE]/60 border border-[#E5DFD0] rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-600/30 text-[#0D3B37]"
+            className="w-12 sm:w-14 px-1 py-2 text-xs text-center bg-[var(--md-sys-color-surface-container-low)] border border-[var(--md-sys-color-outline-variant)]/85 rounded-full focus:outline-none focus:ring-2 focus:ring-[var(--md-sys-color-primary)]/30 text-[var(--md-sys-color-on-surface)]"
             title={lang === 'FR' ? 'Unité (ex. pack, kg, oz)' : 'Unit (e.g. pack, lbs, oz)'}
           />
           <button
             type="submit"
-            className="h-8.5 px-3 sm:px-3.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs flex items-center justify-center gap-1 shrink-0 transition-all active:scale-95 cursor-pointer shadow-2xs"
+            className="h-9 px-3.5 sm:px-4 rounded-full bg-[var(--md-sys-color-primary)] hover:brightness-110 text-[var(--md-sys-color-on-primary)] font-bold text-xs flex items-center justify-center gap-1 shrink-0 transition-all active:scale-95 cursor-pointer shadow-[var(--md-sys-elevation-1)]"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
             <span className="hidden sm:inline">{lang === 'FR' ? 'Ajouter' : 'Add'}</span>
@@ -787,12 +785,12 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
       {/* Categorized Grocery List */}
       <div className="space-y-4">
         {groceryItems.length === 0 ? (
-          <div className="p-8 rounded-2xl bg-white border border-[#E5DFD0] text-center text-[#527470] space-y-2 shadow-2xs">
-            <ShoppingCart className="w-8 h-8 mx-auto text-slate-300 mb-1" />
-            <p className="text-xs font-bold text-[#0D3B37]">
+          <div className="p-8 m3-card-elevated text-center text-[var(--md-sys-color-on-surface-variant)] space-y-2">
+            <ShoppingCart className="w-8 h-8 mx-auto text-[var(--md-sys-color-outline)]/60 mb-1" />
+            <p className="text-xs font-bold text-[var(--md-sys-color-on-surface)]">
               {lang === 'FR' ? 'Votre liste de courses est vide' : 'Your shopping list is empty'}
             </p>
-            <p className="text-[11px] text-[#527470]">
+            <p className="text-[11px] text-[var(--md-sys-color-outline)]">
               {lang === 'FR'
                 ? 'Ajoutez des articles ci-dessus ou chargez une de vos listes sauvegardées.'
                 : 'Add groceries above or pick one of your saved shopping lists.'}
@@ -803,7 +801,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                 setSavedListsInitialTab('saved');
                 setIsSavedListsOpen(true);
               }}
-              className="mt-2 text-xs py-2 px-4 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold inline-flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all active:scale-95"
+              className="mt-2 text-xs py-2.5 px-5 rounded-full bg-[var(--md-sys-color-primary)] hover:brightness-110 text-[var(--md-sys-color-on-primary)] font-bold inline-flex items-center gap-1.5 cursor-pointer shadow-[var(--md-sys-elevation-1)] transition-all active:scale-95"
             >
               <BookmarkCheck className="w-3.5 h-3.5" />
               <span>{lang === 'FR' ? 'Charger une Liste de Courses' : 'Load a Shopping List'}</span>
@@ -819,21 +817,21 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
             return (
               <div key={aisle.id} className="space-y-1.5">
                 {/* Category Aisle Header */}
-                <div className="flex items-center justify-between px-1 text-xs">
+                <div className="flex items-center justify-between px-1.5 text-xs">
                   <div className="flex items-center gap-2">
-                    <div className={`w-5 h-5 rounded-md flex items-center justify-center border text-xs shrink-0 ${aisle.iconBg}`}>
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center border text-xs shrink-0 ${aisle.iconBg}`}>
                       <AisleIcon className="w-3 h-3" />
                     </div>
-                    <span className="font-extrabold text-[#0D3B37] text-xs">
+                    <span className="font-extrabold text-[var(--md-sys-color-on-surface)] text-xs">
                       {aisleName}
                     </span>
-                    <span className="text-[11px] font-semibold text-[#527470]">
+                    <span className="text-[11px] font-semibold text-[var(--md-sys-color-outline)]">
                       ({items.length})
                     </span>
                   </div>
 
                   {isAisleComplete && (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[var(--md-sys-color-on-primary-container)] bg-[var(--md-sys-color-primary-container)] px-2.5 py-0.5 rounded-full">
                       <Check className="w-2.5 h-2.5 stroke-[3]" />
                       <span>{lang === 'FR' ? 'Rayon terminé' : 'Aisle complete'}</span>
                     </span>
@@ -841,7 +839,7 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                 </div>
 
                 {/* Items in Category (Alphabetical, Checked crossed out) */}
-                <div className="rounded-2xl bg-white border border-[#E5DFD0] overflow-hidden divide-y divide-[#E5DFD0]/60 shadow-2xs">
+                <div className="m3-card-elevated overflow-hidden divide-y divide-[var(--md-sys-color-outline-variant)]/45">
                   {items.map((item) => {
                     const visual = getFoodVisual(item.name);
 
@@ -849,13 +847,13 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                       <div
                         key={item.id}
                         onClick={() => toggleCart(item.id)}
-                        className={`p-3 transition-colors flex items-center justify-between gap-2.5 cursor-pointer select-none group ${
+                        className={`p-3.5 transition-colors flex items-center justify-between gap-2.5 cursor-pointer select-none group ${
                           item.inCart
-                            ? 'bg-slate-50/70 hover:bg-slate-100/70 opacity-70'
-                            : 'bg-white hover:bg-[#F9FAF8]'
+                            ? 'bg-[var(--md-sys-color-surface-container-low)]/75 hover:bg-[var(--md-sys-color-surface-container)]/75 opacity-70'
+                            : 'bg-[var(--md-sys-color-surface-container-lowest)] hover:bg-[var(--md-sys-color-surface-container-low)]/50'
                         }`}
                       >
-                        {/* Left: Tactile Checkbox & Visual & Name */}
+                        {/* Left: Tactile M3 Checkbox & Visual & Name */}
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                           {/* Checkbox */}
                           <div
@@ -866,8 +864,8 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                             }
                             className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all shrink-0 active:scale-90 ${
                               item.inCart
-                                ? 'bg-teal-700 text-white shadow-2xs'
-                                : 'border-2 border-slate-300 group-hover:border-teal-600 bg-white'
+                                ? 'bg-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-primary)] shadow-2xs'
+                                : 'border-2 border-[var(--md-sys-color-outline)]/60 group-hover:border-[var(--md-sys-color-primary)] bg-[var(--md-sys-color-surface-container-lowest)]'
                             }`}
                           >
                             {item.inCart && <Check className="w-4 h-4 stroke-[3]" />}
@@ -886,8 +884,8 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                               <span
                                 className={`text-xs font-bold truncate transition-all ${
                                   item.inCart
-                                    ? 'line-through text-slate-400 decoration-slate-400 decoration-2'
-                                    : 'text-[#0D3B37]'
+                                    ? 'line-through text-[var(--md-sys-color-outline)] decoration-[var(--md-sys-color-outline)] decoration-2'
+                                    : 'text-[var(--md-sys-color-on-surface)]'
                                 }`}
                               >
                                 {getItemDisplayName(item, lang)}

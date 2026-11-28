@@ -40,6 +40,7 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [webAuthnSupported, setWebAuthnSupported] = useState(false);
 
   // Auto-fetch users from server on mount to sync public members
@@ -90,8 +91,9 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
     });
   }, []);
 
-  // Quick Passkey / Biometrics trigger
+  // Direct Passkey / Biometrics trigger — immediately prompts OS/browser for fingerprint or passkey selection
   const handlePasskeyLogin = async (userToAuth: User) => {
+    if (passkeyLoading) return;
     setError('');
     setSelectedUser(userToAuth);
 
@@ -104,22 +106,52 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
       return;
     }
 
-    if (userToAuth.fido2Enabled) {
-      setFidoModal({
-        isOpen: true,
-        targetUser: userToAuth,
-        mode: 'VERIFY',
-        preferredMethod: 'fido',
-        loginType: 'passkey',
-      });
-    } else {
-      setFidoModal({
-        isOpen: true,
-        targetUser: userToAuth,
-        mode: 'ENROLL_MANDATORY',
-        preferredMethod: webAuthnSupported ? 'fido' : 'totp',
-        loginType: 'passkey',
-      });
+    if (!webAuthnSupported) {
+      setError(
+        lang === 'FR'
+          ? 'Les clés Passkey / FIDO2 nécessitent un navigateur compatible en HTTPS (ou localhost).'
+          : 'Passkeys / FIDO2 require a supported browser over HTTPS (or localhost).'
+      );
+      return;
+    }
+
+    try {
+      setPasskeyLoading(true);
+      // If the selected user has a registered passkey, pass their ID (supports both platform biometrics & hardware keys);
+      // otherwise use discoverable mode so the browser immediately opens the native passkey picker / biometric prompt.
+      const result = await fido2Client.authenticateKey(
+        userToAuth.fido2Enabled ? userToAuth.id : undefined
+      );
+
+      if (result.success && result.verified) {
+        const authenticatedUser: User = result.user || userToAuth;
+        if (authenticatedUser.mustChangePassword || authenticatedUser.mustSetupProfile) {
+          setOnboardingUser(authenticatedUser);
+          return;
+        }
+        onLoginSuccess(authenticatedUser);
+      }
+    } catch (err: any) {
+      if (err?.name === 'NotAllowedError') {
+        setError(
+          userToAuth.fido2Enabled
+            ? lang === 'FR'
+              ? 'Vérification biométrique / Passkey annulée ou expirée.'
+              : 'Passkey / biometric verification was cancelled or timed out.'
+            : lang === 'FR'
+            ? 'Aucune clé Passkey sélectionnée. Connectez-vous avec votre mot de passe pour enregistrer une clé Passkey.'
+            : 'No passkey selected. Sign in with your password to register a passkey for this account.'
+        );
+      } else {
+        setError(
+          err?.message ||
+            (lang === 'FR'
+              ? "Échec de l'authentification par Passkey / FIDO2"
+              : 'Passkey / FIDO2 authentication failed')
+        );
+      }
+    } finally {
+      setPasskeyLoading(false);
     }
   };
 
@@ -227,12 +259,12 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
   const activeUser = selectedUser || effectiveMembers[0] || null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#FAF7EE] via-[#F4EDE0] to-[#EBE3D0] flex flex-col justify-between items-center p-4 sm:p-6 w-full animate-fade-in">
+    <div className="min-h-screen bg-[var(--md-sys-color-surface)] flex flex-col justify-between items-center p-4 sm:p-6 w-full animate-fade-in">
       {/* Top Header with Language Switcher & Install Button */}
       <header className="w-full max-w-md flex items-center justify-between py-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <PantryoLogo size={32} />
-          <span className="font-black text-lg tracking-tight text-[#0D3B37]">
+          <span className="font-black text-lg tracking-tight text-[var(--md-sys-color-on-surface)]">
             Pantryo
           </span>
         </div>
@@ -242,22 +274,22 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
         </div>
       </header>
 
-      {/* Main Login Card - Unified Profile Selection without tabs */}
-      <div className="w-full max-w-md bg-white/95 backdrop-blur-md border border-[#E5DFD0] rounded-3xl p-6 sm:p-7 shadow-xl space-y-6">
+      {/* Main Login Card - Material Design 3 Elevated Surface Container */}
+      <div className="w-full max-w-md bg-[var(--md-sys-color-surface-container-lowest)] border border-[var(--md-sys-color-outline-variant)]/70 rounded-[28px] p-6 sm:p-8 shadow-[var(--md-sys-elevation-2)] space-y-6">
         {/* Title & Household context */}
         <div className="text-center space-y-1.5">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-50 border border-teal-200 text-teal-900 text-xs font-bold mb-1">
-            <ShieldCheck className="w-3.5 h-3.5 text-teal-700" />
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--md-sys-color-secondary-container)] text-[var(--md-sys-color-on-secondary-container)] text-xs font-bold mb-1">
+            <ShieldCheck className="w-3.5 h-3.5 text-[var(--md-sys-color-primary)]" />
             <span>
               {lang === 'FR' ? 'Pantryo • Connexion Sécurisée' : 'Pantryo • Secure Login'}
             </span>
           </div>
-          <h2 className="text-xl sm:text-2xl font-black text-[#0D3B37] tracking-tight">
+          <h2 className="text-xl sm:text-2xl font-black text-[var(--md-sys-color-on-surface)] tracking-tight">
             {effectiveMembers.length > 1
               ? (lang === 'FR' ? 'Profils de cuisine' : 'Household Profiles')
               : (lang === 'FR' ? 'Connexion Administrateur' : 'Administrator Sign In')}
           </h2>
-          <p className="text-xs text-[#527470]">
+          <p className="text-xs text-[var(--md-sys-color-on-surface-variant)]">
             {effectiveMembers.length > 1
               ? (lang === 'FR'
                   ? 'Sélectionnez votre profil pour accéder à votre cuisine et inventaire'
@@ -270,7 +302,7 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
 
         {/* Member Selector Cards: Single Admin profile or Multi-user profile grid */}
         <div className="space-y-2">
-          <label className="text-[11px] font-bold uppercase tracking-wider text-[#527470] block">
+          <label className="text-[11px] font-bold uppercase tracking-wider text-[var(--md-sys-color-outline)] block">
             {effectiveMembers.length > 1
               ? (lang === 'FR' ? 'Sélectionner un profil :' : 'Select profile:')
               : (lang === 'FR' ? 'Compte administrateur :' : 'Administrator account:')}
@@ -287,32 +319,34 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
                     setError('');
                     setPassword('');
                   }}
-                  className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
+                  className={`p-3 rounded-[20px] border text-left flex items-center gap-3 transition-all cursor-pointer ${
                     isSelected
-                      ? 'bg-teal-50/80 border-teal-600 ring-2 ring-teal-600/20 shadow-xs'
-                      : 'bg-[#FAF7EE] border-[#E5DFD0] hover:bg-white hover:border-slate-300'
+                      ? 'bg-[var(--md-sys-color-primary-container)]/40 border-[var(--md-sys-color-primary)] ring-2 ring-[var(--md-sys-color-primary)]/20 shadow-xs'
+                      : 'bg-[var(--md-sys-color-surface-container-low)] border-[var(--md-sys-color-outline-variant)]/70 hover:bg-[var(--md-sys-color-surface-container)] hover:border-[var(--md-sys-color-outline)]'
                   }`}
                 >
                   <img
                     src={member.avatarUrl || '/avatars/chef-cat.svg'}
                     alt={member.name}
-                    className="w-11 h-11 rounded-full object-cover shrink-0 border-2 border-white shadow-xs bg-teal-100"
+                    className={`w-11 h-11 rounded-full object-cover shrink-0 border-2 shadow-xs bg-[var(--md-sys-color-secondary-container)] ${
+                      isSelected ? 'border-[var(--md-sys-color-primary)]' : 'border-white'
+                    }`}
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-xs sm:text-sm text-[#0D3B37] truncate">
+                      <span className="font-bold text-xs sm:text-sm text-[var(--md-sys-color-on-surface)] truncate">
                         {member.name}
                       </span>
                       {isSelected && (
-                        <Check className="w-4 h-4 text-teal-700 shrink-0" />
+                        <Check className="w-4 h-4 text-[var(--md-sys-color-primary)] shrink-0" />
                       )}
                     </div>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <span
                         className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block ${
                           member.role === 'ADMIN'
-                            ? 'bg-teal-100 text-teal-800'
-                            : 'bg-stone-200 text-stone-700'
+                            ? 'bg-[var(--md-sys-color-secondary-container)] text-[var(--md-sys-color-on-secondary-container)]'
+                            : 'bg-[var(--md-sys-color-surface-container-high)] text-[var(--md-sys-color-on-surface-variant)]'
                         }`}
                       >
                         {member.role === 'ADMIN'
@@ -327,22 +361,36 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
           </div>
         </div>
 
-        {/* Fast Passkey / Biometrics Button (if enabled) */}
+        {/* Fast Passkey / Biometrics Button (M3 Full-Pill Primary Action) */}
         {activeUser && (activeUser.fido2Enabled || webAuthnSupported) && (
           <div className="space-y-1.5 pt-1">
             <button
               type="button"
               onClick={() => handlePasskeyLogin(activeUser)}
-              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#0D3B37] via-[#0E766E] to-[#134E48] hover:from-[#092926] hover:to-[#0B5C56] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs transition-all active:scale-98 cursor-pointer"
+              disabled={passkeyLoading || loading}
+              className="w-full py-3 px-5 rounded-full bg-[var(--md-sys-color-primary)] hover:brightness-110 disabled:opacity-60 text-[var(--md-sys-color-on-primary)] font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-[var(--md-sys-elevation-1)] hover:shadow-[var(--md-sys-elevation-2)] transition-all active:scale-98 cursor-pointer"
             >
-              <Fingerprint className="w-4 h-4 text-teal-300" />
-              <span>
-                {lang === 'FR'
-                  ? `Se connecter avec Passkey / Clé FIDO2`
-                  : `Sign in with Passkey / FIDO2 Key`}
-              </span>
+              {passkeyLoading ? (
+                <>
+                  <RefreshCw className="w-4 h-4 text-[var(--md-sys-color-primary-container)] animate-spin" />
+                  <span>
+                    {lang === 'FR'
+                      ? 'Scannez votre empreinte ou choisissez une clé...'
+                      : 'Scan your finger or select a passkey...'}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Fingerprint className="w-4 h-4 text-[var(--md-sys-color-primary-container)]" />
+                  <span>
+                    {lang === 'FR'
+                      ? `Se connecter avec Passkey / Clé FIDO2`
+                      : `Sign in with Passkey / FIDO2 Key`}
+                  </span>
+                </>
+              )}
             </button>
-            <p className="text-[10px] text-center text-[#527470]">
+            <p className="text-[10px] text-center text-[var(--md-sys-color-outline)]">
               {lang === 'FR'
                 ? 'Compatible Face ID, Touch ID, Windows Hello & YubiKey'
                 : 'Compatible with Face ID, Touch ID, Windows Hello & YubiKey'}
@@ -353,8 +401,8 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
         {/* Divider if Passkey shown */}
         {activeUser && (activeUser.fido2Enabled || webAuthnSupported) && (
           <div className="relative flex items-center justify-center">
-            <div className="border-t border-[#E5DFD0] w-full" />
-            <span className="bg-white px-3 text-[11px] font-bold text-[#7A9A96] uppercase tracking-wider absolute">
+            <div className="border-t border-[var(--md-sys-color-outline-variant)]/70 w-full" />
+            <span className="bg-[var(--md-sys-color-surface-container-lowest)] px-3 text-[11px] font-bold text-[var(--md-sys-color-outline)] uppercase tracking-wider absolute">
               {lang === 'FR' ? 'ou par mot de passe' : 'or with password'}
             </span>
           </div>
@@ -363,17 +411,17 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
         {/* Password Form for Selected Profile */}
         {activeUser && (
           <form onSubmit={handlePasswordSubmit} className="space-y-3.5">
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-[#0D3B37]">
+                <label className="text-xs font-bold text-[var(--md-sys-color-on-surface)]">
                   {lang === 'FR' ? 'Mot de passe' : 'Password'}
                 </label>
-                <span className="text-[10px] text-[#7A9A96]">
+                <span className="text-[10px] text-[var(--md-sys-color-outline)]">
                   {lang === 'FR' ? 'NIST SP 800-63B' : 'NIST SP 800-63B'}
                 </span>
               </div>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[var(--md-sys-color-outline)]">
                   <Lock className="w-4 h-4" />
                 </div>
                 <input
@@ -385,26 +433,26 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
                       ? 'Entrez votre mot de passe...'
                       : 'Enter your password...'
                   }
-                  className="w-full pl-9 pr-10 py-2.5 bg-[#FAF7EE] border border-[#E0D9C8] rounded-xl text-xs sm:text-sm text-[#0D3B37] placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-teal-600 focus:bg-white transition-all font-mono"
+                  className="w-full pl-10 pr-10 py-3 bg-[var(--md-sys-color-surface-container-low)] border border-[var(--md-sys-color-outline-variant)] rounded-2xl text-xs sm:text-sm text-[var(--md-sys-color-on-surface)] placeholder-[var(--md-sys-color-outline)] focus:outline-hidden focus:ring-2 focus:ring-[var(--md-sys-color-primary)] focus:border-[var(--md-sys-color-primary)] focus:bg-[var(--md-sys-color-surface-container-lowest)] transition-all font-mono"
                   autoFocus
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-[var(--md-sys-color-outline)] hover:text-[var(--md-sys-color-on-surface)] cursor-pointer"
                 >
                   {showPassword ? (
-                    <Eye className="w-4 h-4 text-teal-800" />
+                    <Eye className="w-4 h-4 text-[var(--md-sys-color-primary)]" />
                   ) : (
-                    <EyeOff className="w-4 h-4 text-slate-400" />
+                    <EyeOff className="w-4 h-4" />
                   )}
                 </button>
               </div>
             </div>
 
             {error && (
-              <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2 animate-fade-in">
-                <ShieldAlert className="w-4 h-4 shrink-0" />
+              <div className="p-3 rounded-2xl bg-[var(--md-sys-color-error-container)] text-[var(--md-sys-color-on-error-container)] text-xs flex items-center gap-2 animate-fade-in font-medium">
+                <ShieldAlert className="w-4 h-4 shrink-0 text-[var(--md-sys-color-error)]" />
                 <span>{error}</span>
               </div>
             )}
@@ -412,7 +460,7 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 px-4 rounded-xl bg-teal-800 hover:bg-teal-900 disabled:opacity-50 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer active:scale-98"
+              className="w-full py-3 px-5 rounded-full bg-[var(--md-sys-color-secondary-container)] hover:brightness-95 disabled:opacity-50 text-[var(--md-sys-color-on-secondary-container)] font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-98"
             >
               {loading ? (
                 <>
@@ -435,9 +483,9 @@ export const LoginSplash: React.FC<LoginSplashProps> = ({
       </div>
 
       {/* Footer */}
-      <footer className="text-center text-[11px] text-[#7A9A96] py-3 space-y-1">
+      <footer className="text-center text-[11px] text-[var(--md-sys-color-outline)] py-3 space-y-1">
         <p>Pantryo • Zero-Waste Kitchen & Smart Pantry Management</p>
-        <p className="text-[10px] text-slate-400">
+        <p className="text-[10px] opacity-75">
           FIDO2 WebAuthn & NIST SP 800-63B Local Security
         </p>
       </footer>

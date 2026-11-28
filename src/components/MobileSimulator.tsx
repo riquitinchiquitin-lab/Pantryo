@@ -1867,21 +1867,21 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
 
             {/* "COOK FIRST" EXPIRATION & LEFTOVERS PRIORITY STRIP */}
             {(expiringItems.length > 0 || leftoversCount > 0) && (
-              <div className="p-3.5 rounded-[20px] bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-rose-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs animate-fadeIn overflow-hidden">
-                <div className="flex items-center gap-2.5 min-w-0 w-full sm:w-auto sm:flex-1">
-                  <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-700 flex items-center justify-center shrink-0">
-                    <Flame className="w-4 h-4 text-amber-600 animate-pulse" />
+              <div className="p-4 rounded-[24px] bg-[var(--md-sys-color-error-container)]/55 border border-[var(--md-sys-color-error)]/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fadeIn overflow-hidden">
+                <div className="flex items-center gap-3 min-w-0 w-full sm:w-auto sm:flex-1">
+                  <div className="w-9 h-9 rounded-full bg-[var(--md-sys-color-error-container)] text-[var(--md-sys-color-on-error-container)] flex items-center justify-center shrink-0">
+                    <Flame className="w-4 h-4 text-[var(--md-sys-color-error)] animate-pulse" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-black text-amber-950">
+                      <span className="text-xs font-black text-[var(--md-sys-color-on-error-container)]">
                         {lang === 'FR' ? 'À cuisiner en priorité' : 'Cook First Priority'}
                       </span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-900 border border-amber-500/30 shrink-0">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[var(--md-sys-color-error)] text-[var(--md-sys-color-on-error)] shrink-0">
                         {expiringItems.length + (leftoversCount > 0 ? leftoversCount : 0)} {lang === 'FR' ? 'urgents' : 'items'}
                       </span>
                     </div>
-                    <p className="text-[11px] text-amber-900/80 line-clamp-2 break-words">
+                    <p className="text-[11px] text-[var(--md-sys-color-on-error-container)]/85 line-clamp-2 break-words mt-0.5">
                       {lang === 'FR'
                         ? `${expiringItems.map((i) => i.name).slice(0, 3).join(', ')}${expiringItems.length > 3 ? '...' : ''} à consommer rapidement pour éviter le gaspillage.`
                         : `${expiringItems.map((i) => i.name).slice(0, 3).join(', ')}${expiringItems.length > 3 ? '...' : ''} expire soon. Cook to prevent waste.`}
@@ -1892,7 +1892,7 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveNav('cooking')}
-                  className="px-3.5 py-1.5 rounded-full bg-amber-600 hover:bg-amber-700 text-white font-black text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-xs cursor-pointer shrink-0"
+                  className="px-4 py-2 rounded-full bg-[var(--md-sys-color-primary)] hover:brightness-110 text-[var(--md-sys-color-on-primary)] font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-[var(--md-sys-elevation-1)] cursor-pointer shrink-0"
                 >
                   <ChefHat className="w-3.5 h-3.5" />
                   <span>{lang === 'FR' ? 'Cuisiner ce soir' : 'Cook Tonight'}</span>
@@ -1900,45 +1900,45 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
               </div>
             )}
 
-            {/* Unified Search, Filter & View Mode Bar */}
+            {/* Unified Search, Filter & View Mode Bar (Material Design 3) */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                {/* Search Bar */}
+                {/* M3 Pill Search Bar */}
                 <div className="relative flex-1 min-w-0">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#527470]" />
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--md-sys-color-outline)]" />
                   <input
                     type="text"
                     placeholder={t('search_placeholder')}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-8 py-2.5 text-xs font-medium bg-white border border-[#E5DFD0] rounded-full focus:outline-none focus:ring-2 focus:ring-teal-700 text-[#0D3B37] placeholder-[#738C88] transition-all shadow-2xs"
+                    className="m3-search-bar w-full pl-10 pr-8 py-2.5 text-xs font-medium placeholder-[var(--md-sys-color-outline)]"
                   />
                   {searchQuery && (
                     <button
                       type="button"
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[var(--md-sys-color-outline)] hover:text-[var(--md-sys-color-on-surface)] cursor-pointer"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
                   )}
                 </div>
 
-                {/* Filter Drawer Trigger Button */}
+                {/* Filter Drawer Trigger Chip */}
                 <button
                   type="button"
                   onClick={() => setIsFilterDrawerOpen(true)}
-                  className={`px-3 py-2.5 rounded-full border text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-2xs ${
+                  className={`px-3.5 py-2.5 text-xs font-bold flex items-center gap-1.5 cursor-pointer shrink-0 ${
                     filterLocation !== 'ALL' || selectedFoodType !== 'ALL' || filterLeftoversOnly
-                      ? 'bg-teal-700 text-white border-teal-800 shadow-xs'
-                      : 'bg-white hover:bg-[#F5F2E8] border-[#E5DFD0] text-[#0D3B37]'
+                      ? 'm3-chip-active shadow-2xs'
+                      : 'm3-chip'
                   }`}
                   title={lang === 'FR' ? 'Filtrer les stocks' : 'Filter inventory'}
                 >
                   <SlidersHorizontal className="w-4 h-4" />
                   <span className="hidden xs:inline">{lang === 'FR' ? 'Filtres' : 'Filters'}</span>
                   {(filterLocation !== 'ALL' || selectedFoodType !== 'ALL' || filterLeftoversOnly) && (
-                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                    <span className="w-2 h-2 rounded-full bg-[var(--md-sys-color-primary)] animate-pulse" />
                   )}
                 </button>
 
@@ -1946,10 +1946,10 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                 <button
                   type="button"
                   onClick={handleSelectAll}
-                  className={`px-2.5 py-2.5 rounded-full border text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shrink-0 shadow-2xs ${
+                  className={`px-3 py-2.5 text-xs font-bold flex items-center gap-1 cursor-pointer shrink-0 ${
                     selectedItemIds.size > 0
-                      ? 'bg-teal-700 text-white border-teal-800'
-                      : 'bg-white hover:bg-[#F5F2E8] border-[#E5DFD0] text-[#527470]'
+                      ? 'm3-chip-active shadow-2xs'
+                      : 'm3-chip'
                   }`}
                   title={lang === 'FR' ? 'Sélection multiple' : 'Select all'}
                 >
@@ -1964,17 +1964,17 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                   type="button"
                   onClick={() => setGroupByCategory((prev) => !prev)}
                   title={lang === 'FR' ? 'Grouper par catégorie' : 'Group by category'}
-                  className={`p-2 rounded-full border transition-all cursor-pointer shrink-0 flex items-center gap-1 ${
+                  className={`p-2.5 cursor-pointer shrink-0 flex items-center gap-1 ${
                     groupByCategory
-                      ? 'bg-teal-700 border-teal-700 text-white shadow-2xs'
-                      : 'bg-white hover:bg-[#F5F2E8] border-[#E5DFD0] text-[#527470]'
+                      ? 'm3-chip-active shadow-2xs'
+                      : 'm3-chip'
                   }`}
                 >
                   <Layers className="w-3.5 h-3.5" />
                 </button>
 
                 {/* Bento List / Grid View Switcher */}
-                <div className="flex items-center p-0.5 bg-white border border-[#E5DFD0] rounded-full shadow-2xs shrink-0">
+                <div className="flex items-center p-0.5 bg-[var(--md-sys-color-surface-container-low)] border border-[var(--md-sys-color-outline-variant)]/85 rounded-full shrink-0">
                   <button
                     onClick={() => setBentoViewMode('list')}
                     title={lang === 'FR' ? 'Mode Liste' : 'List Mode'}
@@ -2322,10 +2322,10 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
                   return (
                     <div
                       key={item.id}
-                      className={`p-2.5 rounded-3xl bg-white transition-all flex flex-col justify-between group relative border ${
+                      className={`p-2.5 m3-card-elevated flex flex-col justify-between group relative ${
                         selectedItemIds.has(item.id)
-                          ? 'border-teal-600 ring-2 ring-teal-600/40 shadow-sm bg-teal-50/10'
-                          : 'border-[#D5E1D2] shadow-2xs hover:shadow-xs'
+                          ? '!border-[var(--md-sys-color-primary)] ring-2 ring-[var(--md-sys-color-primary)]/35 !bg-[var(--md-sys-color-primary-container)]/20'
+                          : ''
                       }`}
                     >
                       {/* Top Bento Image Frame with corner badges */}
@@ -3104,21 +3104,22 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
         </div>
       </nav>
 
-      {/* Desktop Center-Bottom Round Add Button */}
-      <div className="hidden xl:flex fixed bottom-6 left-1/2 -translate-x-1/2 z-40 items-center justify-center">
+      {/* Desktop Material 3 Extended FAB */}
+      <div className="hidden xl:flex fixed bottom-6 right-8 z-40 items-center justify-center">
         <button
           type="button"
           id="desktop-center-bottom-round-add-btn"
           onClick={() => setIsAddMenuOpen((prev) => !prev)}
-          className={`w-14 h-14 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-[var(--md-sys-elevation-3)] hover:shadow-[var(--md-sys-elevation-4)] active:scale-95 border-2 border-white/80 ring-2 ring-emerald-950/20 ${
+          className={`h-14 px-5 rounded-[20px] flex items-center justify-center gap-2.5 font-bold text-sm transition-all cursor-pointer shadow-[var(--md-sys-elevation-3)] hover:shadow-[var(--md-sys-elevation-4)] active:scale-95 ${
             isAddMenuOpen
-              ? 'bg-[var(--md-sys-color-error)] text-white rotate-45'
-              : 'bg-[var(--md-sys-color-primary)] text-white hover:brightness-110'
+              ? 'bg-[var(--md-sys-color-error-container)] text-[var(--md-sys-color-on-error-container)]'
+              : 'm3-extended-fab'
           }`}
           aria-label={lang === 'FR' ? 'Ajouter un aliment' : 'Add Item'}
           title={lang === 'FR' ? 'Ajouter un aliment' : 'Add Item'}
         >
-          <Plus className="w-7 h-7 stroke-[2.75] transition-transform duration-200" />
+          <Plus className={`w-5 h-5 stroke-[2.75] transition-transform duration-200 ${isAddMenuOpen ? 'rotate-45' : ''}`} />
+          <span>{isAddMenuOpen ? (lang === 'FR' ? 'Fermer' : 'Close') : (lang === 'FR' ? 'Scanner / Ajouter' : 'Scan / Add')}</span>
         </button>
       </div>
 

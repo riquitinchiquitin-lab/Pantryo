@@ -831,38 +831,38 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
         </div>
       </div>
 
-      {/* AI & Recipe Importer Shelf */}
-      <div className="p-4 rounded-3xl bg-gradient-to-r from-emerald-50 via-teal-50/60 to-amber-50/40 border border-[#CDE1CB] text-[#133E3B] flex items-center justify-between gap-3 shadow-2xs">
+      {/* AI & Recipe Importer Shelf (Material Design 3) */}
+      <div className="p-4 rounded-[24px] bg-[var(--md-sys-color-secondary-container)]/55 border border-[var(--md-sys-color-outline-variant)]/70 text-[var(--md-sys-color-on-surface)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="space-y-0.5 min-w-0">
-          <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-emerald-800">
-            <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+          <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-[var(--md-sys-color-primary)]">
+            <Sparkles className="w-3.5 h-3.5" />
             <span>{lang === 'FR' ? 'Importateur de Recettes & IA' : 'AI & Recipe Importer'}</span>
           </div>
-          <h3 className="text-xs font-black text-[#0D3B37] truncate">
+          <h3 className="text-xs font-black text-[var(--md-sys-color-on-surface)] truncate">
             {lang === 'FR'
               ? 'Collez un lien YouTube, texte ou scannez une recette'
               : 'Paste YouTube link, text, or snap photo recipe'}
           </h3>
-          <p className="text-[11px] text-[#527470] truncate">
+          <p className="text-[11px] text-[var(--md-sys-color-on-surface-variant)] truncate">
             {lang === 'FR'
               ? 'Extraction instantanée et vérification avec vos stocks'
               : 'Extracts ingredients & matches with kitchen inventory'}
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
           <button
             onClick={() => setIsSmartSuggestionsOpen(true)}
-            className="px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs flex items-center gap-1.5 border border-amber-300 active:scale-95 transition-all shadow-2xs cursor-pointer"
+            className="px-3.5 py-2 rounded-full bg-[var(--md-sys-color-primary-container)] hover:brightness-95 text-[var(--md-sys-color-on-primary-container)] font-bold text-xs flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
             title={lang === 'FR' ? 'Suggestions de repas anti-gaspillage basées sur vos stocks' : 'Zero-waste meal suggestions from your inventory'}
           >
-            <Sparkles className="w-3.5 h-3.5 text-amber-600 stroke-[2.5]" />
+            <Sparkles className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>{lang === 'FR' ? 'Idées IA' : 'AI Ideas'}</span>
           </button>
 
           <button
             onClick={openRecipeScan}
-            className="px-3 py-2 rounded-xl bg-white hover:bg-emerald-50 text-emerald-800 font-bold text-xs flex items-center gap-1.5 border border-emerald-300 active:scale-95 transition-all shadow-2xs cursor-pointer"
+            className="m3-chip px-3.5 py-2 font-bold text-xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
             title={lang === 'FR' ? 'Scanner une recette écrite avec la caméra' : 'Scan written recipe with camera'}
           >
             <Camera className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -871,7 +871,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
 
           <button
             onClick={openRecipeAdd}
-            className="px-3.5 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all shrink-0 cursor-pointer"
+            className="px-4 py-2 rounded-full bg-[var(--md-sys-color-primary)] hover:brightness-110 text-[var(--md-sys-color-on-primary)] font-bold text-xs flex items-center gap-1.5 shadow-[var(--md-sys-elevation-1)] active:scale-95 transition-all shrink-0 cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5 stroke-[3]" />
             <span>{lang === 'FR' ? '+ Recette' : '+ Add'}</span>
@@ -881,29 +881,29 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
 
       {/* Notice Alert */}
       {addedItemsNotice && (
-        <div className="p-3 rounded-2xl bg-teal-50 text-teal-900 border border-teal-200 text-xs font-bold flex items-center gap-2 shadow-2xs">
-          <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0 stroke-[2.5]" />
+        <div className="p-3.5 rounded-[20px] bg-[var(--md-sys-color-primary-container)]/70 text-[var(--md-sys-color-on-primary-container)] text-xs font-bold flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-[var(--md-sys-color-primary)] shrink-0 stroke-[2.5]" />
           <span>{addedItemsNotice}</span>
         </div>
       )}
 
       {/* Culinary Partners & Featured Chefs Shelf */}
-      <div className="p-4 rounded-3xl bg-white text-[#133E3B] border border-[#E5DFD0] space-y-2.5 shadow-2xs">
+      <div className="p-4 m3-card-elevated text-[var(--md-sys-color-on-surface)] space-y-2.5">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-xl bg-amber-100 text-amber-900 border border-amber-200 flex items-center justify-center font-black text-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-[var(--md-sys-color-secondary-container)] text-[var(--md-sys-color-on-secondary-container)] flex items-center justify-center font-black text-xs">
               ★
             </div>
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-[#527470] block">
+              <span className="text-[10px] font-black uppercase tracking-wider text-[var(--md-sys-color-outline)] block">
                 {lang === 'FR' ? 'Partenaires Culinaires & Chefs' : 'Culinary Partners & Chefs'}
               </span>
-              <h3 className="text-xs font-black tracking-tight leading-tight text-[#0D3B37]">
+              <h3 className="text-xs font-black tracking-tight leading-tight text-[var(--md-sys-color-on-surface)]">
                 {lang === 'FR' ? 'Ricardo, Marilou, Jamie Oliver, Marmiton & plus' : 'Ricardo, Marilou, Jamie Oliver, Marmiton & more'}
               </h3>
             </div>
           </div>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+          <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)]">
             {lang === 'FR' ? 'Anti-Gaspillage' : 'Zero-Waste'}
           </span>
         </div>
@@ -914,7 +914,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
             href={lang === 'FR' ? 'https://www.ricardocuisine.com/fr' : 'https://www.ricardocuisine.com/en'}
             target="_blank"
             rel="noopener noreferrer"
-            className="px-2.5 py-1 rounded-xl bg-white hover:bg-slate-50 text-[#0D3B37] text-[10px] font-bold border border-[#E5DFD0] shadow-2xs flex items-center gap-1 transition-colors"
+            className="m3-chip px-3 py-1 text-[10px] font-bold flex items-center gap-1"
           >
             <span>Ricardo Cuisine</span>
             <ExternalLink className="w-2.5 h-2.5" />
@@ -923,7 +923,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
             href="https://www.troisfoisparjour.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="px-2.5 py-1 rounded-xl bg-white hover:bg-slate-50 text-[#0D3B37] text-[10px] font-bold border border-[#E5DFD0] shadow-2xs flex items-center gap-1 transition-colors"
+            className="m3-chip px-3 py-1 text-[10px] font-bold flex items-center gap-1"
           >
             <span>Trois Fois Par Jour (Marilou)</span>
             <ExternalLink className="w-2.5 h-2.5" />
@@ -932,7 +932,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
             href="https://www.jamieoliver.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="px-2.5 py-1 rounded-xl bg-white hover:bg-slate-50 text-[#0D3B37] text-[10px] font-bold border border-[#E5DFD0] shadow-2xs flex items-center gap-1 transition-colors"
+            className="m3-chip px-3 py-1 text-[10px] font-bold flex items-center gap-1"
           >
             <span>Jamie Oliver</span>
             <ExternalLink className="w-2.5 h-2.5" />
@@ -941,7 +941,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
             href="https://www.marmiton.org"
             target="_blank"
             rel="noopener noreferrer"
-            className="px-2.5 py-1 rounded-xl bg-white hover:bg-slate-50 text-[#0D3B37] text-[10px] font-bold border border-[#E5DFD0] shadow-2xs flex items-center gap-1 transition-colors"
+            className="m3-chip px-3 py-1 text-[10px] font-bold flex items-center gap-1"
           >
             <span>Marmiton</span>
             <ExternalLink className="w-2.5 h-2.5" />
@@ -949,10 +949,10 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
         </div>
       </div>
 
-      {/* Search Bar */}
+      {/* M3 Pill Search Bar */}
       <div className="space-y-2">
         <div className="relative">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--md-sys-color-outline)]" />
           <input
             type="text"
             value={searchQuery}
@@ -962,7 +962,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                 ? 'Rechercher une recette (ex: saumon, pâtes, Jamie Oliver, Marilou)...'
                 : 'Search recipes (e.g. salmon, pasta, Jamie Oliver, Marilou)...'
             }
-            className="w-full pl-10 pr-36 py-2 bg-white border border-[#E5DFD0] rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-teal-600/30 focus:border-teal-600 text-[#0D3B37] font-semibold placeholder-[#7C9A92] shadow-2xs"
+            className="m3-search-bar w-full pl-10 pr-36 py-2.5 text-xs font-semibold placeholder-[var(--md-sys-color-outline)]"
           />
           {searchQuery && (
             <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -970,7 +970,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                 href={getSearchUrl(searchQuery, 'ricardo')}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-2 py-1 rounded-lg bg-rose-700 hover:bg-rose-800 text-white text-[10px] font-bold flex items-center gap-1 transition-colors shadow-2xs"
+                className="px-2.5 py-1 rounded-full bg-rose-700 hover:bg-rose-800 text-white text-[10px] font-bold flex items-center gap-1 transition-colors"
                 title="Search on Ricardo Cuisine"
               >
                 <span>Ricardo</span>
@@ -980,7 +980,7 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                 href={getSearchUrl(searchQuery, 'troisfoisparjour')}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-2 py-1 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white text-[10px] font-bold flex items-center gap-1 transition-colors shadow-2xs hidden sm:flex"
+                className="px-2.5 py-1 rounded-full bg-[var(--md-sys-color-primary)] hover:brightness-110 text-white text-[10px] font-bold flex items-center gap-1 transition-colors hidden sm:flex"
                 title="Search on Trois Fois Par Jour"
               >
                 <span>Marilou</span>
@@ -992,13 +992,13 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
 
         {/* Expiring Soon Rescue Bar */}
         {expiringItems.length > 0 && (
-          <div className="p-3 rounded-2xl bg-amber-50/80 border border-amber-200 text-xs space-y-1.5 shadow-2xs">
+          <div className="p-3.5 rounded-[20px] bg-[var(--md-sys-color-error-container)]/50 border border-[var(--md-sys-color-error)]/20 text-xs space-y-1.5">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-amber-950 font-black">
-                <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+              <div className="flex items-center gap-1.5 text-[var(--md-sys-color-on-error-container)] font-black">
+                <Sparkles className="w-3.5 h-3.5 text-[var(--md-sys-color-error)]" />
                 <span className="uppercase tracking-wider">{lang === 'FR' ? 'Anti-gaspillage prioritaire' : 'Priority Rescue'}</span>
               </div>
-              <span className="text-[10px] font-bold text-amber-900 bg-amber-100/80 px-2 py-0.5 rounded-full border border-amber-300">
+              <span className="text-[10px] font-bold text-[var(--md-sys-color-on-error)] bg-[var(--md-sys-color-error)] px-2.5 py-0.5 rounded-full">
                 {expiringItems.length} {lang === 'FR' ? 'bientôt expiré' : 'expiring soon'}
               </span>
             </div>
@@ -1009,11 +1009,11 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
                   href={getSearchUrl(item.name, 'ricardo')}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-2.5 py-0.5 rounded-full bg-white border border-amber-300 text-[10px] font-bold text-amber-950 hover:bg-amber-100/50 flex items-center gap-1 transition-colors shadow-2xs"
+                  className="px-2.5 py-0.5 rounded-full bg-[var(--md-sys-color-surface-container-lowest)] border border-[var(--md-sys-color-error)]/25 text-[10px] font-bold text-[var(--md-sys-color-on-error-container)] hover:bg-[var(--md-sys-color-error-container)]/60 flex items-center gap-1 transition-colors"
                   title={`Find recipes using ${item.name}`}
                 >
                   <span>{item.name}</span>
-                  <ExternalLink className="w-2.5 h-2.5 text-amber-700" />
+                  <ExternalLink className="w-2.5 h-2.5 text-[var(--md-sys-color-error)]" />
                 </a>
               ))}
             </div>
@@ -1021,14 +1021,12 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
         )}
       </div>
 
-      {/* Filter Tabs */}
+      {/* M3 Filter Chips */}
       <ScrollableRow className="pb-1 text-xs" showChevrons={true}>
         <button
           onClick={() => setActiveFilter('ALL')}
-          className={`px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all cursor-pointer shadow-2xs ${
-            activeFilter === 'ALL'
-              ? 'bg-teal-700 text-white'
-              : 'bg-white text-[#527470] hover:text-[#0D3B37] border border-[#E5DFD0]'
+          className={`px-3.5 py-1.5 text-xs font-bold whitespace-nowrap cursor-pointer ${
+            activeFilter === 'ALL' ? 'm3-chip-active' : 'm3-chip'
           }`}
         >
           {lang === 'FR' ? 'Toutes' : 'All'} ({allRecipes.length})
@@ -1036,10 +1034,8 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
 
         <button
           onClick={() => setActiveFilter('CUSTOM')}
-          className={`px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs ${
-            activeFilter === 'CUSTOM'
-              ? 'bg-teal-700 text-white'
-              : 'bg-white text-[#527470] hover:text-[#0D3B37] border border-[#E5DFD0]'
+          className={`px-3.5 py-1.5 text-xs font-bold whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+            activeFilter === 'CUSTOM' ? 'm3-chip-active' : 'm3-chip'
           }`}
         >
           <Youtube className="w-3.5 h-3.5 text-rose-600" />
@@ -1050,10 +1046,8 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
 
         <button
           onClick={() => setActiveFilter('CHEFS')}
-          className={`px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs ${
-            activeFilter === 'CHEFS'
-              ? 'bg-teal-700 text-white'
-              : 'bg-white text-[#527470] hover:text-[#0D3B37] border border-[#E5DFD0]'
+          className={`px-3.5 py-1.5 text-xs font-bold whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+            activeFilter === 'CHEFS' ? 'm3-chip-active' : 'm3-chip'
           }`}
         >
           <span>{lang === 'FR' ? 'Chefs' : 'Chefs'}</span>
@@ -1061,10 +1055,10 @@ export const CookingIdeasView: React.FC<CookingIdeasViewProps> = ({
 
         <button
           onClick={() => setActiveFilter('RICARDO')}
-          className={`px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs ${
+          className={`px-3.5 py-1.5 text-xs font-bold whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
             activeFilter === 'RICARDO'
-              ? 'bg-rose-700 text-white'
-              : 'bg-white text-[#527470] hover:text-[#0D3B37] border border-[#E5DFD0]'
+              ? 'rounded-full bg-rose-700 text-white'
+              : 'm3-chip'
           }`}
         >
           <span>Ricardo</span>

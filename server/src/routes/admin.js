@@ -965,17 +965,26 @@ router.get("/security/compliance-audit", requireAdmin, async (req, res) => {
 
     // 11. SEC-11: OpenSSH CVE Remediation (CVE-2026-35385, CVE-2024-6387, CVE-2023-28531)
     const sshdInstalled = fs.existsSync("/usr/sbin/sshd");
+    const scpInstalled = fs.existsSync("/usr/bin/scp");
     const sshHardeningPresent = fs.existsSync("/etc/ssh/sshd_config.d/99-pantryo-cve-hardening.conf");
+    let scpWrapped = false;
+    if (scpInstalled) {
+      try {
+        const scpHead = fs.readFileSync("/usr/bin/scp", "utf8").slice(0, 512);
+        scpWrapped = scpHead.includes("CVE-2026-35385");
+      } catch (_) {}
+    }
     let sshStatus = "PASS";
-    let sshDetails = "OpenSSH server is not installed (zero port-22 exposure).";
-    if (sshdInstalled) {
-      if (sshHardeningPresent) {
-        sshStatus = "PASS";
-        sshDetails = "OpenSSH hardened with LoginGraceTime 0, AllowAgentForwarding no, and DebianBanner no.";
-      } else {
-        sshStatus = "WARN";
-        sshDetails = "sshd binary present without Pantryo CVE hardening drop-in. Run ./scripts/fix-openssh-cves.sh.";
-      }
+    let sshDetails = "OpenSSH server & client are not installed (zero port-22 and OpenSSH CVE exposure).";
+    if (sshdInstalled && !sshHardeningPresent) {
+      sshStatus = "WARN";
+      sshDetails = "sshd binary present without Pantryo CVE hardening drop-in. Run sudo ./scripts/fix-openssh-cves.sh --disable-ssh.";
+    } else if (scpInstalled && !scpWrapped) {
+      sshStatus = "WARN";
+      sshDetails = "openssh-client (scp) installed without CVE-2026-35385 mitigation. Run sudo ./scripts/fix-openssh-cves.sh --disable-ssh.";
+    } else if (sshdInstalled || scpInstalled) {
+      sshStatus = "PASS";
+      sshDetails = "OpenSSH hardened (LoginGraceTime 0, AllowAgentForwarding no, legacy scp -O blocked).";
     }
     checks.push({
       id: "SEC-11",
@@ -983,7 +992,7 @@ router.get("/security/compliance-audit", requireAdmin, async (req, res) => {
       category: "Host Network Exposure",
       title: "OpenSSH CVE Protection (CVE-2026-35385 / 2024-6387 / 2023-28531)",
       status: sshStatus,
-      description: "Ensures sshd is disabled inside containers or hardened against known OpenSSH CVEs.",
+      description: "Ensures OpenSSH server & client are purged inside containers or hardened against known OpenSSH CVEs.",
       details: sshDetails,
       remediable: false,
     });

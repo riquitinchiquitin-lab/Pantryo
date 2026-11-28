@@ -153,7 +153,7 @@ EOF_TUN
 
     if [[ "$DO_INSTALL_INSIDE" =~ ^[Yy]$ ]]; then
       echo -e "\n${BLUE}Installing packages & running Pantryo setup inside Container ${CT_ID}...${NC}"
-      pct exec "$CT_ID" -- bash -c "mkdir -p /opt/pantryo && cd /opt/pantryo && apt-get update -y && apt-get install -y curl ca-certificates sudo git && bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/riquitinchiquitin-lab/Pantryo/main/install-proxmox.sh)\""
+      pct exec "$CT_ID" -- bash -c "mkdir -p /opt/pantryo && cd /opt/pantryo && apt-get update -y && apt-get install -y --no-install-recommends curl ca-certificates sudo git && bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/riquitinchiquitin-lab/Pantryo/main/install-proxmox.sh)\""
       exit 0
     else
       echo -e "\n${CYAN}To enter your container anytime, run:${NC}"

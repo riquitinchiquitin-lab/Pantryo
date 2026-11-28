@@ -66,8 +66,8 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
       <div
         id={`inventory-item-collapsed-${item.id}`}
         onClick={onToggleExpand}
-        className={`p-2.5 sm:p-3 rounded-[16px] bg-[var(--md-sys-color-surface-container-low)] border border-[var(--md-sys-color-outline-variant)] hover:bg-[var(--md-sys-color-surface-container)] hover:border-[var(--md-sys-color-outline)] transition-all flex items-center justify-between gap-2.5 cursor-pointer group select-none ${
-          isSelected ? 'bg-[var(--md-sys-color-primary-container)]/30 ring-2 ring-[var(--md-sys-color-primary)]' : ''
+        className={`p-3 rounded-[20px] bg-[var(--md-sys-color-surface-container-lowest)] border border-[var(--md-sys-color-outline-variant)]/70 hover:bg-[var(--md-sys-color-surface-container-low)] hover:border-[var(--md-sys-color-outline)]/60 shadow-2xs hover:shadow-[var(--md-sys-elevation-1)] transition-all flex items-center justify-between gap-2.5 cursor-pointer group select-none ${
+          isSelected ? '!bg-[var(--md-sys-color-primary-container)]/35 ring-2 ring-[var(--md-sys-color-primary)] !border-[var(--md-sys-color-primary)]' : ''
         }`}
       >
         {/* Left: Select Checkbox + Circle Quick-Consume + Food Badge + Title & Qty */}

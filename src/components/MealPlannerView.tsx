@@ -727,36 +727,36 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                   })()}
                 </span>
                 {weekDays.some((d) => d.isToday) ? (
-                  <span className="px-2.5 py-0.5 rounded-full bg-teal-100 text-teal-800 text-[10px] font-black uppercase tracking-wider">
+                  <span className="px-2.5 py-0.5 rounded-full bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] text-[10px] font-black uppercase tracking-wider">
                     {lang === 'FR' ? 'Cette semaine' : 'This week'}
                   </span>
                 ) : (
                   <button
                     type="button"
                     onClick={() => setSelectedDate(todayStr)}
-                    className="px-2 py-0.5 rounded-full bg-amber-100 hover:bg-amber-200 text-amber-900 text-[10px] font-bold cursor-pointer transition-colors"
+                    className="px-2.5 py-0.5 rounded-full bg-[var(--md-sys-color-secondary-container)] hover:brightness-95 text-[var(--md-sys-color-on-secondary-container)] text-[10px] font-bold cursor-pointer transition-all"
                   >
                     {lang === 'FR' ? 'Revenir à aujourd’hui' : 'Jump to Today'}
                   </button>
                 )}
               </div>
 
-              {/* Prev / Today / Next Week Arrows */}
+              {/* Prev / Today / Next Week Pill Controls */}
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   id="btn-prev-week-nav"
                   onClick={handlePrevWeek}
-                  className="px-2.5 py-1.5 rounded-xl border border-[#E0D9C8] bg-white hover:bg-[#FAF7EE] text-[#0D3B37] transition-all cursor-pointer shadow-2xs flex items-center gap-1 text-xs font-bold active:scale-95"
+                  className="m3-chip px-3 py-1.5 flex items-center gap-1 text-xs font-bold cursor-pointer active:scale-95"
                   title={lang === 'FR' ? 'Semaine précédente (-7j)' : 'Previous week (-7d)'}
                 >
-                  <ChevronLeft className="w-4 h-4 text-teal-700" />
+                  <ChevronLeft className="w-4 h-4 text-[var(--md-sys-color-primary)]" />
                   <span className="hidden sm:inline">{lang === 'FR' ? 'Sem. précéd.' : 'Prev week'}</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setSelectedDate(todayStr)}
-                  className="px-2.5 py-1.5 rounded-xl border border-[#E0D9C8] bg-white hover:bg-[#FAF7EE] text-xs font-bold text-[#0D3B37] transition-all cursor-pointer shadow-2xs active:scale-95"
+                  className="m3-chip px-3 py-1.5 text-xs font-bold cursor-pointer active:scale-95"
                   title={lang === 'FR' ? "Aujourd'hui" : 'Today'}
                 >
                   {lang === 'FR' ? 'Aujourd’hui' : 'Today'}
@@ -765,11 +765,11 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                   type="button"
                   id="btn-next-week-nav"
                   onClick={handleNextWeek}
-                  className="px-2.5 py-1.5 rounded-xl border border-[#E0D9C8] bg-white hover:bg-[#FAF7EE] text-[#0D3B37] transition-all cursor-pointer shadow-2xs flex items-center gap-1 text-xs font-bold active:scale-95"
+                  className="m3-chip px-3 py-1.5 flex items-center gap-1 text-xs font-bold cursor-pointer active:scale-95"
                   title={lang === 'FR' ? 'Semaine suivante (+7j)' : 'Next week (+7d)'}
                 >
                   <span className="hidden sm:inline">{lang === 'FR' ? 'Sem. suiv.' : 'Next week'}</span>
-                  <ChevronRight className="w-4 h-4 text-teal-700" />
+                  <ChevronRight className="w-4 h-4 text-[var(--md-sys-color-primary)]" />
                 </button>
               </div>
             </div>
@@ -780,7 +780,7 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                 type="button"
                 id="btn-prev-week-side-chevron"
                 onClick={handlePrevWeek}
-                className="h-14 sm:h-16 w-8 sm:w-10 rounded-2xl border border-[#E5DFD0] bg-white hover:bg-teal-50 hover:border-teal-400 text-teal-800 flex items-center justify-center transition-all cursor-pointer shadow-2xs shrink-0 active:scale-90"
+                className="h-14 sm:h-16 w-8 sm:w-10 rounded-[18px] border border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface-container-lowest)] hover:bg-[var(--md-sys-color-primary-container)]/50 hover:border-[var(--md-sys-color-primary)]/40 text-[var(--md-sys-color-primary)] flex items-center justify-center transition-all cursor-pointer shrink-0 active:scale-90"
                 title={lang === 'FR' ? 'Semaine précédente (-7 jours)' : 'Previous week (-7 days)'}
                 aria-label={lang === 'FR' ? 'Semaine précédente' : 'Previous week'}
               >
@@ -795,12 +795,12 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                     <button
                       key={d.isoString}
                       onClick={() => setSelectedDate(d.isoString)}
-                      className={`p-1.5 sm:p-2.5 rounded-[16px] flex flex-col items-center justify-between transition-all text-center border relative cursor-pointer select-none ${
+                      className={`p-1.5 sm:p-2.5 rounded-[18px] flex flex-col items-center justify-between transition-all text-center border relative cursor-pointer select-none ${
                         d.isSelected
                           ? 'bg-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-primary)] border-[var(--md-sys-color-primary)] shadow-xs ring-2 ring-[var(--md-sys-color-primary-container)]'
                           : d.isToday
-                          ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] border-[var(--md-sys-color-outline)]'
-                          : 'bg-[var(--md-sys-color-surface-container-lowest)] text-[var(--md-sys-color-on-surface)] border-[var(--md-sys-color-outline-variant)] hover:bg-[var(--md-sys-color-surface-container)]'
+                          ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] border-[var(--md-sys-color-primary)]/30'
+                          : 'bg-[var(--md-sys-color-surface-container-lowest)] text-[var(--md-sys-color-on-surface)] border-[var(--md-sys-color-outline-variant)]/70 hover:bg-[var(--md-sys-color-surface-container)]'
                       }`}
                     >
                       <span className={`text-[10px] font-bold uppercase ${d.isSelected ? 'text-[var(--md-sys-color-on-primary)]' : 'text-[var(--md-sys-color-on-surface-variant)]'}`}>
@@ -813,7 +813,7 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                       <div className="flex items-center gap-0.5 h-2">
                         {count > 0 ? (
                           <span className={`text-[8px] font-bold px-1.5 rounded-full leading-tight ${
-                            d.isSelected ? 'bg-white/20 text-white' : hasCooked ? 'bg-emerald-100 text-emerald-800' : 'bg-[var(--md-sys-color-secondary-container)] text-[var(--md-sys-color-on-secondary-container)]'
+                            d.isSelected ? 'bg-white/20 text-white' : hasCooked ? 'bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)]' : 'bg-[var(--md-sys-color-secondary-container)] text-[var(--md-sys-color-on-secondary-container)]'
                           }`}>
                             {count}m
                           </span>
@@ -830,7 +830,7 @@ export const MealPlannerView: React.FC<MealPlannerViewProps> = ({
                 type="button"
                 id="btn-next-week-side-chevron"
                 onClick={handleNextWeek}
-                className="h-14 sm:h-16 w-8 sm:w-10 rounded-2xl border border-[#E5DFD0] bg-white hover:bg-teal-50 hover:border-teal-400 text-teal-800 flex items-center justify-center transition-all cursor-pointer shadow-2xs shrink-0 active:scale-90"
+                className="h-14 sm:h-16 w-8 sm:w-10 rounded-[18px] border border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface-container-lowest)] hover:bg-[var(--md-sys-color-primary-container)]/50 hover:border-[var(--md-sys-color-primary)]/40 text-[var(--md-sys-color-primary)] flex items-center justify-center transition-all cursor-pointer shrink-0 active:scale-90"
                 title={lang === 'FR' ? 'Semaine suivante (+7 jours)' : 'Next week (+7 days)'}
                 aria-label={lang === 'FR' ? 'Semaine suivante' : 'Next week'}
               >

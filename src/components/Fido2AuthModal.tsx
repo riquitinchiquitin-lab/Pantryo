@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Key,
   Fingerprint,
@@ -72,6 +72,10 @@ export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
   const [generatedCodes, setGeneratedCodes] = useState<string[] | null>(null);
   const [copiedCodes, setCopiedCodes] = useState(false);
 
+  // Guards to auto-start WebAuthn once per modal open without duplicate prompts
+  const autoTriggeredRef = useRef(false);
+  const authInFlightRef = useRef(false);
+
   useEffect(() => {
     fido2Client.checkSupport().then((res) => {
       setWebAuthnSupported(res.supported);
@@ -79,7 +83,12 @@ export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
   }, []);
 
   useEffect(() => {
+    if (!isOpen) {
+      autoTriggeredRef.current = false;
+      return;
+    }
     if (isOpen && targetUser) {
+      autoTriggeredRef.current = false;
       setErrorMessage('');
       setSuccessMessage('');
       setRecoveryCodeInput('');
@@ -135,12 +144,31 @@ export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
     }
   }, [isOpen, targetUser, lang, mode, preferredMethod, loginType, webAuthnSupported]);
 
+  // Automatically start the native Passkey / biometric prompt when opening VERIFY on the Passkey tab
+  useEffect(() => {
+    if (
+      isOpen &&
+      targetUser &&
+      mode === 'VERIFY' &&
+      !loading &&
+      verifyMethod === 'fido' &&
+      webAuthnSupported &&
+      !autoTriggeredRef.current &&
+      !authInFlightRef.current
+    ) {
+      autoTriggeredRef.current = true;
+      handleAuthenticateFido(false);
+    }
+  }, [isOpen, targetUser, mode, loading, verifyMethod, webAuthnSupported]);
+
   if (!isOpen || !targetUser) return null;
 
   // ==========================================
   // FIDO2 Authentication & Enrollment Handlers
   // ==========================================
   const handleAuthenticateFido = async (simulated: boolean = false) => {
+    if (authInFlightRef.current) return;
+    authInFlightRef.current = true;
     try {
       setActionLoading(true);
       setErrorMessage('');
@@ -180,13 +208,22 @@ export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
         }, 600);
       }
     } catch (err: any) {
-      setErrorMessage(
-        err.message ||
-          (lang === 'FR'
-            ? 'Échec de vérification FIDO2'
-            : 'FIDO2 verification failed')
-      );
+      if (err?.name === 'NotAllowedError') {
+        setErrorMessage(
+          lang === 'FR'
+            ? 'Vérification biométrique / Passkey annulée ou expirée.'
+            : 'Passkey / biometric verification was cancelled or timed out.'
+        );
+      } else {
+        setErrorMessage(
+          err.message ||
+            (lang === 'FR'
+              ? 'Échec de vérification FIDO2'
+              : 'FIDO2 verification failed')
+        );
+      }
     } finally {
+      authInFlightRef.current = false;
       setActionLoading(false);
     }
   };
@@ -863,7 +900,14 @@ export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
               <div className="flex rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-bold text-slate-700">
                 <button
                   type="button"
-                  onClick={() => setVerifyMethod('fido')}
+                  onClick={() => {
+                    setVerifyMethod('fido');
+                    setErrorMessage('');
+                    if (webAuthnSupported && !authInFlightRef.current) {
+                      autoTriggeredRef.current = true;
+                      handleAuthenticateFido(false);
+                    }
+                  }}
                   className={`flex-1 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                     verifyMethod === 'fido'
                       ? 'bg-white text-teal-900 shadow-xs'
@@ -903,38 +947,48 @@ export const Fido2AuthModal: React.FC<Fido2AuthModalProps> = ({
               {verifyMethod === 'fido' && (
                 <div className="p-4 rounded-2xl bg-white border border-[#E0D9C8] text-center space-y-3 animate-fade-in">
                   <div className="w-12 h-12 rounded-full bg-teal-50 text-teal-700 border border-teal-200 flex items-center justify-center mx-auto animate-pulse">
-                    <Fingerprint className="w-6 h-6" />
+                    {actionLoading ? (
+                      <RefreshCw className="w-6 h-6 animate-spin" />
+                    ) : (
+                      <Fingerprint className="w-6 h-6" />
+                    )}
                   </div>
                   <div>
                     <h4 className="font-bold text-xs text-[#0D3B37]">
-                      {lang === 'FR'
-                        ? 'Vérification Passkey / FIDO2'
-                        : 'Passkey / FIDO2 Verification'}
+                      {actionLoading
+                        ? lang === 'FR'
+                          ? 'En attente de votre empreinte ou Passkey...'
+                          : 'Waiting for fingerprint or passkey...'
+                        : lang === 'FR'
+                        ? 'Vérification Passkey / Biométrie'
+                        : 'Passkey / Biometric Verification'}
                     </h4>
                     <p className="text-[11px] text-[#527470] mt-1">
-                      {lang === 'FR'
-                        ? 'Touchez votre clé physique de sécurité ou utilisez la validation Sandbox.'
-                        : 'Touch your physical security key or use the Sandbox authenticator.'}
+                      {actionLoading
+                        ? lang === 'FR'
+                          ? 'Suivez la fenêtre système pour scanner votre empreinte ou sélectionner une clé Passkey.'
+                          : 'Follow your device prompt to scan your finger or select a passkey.'
+                        : lang === 'FR'
+                        ? 'Scannez votre empreinte ou sélectionnez une clé Passkey pour continuer.'
+                        : 'Scan your finger or select a passkey to continue.'}
                     </p>
                   </div>
 
                   <div className="space-y-2 pt-1">
-                    <button
-                      onClick={() => handleAuthenticateFido(false)}
-                      disabled={actionLoading}
-                      className="w-full py-3 rounded-2xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all active:scale-98 shadow-md cursor-pointer disabled:opacity-50"
-                    >
-                      {actionLoading ? (
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                      ) : (
+                    {!actionLoading && (
+                      <button
+                        type="button"
+                        onClick={() => handleAuthenticateFido(false)}
+                        className="w-full py-3 rounded-2xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all active:scale-98 shadow-md cursor-pointer"
+                      >
                         <Fingerprint className="w-4 h-4" />
-                      )}
-                      <span>
-                        {lang === 'FR'
-                          ? 'Toucher la Clé Physique (WebAuthn)'
-                          : 'Touch Hardware Key (WebAuthn)'}
-                      </span>
-                    </button>
+                        <span>
+                          {lang === 'FR'
+                            ? 'Réessayer Passkey / Biométrie'
+                            : 'Retry Passkey / Biometrics'}
+                        </span>
+                      </button>
+                    )}
 
                     {canUseSandboxBypass(isInstalled) && (
                       <button

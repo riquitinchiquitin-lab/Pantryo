@@ -191,11 +191,17 @@ router.post("/register-verify", requireAuth, async (req, res) => {
 
 /**
  * POST /api/v1/auth/fido2/auth-options
- * Generates WebAuthn authentication options for 2FA challenge
+ * Generates WebAuthn authentication options for 2FA challenge or discoverable passkey sign-in
  */
 router.post("/auth-options", async (req, res) => {
   try {
-    const { userId, username } = req.body || {};
+    const { userId, username, discoverable } = req.body || {};
+
+    if (discoverable) {
+      const options = await fido2Service.createDiscoverableAuthenticationOptions(req);
+      return res.json(options);
+    }
+
     let user = findUser(userId || username);
     if (!user && req.headers["x-user-id"]) {
       user = findUser(req.headers["x-user-id"]);
@@ -203,14 +209,16 @@ router.post("/auth-options", async (req, res) => {
     if (!user && dbStore.users.length === 1) {
       user = dbStore.users[0];
     }
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
+
+    const realCreds = (user?.fido2Credentials || []).filter(
+      (c) => c.id && !c.id.startsWith("sim_fido2_")
+    );
+
+    if (!user || realCreds.length === 0) {
+      const options = await fido2Service.createDiscoverableAuthenticationOptions(req);
+      return res.json(options);
     }
 
-    const hasCreds = Boolean(user.fido2Credentials && user.fido2Credentials.length > 0);
-    if (!hasCreds) {
-      return res.status(400).json({ error: "FIDO2 2FA is not enabled for this user" });
-    }
     user.fido2Enabled = true;
 
     const options = await fido2Service.createAuthenticationOptions(user, req);
@@ -222,35 +230,46 @@ router.post("/auth-options", async (req, res) => {
 
 /**
  * POST /api/v1/auth/fido2/auth-verify
- * Verifies WebAuthn authentication response
+ * Verifies WebAuthn authentication response (user-specific or discoverable passkey)
  */
 router.post("/auth-verify", async (req, res) => {
   try {
-    const { userId, username, response } = req.body || {};
-    const user = findUser(userId || username);
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
+    const { userId, username, challengeId, response } = req.body || {};
     if (!response) {
       return res.status(400).json({ error: "Missing authentication response payload" });
     }
 
-    // Check if it's a simulated token verification (requires explicit opt-in and non-production mode)
-    if (response.id?.startsWith("sim_fido2_")) {
-      if (process.env.NODE_ENV === "production" || process.env.ENABLE_AUTH_SIMULATION !== "true") {
-        return res.status(403).json({
-          error: "Simulated WebAuthn credentials are disabled. Real hardware Passkey or TOTP verification is required.",
-        });
-      }
-      const match = (user.fido2Credentials || []).find((c) => c.id === response.id);
-      if (!match) {
-        return res.status(400).json({ error: "Invalid simulated FIDO2 key" });
-      }
-      match.counter += 1;
-      match.lastUsedAt = new Date().toISOString();
-      dbStore.persistToEncryptedDisk();
+    let user;
+    if (challengeId) {
+      const result = await fido2Service.verifyDiscoverableAuthentication(
+        challengeId,
+        response,
+        req
+      );
+      user = result.user;
     } else {
-      await fido2Service.verifyAuthentication(user, response, req);
+      user = findUser(userId || username);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Check if it's a simulated token verification (requires explicit opt-in and non-production mode)
+      if (response.id?.startsWith("sim_fido2_")) {
+        if (process.env.NODE_ENV === "production" || process.env.ENABLE_AUTH_SIMULATION !== "true") {
+          return res.status(403).json({
+            error: "Simulated WebAuthn credentials are disabled. Real hardware Passkey or TOTP verification is required.",
+          });
+        }
+        const match = (user.fido2Credentials || []).find((c) => c.id === response.id);
+        if (!match) {
+          return res.status(400).json({ error: "Invalid simulated FIDO2 key" });
+        }
+        match.counter += 1;
+        match.lastUsedAt = new Date().toISOString();
+        dbStore.persistToEncryptedDisk();
+      } else {
+        await fido2Service.verifyAuthentication(user, response, req);
+      }
     }
 
     const { passwordHash: _, recoveryCodes: __, ...safeUser } = user;

@@ -194,32 +194,39 @@ export const fido2Client = {
   },
 
   /**
-   * Complete standard FIDO2 WebAuthn Authentication (2FA Challenge)
+   * Complete standard FIDO2 WebAuthn Authentication (2FA Challenge or Discoverable Passkey Sign-In)
    */
-  async authenticateKey(userIdOrUsername: string): Promise<AuthenticationResult> {
+  async authenticateKey(userIdOrUsername?: string): Promise<AuthenticationResult> {
     // 1. Get auth options from server
     const optRes = await fetch("/api/v1/auth/fido2/auth-options", {
       method: "POST",
       headers: getAuthHeaders(),
-      body: JSON.stringify({ userId: userIdOrUsername }),
+      body: JSON.stringify(
+        userIdOrUsername
+          ? { userId: userIdOrUsername }
+          : { discoverable: true }
+      ),
     });
 
     if (!optRes.ok) {
-      const err = await optRes.json();
+      const err = await optRes.json().catch(() => ({}));
       throw new Error(err.error || "Failed to generate authentication challenge");
     }
 
-    const options = await optRes.json();
+    const rawOptions = await optRes.json();
+    const { challengeId, ...options } = rawOptions;
 
-    // 2. Trigger browser authenticator
+    // 2. Trigger browser authenticator (fingerprint, Face ID, Windows Hello, passkey picker, or hardware key)
     let asseResp;
     try {
       asseResp = await startAuthentication({ optionsJSON: options });
     } catch (err: any) {
       if (err.name === "NotAllowedError") {
-        throw new Error(
-          "Vérification annulée ou délai dépassé sur la clé de sécurité."
+        const cancelErr = new Error(
+          "Passkey verification was cancelled or timed out."
         );
+        cancelErr.name = "NotAllowedError";
+        throw cancelErr;
       }
       throw new Error(`WebAuthn authentication error: ${err.message}`);
     }
@@ -229,13 +236,14 @@ export const fido2Client = {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({
-        userId: userIdOrUsername,
+        ...(userIdOrUsername ? { userId: userIdOrUsername } : {}),
+        ...(challengeId ? { challengeId } : {}),
         response: asseResp,
       }),
     });
 
     if (!verifyRes.ok) {
-      const err = await verifyRes.json();
+      const err = await verifyRes.json().catch(() => ({}));
       throw new Error(err.error || "Failed to verify security key signature");
     }
 
@@ -480,7 +488,7 @@ export const fido2Client = {
     return this.registerKey(userId, friendlyName);
   },
 
-  authenticateHardwareKey(userIdOrUsername: string): Promise<AuthenticationResult> {
+  authenticateHardwareKey(userIdOrUsername?: string): Promise<AuthenticationResult> {
     return this.authenticateKey(userIdOrUsername);
   },
 

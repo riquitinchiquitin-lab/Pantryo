@@ -59,7 +59,15 @@ echo -e "Environment:       ${BOLD}$( [[ "$IS_LXC" == true ]] && echo "Proxmox /
 echo -e "Active SSH Session:${BOLD}$( [[ -n "${SSH_CONNECTION:-}" ]] && echo " YES (will not disconnect)" || echo " NO" )${NC}"
 
 if [[ "$MODE" == "audit" ]]; then
-  echo -e "\n${BLUE}[Audit] Checking OpenSSH daemon & hardening configuration...${NC}"
+  echo -e "\n${BLUE}[Audit] Checking OpenSSH packages, daemon, & CVE mitigations...${NC}"
+  for pkg in openssh-server openssh-client openssh-sftp-server; do
+    if command -v dpkg >/dev/null 2>&1 && dpkg -s "$pkg" >/dev/null 2>&1; then
+      VER=$(dpkg-query -W -f='${Version}' "$pkg" 2>/dev/null || echo "unknown")
+      echo -e "  ${YELLOW}[INFO] ${pkg} installed: ${VER}${NC}"
+    else
+      echo -e "  ${GREEN}[PASS] ${pkg} is not installed.${NC}"
+    fi
+  done
   if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet ssh 2>/dev/null; then
     echo -e "  ${YELLOW}[WARN] ssh.service is active and listening on port 22.${NC}"
   else
@@ -67,10 +75,26 @@ if [[ "$MODE" == "audit" ]]; then
   fi
   if [[ -f "/etc/ssh/sshd_config.d/99-pantryo-cve-hardening.conf" ]]; then
     echo -e "  ${GREEN}[PASS] Hardening drop-in present: /etc/ssh/sshd_config.d/99-pantryo-cve-hardening.conf${NC}"
+  elif [[ ! -x "/usr/sbin/sshd" ]]; then
+    echo -e "  ${GREEN}[PASS] sshd not installed (CVE-2024-6387 / regreSSHion not applicable).${NC}"
   else
     echo -e "  ${YELLOW}[WARN] Hardening drop-in missing: /etc/ssh/sshd_config.d/99-pantryo-cve-hardening.conf${NC}"
   fi
+  if [[ ! -x "/usr/bin/scp" ]]; then
+    echo -e "  ${GREEN}[PASS] scp not installed (CVE-2026-35385 not applicable).${NC}"
+  elif grep -q "CVE-2026-35385" /usr/bin/scp 2>/dev/null; then
+    echo -e "  ${GREEN}[PASS] scp legacy '-O' mitigation wrapper active (CVE-2026-35385).${NC}"
+  else
+    echo -e "  ${YELLOW}[WARN] scp installed without CVE-2026-35385 wrapper.${NC}"
+  fi
   exit 0
+fi
+
+SHOULD_DISABLE_SSH=false
+if [[ "$MODE" == "disable-ssh" ]]; then
+  SHOULD_DISABLE_SSH=true
+elif [[ "$MODE" == "auto" && "$IS_LXC" == true && -z "${SSH_CONNECTION:-}" ]]; then
+  SHOULD_DISABLE_SSH=true
 fi
 
 # ------------------------------------------------------------------------------
@@ -108,7 +132,7 @@ fi
 # 2. Apply sshd CVE Hardening Drop-In (Mitigates CVE-2024-6387 & CVE-2023-28531)
 # ------------------------------------------------------------------------------
 echo -e "\n${BLUE}[2/4] Applying sshd CVE hardening directives...${NC}"
-if [[ -d "/etc/ssh" ]]; then
+if [[ "$SHOULD_DISABLE_SSH" == false ]] && [[ -d "/etc/ssh" ]]; then
   mkdir -p /etc/ssh/sshd_config.d
   cat <<'EOF_SSHD' > /etc/ssh/sshd_config.d/99-pantryo-cve-hardening.conf
 # Pantryo OpenSSH CVE Hardening
@@ -135,29 +159,32 @@ EOF_SSHD
   else
     echo -e "  ${YELLOW}⚠ sshd config test skipped (sshd not installed or custom config).${NC}"
   fi
+else
+  echo -e "  ${GREEN}✓ OpenSSH server will be removed in Step 4 (no sshd config needed).${NC}"
 fi
 
 # ------------------------------------------------------------------------------
 # 3. Mitigate CVE-2026-35385 (legacy scp -O setuid/setgid preservation)
 # ------------------------------------------------------------------------------
 echo -e "\n${BLUE}[3/4] Mitigating CVE-2026-35385 (legacy scp -O permission preservation)...${NC}"
-if [[ -x "/usr/bin/scp" ]] && [[ ! -L "/usr/bin/scp" ]]; then
+if [[ "$SHOULD_DISABLE_SSH" == false ]] && [[ -x "/usr/bin/scp" ]] && [[ ! -L "/usr/bin/scp" ]]; then
   SSH_VER_NOW=$(ssh -V 2>&1 || true)
   MAJOR=$(echo "$SSH_VER_NOW" | sed -nE 's/.*OpenSSH_([0-9]+)\.([0-9]+).*/\1/p')
   MINOR=$(echo "$SSH_VER_NOW" | sed -nE 's/.*OpenSSH_([0-9]+)\.([0-9]+).*/\2/p')
   if [[ -n "$MAJOR" && -n "$MINOR" ]] && (( MAJOR < 10 || (MAJOR == 10 && MINOR < 3) )); then
-    # Restrict legacy scp binary execution to root/sftp-only or disable legacy -O usage
-    # Move /usr/bin/scp -> /usr/bin/scp.real and install a thin wrapper rejecting -O
-    if [[ ! -f "/usr/bin/scp.real" ]]; then
+    # Move /usr/bin/scp -> /usr/bin/scp.distrib (via dpkg-divert) and install a wrapper rejecting -O
+    if ! grep -q "CVE-2026-35385" /usr/bin/scp 2>/dev/null; then
       dpkg-divert --local --rename --add /usr/bin/scp >/dev/null 2>&1 || mv /usr/bin/scp /usr/bin/scp.real
       if [[ -f "/usr/bin/scp.distrib" && ! -f "/usr/bin/scp.real" ]]; then
         ln -sf /usr/bin/scp.distrib /usr/bin/scp.real
       fi
-      cat <<'EOF_SCP' > /usr/bin/scp
+    fi
+    cat <<'EOF_SCP' > /usr/bin/scp
 #!/usr/bin/env bash
 # Pantryo CVE-2026-35385 mitigation wrapper: blocks legacy SCP protocol (-O)
 for arg in "$@"; do
-  if [[ "$arg" == "-O" ]]; then
+  [[ "$arg" == "--" ]] && break
+  if [[ "$arg" == "-O" || "$arg" =~ ^-[a-zA-Z0-9]*O ]]; then
     echo "Blocked: legacy SCP protocol (-O) is disabled to mitigate CVE-2026-35385. Use SFTP mode instead." >&2
     exit 1
   fi
@@ -166,28 +193,22 @@ REAL_SCP="/usr/bin/scp.distrib"
 [[ -x "$REAL_SCP" ]] || REAL_SCP="/usr/bin/scp.real"
 exec "$REAL_SCP" "$@"
 EOF_SCP
-      chmod 755 /usr/bin/scp
-      echo -e "  ${GREEN}✓ Installed SFTP-only scp wrapper blocking vulnerable legacy '-O' mode (CVE-2026-35385).${NC}"
-    else
-      echo -e "  ${GREEN}✓ Legacy scp '-O' mitigation wrapper already active.${NC}"
-    fi
+    chmod 755 /usr/bin/scp
+    echo -e "  ${GREEN}✓ Installed SFTP-only scp wrapper blocking vulnerable legacy '-O' mode (CVE-2026-35385).${NC}"
   else
     echo -e "  ${GREEN}✓ OpenSSH ${MAJOR}.${MINOR} is natively patched against CVE-2026-35385.${NC}"
   fi
+elif [[ "$SHOULD_DISABLE_SSH" == true ]]; then
+  echo -e "  ${GREEN}✓ openssh-client (scp / ssh-add) will be purged in Step 4.${NC}"
 else
   echo -e "  ${GREEN}✓ scp binary not exposed or already wrapped.${NC}"
 fi
 
 # ------------------------------------------------------------------------------
-# 4. Disable Unnecessary sshd inside Proxmox LXC Containers (Eliminates Port 22)
+# 4. Disable & Purge OpenSSH inside Proxmox LXC Containers
+#    Eliminates port 22 + all OpenSSH CVEs (CVE-2024-6387, CVE-2026-35385, CVE-2023-28531)
 # ------------------------------------------------------------------------------
-echo -e "\n${BLUE}[4/4] Securing SSH network exposure...${NC}"
-SHOULD_DISABLE_SSH=false
-if [[ "$MODE" == "disable-ssh" ]]; then
-  SHOULD_DISABLE_SSH=true
-elif [[ "$MODE" == "auto" && "$IS_LXC" == true && -z "${SSH_CONNECTION:-}" ]]; then
-  SHOULD_DISABLE_SSH=true
-fi
+echo -e "\n${BLUE}[4/4] Securing SSH network & package exposure...${NC}"
 
 if [[ "$SHOULD_DISABLE_SSH" == true ]]; then
   if command -v systemctl >/dev/null 2>&1; then
@@ -195,12 +216,27 @@ if [[ "$SHOULD_DISABLE_SSH" == true ]]; then
     systemctl disable ssh.service ssh.socket sshd.service 2>/dev/null || true
     systemctl mask ssh.service ssh.socket 2>/dev/null || true
   fi
-  if command -v apt-get >/dev/null 2>&1 && dpkg -s openssh-server >/dev/null 2>&1; then
-    export DEBIAN_FRONTEND=noninteractive
-    apt-get purge -y openssh-server openssh-sftp-server -q 2>/dev/null || true
-    apt-get autoremove -y -q 2>/dev/null || true
+
+  # Remove any previous scp wrapper/diversion so dpkg can purge openssh-client cleanly
+  if grep -q "CVE-2026-35385" /usr/bin/scp 2>/dev/null; then
+    rm -f /usr/bin/scp /usr/bin/scp.real
+    dpkg-divert --local --rename --remove /usr/bin/scp >/dev/null 2>&1 || true
   fi
-  echo -e "  ${GREEN}✓ Stopped and removed openssh-server inside LXC container (port 22 closed).${NC}"
+
+  if command -v apt-get >/dev/null 2>&1; then
+    export DEBIAN_FRONTEND=noninteractive
+    PKGS_TO_PURGE=()
+    for pkg in openssh-server openssh-client openssh-sftp-server; do
+      if dpkg -s "$pkg" >/dev/null 2>&1; then
+        PKGS_TO_PURGE+=("$pkg")
+      fi
+    done
+    if [[ ${#PKGS_TO_PURGE[@]} -gt 0 ]]; then
+      apt-get purge -y --allow-change-held-packages "${PKGS_TO_PURGE[@]}" -q 2>/dev/null || true
+      apt-get autoremove -y -q 2>/dev/null || true
+    fi
+  fi
+  echo -e "  ${GREEN}✓ Stopped and purged openssh-server, openssh-client, and openssh-sftp-server (port 22 closed, zero OpenSSH CVE surface).${NC}"
   echo -e "    Manage this container securely from Proxmox host via: ${BOLD}pct enter <CTID>${NC}"
 else
   if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet ssh 2>/dev/null; then
@@ -210,8 +246,8 @@ else
     echo -e "  ${GREEN}✓ sshd service is inactive (port 22 closed).${NC}"
   fi
   if [[ "$IS_LXC" == true && -n "${SSH_CONNECTION:-}" ]]; then
-    echo -e "  ${YELLOW}ℹ Active SSH session detected, so sshd was kept running in hardened mode.${NC}"
-    echo -e "    To remove port 22 completely, run from Proxmox console: ${BOLD}sudo $0 --disable-ssh${NC}"
+    echo -e "  ${YELLOW}ℹ Active SSH session detected, so OpenSSH was kept in hardened mode.${NC}"
+    echo -e "    To eliminate all OpenSSH packages & port 22 completely, run from Proxmox console: ${BOLD}sudo $0 --disable-ssh${NC}"
   fi
 fi
 
